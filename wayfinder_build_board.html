@@ -1,0 +1,283 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --paper:#eef1ec; --paper2:#e5e9e2; --card:#fbfcfa;
+    --ink:#1c2a2b; --ink-soft:#4c5c59; --ink-faint:#7d8a86;
+    --line:#ccd3cb; --line-strong:#b4bdb3;
+    --brass:#a9761f; --brass-soft:#ecdcbc;
+    --teal:#2f7d6e; --teal-soft:#d4e7e0;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+       -webkit-font-smoothing:antialiased;line-height:1.5}
+  .wrap{max-width:1400px;margin:0 auto;padding:28px 22px 60px}
+
+  /* ---- masthead ---- */
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+           color:var(--brass);margin:0 0 6px}
+  h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,5vw,46px);margin:0;letter-spacing:-.01em}
+  .lede{color:var(--ink-soft);max-width:60ch;margin:10px 0 0;font-size:15px}
+
+  /* ---- route spine (signature) ---- */
+  .spine{margin:30px 0 8px;padding:20px 8px 8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .spine-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px}
+  .spine-top .pct{font-family:var(--serif);font-size:34px;font-weight:600;line-height:1}
+  .spine-top .pct small{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.1em}
+  .trail{display:flex;position:relative}
+  .leg-node{flex:1;position:relative;text-align:center;padding-top:22px;cursor:default}
+  .trail::before{content:"";position:absolute;top:8px;left:6%;right:6%;height:2px;background:var(--line-strong)}
+  .trail::after{content:"";position:absolute;top:8px;left:6%;width:var(--fill,0%);height:2px;background:var(--brass);
+                transition:width .4s ease}
+  .node-dot{position:absolute;top:2px;left:50%;transform:translateX(-50%);width:14px;height:14px;border-radius:50%;
+            background:var(--paper);border:2px solid var(--line-strong);z-index:2}
+  .leg-node.partial .node-dot{border-color:var(--brass);background:var(--brass-soft)}
+  .leg-node.complete .node-dot{border-color:var(--teal);background:var(--teal)}
+  .node-num{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+  .node-name{font-size:12px;font-weight:600;margin-top:1px;color:var(--ink-soft)}
+  @media(max-width:640px){.node-name{display:none}}
+
+  /* ---- skeleton banner ---- */
+  .skeleton{margin:22px 0 4px;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--brass);
+            border-radius:6px;padding:14px 16px}
+  .skeleton b{font-family:var(--serif);font-weight:600}
+  .skeleton .path{font-family:var(--mono);font-size:12.5px;color:var(--brass);background:var(--brass-soft);
+                  padding:1px 6px;border-radius:4px;white-space:nowrap}
+  .skeleton p{margin:6px 0 0;font-size:13.5px;color:var(--ink-soft)}
+
+  /* ---- controls ---- */
+  .controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:22px 0 14px}
+  .legend{display:flex;gap:14px;font-size:12.5px;color:var(--ink-soft)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .chip{width:11px;height:11px;border-radius:3px;border:1px solid var(--line-strong)}
+  .chip.todo{background:var(--card)}
+  .chip.doing{background:var(--brass-soft);border-color:var(--brass)}
+  .chip.done{background:var(--teal-soft);border-color:var(--teal)}
+  .hint{font-size:12px;color:var(--ink-faint)}
+  .reset{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+         background:none;border:1px solid var(--line-strong);color:var(--ink-soft);padding:6px 12px;
+         border-radius:5px;cursor:pointer}
+  .reset:hover{border-color:var(--ink-soft);color:var(--ink)}
+
+  /* ---- board ---- */
+  .board{display:flex;gap:16px;overflow-x:auto;padding-bottom:14px;scroll-snap-type:x proximity}
+  .col{flex:0 0 320px;scroll-snap-align:start}
+  @media(max-width:640px){.col{flex:0 0 88vw}}
+  .col-head{position:sticky;top:0;padding:2px 2px 12px}
+  .col-head .leg-label{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--brass)}
+  .col-head h2{font-family:var(--serif);font-size:20px;font-weight:600;margin:2px 0 0;display:flex;
+               justify-content:space-between;align-items:baseline;gap:8px}
+  .col-head .count{font-family:var(--mono);font-size:12px;color:var(--ink-faint);font-weight:400}
+  .col-head .rule{height:2px;background:var(--ink);margin-top:8px;opacity:.85}
+
+  /* ---- card ---- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:13px 14px 12px;
+        margin-bottom:11px;cursor:pointer;position:relative;transition:transform .08s,box-shadow .15s,border-color .15s;
+        border-left:3px solid var(--line-strong);user-select:none}
+  .card:hover{box-shadow:0 3px 12px rgba(28,42,43,.09);transform:translateY(-1px)}
+  .card:active{transform:translateY(0)}
+  .card[data-s="doing"]{border-left-color:var(--brass);background:linear-gradient(0deg,var(--card),var(--card)),var(--brass-soft)}
+  .card[data-s="done"]{border-left-color:var(--teal);opacity:.66}
+  .card[data-s="done"] .c-title{text-decoration:line-through;text-decoration-color:var(--ink-faint)}
+  .c-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}
+  .c-id{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.03em}
+  .c-eff{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--ink-soft);
+         border:1px solid var(--line-strong);border-radius:4px;padding:1px 5px}
+  .c-title{font-weight:600;font-size:14.5px;line-height:1.32}
+  .c-what{font-size:12.8px;color:var(--ink-soft);margin-top:4px;line-height:1.42}
+  .c-skills{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .c-skills span{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);background:var(--paper2);
+                 border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+  .c-dep{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-top:8px}
+  .c-dep.keystone{color:var(--brass)}
+  .status-pip{position:absolute;top:13px;right:13px;width:9px;height:9px;border-radius:50%;
+              background:var(--line-strong)}
+  .card[data-s="doing"] .status-pip{background:var(--brass)}
+  .card[data-s="done"] .status-pip{background:var(--teal)}
+  .card .c-top .c-eff{margin-right:16px}
+
+  footer{margin-top:34px;font-size:12px;color:var(--ink-faint);border-top:1px solid var(--line);padding-top:14px}
+  footer b{color:var(--ink-soft);font-weight:600}
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Reading&#8202;Buddy &middot; Build&nbsp;Route</p>
+  <h1>Wayfinder Map</h1>
+  <p class="lede">Six legs from empty repo to an installed phone app. Tap any waypoint to move it
+     <b>To&nbsp;do &rarr; In&nbsp;progress &rarr; Done</b> (shift-tap steps back). The trail up top fills as you go.</p>
+
+  <div class="spine">
+    <div class="spine-top">
+      <div class="pct"><span id="pctNum">0</span>%&nbsp;<small id="pctCount">0 / 34 waypoints</small></div>
+    </div>
+    <div class="trail" id="trail"></div>
+  </div>
+
+  <div class="skeleton">
+    <b>Walk the skeleton first.</b> Before breadth, get one thin vertical slice running end-to-end:
+    import a single <span class="path">.md</span> &rarr; render it &rarr; select a paragraph &rarr; Ask &rarr; watch a streamed answer.
+    That's waypoints <b>01 &rarr; 03 &rarr; 04 &rarr; 05 &rarr; 08 &rarr; 11 &rarr; 12 &rarr; 17 &rarr; 18 &rarr; 19 &rarr; 20</b>.
+    <p>Once that loop feels good on the Tauri shell, then widen to PDF/epub, the tutor apparatus, and the phone install. The web UI is the asset; the shell is scaffolding you throw away at the end (waypoint&nbsp;34).</p>
+  </div>
+
+  <div class="controls">
+    <div class="legend">
+      <span><i class="chip todo"></i>To do</span>
+      <span><i class="chip doing"></i>In progress</span>
+      <span><i class="chip done"></i>Done</span>
+    </div>
+    <span class="hint">Tap a card to advance &middot; shift-tap to reverse</span>
+    <button class="reset" id="reset">Reset board</button>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <footer>
+    <b>Effort key:</b> S = an afternoon &middot; M = a day or two &middot; L = the meaty ones (parsers, tutor, learner model).
+    &nbsp;&middot;&nbsp; <b>Deps</b> name the waypoints that should land first. The two true keystones are
+    <b>05</b> (the shared structure schema) and the walking skeleton loop &mdash; everything hangs off those.
+  </footer>
+</div>
+
+<script>
+const LEGS = [
+  {n:"LEG 0", name:"Basecamp",        sub:"scaffold & stack"},
+  {n:"LEG 1", name:"Cartography",     sub:"the parsing pipeline"},
+  {n:"LEG 2", name:"Reading Room",    sub:"reader UI & comfort"},
+  {n:"LEG 3", name:"The Tutor",       sub:"inline explain + Claude"},
+  {n:"LEG 4", name:"The Archive",     sub:"library & persistence"},
+  {n:"LEG 5", name:"Landfall",        sub:"deploy, install, backup"},
+];
+
+const CARDS = [
+  // LEG 0
+  {id:"01",leg:0,eff:"M",title:"Scaffold the stack",what:"Vite + React + TypeScript with a PWA plugin. Monorepo: /web (the reusable UI), /shell (Tauri), /api (the tiny key backend).",skills:["Vite","TypeScript","vite-plugin-pwa"],dep:"start here"},
+  {id:"02",leg:0,eff:"M",title:"Wrap the Tauri dev shell",what:"Throwaway desktop harness around the web UI so you can iterate on the reading loop before it's phone-reachable.",skills:["Tauri","Rust toolchain"],dep:"after 01"},
+  {id:"03",leg:0,eff:"M",title:"Local storage layer",what:"One IndexedDB seam (Dexie) for books, parsed trees, notes, learner.md and settings. Every feature reads/writes through it.",skills:["IndexedDB","Dexie"],dep:"after 01"},
+  {id:"04",leg:0,eff:"S",title:"App shell + routing",what:"Library ⇄ Reader ⇄ Settings skeleton, plus the day/night theme tokens everything else will inherit.",skills:["React Router","CSS tokens"],dep:"after 01"},
+  // LEG 1
+  {id:"05",leg:1,eff:"M",title:"Shared structure schema",what:"The keystone. Folder tree where the path IS the address, manifest.md shape, per-section files, anchor grammar [ch02-s03-p013], the permanence rule.",skills:["schema design","spec"],dep:"KEYSTONE — after 03",key:true},
+  {id:"06",leg:1,eff:"L",title:"Epub parser → structure",what:"Best-effort chapter inference + fixed-size fallback, flag approximate chapters, assign permanent anchors.",skills:["epub.js","JSZip","DOM parse"],dep:"after 05"},
+  {id:"07",leg:1,eff:"L",title:"PDF parser → structure",what:"Reuse the epub inference rule, add a running-header/footer filter to strip boilerplate.",skills:["pdf.js","text-layer"],dep:"after 06"},
+  {id:"08",leg:1,eff:"M",title:"Markdown parser → structure",what:"Resolve to whichever heading levels are actually present; fall back to fixed-size bucketing. Cheapest format — build it first.",skills:["remark / unified"],dep:"after 05"},
+  {id:"09",leg:1,eff:"M",title:"Manifest + crossrefs at import",what:"Generate manifest.md (title + one-line summary per chapter) and build crossrefs.md once, automatically, on import.",skills:["batch import job","summary call"],dep:"after 06,07,08"},
+  {id:"10",leg:1,eff:"M",title:"Import classification pass",what:"Tag light-fiction vs dense/technical + subject/domain, extract per-chapter concepts/vocab/themes, expose a manual override.",skills:["classification prompt","import UX"],dep:"after 09"},
+  {id:"11",leg:1,eff:"M",title:"In-app import + auto-parse",what:"Phone file picker, parse-on-import with progress, land the finished book in the library.",skills:["File API","async job UX"],dep:"after 06,07,08"},
+  // LEG 2
+  {id:"12",leg:2,eff:"L",title:"Structured renderer",what:"Render the parsed tree with addressable, anchored paragraphs. Virtualize for long books; paginate for the Books-style feel.",skills:["virtualized render","pagination"],dep:"after 05,11"},
+  {id:"13",leg:2,eff:"M",title:"Nav overlay (Books-style)",what:"Tap fades the page → bottom progress slider (\"44/287\") + left-side ToC icon with current position marked.",skills:["gesture handling","overlay UI"],dep:"after 12"},
+  {id:"14",leg:2,eff:"M",title:"Reader conveniences",what:"Font size / line spacing, day/night, in-book search, and bookmarks (kept distinct from highlights and from resume).",skills:["settings state","text search"],dep:"after 12"},
+  {id:"15",leg:2,eff:"S",title:"Reopen where you left off",what:"Persist and restore the last anchor/scroll position per book.",skills:["IndexedDB","anchor mapping"],dep:"after 12,03"},
+  {id:"16",leg:2,eff:"S",title:"Read-aloud",what:"Phone's own built-in TTS voice via the Web Speech API — no paid or cloud voice.",skills:["SpeechSynthesis API"],dep:"after 12"},
+  // LEG 3
+  {id:"17",leg:3,eff:"M",title:"Selection menu",what:"Tap selects a paragraph, drag selects precise text; menu offers Highlight, Copy, Define (local, no API) and Ask.",skills:["Selection API","touch drag"],dep:"after 12"},
+  {id:"18",leg:3,eff:"M",title:"Retrieval assembler",what:"For an Ask, load manifest + chapter index + one section file + learner.md. Never the whole book — this is the token strategy.",skills:["your schema","context budget"],dep:"after 05,09"},
+  {id:"19",leg:3,eff:"M",title:"Claude API call shape",what:"Tiered Haiku 4.5 (first 5 exchanges/thread) → Sonnet 5, prompt caching on, streamed concise responses, errors as a retry button.",skills:["Messages API","streaming","caching"],dep:"after 18"},
+  {id:"20",leg:3,eff:"M",title:"Inline popup + streaming UI",what:"Popup (not a side panel) with a streamed answer, a follow-up question box, and auto-saved plain-language Q&A notes.",skills:["streaming UI","popover"],dep:"after 17,19"},
+  {id:"21",leg:3,eff:"L",title:"Tutor persona + teaching modes",what:"Subject-tag-driven domain-expert tutor prompt, 12 quick-tap modes, live prerequisite-gap detection. Dense/technical books only.",skills:["prompt engineering","gating"],dep:"after 19,10"},
+  {id:"22",leg:3,eff:"L",title:"learner.md adaptive model",what:"Track understood/struggled concepts, working analogies, misconceptions; read into every Ask; actively shorten re-explanations.",skills:["state compression","prompt assembly"],dep:"after 20"},
+  {id:"23",leg:3,eff:"M",title:"Chapter recap",what:"Tap-triggered zero-token summary + \"things learned\" (from saved notes) + an optional cheap live quiz whose misses feed learner.md.",skills:["precompute","scoped quiz call"],dep:"after 21,22"},
+  // LEG 4
+  {id:"24",leg:4,eff:"M",title:"Multi-book library",what:"Shelf/grid covers, progress indicators, status grouping: Not Started / Currently Reading / Completed.",skills:["layout","IndexedDB queries"],dep:"after 04,11"},
+  {id:"25",leg:4,eff:"M",title:"Highlights & notes list",what:"A dedicated per-book notes view, not just inline display.",skills:["CRUD UI"],dep:"after 17,03"},
+  {id:"26",leg:4,eff:"S",title:"Vocabulary / glossary view",what:"Surface the terms learner.md is tracking as a browsable per-book glossary.",skills:["derived views"],dep:"after 22"},
+  {id:"27",leg:4,eff:"M",title:"Cost / usage visibility",what:"A detailed breakdown screen: per-book, per-session, and per-model-tier.",skills:["token accounting","logging"],dep:"after 19"},
+  {id:"28",leg:4,eff:"S",title:"Books-stay-separate guard",what:"Enforce no cross-book memory or lookups in the retrieval and learner layers — matches the per-book token architecture.",skills:["architecture discipline"],dep:"after 18,22"},
+  // LEG 5
+  {id:"29",leg:5,eff:"M",title:"Tiny key backend",what:"One purpose-built endpoint that holds the API key; move it off env-var / OS-secret once the phone can reach it.",skills:["Fastify / serverless","CORS"],dep:"after 19"},
+  {id:"30",leg:5,eff:"M",title:"PWA manifest + service worker",what:"Installable app with offline caching of the shell and parsed books.",skills:["Workbox","web manifest"],dep:"after 04"},
+  {id:"31",leg:5,eff:"M",title:"mkcert HTTPS + phone trust",what:"Local HTTPS cert, one-time manual trust per phone, serve over the LAN.",skills:["mkcert","LAN serving"],dep:"after 30"},
+  {id:"32",leg:5,eff:"S",title:"Install on iOS + Android",what:"Add-to-home-screen, then verify install and offline behaviour on both.",skills:["PWA install testing"],dep:"after 31"},
+  {id:"33",leg:5,eff:"M",title:"Google Drive backup / restore",what:"Opt-in Settings toggle (off by default) for bookmarks, notes and highlights.",skills:["Drive API","OAuth"],dep:"after 25"},
+  {id:"34",leg:5,eff:"S",title:"Retire the Tauri shell",what:"Once the loop runs on-phone, drop the disposable desktop harness. The web UI was always the real product.",skills:["cleanup"],dep:"last — after 32"},
+];
+
+const KEY="wayfinder-progress";
+// Synced from docs/backlog.md by /wrap-session — hand-edits here get overwritten
+// next session. Empty means every waypoint is still "todo".
+let state={};
+
+async function load(){
+  // No live storage on a static file — this always falls back to the baked-in
+  // `state` above, which is /wrap-session's job to keep current.
+  try{ const r=await window.storage.get(KEY); if(r&&r.value) state=JSON.parse(r.value); }
+  catch(e){ /* keep baked-in state */ }
+  render();
+}
+async function save(){
+  try{ await window.storage.set(KEY, JSON.stringify(state)); }catch(e){/* in-memory only */}
+}
+const cycle={todo:"doing",doing:"done",done:"todo"};
+const back ={todo:"done",doing:"todo",done:"doing"};
+
+function statusOf(id){ return state[id]||"todo"; }
+
+function toggle(id, reverse){
+  const cur=statusOf(id);
+  state[id]= reverse? back[cur] : cycle[cur];
+  save(); render();
+}
+
+function render(){
+  const board=document.getElementById("board");
+  board.innerHTML="";
+  LEGS.forEach((leg,i)=>{
+    const cards=CARDS.filter(c=>c.leg===i);
+    const done=cards.filter(c=>statusOf(c.id)==="done").length;
+    const col=document.createElement("div");
+    col.className="col";
+    col.innerHTML=`<div class="col-head">
+        <div class="leg-label">${leg.n} · ${leg.sub}</div>
+        <h2>${leg.name}<span class="count">${done}/${cards.length}</span></h2>
+        <div class="rule"></div>
+      </div>`;
+    cards.forEach(c=>{
+      const s=statusOf(c.id);
+      const el=document.createElement("div");
+      el.className="card"; el.dataset.s=s;
+      el.innerHTML=`<span class="status-pip"></span>
+        <div class="c-top"><span class="c-id">WP&middot;${c.id}</span><span class="c-eff">${c.eff}</span></div>
+        <div class="c-title">${c.title}</div>
+        <div class="c-what">${c.what}</div>
+        <div class="c-skills">${c.skills.map(k=>`<span>${k}</span>`).join("")}</div>
+        <div class="c-dep${c.key?" keystone":""}">${c.key?"◆ ":"↳ "}${c.dep}</div>`;
+      el.addEventListener("click",ev=>toggle(c.id, ev.shiftKey));
+      col.appendChild(el);
+    });
+    board.appendChild(col);
+  });
+  renderSpine();
+}
+
+function renderSpine(){
+  const trail=document.getElementById("trail");
+  const totalDone=CARDS.filter(c=>statusOf(c.id)==="done").length;
+  const pct=Math.round(totalDone/CARDS.length*100);
+  document.getElementById("pctNum").textContent=pct;
+  document.getElementById("pctCount").textContent=`${totalDone} / ${CARDS.length} waypoints`;
+  trail.style.setProperty("--fill", (pct*0.88)+"%"); // 88% = distance between first/last node centers
+  trail.innerHTML="";
+  LEGS.forEach((leg,i)=>{
+    const cards=CARDS.filter(c=>c.leg===i);
+    const done=cards.filter(c=>statusOf(c.id)==="done").length;
+    let cls="leg-node";
+    if(done===cards.length) cls+=" complete";
+    else if(done>0) cls+=" partial";
+    const node=document.createElement("div");
+    node.className=cls;
+    node.innerHTML=`<span class="node-dot"></span>
+       <div class="node-num">${leg.n.replace('LEG ','')}</div>
+       <div class="node-name">${leg.name}</div>`;
+    trail.appendChild(node);
+  });
+}
+
+document.getElementById("reset").addEventListener("click",()=>{
+  if(confirm("Reset every waypoint back to To do?")){ state={}; save(); render(); }
+});
+
+load();
+</script>

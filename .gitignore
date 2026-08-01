@@ -1,0 +1,34 @@
+# SECRETS — never commit. Holds a live Anthropic API key.
+Claude API/
+**/API.txt
+
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env
+.env.*
+!.env.example
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# vite-plugin-pwa generated output
+web/dev-dist/
+web/public/sw.js
+web/public/workbox-*.js
+
+# Source material — large binaries / copyrighted. Kept on disk, out of history.
+books/
+research-paper/
+
+# Python scratch
+__pycache__/
+*.pyc
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

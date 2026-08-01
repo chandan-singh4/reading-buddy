@@ -1,0 +1,15 @@
+{
+  "name": "wayfinder",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Wayfinder Map — mobile-first PWA reading companion (monorepo root)",
+  "workspaces": [
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace web",
+    "build": "npm run build --workspace web",
+    "typecheck": "npm run typecheck --workspace web",
+    "preview": "npm run preview --workspace web"
+  }
+}
