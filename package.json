@@ -1,8 +1,8 @@
 {
-  "name": "wayfinder",
+  "name": "reading-buddy",
   "version": "0.0.0",
   "private": true,
-  "description": "Wayfinder Map — mobile-first PWA reading companion (monorepo root)",
+  "description": "Reading Buddy — mobile-first PWA reading companion (monorepo root)",
   "workspaces": [
     "web"
   ],

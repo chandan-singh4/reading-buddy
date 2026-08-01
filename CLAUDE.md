@@ -1,4 +1,10 @@
-# Wayfinder Map — project memory
+# Reading Buddy — project memory
+
+> **Naming.** The product is **Reading Buddy**. *Wayfinder* is the planning
+> method used to map the build out end-to-end — it survives only in planning
+> artefacts (`wayfinder_build_board.html`, the 34 "waypoints" in
+> `docs/backlog.md`, and the external archive path below). Never use *Wayfinder*
+> as the product's name in code or UI.
 
 Mobile-first PWA reading companion. The web UI in `web/` is the product; the
 Tauri shell in `shell/` is a throwaway dev harness; `api/` is a tiny endpoint

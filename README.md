@@ -1,4 +1,4 @@
-# Wayfinder Map
+# Reading Buddy
 
 A mobile-first PWA reading companion. The web app in `web/` **is** the product;
 `shell/` is a throwaway Tauri harness for desktop dev, and `api/` is a tiny
@@ -62,5 +62,9 @@ the next.
 *on demand*. The build session's default reading list is one short file
 (`active-task.md`) plus the handful of code paths it names — not a tree scan.
 State lives in Markdown the model can reload in a few hundred tokens instead of
-replaying whole files. It's the same trick Wayfinder itself uses on books: a
+replaying whole files. It's the same trick Reading Buddy itself uses on books: a
 manifest so the model finds the right slice without reading everything.
+
+*(Aside on naming: "Wayfinder" was the planning method used to map this build
+end-to-end. It lives on only in the planning artefacts — the build board and the
+34 "waypoints" in `docs/backlog.md` — not as the product's name.)*

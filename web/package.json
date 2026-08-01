@@ -1,5 +1,5 @@
 {
-  "name": "@wayfinder/web",
+  "name": "@reading-buddy/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
