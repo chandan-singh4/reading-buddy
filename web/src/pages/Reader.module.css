@@ -1,3 +1,10 @@
+/*
+ * The reading page's frame. Block typography lives in `reader/blocks.module.css`.
+ *
+ * Kept sparse on purpose: this is the bare page Focus Mode reveals, and WP-13's
+ * overlay will sit on top of it rather than beside it.
+ */
+
 .reader {
   min-height: 100dvh;
   padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
@@ -11,20 +18,34 @@
 }
 
 .page {
+  /* ~66 characters. The single most effective thing for long-form reading:
+     wider and the eye loses the start of the next line. */
   max-width: var(--reading-measure);
   margin: var(--space-6) auto 0;
   font-family: var(--font-reading);
+  font-size: var(--text-lg);
   line-height: var(--leading-reading);
 }
 
-.bookTitle {
-  font-size: var(--text-2xl);
-  font-weight: 700;
+.header {
+  margin-bottom: var(--space-6);
 }
 
-.byline {
-  margin-top: var(--space-1);
+/* Where you are, in one quiet line. Not a title bar — it scrolls away with the
+   text instead of holding a strip of the screen for the whole book. */
+.context {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-ui);
   color: var(--color-text-muted);
+}
+
+.sectionTitle {
+  margin-top: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: var(--leading-ui);
 }
 
 .note {
@@ -32,4 +53,34 @@
   color: var(--color-text-muted);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
+}
+
+.pager {
+  max-width: var(--reading-measure);
+  margin: var(--space-8) auto 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.pagerButton {
+  flex: 1;
+  /* 44px is the smallest reliable thumb target, and these are the two controls
+     the whole reader depends on. */
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.pagerButton:disabled {
+  /* Left visible rather than hidden: the ends of a book should feel like ends,
+     not like a control that vanished. */
+  opacity: 0.4;
+  cursor: default;
 }
