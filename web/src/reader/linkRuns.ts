@@ -53,17 +53,49 @@ export function runsOf(block: Paragraph): Run[] {
  * its own links.
  */
 export function lineRunsOf(block: Paragraph): Run[][] {
-  const lines: Run[][] = [[]]
+  return cutRuns(runsOf(block), '\n').filter((line) => line.length > 0)
+}
 
-  for (const run of runsOf(block)) {
-    const pieces = run.text.split('\n')
+/**
+ * The separator a table's cells are joined by in its flattened text. Must match
+ * `CELL_SEPARATOR` in `parse/html.ts` exactly — that side writes the string,
+ * this side cuts it back apart.
+ */
+const CELL_SEPARATOR = ' | '
+
+/**
+ * A table's runs, cut back into rows and cells — so a contents page laid out as
+ * a table gets tappable chapters rather than a grid of dead words.
+ *
+ * The parser stores a table as one block whose text is rows joined by newlines
+ * and cells joined by `" | "`, so undoing exactly those two joins recovers the
+ * grid with every link still sitting on its own words. A link never spans a
+ * cell, which is what makes cutting rather than re-parsing correct.
+ */
+export function cellRunsOf(block: Paragraph): Run[][][] {
+  return cutRuns(runsOf(block), '\n')
+    .map((row) => cutRuns(row, CELL_SEPARATOR))
+    .filter((row) => row.some((cell) => cell.length > 0))
+}
+
+/**
+ * Split a line of runs wherever a separator appears, keeping each piece's link.
+ *
+ * Blank pieces are dropped rather than kept as empty runs: a separator at the
+ * very start or end of a piece would otherwise produce a run of no characters,
+ * which renders as nothing and counts as something.
+ */
+function cutRuns(runs: readonly Run[], separator: string): Run[][] {
+  const parts: Run[][] = [[]]
+
+  for (const run of runs) {
+    const pieces = run.text.split(separator)
     for (const [index, piece] of pieces.entries()) {
-      if (index > 0) lines.push([])
+      if (index > 0) parts.push([])
       if (piece === '') continue
-      lines[lines.length - 1].push(run.link ? { text: piece, link: run.link } : { text: piece })
+      parts[parts.length - 1].push(run.link ? { text: piece, link: run.link } : { text: piece })
     }
   }
 
-  // A blank line between two items is spacing in the source, not an item.
-  return lines.filter((line) => line.length > 0)
+  return parts
 }

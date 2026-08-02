@@ -13,7 +13,8 @@
  */
 
 import type { Anchor, Paragraph } from '../structure/index.ts'
-import { lineRunsOf, runsOf, type Run } from './linkRuns.ts'
+import { NO_IMAGES, srcOf } from './figures.ts'
+import { cellRunsOf, lineRunsOf, runsOf, type Run } from './linkRuns.ts'
 import styles from './blocks.module.css'
 
 /** Told where a tapped link goes. Absent while nothing can follow one. */
@@ -84,15 +85,25 @@ export function elementIdOf(anchor: string): string {
   return anchor.replace(/^\[|\]$/g, '')
 }
 
-function Figure({ block }: { block: Paragraph }) {
-  // No image, or one whose path can't be resolved until WP-39, degrades to the
-  // caption. A caption alone is readable; a broken-image icon is not.
+function Figure({
+  block,
+  images,
+}: {
+  block: Paragraph
+  images: ReadonlyMap<string, string>
+}) {
+  // A figure whose picture isn't there degrades to its caption — no image, or
+  // one stored under a path this book has no bytes for, which is every book
+  // imported before WP-39. A caption alone is readable; a broken-image icon
+  // is not.
+  const src = block.image ? srcOf(block.image.src, images) : undefined
+
   return (
     <figure className={styles.figure}>
-      {block.image && (
+      {block.image && src && (
         <img
           className={styles.image}
-          src={block.image.src}
+          src={src}
           alt={block.image.alt ?? block.text}
           onError={(event) => {
             event.currentTarget.hidden = true
@@ -104,7 +115,44 @@ function Figure({ block }: { block: Paragraph }) {
   )
 }
 
-function Table({ block }: { block: Paragraph }) {
+function Table({ block, onFollow }: { block: Paragraph; onFollow?: FollowLink }) {
+  // A table with links is drawn from its runs rather than from `rows`, so the
+  // links survive into the cells. A caption is skipped for this: it is
+  // prepended to the flattened text as its own line, so cutting on newlines
+  // would hand it back as a phantom first row.
+  const linked = block.links && block.links.length > 0 && !block.label
+  const cells = linked ? cellRunsOf(block) : undefined
+
+  if (cells && cells.length > 0) {
+    const [head, ...body] = cells
+    return (
+      <div className={styles.tableScroll}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              {head?.map((cell, index) => (
+                <th key={index}>
+                  <Runs runs={cell} onFollow={onFollow} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex}>
+                    <Runs runs={cell} onFollow={onFollow} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   if (!block.rows || block.rows.length === 0) {
     return <p className={styles.prose}>{block.text}</p>
   }
@@ -158,9 +206,12 @@ function List({ block, onFollow }: { block: Paragraph; onFollow?: FollowLink }) 
 export function Block({
   block,
   onFollowLink,
+  images = NO_IMAGES,
 }: {
   block: Paragraph
   onFollowLink?: FollowLink
+  /** Stored picture paths → showable URLs, for this section's figures. */
+  images?: ReadonlyMap<string, string>
 }) {
   const id = elementIdOf(block.anchor)
   const text = <Text block={block} onFollow={onFollowLink} />
@@ -208,14 +259,14 @@ export function Block({
     case 'figure':
       return (
         <div id={id}>
-          <Figure block={block} />
+          <Figure block={block} images={images} />
         </div>
       )
 
     case 'table':
       return (
         <div id={id}>
-          <Table block={block} />
+          <Table block={block} onFollow={onFollowLink} />
         </div>
       )
 

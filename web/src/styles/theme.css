@@ -56,6 +56,12 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 
+  /* The height of the reading screen's permanent status line — "Page 84 of
+     350". Named here because three places have to agree about it: the line
+     itself, the text above it, which must not run underneath it, and the
+     overlay's bottom bar, which must not cover it. */
+  --status-line: 2rem;
+
   color-scheme: light;
 }
 

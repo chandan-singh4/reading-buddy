@@ -10,8 +10,10 @@
 
 ## Task — the rest of WP-14: how it looks
 
-Page turning, links (WP-42), bulk delete (WP-44) and the second phone round
-(WP-45) all shipped 2026-08-02. Gates: **426 tests**, typecheck, build.
+Page turning, links (WP-42), bulk delete (WP-44), the second and third phone
+rounds (WP-45; bare reading screen, no pager, permanent status line) and book
+pictures (WP-39's first half) all shipped 2026-08-02. Gates: **472 tests**,
+typecheck, build. App-shell precache 425.30 KiB.
 
 What is left of WP-14 is the *look*, which the reader has confirmed twice is the
 next thing they want:
@@ -41,15 +43,20 @@ snap, and reduced-motion users still get instant.
 - `web/src/reader/columns.ts` — the page arithmetic a re-flow must not break.
 - `web/src/reader/focusMode.ts` — the existing pattern for a persisted setting;
   copy it rather than inventing a second one.
-- `web/src/reader/blocks.module.css` — per-block spacing.
+- `web/src/reader/blocks.module.css` — per-block spacing, and the figure cap
+  (`max-height: 70dvh`) that a change to type size or margins interacts with.
 
 ### Out of scope
-The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39 figure images.
+The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half (tap a
+figure → ask Claude about it), pdf.js region rendering.
 
 ---
 
 ## Carried forward — things that will bite
 
+- **Pictures only exist for books imported or updated under `PARSER_VERSION` 3.**
+  The shelf offers the update; it needs the kept source file. Watch what this
+  does to storage on a real phone — a picture-heavy library roughly doubles.
 - **Books imported before a parser change keep the old parse, silently.** This
   has now cost two rounds: links didn't appear on already-imported books, and
   there was no way to tell. Worth stamping each book with the parser version
@@ -68,7 +75,6 @@ The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39 figure images.
   out and be read from an env var.
 - **The certificate names an address.** If the router gives this PC a new one,
   `npm run lan` prints both the address and the mkcert command to reissue it.
-- **Figures render captions without images** until WP-39.
 
 ## Decisions already made — don't re-derive these
 - **A reading place is an anchor, never a page number** (WP-15).

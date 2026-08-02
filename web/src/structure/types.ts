@@ -93,6 +93,21 @@ export interface BookMeta {
    * the words don't.
    */
   textSignature?: string
+  /**
+   * Which build of the parser produced this book's text.
+   *
+   * A book keeps whatever parse it got on the day it was imported — forever,
+   * and silently. That has now cost three rounds of "the fix didn't work":
+   * links didn't appear on already-imported books, then table links didn't
+   * either, and there was no way to tell from the shelf. This is the flag that
+   * makes it visible. Compared against `PARSER_VERSION` (`parse/version.ts`);
+   * anything lower, or absent, means the book predates a parser improvement and
+   * can be brought up to date.
+   *
+   * Absent on every book imported before this existed — which is exactly the
+   * set that most needs re-parsing, so absent is treated as "out of date".
+   */
+  parserVersion?: number
   /** ISO 8601. */
   importedAt: string
 }

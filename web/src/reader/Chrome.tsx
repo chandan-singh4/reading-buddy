@@ -112,9 +112,10 @@ export function Chrome({
   }
 
   return (
-    // `inert` rather than unmounted: the overlay keeps its scroll position in
-    // the contents list, and a hidden control must not be reachable by tab or
-    // by a screen reader while it is invisible.
+    <>
+    {/* `inert` rather than unmounted: the overlay keeps its scroll position in
+        the contents list, and a hidden control must not be reachable by tab or
+        by a screen reader while it is invisible. */}
     <div className={styles.chrome} data-shown={shown} inert={!shown}>
       <header className={styles.bar}>
         <Link to="/" className={styles.control}>
@@ -276,27 +277,38 @@ export function Chrome({
           >
             <span aria-hidden="true">☰</span>
           </button>
-
-          {/*
-            The status line is itself the control — tapping it cycles the three
-            states, exactly as Google Books does. Keeping the button present in
-            the bare state (with an empty label) is what makes the third state
-            escapable: something has to be there to tap to get back.
-          */}
-          <button
-            type="button"
-            className={styles.status}
-            onClick={() => onBarStateChange(advanceBar(barState))}
-            aria-label={label ?? 'Show where you are in the book'}
-          >
-            {label}
-          </button>
-
-          <span className={styles.percent}>
-            {showsPercent(barState) && pages ? `${pages.percent}%` : ''}
-          </span>
         </div>
       </footer>
     </div>
+
+    {/*
+      Where you are — and the only part of the interface that stays on screen.
+
+      Deliberately *outside* the overlay above, and it is the whole point of
+      this arrangement. Everything else here is a panel: it has a background, an
+      edge, and a shadow, and it sits over the book. This has none of those. It
+      is a line of small grey text at the foot of the page, exactly as a page
+      number is printed at the foot of a printed page, and it neither comes nor
+      goes as the overlay does.
+
+      Still the control it always was — tapping it cycles through the page
+      number, the pages left in this chapter, and nothing at all. The third
+      state is escapable because the button stays there, empty, to be tapped.
+    */}
+    <div className={styles.statusLine}>
+      <button
+        type="button"
+        className={styles.status}
+        onClick={() => onBarStateChange(advanceBar(barState))}
+        aria-label={label ?? 'Show where you are in the book'}
+      >
+        {label}
+      </button>
+
+      <span className={styles.percent}>
+        {showsPercent(barState) && pages ? `${pages.percent}%` : ''}
+      </span>
+    </div>
+    </>
   )
 }

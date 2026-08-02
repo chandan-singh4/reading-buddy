@@ -6,11 +6,15 @@ import {
   dropHasDirectory,
   filesFromDrop,
   importBooks,
+  isOutOfDate,
+  reparseBooks,
   shelfOf,
   type BatchProgress,
   type ImportOutcome,
+  type ReparseOutcome,
+  type ReparseProgress,
 } from '../import/index.ts'
-import type { BookMeta, Shelf } from '../structure/index.ts'
+import type { BookId, BookMeta, Shelf } from '../structure/index.ts'
 import { repository } from '../storage/index.ts'
 import { rowId, useRowMemory } from '../app/useRowMemory.ts'
 import styles from './page.module.css'
@@ -31,6 +35,12 @@ const STAGE_LABEL: Record<BatchProgress['stage'], string> = {
   parsing: 'Parsing',
   saving: 'Saving',
 }
+
+/** Re-reading books from the files they were imported from. */
+type UpdateState =
+  | { status: 'idle' }
+  | { status: 'busy'; progress: ReparseProgress }
+  | { status: 'done'; outcomes: ReparseOutcome[] }
 
 /** Fixed order, so the shelves don't rearrange themselves as books arrive. */
 const SHELVES: readonly Shelf[] = ['book', 'paper', 'document']
@@ -93,6 +103,19 @@ export default function Library() {
   /** What has been typed into the shelf search. Empty means "show everything". */
   const [query, setQuery] = useState('')
 
+  const [updating, setUpdating] = useState<UpdateState>({ status: 'idle' })
+
+  /**
+   * Which books still have the file they were imported from.
+   *
+   * Held apart from the books themselves because it answers a different
+   * question and is fetched a different way — one read of the key index, no
+   * blobs touched. A book without its file can still be brought up to date, but
+   * only the long way, and the shelf has to be able to say which is which
+   * rather than offering a button that fails per book.
+   */
+  const [withSource, setWithSource] = useState<Set<BookId>>(new Set())
+
   const books = state.status === 'ready' ? state.books : []
   const visible = matching(books, query)
   const allShown = visible.length > 0 && visible.every((book) => selected?.has(book.id))
@@ -106,10 +129,11 @@ export default function Library() {
   useEffect(() => {
     let cancelled = false
 
-    repository
-      .listBooks()
-      .then((books) => {
-        if (!cancelled) setState({ status: 'ready', books })
+    Promise.all([repository.listBooks(), repository.booksWithSource()])
+      .then(([books, sources]) => {
+        if (cancelled) return
+        setState({ status: 'ready', books })
+        setWithSource(sources)
       })
       .catch((error: unknown) => {
         if (cancelled) return
@@ -126,7 +150,56 @@ export default function Library() {
     }
   }, [])
 
-  const busy = importing.status === 'busy' || importing.status === 'scanning'
+  const busy =
+    importing.status === 'busy' ||
+    importing.status === 'scanning' ||
+    updating.status === 'busy'
+
+  /** Books an improved parser could do better with — see `parse/version.ts`. */
+  const outdated = books.filter(isOutOfDate)
+  const updatable = outdated.filter((book) => withSource.has(book.id))
+  const stranded = outdated.length - updatable.length
+
+  /** Re-read the shelf and which books still have their file. */
+  async function reload() {
+    const [books, sources] = await Promise.all([
+      repository.listBooks(),
+      repository.booksWithSource(),
+    ])
+    setState({ status: 'ready', books })
+    setWithSource(sources)
+  }
+
+  /**
+   * Bring every book that can be updated up to the current parser.
+   *
+   * The books keep their identity throughout — same id, same shelf, same place
+   * in the list, same reading position — so this is genuinely an update rather
+   * than a delete and a re-import wearing a friendlier name.
+   */
+  async function runUpdate() {
+    if (updatable.length === 0) return
+
+    setUpdating({
+      status: 'busy',
+      progress: { index: 1, total: updatable.length, title: updatable[0]!.title, stage: 'reading' },
+    })
+
+    const outcomes = await reparseBooks(updatable, {
+      onProgress: (progress) => setUpdating({ status: 'busy', progress }),
+    })
+
+    setUpdating({ status: 'done', outcomes })
+
+    try {
+      await reload()
+    } catch (error: unknown) {
+      setState({
+        status: 'failed',
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
 
   /**
    * `fromFolder` decides whether an unreadable file is worth reporting: a
@@ -148,7 +221,7 @@ export default function Library() {
     setImporting({ status: 'done', outcomes })
 
     try {
-      setState({ status: 'ready', books: await repository.listBooks() })
+      await reload()
     } catch (error: unknown) {
       setState({
         status: 'failed',
@@ -166,7 +239,7 @@ export default function Library() {
     setRemoving(null)
     try {
       await repository.deleteBook(book.id)
-      setState({ status: 'ready', books: await repository.listBooks() })
+      await reload()
     } catch (error: unknown) {
       setState({
         status: 'failed',
@@ -202,7 +275,7 @@ export default function Library() {
     try {
       await repository.deleteBooks(ids)
       setSelected(null)
-      setState({ status: 'ready', books: await repository.listBooks() })
+      await reload()
     } catch (error: unknown) {
       setState({
         status: 'failed',
@@ -320,6 +393,73 @@ export default function Library() {
 
         {importing.status === 'done' && <ImportReport outcomes={importing.outcomes} />}
       </div>
+
+      {/*
+        The reason this screen now keeps the original files.
+
+        A parsed book is a snapshot, so improving the parser does nothing for
+        books already on the shelf and says nothing about itself — the reader
+        sees the old behaviour and reasonably concludes the fix didn't work.
+        This is the shelf telling them, and offering the one tap that fixes it.
+      */}
+      {/* Deliberately still shown after a run that left some books behind: the
+          report says what happened, and the banner says what is still true. */}
+      {state.status === 'ready' && outdated.length > 0 && (
+        <div className={styles.update}>
+          <p className={styles.emptyTitle}>
+            {outdated.length === 1
+              ? 'One book can be improved'
+              : `${outdated.length} books can be improved`}
+          </p>
+          <p className={styles.pending}>
+            {outdated.length === 1 ? 'It was' : 'They were'} read by an older version of
+            Reading Buddy. Updating re-reads{' '}
+            {outdated.length === 1 ? 'it' : 'them'} from the original file — links,
+            figures and chapter breaks all improve. Your place in{' '}
+            {outdated.length === 1 ? 'the book' : 'each book'} is kept.
+          </p>
+
+          {updatable.length > 0 && (
+            <button
+              type="button"
+              className={styles.importButton}
+              disabled={busy}
+              onClick={() => {
+                void runUpdate()
+              }}
+            >
+              {updating.status === 'busy'
+                ? 'Updating…'
+                : `Update ${updatable.length} ${updatable.length === 1 ? 'book' : 'books'}`}
+            </button>
+          )}
+
+          {/* Said plainly rather than left as a button that quietly does
+              nothing for some rows: these predate the kept file, so the long
+              way round is genuinely the only way. */}
+          {stranded > 0 && (
+            <p className={styles.pending}>
+              {stranded === 1
+                ? 'One of them was'
+                : `${stranded} of them were`}{' '}
+              imported before Reading Buddy kept the original file, so{' '}
+              {stranded === 1 ? 'it' : 'they'} can’t be updated in place — remove{' '}
+              {stranded === 1 ? 'it' : 'them'} and import the{' '}
+              {stranded === 1 ? 'file' : 'files'} again. That is the last time this
+              will be needed.
+            </p>
+          )}
+
+          {updating.status === 'busy' && (
+            <p className={styles.pending} role="status">
+              {STAGE_LABEL[updating.progress.stage]} “{updating.progress.title}” —{' '}
+              {updating.progress.index} of {updating.progress.total}.
+            </p>
+          )}
+        </div>
+      )}
+
+      {updating.status === 'done' && <UpdateReport outcomes={updating.outcomes} />}
 
       {state.status === 'loading' && <p className={styles.pending}>Loading…</p>}
 
@@ -503,6 +643,12 @@ export default function Library() {
                           <p className={styles.pending}>
                             {book.author ? `${book.author} · ` : ''}
                             {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
+                            {/* So the banner's number has faces. Without this
+                                "4 books can be improved" is a claim the reader
+                                has no way to check. */}
+                            {isOutOfDate(book) && (
+                              <span className={styles.outdated}> · can be improved</span>
+                            )}
                           </p>
                         </button>
                       ) : (
@@ -515,6 +661,12 @@ export default function Library() {
                           <p className={styles.pending}>
                             {book.author ? `${book.author} · ` : ''}
                             {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
+                            {/* So the banner's number has faces. Without this
+                                "4 books can be improved" is a claim the reader
+                                has no way to check. */}
+                            {isOutOfDate(book) && (
+                              <span className={styles.outdated}> · can be improved</span>
+                            )}
                           </p>
                         </Link>
                       )}
@@ -572,6 +724,43 @@ export default function Library() {
             </section>
           )
         })}
+    </div>
+  )
+}
+
+/**
+ * What happened to each book that was re-read.
+ *
+ * Named rather than counted where something went wrong, for the same reason the
+ * import report is: "one book couldn't be updated" is not actionable, and the
+ * book that failed is still sitting on the shelf reading exactly as it did
+ * before — which is the one saving grace worth stating out loud.
+ */
+function UpdateReport({ outcomes }: { outcomes: ReparseOutcome[] }) {
+  const updated = outcomes.filter((outcome) => outcome.status === 'updated')
+  const failed = outcomes.filter((outcome) => outcome.status === 'failed')
+
+  return (
+    <div className={failed.length > 0 ? styles.error : undefined} role="status">
+      <p>
+        {updated.length > 0
+          ? `Updated ${updated.length} ${updated.length === 1 ? 'book' : 'books'}.`
+          : 'No books were updated.'}
+        {failed.length > 0 &&
+          ` ${failed.length} couldn’t be — ${
+            failed.length === 1 ? 'it is' : 'they are'
+          } unchanged and still readable:`}
+      </p>
+
+      {failed.length > 0 && (
+        <ul className={styles.failureList}>
+          {failed.map((outcome) => (
+            <li key={outcome.bookId} className={styles.pending}>
+              <strong>{outcome.title}</strong> — {outcome.message}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

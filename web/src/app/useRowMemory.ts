@@ -35,6 +35,14 @@ export function useRowMemory(
     const remembered = window.sessionStorage.getItem(key)
     if (!remembered) return
 
+    // Consumed on use, not left lying about. The memory answers exactly one
+    // question — "which book did you just come back from?" — and it is asked
+    // once. Left in place it would also answer a *reload*, which is a different
+    // question with a different right answer: a reader who scrolled to the top
+    // and refreshed expects the top, and being thrown back down to a book they
+    // left earlier reads as the app ignoring them.
+    window.sessionStorage.removeItem(key)
+
     const row = document.getElementById(rowId(remembered))
     // `center`, not `start`: a row pinned to the very top of the viewport reads
     // as "the list begins here", which is a lie about where you are in it.

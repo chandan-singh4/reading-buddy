@@ -11,6 +11,13 @@ import {
   pagesAt,
   refAtPage,
   wordsAt,
+  cancelTurn,
+  fadeIn,
+  holdOutgoing,
+  playTurn,
+  scrollStrip,
+  type Cancel,
+  type HeldPage,
   firstSection,
   isFresh,
   offsetOfPage,
@@ -25,6 +32,7 @@ import {
   readFocusMode,
   type FollowLink,
   useBackDismiss,
+  useFigureImages,
   writeFocusMode,
   type BarState,
   type SectionRef,
@@ -40,6 +48,7 @@ import type {
   BookId,
   BookMeta,
   Manifest,
+  Paragraph,
   Section,
   SectionPath,
 } from '../structure/index.ts'
@@ -87,15 +96,35 @@ function measure(element: HTMLElement | null): Strip {
   if (!element) return { scrollWidth: 0, pageWidth: 0, scrollLeft: 0 }
   return {
     scrollWidth: element.scrollWidth,
-    pageWidth: element.clientWidth,
+    // `getBoundingClientRect`, not `clientWidth`. This is the whole of the
+    // "page 134 is cut off down the middle" bug, and it is pure arithmetic: a
+    // column is exactly as wide as this box, but `clientWidth` is *rounded to a
+    // whole pixel* while the box itself is very often fractional — 393.6px on a
+    // phone. Every page turn then lands 0.4px short, which nobody can see, and
+    // by page 134 the strip is 50px out of true, which everybody can. The
+    // fractional width is the real column pitch, so multiples of it land on
+    // real column edges however far into the book they are.
+    pageWidth: element.getBoundingClientRect().width,
     scrollLeft: element.scrollLeft,
   }
 }
 
-/** Which page of the strip a paragraph sits on, 1-based. */
-function columnOf(element: HTMLElement, pageWidth: number): number {
-  if (pageWidth <= 0) return 1
-  return Math.floor(element.offsetLeft / pageWidth) + 1
+/**
+ * Which page of the strip a paragraph sits on, 1-based.
+ *
+ * Measured against the strip rather than read off `offsetLeft`, for the same
+ * reason as above: `offsetLeft` is a whole number, and rounding a position that
+ * may be forty thousand pixels along is how a paragraph gets attributed to the
+ * page next to the one it is on.
+ */
+function columnOf(node: HTMLElement, strip: HTMLElement | null): number {
+  const { pageWidth } = measure(strip)
+  if (!strip || pageWidth <= 0) return 1
+
+  const from = node.getBoundingClientRect().left - strip.getBoundingClientRect().left
+  // A half-pixel of slack, so a paragraph sitting exactly on a column edge is
+  // read as opening that column rather than as ending the one before it.
+  return Math.floor((from + strip.scrollLeft + 0.5) / pageWidth) + 1
 }
 
 /**
@@ -106,6 +135,10 @@ function columnOf(element: HTMLElement, pageWidth: number): number {
  * enough that closing the tab almost never beats it.
  */
 const SAVE_AFTER_MS = 800
+
+/** One array, so "no section yet" is the same value every render — see
+    `useFigureImages`, which re-fetches when its input changes identity. */
+const EMPTY_PARAGRAPHS: Paragraph[] = []
 
 /**
  * The last paragraph to have crossed the reading line — what the page number
@@ -155,10 +188,36 @@ export default function Reader() {
     next?: SectionRef
   }>({})
 
+  /**
+   * The pictures for the section on screen, and only that section.
+   *
+   * A figure stores an archive path, which no browser can fetch; the hook
+   * turns the handful this page needs into `blob:` URLs and revokes them when
+   * the page turns. Bound to the book here because `reader/` holds no
+   * reference to storage — the lookup is passed in.
+   */
+  const loadAssets = useCallback(
+    async (paths: readonly string[]) =>
+      id ? repository.getAssets(id, paths) : new Map<string, Blob>(),
+    [id],
+  )
+  const figureImages = useFigureImages(
+    page.status === 'ready' ? page.section.paragraphs : EMPTY_PARAGRAPHS,
+    loadAssets,
+  )
+
   const [focusMode, setFocusMode] = useState(readFocusMode)
-  // Focus Mode decides only what's showing when you arrive. A tap still brings
-  // everything back, which is the difference between hiding and removing.
-  const [chromeShown, setChromeShown] = useState(() => !readFocusMode())
+  /**
+   * A book opens on the book, not on the interface.
+   *
+   * This used to start showing, so the library link and the contents button
+   * were the first thing a reader met. But the overlay is a panel over the
+   * page, and starting with it up means every book begins covered. The status
+   * line at the foot stays regardless, and a tap in the middle of the page
+   * brings the rest back — the gesture this screen has always had, and the one
+   * Google Books trains.
+   */
+  const [chromeShown, setChromeShown] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetTab, setSheetTab] = useState<SheetTab>('contents')
   const [barState, setBarState] = useState<BarState>('pages')
@@ -178,12 +237,11 @@ export default function Reader() {
    */
   const [anchorHere, setAnchorHere] = useState<Anchor | undefined>(undefined)
 
-  /**
-   * Whether there are pages left in this section either way. Previous and Next
-   * now turn *pages*, so "is there anywhere to go?" is no longer answered by
-   * the neighbouring sections alone — mid-section, both are always available.
-   */
-  const [ends, setEnds] = useState({ atStart: true, atEnd: true })
+  // There was an `ends` state here — whether this section had pages left either
+  // way — and it existed solely to grey out the Previous and Next buttons. With
+  // those gone, nothing renders from it: a swipe or an arrow key at the end of
+  // the book is answered by `turnPage` finding nowhere to go and doing nothing,
+  // which was always the real rule.
 
   /**
    * Where reading was before a link was followed.
@@ -195,9 +253,9 @@ export default function Reader() {
    * The page number rides along because "back to where you were" is a promise a
    * reader has to take on trust, and "back to page 250" is one they can check.
    */
-  const [returnTo, setReturnTo] = useState<{ anchor: Anchor; page?: number } | undefined>(
-    undefined,
-  )
+  const [returnTo, setReturnTo] = useState<
+    { anchor: Anchor; page?: number; within: number } | undefined
+  >(undefined)
 
   /**
    * A page asked for that needs its section loaded before it can be resolved to
@@ -213,8 +271,24 @@ export default function Reader() {
    */
   const pendingAnchor = useRef<Anchor | undefined>(undefined)
 
+  /**
+   * How many pages past the start of `pendingAnchor` to land.
+   *
+   * A paragraph names a place, but on a phone one block can run over several
+   * pages — a long note, a caption, a table — and a page in the middle of one
+   * has no paragraph of its own to be named by. That is the whole of the "Back
+   * to page 10 put me on a different page 10" bug: leaving from the third page
+   * of a long block and coming back to its first page is a real move, even
+   * though both pages answer to the same anchor. Carrying the offset makes the
+   * way back exact rather than merely close.
+   */
+  const pendingWithin = useRef(0)
+
   /** The section already landed on, so arriving somewhere happens once. */
   const landedOn = useRef<SectionPath | undefined>(undefined)
+
+  /** Whether any section has been landed on yet — see the arrival below. */
+  const landedBefore = useRef(false)
 
   /** The element the book is laid out in — the strip of pages. */
   const strip = useRef<HTMLElement | null>(null)
@@ -227,6 +301,45 @@ export default function Reader() {
    * then forward again lands somewhere you have never been.
    */
   const landOn = useRef<'start' | 'end'>('start')
+
+  /**
+   * The page being left, held on screen while the next section loads.
+   *
+   * A turn between sections has to be made out of two moving pages, like the
+   * scroll it stands in for — see `reader/pageTurn.ts` for why one moving page
+   * reads as wrong however it is animated. Only ever set by a real page turn:
+   * a link, the slider and opening the book are not directional gestures, and
+   * giving them a direction would be inventing one.
+   */
+  const held = useRef<HeldPage | null>(null)
+
+  /** Stops the slide in flight, if there is one. */
+  const scrolling = useRef<Cancel | null>(null)
+
+  /**
+   * Where the strip was last told to go, or `null` if that was a landing.
+   *
+   * A page turn asks "which page am I on?" and answers it from `scrollLeft` —
+   * which, while a slide is running, is somewhere between two pages. Tapping
+   * Next twice quickly would read that halfway point, round it back to the page
+   * being left, and turn to the page already being turned to: the second tap
+   * does nothing. Asking where the strip is *going* makes every tap count.
+   *
+   * It needs no clearing when a slide ends, because by then it says exactly
+   * where the strip is. A landing resets it to `null` — the offsets it was
+   * measured in belong to a section that is no longer on screen.
+   */
+  const scrollTarget = useRef<number | null>(null)
+
+  /**
+   * How many moves have been asked for. Only ever compared with itself.
+   *
+   * `settleOn` corrects a landing a frame or two after it happens, and a reader
+   * who swipes inside those two frames must not be dragged back to where they
+   * just left. Comparing the count taken before the wait with the count after
+   * it is how the correction knows it has been overtaken.
+   */
+  const moveSeq = useRef(0)
 
   /** Where the finger went down, for the swipe that turns a page. */
   const touchStart = useRef<Touch | null>(null)
@@ -295,12 +408,89 @@ export default function Reader() {
     setResumed(false)
   }, [])
 
-  /** Scroll the strip so that `page` is the one showing. */
-  const showPage = useCallback((page: number) => {
+  /**
+   * Scroll the strip so that `page` is the one showing.
+   *
+   * `instant` is not a nicety — it fixes a turn that animated the wrong way.
+   * The strip slides, which is right for a turn *within* a section: page 3 → 4
+   * moves leftwards, forwards. But arriving in a *new* section is not a scroll
+   * at all, it is different text in the same box. Turning forward off the last
+   * page left the strip scrolled hard right, the new section replaced the
+   * content, and scrolling to page 1 then slid rightwards — a forward move
+   * playing a backward animation. So a landing is instant, and the movement for
+   * it is supplied by `pageTurn.ts` instead.
+   *
+   * The slide is timed by `motion.ts` rather than by `scroll-behavior: smooth`,
+   * because the browser varies that duration with the distance travelled — the
+   * reason a turn inside a chapter used to take visibly longer than a turn
+   * between two.
+   */
+  const showPage = useCallback((page: number, instant = false) => {
     const element = strip.current
     if (!element) return
-    element.scrollLeft = offsetOfPage(measure(element), page)
+
+    // A move in flight is abandoned rather than left to fight the new one for
+    // the same property — a fast tapper outruns the animation.
+    scrolling.current?.()
+    moveSeq.current += 1
+    const left = offsetOfPage(measure(element), page)
+    scrollTarget.current = instant ? null : left
+    scrolling.current = scrollStrip(element, left, { instant })
   }, [])
+
+  /**
+   * Which page is showing, asked in a way that survives a slide in flight.
+   *
+   * `scrollLeft` alone answers "somewhere between two pages" while a turn is
+   * running, and rounding that lands on either of them. Where the strip has been
+   * *told* to go is the honest answer, and it is the one a link tapped straight
+   * after a page turn depends on: it is the number written into the way back.
+   */
+  const pageShowing = useCallback(() => {
+    const strip0 = measure(strip.current)
+    const going = scrollTarget.current
+    return pageAt(going === null ? strip0 : { ...strip0, scrollLeft: going })
+  }, [])
+
+  /**
+   * Land on a paragraph's page — and stay there once the browser has finished
+   * laying the section out.
+   *
+   * The measurement is right the moment it is taken; the trouble is that it is
+   * taken the instant React has put the section in the document, and the browser
+   * may still be re-flowing forty pages of columns behind it — a webfont
+   * swapping in, an image finding its height. A column boundary that then moves
+   * takes the page we scrolled to with it, which is how "back to page 1" arrives
+   * on a screen of page 1 that isn't the one you left.
+   *
+   * So the answer is checked again on the next two frames and corrected in place
+   * if the layout has moved under it. Silent when nothing changed, which is most
+   * of the time, and abandoned if the reader has moved on meanwhile.
+   */
+  const settleOn = useCallback(
+    (node: HTMLElement, within = 0) => {
+      showPage(columnOf(node, strip.current) + within, true)
+
+      const mine = moveSeq.current
+      if (typeof requestAnimationFrame !== 'function') return
+
+      const correct = () => {
+        const element = strip.current
+        if (!element || !node.isConnected || moveSeq.current !== mine) return
+
+        const wanted = offsetOfPage(measure(element), columnOf(node, element) + within)
+        // Half a pixel: below that the strip is already on the column, and
+        // assigning `scrollLeft` again would only invite a rounding loop.
+        if (Math.abs(element.scrollLeft - wanted) > 0.5) element.scrollLeft = wanted
+      }
+
+      requestAnimationFrame(() => {
+        correct()
+        requestAnimationFrame(correct)
+      })
+    },
+    [showPage],
+  )
 
   /**
    * Move to a page.
@@ -323,7 +513,7 @@ export default function Reader() {
         const anchor = anchorAtPage(spine, ref, page.section, wanted)
         const node = anchor ? document.getElementById(elementIdOf(anchor)) : null
         if (anchor && node) {
-          showPage(columnOf(node, measure(strip.current).pageWidth))
+          settleOn(node)
           setAnchorHere(anchor)
         }
         return
@@ -334,7 +524,7 @@ export default function Reader() {
       pendingPage.current = wanted
       setHere(ref)
     },
-    [spine, here, page, showPage],
+    [spine, here, page, settleOn],
   )
 
   /**
@@ -362,7 +552,7 @@ export default function Reader() {
    * than a load.
    */
   const jumpToAnchor = useCallback(
-    (anchor: Anchor) => {
+    (anchor: Anchor, within = 0) => {
       const parts = tryParseAnchor(anchor)
       if (!parts) return
 
@@ -375,27 +565,41 @@ export default function Reader() {
       // likely to tap a link, on the page they just opened.
       const from =
         anchorHere ?? (page.status === 'ready' ? page.section.paragraphs[0]?.anchor : undefined)
-      if (from) setReturnTo(pages ? { anchor: from, page: pages.page } : { anchor: from })
+      if (from) {
+        // How far into that paragraph's own run of pages we are — see
+        // `pendingWithin`. Measured now, while the page it describes is still
+        // the one on screen.
+        const fromNode = document.getElementById(elementIdOf(from))
+        const fromWithin = fromNode
+          ? Math.max(0, pageShowing() - columnOf(fromNode, strip.current))
+          : 0
+        setReturnTo({ anchor: from, within: fromWithin, ...(pages ? { page: pages.page } : {}) })
+      }
       setSheetOpen(false)
 
-      // A jump is the one move where a reader genuinely doesn't know where they
-      // have landed — every other one they made a page at a time. So the bar
-      // comes back to say so, unless they've explicitly asked for a bare page.
-      if (!focusMode) setChromeShown(true)
-
+      // Nothing is raised on arrival. A jump is the one move where a reader
+      // genuinely doesn't know where they have landed, and this used to answer
+      // that by throwing the whole overlay up — a lot of furniture for one
+      // number, over the page just arrived at. The number is now permanently at
+      // the foot of the page, so there is nothing left to announce.
       if (parts.chapter === here.chapter && parts.section === here.section) {
         const node = document.getElementById(elementIdOf(anchor))
         if (node) {
-          showPage(columnOf(node, measure(strip.current).pageWidth))
+          // Instant, then faded. A jump has no direction — a footnote is not to
+          // the left or the right of the sentence that sent you to it — so it
+          // gets the turn's *duration* rather than the turn's slide.
+          settleOn(node, within)
+          fadeIn(strip.current)
           setAnchorHere(anchor)
         }
         return
       }
 
       pendingAnchor.current = anchor
+      pendingWithin.current = within
       setHere({ chapter: parts.chapter, section: parts.section })
     },
-    [here, anchorHere, page, showPage, pages, focusMode],
+    [here, anchorHere, page, settleOn, pageShowing, pages],
   )
 
   /**
@@ -409,7 +613,13 @@ export default function Reader() {
    */
   const turnPage = useCallback(
     (by: 1 | -1) => {
-      const next = turn(measure(strip.current), by)
+      // Measured against the slide's destination when one is running — see
+      // `scrollTarget`. Without this, a quick second tap is swallowed.
+      const now = measure(strip.current)
+      const next = turn(
+        scrollTarget.current === null ? now : { ...now, scrollLeft: scrollTarget.current },
+        by,
+      )
       if (next !== null) {
         showPage(next)
         return
@@ -420,10 +630,50 @@ export default function Reader() {
       const target = by === 1 ? neighbours.next : neighbours.previous
       if (!target) return
       landOn.current = by === 1 ? 'start' : 'end'
+      // A second turn before the first has landed drops the first outright —
+      // a fast tapper outruns the animation rather than queueing behind it.
+      cancelTurn(held.current)
+      held.current = holdOutgoing(strip.current, by)
       goTo(target)
     },
     [neighbours, showPage, goTo],
   )
+
+  /**
+   * Turn a page from the keyboard.
+   *
+   * The book is read by swiping and by tapping the edges of the page, neither of
+   * which exists without a touch screen or a mouse. This is what a reader on a
+   * laptop turns pages with, and it is the whole replacement for the Previous
+   * and Next buttons that used to sit under every page.
+   *
+   * On the window rather than on the text, because nothing on this screen holds
+   * focus while you read — the page is prose, not a control.
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      // Not while typing, and not while a modifier is held: those belong to the
+      // browser, and stealing ⌘← would take a reader out of the book.
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target?.isContentEditable) return
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return
+
+      const by =
+        event.key === 'ArrowRight' || event.key === 'PageDown'
+          ? 1
+          : event.key === 'ArrowLeft' || event.key === 'PageUp'
+            ? -1
+            : 0
+      if (by === 0) return
+
+      event.preventDefault()
+      turnPage(by)
+    }
+
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [turnPage])
 
   const closeSheet = useCallback(() => {
     setSheetOpen(false)
@@ -623,8 +873,10 @@ export default function Reader() {
 
     const wanted = pendingPage.current
     const saved = pendingAnchor.current
+    const within = pendingWithin.current
     pendingPage.current = undefined
     pendingAnchor.current = undefined
+    pendingWithin.current = 0
 
     const asked =
       saved ??
@@ -639,22 +891,49 @@ export default function Reader() {
     const end = landOn.current === 'end'
     landOn.current = 'start'
 
+    // Taken now, played last. The two pages may only start crossing once the
+    // arriving one is both on screen and scrolled to where it belongs —
+    // animating first would slide in a page that then jumps under the reader.
+    const turn = held.current
+    held.current = null
+
+    // Every way of arriving in a new section that *isn't* a page turn — a link,
+    // the contents list, the slider crossing a boundary — is a jump, and gets
+    // the jump's fade at the same duration. Except the very first section of
+    // all: opening the book has its own entrance, and two at once is a flicker.
+    const arriving = () => {
+      if (turn) playTurn(turn, strip.current)
+      else if (landedBefore.current) fadeIn(strip.current)
+      landedBefore.current = true
+    }
+
     if (asked && target) {
-      showPage(columnOf(target, measure(strip.current).pageWidth))
+      settleOn(target, within)
       setAnchorHere(asked)
+      arriving()
       return
     }
 
     // Turning *back* into a section lands on its last page, not its first —
     // otherwise going back a page and forward again arrives somewhere the
     // reader has never been.
-    showPage(end ? pageCountOf(measure(strip.current)) : 1)
+    showPage(end ? pageCountOf(measure(strip.current)) : 1, true)
     setAnchorHere(
       end
         ? page.section.paragraphs[page.section.paragraphs.length - 1]?.anchor
         : page.section.paragraphs[0]?.anchor,
     )
-  }, [page, here, spine, showPage])
+    arriving()
+  }, [page, here, spine, showPage, settleOn])
+
+  // A held page must never outlive the screen it was copied from — leaving the
+  // book mid-turn would otherwise leave the copy in the document.
+  useEffect(() => {
+    return () => {
+      cancelTurn(held.current)
+      held.current = null
+    }
+  }, [])
 
   /**
    * Keep the page number honest while you read.
@@ -680,15 +959,37 @@ export default function Reader() {
       const { pageWidth } = measure(element)
 
       const showing = pageAt(measure(element))
-      const count = pageCountOf(measure(element))
-      setEnds({ atStart: showing <= 1, atEnd: showing >= count })
 
       if (pageWidth > 0 && element) {
-        const found = anchors.find((anchor) => {
+        // The paragraph the visible page *starts in* — the last one to have
+        // begun on this column or an earlier one, not the first one to begin on
+        // this column or a later one.
+        //
+        // The difference is the whole of the "Back to page 250 moved my place"
+        // bug. A page very often opens mid-paragraph: the paragraph began on
+        // the previous column and spills onto this one. Asking for the first
+        // anchor at or after this column skips it and names the *next*
+        // paragraph, which starts further down — so the place written down is a
+        // paragraph or two ahead of where the reader is looking, and coming
+        // back scrolls to it and lands them past where they left.
+        let found: Anchor | undefined
+        let after: Anchor | undefined
+        for (const anchor of anchors) {
           const node = document.getElementById(elementIdOf(anchor))
-          return node ? columnOf(node, pageWidth) >= showing : false
-        })
-        if (found) setAnchorHere(found)
+          if (!node) continue
+
+          const column = columnOf(node, element)
+          if (column <= showing) found = anchor
+          else {
+            after = anchor
+            break
+          }
+        }
+        // The fallback covers the one case the rule above can't: a page whose
+        // every paragraph begins later, which is what a section's opening page
+        // looks like before anything has been laid out.
+        const settled = found ?? after
+        if (settled) setAnchorHere(settled)
         return
       }
 
@@ -704,8 +1005,8 @@ export default function Reader() {
       })
     }
 
-    // Once immediately: a freshly laid-out section has to report its own ends
-    // before anything has scrolled, or Previous and Next start out wrong.
+    // Once immediately: a freshly laid-out section has to name the paragraph on
+    // screen before anything has scrolled, or the page number starts out wrong.
     update()
 
     element?.addEventListener('scroll', onScroll, { passive: true })
@@ -848,21 +1149,41 @@ export default function Reader() {
               setResumed(false)
             }}
           >
-            <header className={styles.header}>
-              <p className={styles.context}>
-                {frame.book.title}
-                {title ? ` · ${title}` : ''}
-              </p>
+            {/*
+              A chapter should open like a chapter.
+
+              The book's own title used to sit here, above every section — but
+              it is already in the bar at the top of the screen, so it was
+              saying the same thing twice, and on a book whose title came from
+              a filename it said it at length. What a reader wants at the top
+              of a chapter is what print gives them: which chapter this is, in
+              a quiet line, then its name, given room.
+
+              The chapter line only appears on a chapter's *first* section.
+              Repeating "Part Three" over each of its nine sections would turn
+              a title page into a running header.
+            */}
+            <header
+              className={`${styles.header} ${here.section === 1 ? styles.opening : ''}`}
+            >
+              {title && here.section === 1 && (
+                <p className={styles.chapterName}>{title}</p>
+              )}
+
+              {page.status === 'ready' && page.section.title && (
+                <h2 className={styles.sectionTitle}>{page.section.title}</h2>
+              )}
+
+              {/* A hairline instead of a blank gap: it says "the chapter starts
+                  below this" without spending a word on it. */}
+              <span className={styles.openingRule} aria-hidden="true" />
+
               {/* Only for a place saved a while ago. Opening a book you were
                   reading a minute ago somewhere other than the first page is
                   expected; opening last month's book on page 190 without a word
                   looks like the app lost your place rather than kept it. */}
               {resumed && (
                 <p className={styles.resumed}>Picked up where you left off.</p>
-              )}
-
-              {page.status === 'ready' && page.section.title && (
-                <h2 className={styles.sectionTitle}>{page.section.title}</h2>
               )}
             </header>
 
@@ -880,6 +1201,7 @@ export default function Reader() {
                   key={block.anchor}
                   block={block}
                   onFollowLink={jumpToAnchor as FollowLink}
+                  images={figureImages}
                 />
               ))}
           </article>
@@ -897,8 +1219,9 @@ export default function Reader() {
               onClick={(event) => {
                 event.stopPropagation()
                 const back = returnTo.anchor
+                const within = returnTo.within
                 setReturnTo(undefined)
-                jumpToAnchor(back)
+                jumpToAnchor(back, within)
                 // `jumpToAnchor` sets a new return point; going back is not
                 // itself somewhere to come back from.
                 setReturnTo(undefined)
@@ -908,29 +1231,13 @@ export default function Reader() {
             </button>
           )}
 
-          <nav className={styles.pager} aria-label="Move through the book">
-            <button
-              type="button"
-              className={styles.pagerButton}
-              disabled={!neighbours.previous && ends.atStart}
-              onClick={() => {
-                turnPage(-1)
-              }}
-            >
-              Previous
-            </button>
-
-            <button
-              type="button"
-              className={styles.pagerButton}
-              disabled={!neighbours.next && ends.atEnd}
-              onClick={() => {
-                turnPage(1)
-              }}
-            >
-              Next
-            </button>
-          </nav>
+          {/*
+            There were Previous and Next buttons here. They are gone: a phone is
+            read by swiping and by tapping the edge of the page, and two labelled
+            controls under every page of the book were furniture nobody used.
+            The keyboard route above replaces them for anyone not using a touch
+            screen, which is the only thing they were still owed for.
+          */}
         </>
       )}
     </div>

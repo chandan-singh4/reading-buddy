@@ -14,8 +14,17 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* The frame a turn between sections is measured against: the copy of the
+     outgoing page is laid over the strip in *this* box's coordinates (see
+     `reader/pageTurn.ts`). `relative` and not `transform` — a transform here
+     would redefine what "fixed" means for the overlay's bars, which is the
+     trap documented below. */
+  position: relative;
+  /* The foot leaves room for the status line, which is `fixed` and so takes no
+     space of its own — without this the last line of every page would be read
+     through the page number. */
   padding: calc(var(--safe-top) + var(--space-4)) 0
-    calc(var(--safe-bottom) + var(--space-4));
+    calc(var(--safe-bottom) + var(--space-4) + var(--status-line));
   /* Opening a book was a hard cut — the shelf was simply replaced by text,
      which reads as a glitch rather than as a move. Fade only, and deliberately
      no `transform` here: the overlay inside is `position: fixed`, and any
@@ -58,7 +67,10 @@
      columns against each other, which here would mean half-empty pages. */
   column-fill: auto;
   overflow: hidden;
-  scroll-behavior: smooth;
+  /* Deliberately *not* `scroll-behavior: smooth`. The browser times that one,
+     and lengthens it with the distance travelled, so a turn inside a chapter
+     ran visibly longer than a turn between two. Every move on this screen is
+     driven from the single duration in `reader/motion.ts` instead. */
   font-family: var(--font-reading);
   font-size: var(--text-lg);
   line-height: var(--leading-reading);
@@ -76,11 +88,9 @@
   padding-inline: var(--space-4);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .page {
-    scroll-behavior: auto;
-  }
-}
+/* Reduced motion is honoured in `reader/motion.ts`, where every move now
+   originates — a stylesheet rule here would only cover the one that no longer
+   exists. */
 
 @keyframes fadeIn {
   from {
@@ -104,15 +114,32 @@
 
 .header {
   margin-bottom: var(--space-6);
+  text-align: center;
 }
 
-/* Where you are, in one quiet line. Not a title bar — it scrolls away with the
-   text instead of holding a strip of the screen for the whole book. */
-.context {
+/*
+ * A chapter's first section gets the room a title page gets in print. Enough
+ * space above that the title is clearly *starting* something rather than
+ * continuing it — but not a whole screen of it, because on a phone that would
+ * push the first sentence onto page two.
+ */
+.opening {
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+
+/* "Part Three" — the chapter's own name, said once and quietly, above its
+   title. Letterspaced small caps is what print uses here, and it reads as a
+   label rather than as a line of the book. */
+.chapterName {
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   line-height: var(--leading-ui);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
 }
 
 /* Deliberately quieter than the chapter line above it: it explains one thing,
@@ -126,12 +153,32 @@
   opacity: 0.8;
 }
 
+/*
+ * The chapter's name, set as a title rather than as a bold sentence.
+ *
+ * In the reading font, not the UI font: this is part of the book, and a heading
+ * in the interface's typeface reads as a label the app has stuck on top of the
+ * text. Letterspaced and unbolded because at title size, weight shouts where
+ * space speaks — which is exactly the difference between "bland" and "this is
+ * where the chapter begins".
+ */
 .sectionTitle {
-  margin-top: var(--space-2);
-  font-family: var(--font-ui);
+  font-family: var(--font-reading);
   font-size: var(--text-xl);
-  font-weight: 700;
-  line-height: var(--leading-ui);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+/* The hairline under a chapter opening. Short and centred, so it reads as a
+   flourish closing the title rather than as a border dividing the screen. */
+.openingRule {
+  display: block;
+  width: 2.5rem;
+  height: 1px;
+  margin: var(--space-4) auto 0;
+  background: var(--color-border);
 }
 
 .note {
@@ -141,35 +188,8 @@
   font-size: var(--text-sm);
 }
 
-.pager {
-  max-width: var(--reading-measure);
-  margin: var(--space-8) auto 0;
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.pagerButton {
-  flex: 1;
-  /* 44px is the smallest reliable thumb target, and these are the two controls
-     the whole reader depends on. */
-  min-height: 44px;
-  padding: var(--space-2) var(--space-4);
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.pagerButton:disabled {
-  /* Left visible rather than hidden: the ends of a book should feel like ends,
-     not like a control that vanished. */
-  opacity: 0.4;
-  cursor: default;
-}
+/* The Previous and Next buttons that lived here are gone — the book is turned
+   by swiping, by tapping the edge of the page, and by the arrow keys. */
 
 /* The way back from a followed link. Deliberately unlike the pager buttons —
    it undoes a jump rather than moving through the book, and it comes and goes,
