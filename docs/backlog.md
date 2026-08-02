@@ -74,6 +74,35 @@
 >
 > Ordering: this belongs in WP-14, next to the font and margin controls, because
 > surviving a font change *is* the hard half. WP-13 stays scrolling.
+>
+> **The page turn is a seam, decided 2026-08-02.** Choosing *which* column comes
+> next and choosing *how the move looks* are separate, and the navigation half
+> must not know about the animation half. Not architecture for its own sake:
+> Next/Previous, an edge tap, a keyboard shortcut, the progress slider and a
+> jump from the ToC are five routes to the same move. Bake the animation into
+> the button and four of them arrive unanimated, or the same code lands five
+> times.
+>
+> Cost is lopsided, so ship accordingly:
+> - **Instant** — already what WP-12 does.
+> - **Slide** — essentially `scroll-behavior: smooth`.
+> - **Fade** — a few lines.
+> - **Page curl** — a project of its own, not a fourth item. Text can't be bent,
+>   so it means snapshotting the page to an image, animating that, then swapping
+>   real text back. Hence the soft edges and dead text selection mid-flip in apps
+>   that do it. Leave a labelled slot; decide once real reading has happened.
+>
+> **Build the seam and two implementations, not a plugin system.** Empty
+> extension points for animations nobody has written are maintenance with no
+> payoff.
+>
+> Two requirements that are easy to forget:
+> - **Honour `prefers-reduced-motion`** — fall back to instant automatically.
+>   Sliding screens make some people motion sick and the OS already knows who.
+> - **The animation must never make the reader wait.** ~200 ms ceiling, and a
+>   fast tapper must be able to outrun it: the next turn starts even if the last
+>   hasn't finished. A per-page delay is what makes a reader feel heavy after an
+>   hour.
 - [ ] **WP-15 Reopen where left off** — persist/restore anchor position · *after 12,03*
 - [ ] **WP-16 Read-aloud** — phone built-in TTS via Web Speech API · *after 12*
 
