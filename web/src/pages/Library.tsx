@@ -6,10 +6,11 @@ import {
   dropHasDirectory,
   filesFromDrop,
   importBooks,
+  shelfOf,
   type BatchProgress,
   type ImportOutcome,
 } from '../import/index.ts'
-import type { BookMeta } from '../structure/index.ts'
+import type { BookMeta, Shelf } from '../structure/index.ts'
 import { repository } from '../storage/index.ts'
 import styles from './page.module.css'
 
@@ -28,6 +29,22 @@ const STAGE_LABEL: Record<BatchProgress['stage'], string> = {
   reading: 'Reading',
   parsing: 'Parsing',
   saving: 'Saving',
+}
+
+/** Fixed order, so the shelves don't rearrange themselves as books arrive. */
+const SHELVES: readonly Shelf[] = ['book', 'paper', 'document']
+
+const SHELF_LABEL: Record<Shelf, string> = {
+  book: 'Books',
+  paper: 'Research papers',
+  document: 'Documents',
+}
+
+/** Singular, for the "move this one" control. */
+const SHELF_SINGULAR: Record<Shelf, string> = {
+  book: 'Book',
+  paper: 'Research paper',
+  document: 'Document',
 }
 
 /**
@@ -109,6 +126,24 @@ export default function Library() {
       setState({
         status: 'failed',
         message: `Couldn’t remove “${book.title}”. ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      })
+    }
+  }
+
+  /**
+   * Moving is always the reader's decision, so it's recorded as an override —
+   * nothing later gets to re-guess a shelf that's been corrected by hand.
+   */
+  async function move(book: BookMeta, shelf: Shelf) {
+    try {
+      await repository.saveBook({ ...book, shelf, shelfOverridden: true })
+      setState({ status: 'ready', books: await repository.listBooks() })
+    } catch (error: unknown) {
+      setState({
+        status: 'failed',
+        message: `Couldn’t move “${book.title}”. ${
           error instanceof Error ? error.message : String(error)
         }`,
       })
@@ -221,50 +256,82 @@ export default function Library() {
         </div>
       )}
 
-      {state.status === 'ready' && state.books.length > 0 && (
-        <ul className={styles.list}>
-          {state.books.map((book) => (
-            <li key={book.id} className={styles.card}>
-              <div className={styles.cardRow}>
-                <Link to={`/book/${book.id}`} className={styles.cardLink}>
-                  <span className={styles.emptyTitle}>{book.title}</span>
-                  <p className={styles.pending}>
-                    {book.author ? `${book.author} · ` : ''}
-                    {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
-                  </p>
-                </Link>
+      {state.status === 'ready' &&
+        state.books.length > 0 &&
+        SHELVES.map((shelf) => {
+          const shelved = state.books.filter((book) => shelfOf(book) === shelf)
+          // An empty shelf isn't shown at all: someone who only reads books
+          // should never see a "Research papers" heading over nothing.
+          if (shelved.length === 0) return null
 
-                {removing === book.id ? (
-                  <div className={styles.confirm}>
-                    <span className={styles.pending}>Remove?</span>
-                    <button
-                      type="button"
-                      className={styles.danger}
-                      onClick={() => {
-                        void remove(book)
-                      }}
-                    >
-                      Remove
-                    </button>
-                    <button type="button" onClick={() => setRemoving(null)}>
-                      Keep
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.iconButton}
-                    aria-label={`Remove ${book.title}`}
-                    onClick={() => setRemoving(book.id)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+          return (
+            <section key={shelf}>
+              <h2 className={styles.shelfHeading}>
+                {SHELF_LABEL[shelf]} <span className={styles.pending}>({shelved.length})</span>
+              </h2>
+
+              <ul className={styles.list}>
+                {shelved.map((book) => (
+                  <li key={book.id} className={styles.card}>
+                    <div className={styles.cardRow}>
+                      <Link to={`/book/${book.id}`} className={styles.cardLink}>
+                        <span className={styles.emptyTitle}>{book.title}</span>
+                        <p className={styles.pending}>
+                          {book.author ? `${book.author} · ` : ''}
+                          {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
+                        </p>
+                      </Link>
+
+                      {removing === book.id ? (
+                        <div className={styles.confirm}>
+                          <span className={styles.pending}>Remove?</span>
+                          <button
+                            type="button"
+                            className={styles.danger}
+                            onClick={() => {
+                              void remove(book)
+                            }}
+                          >
+                            Remove
+                          </button>
+                          <button type="button" onClick={() => setRemoving(null)}>
+                            Keep
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={styles.confirm}>
+                          <select
+                            className={styles.shelfSelect}
+                            aria-label={`Shelf for ${book.title}`}
+                            value={shelf}
+                            onChange={(event) => {
+                              void move(book, event.target.value as Shelf)
+                            }}
+                          >
+                            {SHELVES.map((option) => (
+                              <option key={option} value={option}>
+                                {SHELF_SINGULAR[option]}
+                              </option>
+                            ))}
+                          </select>
+
+                          <button
+                            type="button"
+                            className={styles.iconButton}
+                            aria-label={`Remove ${book.title}`}
+                            onClick={() => setRemoving(book.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        })}
     </div>
   )
 }

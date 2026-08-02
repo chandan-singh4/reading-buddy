@@ -44,6 +44,14 @@ export type BookType = 'light-fiction' | 'dense-technical'
 
 export type SourceFormat = 'epub' | 'pdf' | 'md' | 'txt' | 'docx'
 
+/**
+ * Which shelf a book is filed on. Purely about *what kind of thing* it is, so
+ * a paper doesn't sit among novels — unrelated to `BookType`, which is about
+ * how the tutor should behave. A single PDF can be a `paper` and
+ * `dense-technical` at once, and usually is.
+ */
+export type Shelf = 'book' | 'paper' | 'document'
+
 export interface BookMeta {
   id: BookId
   title: string
@@ -54,6 +62,18 @@ export interface BookMeta {
   subject?: string
   /** True when `type` was set by hand rather than by classification. */
   typeOverridden?: boolean
+  /**
+   * Which shelf it's filed on. Guessed at import from the format and the first
+   * page (see `import/shelf.ts`). Absent on books imported before shelves
+   * existed — read it through `shelfOf`, which falls back to the format's
+   * default rather than requiring a migration.
+   */
+  shelf?: Shelf
+  /**
+   * True once the reader has moved it by hand. The guess must never overrule a
+   * correction, so re-importing or any future re-classification leaves it be.
+   */
+  shelfOverridden?: boolean
   /**
    * SHA-256 of the imported file's bytes — the book's fingerprint, used to
    * recognise a re-import. Identity is the *file*, not the title: two editions

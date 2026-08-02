@@ -44,6 +44,16 @@ This closes the walking skeleton's first half (import → store → list). WP-12
 - `web/src/import/index.ts` (new — public entry point)
 - `web/src/pages/Library.tsx` (edit — the picker + progress + error states)
 - `web/src/pages/Library.module.css` (edit — if it exists; create if not)
+- `web/src/import/dropped.ts` (new — turns a drop, folders included, into files)
+- `web/src/import/shelf.ts` (new — guesses book / paper / document at import)
+- `web/src/import/shelf.test.ts` (new)
+- `web/src/pages/page.module.css` (edit — import, card and shelf styles went here,
+  in the shared stylesheet, rather than into a new `Library.module.css`)
+- `web/src/storage/db.ts` (edit — schema v2/v3 for the duplicate fingerprints)
+- `web/src/storage/repository.ts` (edit — fingerprint lookups; the index only
+  re-exports names, so the signatures had to be read here)
+- `web/src/structure/types.ts` (edit — `contentHash`, `textSignature`, `shelf`;
+  same reason as above)
 - `web/src/parse/index.ts` (read only — the five parser entry points)
 - `web/src/storage/index.ts` (read only — `repository`, `ParsedBook`)
 - `web/src/structure/index.ts` (read only — `BookMeta`, `BookId`, `SourceFormat`)

@@ -14,6 +14,7 @@
 import type { ParsedBook, Repository } from '../storage/index.ts'
 import { repository as defaultRepository } from '../storage/index.ts'
 import type { BookId, BookMeta, SourceFormat } from '../structure/index.ts'
+import { shelfFor } from './shelf.ts'
 
 // --- Failure ----------------------------------------------------------------
 
@@ -334,10 +335,13 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     if (existing) throw duplicateOf(existing)
   }
 
+  // Filed once the text exists, since the first page is what tells a paper from
+  // a book. A guess, and shown as one — the library lets any book be moved.
   const toSave: ParsedBook = {
     ...parsed,
     meta: {
       ...parsed.meta,
+      shelf: shelfFor(format, parsed),
       ...(textSignature === undefined ? {} : { textSignature }),
     },
   }

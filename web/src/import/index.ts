@@ -25,3 +25,5 @@ export type {
 } from './importBook.ts'
 
 export { dropHasDirectory, filesFromDrop } from './dropped.ts'
+
+export { shelfFor, shelfOf } from './shelf.ts'

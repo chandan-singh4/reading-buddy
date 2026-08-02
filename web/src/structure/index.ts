@@ -20,6 +20,7 @@ export type {
   Paragraph,
   Section,
   SectionPath,
+  Shelf,
   SourceFormat,
 } from './types.ts'
 
