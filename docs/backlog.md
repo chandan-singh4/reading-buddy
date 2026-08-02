@@ -65,3 +65,84 @@
 - [ ] **WP-32 Install on iOS + Android** — add-to-home-screen, verify offline · *after 31*
 - [ ] **WP-33 Google Drive backup/restore** — opt-in Settings toggle, off by default · *after 25*
 - [ ] **WP-34 Retire the Tauri shell** — drop the disposable harness · *last, after 32*
+
+---
+
+## Reader's feature wishlist — captured 2026-08-02
+
+> Raised by the reader after WP-11, to be discussed when the relevant leg comes
+> up. Not scheduled. Most of it lands inside waypoints that already exist —
+> the `→ WP-nn` notes say where, so this list stays a wishlist and the legs above
+> stay the plan. Items marked **NEW** have no home yet and need a waypoint (or a
+> decision to decline) before they can be built.
+
+### Library — finding the next book
+- Rename a book → **NEW** (small; pairs with reading real title/author out of EPUB and docx metadata, since titles are filename-derived today)
+- Search the library → WP-24
+- Filter by status (Unread / Reading / Finished) → WP-24 ("status grouping")
+- Sort: recently read, recently added, title, author → WP-24
+- Cover images → WP-24
+- Continue Reading → WP-24, needs WP-15
+- Reading progress (% and last location) → WP-24, needs WP-15
+- Import folder / watch a directory → **NEW.** Folder *import* shipped in WP-11; *watching* a directory is a different thing and the browser can't do it unaided — needs the Tauri shell or the File System Access API. Decide before promising it.
+- Favourites / pin important books → **NEW** (small, sits in WP-24)
+- Archive instead of delete → **NEW** (small, sits in WP-24)
+- Recently opened list → **NEW** (small, needs WP-15)
+- Rate a book on finishing, then 5 recommendations: 2 by the same author, 3 on the topic by others → **NEW, and the largest item here.** Needs a book-metadata source we don't have — the shelf only knows what's been imported, so recommendations must come from Claude or an external catalogue. Worth its own waypoint and its own decision, including whether it violates "no book recommendations everywhere" below. The reader's framing is *at the end of a book only*, which is the version that survives that rule.
+
+### Reading experience
+- Adjustable font, line spacing, margins → WP-14
+- Theme: light / dark / sepia → WP-14 (day/night exists; sepia is the addition)
+- Full-screen reading → **Focus Mode**, below
+- Keyboard shortcuts, plus mobile equivalents where they apply → WP-14
+- Table of contents, chapter navigation → WP-13
+- Estimated time remaining in chapter and in book → **NEW** (small once WP-12 knows section lengths)
+- Reading streak → **NEW**, optional, and in tension with the "no streak pressure" rule below. If built, it must never nag.
+
+### Navigation
+- Back button (return to previous location) → WP-13
+- Jump to page/location, jump to chapter → WP-13
+- Reading history → **NEW** (needs WP-15)
+
+### Bookmarks — kept separate from notes
+- Bookmark a page, name a bookmark, list bookmarks → WP-14
+
+### Highlights
+- Four colours with fixed meanings: yellow = important, blue = question, green = insight, red = confusing → WP-17 (colour semantics are **NEW** on top of it)
+- Tap a paragraph or drag across text → prompt offering highlight (by colour), define, pronounce, copy, search → WP-17. Pronounce leans on WP-16's TTS.
+- Search opens a scrollable pop-up of results, each labelled with its chapter and page → **NEW**, overlaps WP-14's in-book search but the result-with-location pop-up is its own piece of work.
+
+### AI notebook
+- Collects highlights, notes, questions and AI conversations, organised by chapter automatically → WP-25 (highlights/notes) + WP-20 (saved Q&A). Auto-organisation by chapter falls out of anchors for free.
+
+### Reading analytics — deliberately minimal
+- Current book, progress, last read, reading time, books completed → **NEW** (needs WP-15)
+- Reading challenge set by the reader, tracked by month and year → **NEW**
+- Explicitly skipped: badges, XP, leaderboards, coins, daily rewards — they optimise for app engagement rather than reading.
+
+### Quality of life
+- Auto-save reading position → WP-15
+- Undo an accidental highlight → WP-17
+- Export notes, export highlights → WP-25
+- Offline reading, with cloud sync that catches up when back online → WP-30 (offline) + WP-33 (sync). Note the ordering: the app is local-first and already works offline; the *sync* half is the new part.
+- Open multiple books at once → **NEW**, and in tension with WP-28 (books stay separate). Separate *memory* and separate *tabs* aren't the same thing, but the guard needs checking first.
+- Recently closed books → **NEW** (small)
+- Persistent search within a book, find next/previous, remember last search → WP-14
+
+### Explicitly declined
+Social feeds · public comments · reading leaderboards · achievement badges ·
+recommendations scattered everywhere · AI that interrupts on its own · daily
+challenges · streak pressure · notifications while reading · infinite discovery
+pages. All of these pull attention toward the app and away from the book.
+
+### Focus Mode — **NEW**, and the reader's own idea
+The default reading mode. Hides library, settings, AI panel, progress statistics
+and chapter list, leaving text and Previous / Next. AI stays available but only
+on an explicit selection or shortcut — it never appears on its own.
+
+> Worth noting this is less a feature than the shape of the whole reader: if
+> Focus Mode is the *default*, WP-12 and WP-13 should be built with it as the
+> baseline and the chrome as the thing that appears on demand, rather than
+> building full chrome and hiding it afterwards. That is a cheaper decision to
+> make now than later. **The goal: less a content platform, more a quiet reading
+> desk.**
