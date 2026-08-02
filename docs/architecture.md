@@ -49,6 +49,29 @@ Implemented in `web/src/structure/` (WP-05): `types.ts` holds the shape,
 other code should import from. Anchor rules are strict — malformed input throws
 rather than being repaired, since a plausible-but-wrong permanent id would
 silently mis-address saved highlights forever.
+
+### Storage (WP-03)
+
+`web/src/storage/` is the only code allowed to touch IndexedDB. Dexie database
+`reading-buddy`, schema version 1:
+
+| Table | Primary key | Holds |
+|---|---|---|
+| `books` | `id` | `BookMeta` — indexed on title, type, importedAt |
+| `manifests` | `bookId` | one `Manifest` per book |
+| `chapters` | `[bookId+chapter]` | one `ChapterIndex` per chapter |
+| `sections` | `[bookId+path]` | **one row per section** — the retrieval atom |
+
+- **Import `./storage`, never `./storage/db.ts`.** `repository.ts` is the door;
+  the database behind it stays swappable.
+- **There is deliberately no `loadBook()`.** Retrieval is `getManifest` +
+  `getChapterIndex` + one `getSection`. Adding a whole-book read would quietly
+  undo the token strategy.
+- **Schema changes go in a new `.version(n)` block** — never edit a shipped one,
+  or existing installs lose data. Highlights/notes (WP-25) and reading position
+  (WP-15) land as version 2.
+- Import and delete both run in transactions: no half-parsed books, no orphaned
+  sections eating the phone's storage quota.
 - **Book metadata set at import:** type (`light-fiction` | `dense/technical`),
   subject/domain tag, and per-chapter concepts / vocabulary / themes.
 

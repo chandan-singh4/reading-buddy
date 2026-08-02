@@ -8,44 +8,41 @@
 
 ---
 
-## Task — WP-05 · Shared structure schema  ·  KEYSTONE
+## Task — WP-03 · Local storage layer
 
-Define the one shape every other waypoint reads and writes: the parsed-book
-structure, the path-as-address rule, and the anchor grammar. Types and pure
-helpers only — no parser, no database, no UI.
+The single door to all persistence: a Dexie/IndexedDB seam that stores the
+WP-05 structure. Nothing outside `web/src/storage/` may touch the database.
 
-**Order note (2026-08-01):** the backlog lists WP-05 as *after 03*. Reordered by
-Chandan to run **before** WP-03, so the storage layer is built to fit a settled
-schema rather than the reverse. WP-03 becomes *after 05*.
+**Order note (2026-08-01):** run after WP-05, not before — reordered by Chandan
+so storage is built to fit a settled schema.
 
 ### Definition of done
-- [ ] `web/src/structure/types.ts` declares the full parsed-book shape —
-      `BookMeta`, `Manifest`, `ChapterIndex`, `Section`, `Paragraph` — with
-      book-type gating (`light-fiction` | `dense-technical`) present from the
-      start.
-- [ ] `web/src/structure/anchor.ts` provides pure `formatAnchor` /
-      `parseAnchor` / `isAnchor` over the `[ch02-s03-p013]` grammar, plus
-      `sectionPath()` returning the `ch02/s03` address used as the storage key.
-      Malformed input fails loudly rather than returning a wrong anchor.
-- [ ] Vitest installed, `npm test` wired at the root, and the anchor grammar
-      covered by tests — round-trip, padding, and loud failure on malformed
-      input. (Approved by Chandan 2026-08-01 as a rider on this task, since the
-      anchor rules are permanent and every Leg 1 parser depends on them.)
-- [ ] `npm run typecheck`, `npm run build` and `npm test` all pass, and
-      `docs/architecture.md` is updated to record that the on-disk folder tree
-      is realised as **keys**, not files, in the browser.
+- [ ] `web/src/storage/db.ts` declares a versioned Dexie database with tables
+      for books, manifests, chapter indexes and sections — **one row per
+      section**, keyed by `[bookId+path]` so `ch02/s03` is a direct lookup.
+- [ ] `web/src/storage/repository.ts` is the only public API: put/get for each
+      shape, `listBooks`, bulk `putSections`, and a `deleteBook` that cascades
+      in a transaction so no orphan sections survive.
+- [ ] Tests against a real IndexedDB implementation (`fake-indexeddb`) cover
+      round-trip, section-level retrieval, bulk insert and cascade delete.
+- [ ] `npm test`, `npm run typecheck`, `npm run build` all pass.
 
 ### Files in scope
-- `web/src/structure/types.ts` (new)
-- `web/src/structure/anchor.ts` (new)
-- `web/src/structure/anchor.test.ts` (new)
-- `web/src/structure/index.ts` (new — the single public entry point)
-- `web/package.json`, `package.json`, `web/vite.config.ts` (wire up Vitest)
-- `docs/architecture.md` (record path-as-key; it currently implies real files)
+- `web/src/storage/db.ts` (new)
+- `web/src/storage/repository.ts` (new)
+- `web/src/storage/index.ts` (new — the single public entry point)
+- `web/src/storage/repository.test.ts` (new)
+- `web/package.json` (add `dexie`, `fake-indexeddb`)
+- `docs/architecture.md` (record the storage layout)
 - *(create as needed — add any new path to this list)*
 
 ### Out of scope
-- Any parser (WP-06/07/08), the storage layer (WP-03), and all UI.
-- `crossrefs.md` / `learner.md` shapes — later waypoints; leave them undeclared.
-- Syncing `docs/backlog.md` / `docs/progress.md` — deferred to after WP-03 at
-  Chandan's request.
+- Highlights, notes and reading-position tables — WP-25 and WP-15 add these via
+  a Dexie version bump; that mechanism is what this task exists to provide.
+- Any parser, retrieval assembler or UI. Nothing renders yet.
+- Google Drive backup (WP-33).
+
+### Deferred, don't lose
+- `docs/backlog.md` and `docs/progress.md` are stale: WP-01 and WP-05 are done
+  but still show `[ ]`, and the 05-before-03 reorder isn't recorded. Chandan
+  asked to sync these once WP-03 lands.

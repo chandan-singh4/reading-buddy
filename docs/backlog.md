@@ -10,13 +10,13 @@
 ---
 
 ### Leg 0 — Basecamp (scaffold & stack)
-- [ ] **WP-01 Scaffold the stack** — Vite + React + TS, PWA plugin, monorepo web/shell/api · *start here*
+- [x] **WP-01 Scaffold the stack** — Vite + React + TS, PWA plugin, monorepo web/shell/api · *start here*
 - [ ] **WP-02 Wrap the Tauri dev shell** — disposable desktop harness · *after 01*
-- [ ] **WP-03 Local storage layer** — IndexedDB/Dexie seam for all persistence · *after 01*
+- [x] **WP-03 Local storage layer** — IndexedDB/Dexie seam for all persistence · *after 01, **05*** 
 - [ ] **WP-04 App shell + routing** — Library/Reader/Settings + theme tokens · *after 01*
 
 ### Leg 1 — Cartography (parsing pipeline)
-- [ ] **WP-05 Shared structure schema** — path-as-address, manifest, anchor grammar · *KEYSTONE, after 03*
+- [x] **WP-05 Shared structure schema** — path-as-address, manifest, anchor grammar · *KEYSTONE, **before 03** (reordered 2026-08-01)*
 - [ ] **WP-06 Epub parser → structure** — inference + fixed-size fallback, permanent anchors · *after 05*
 - [ ] **WP-07 PDF parser → structure** — reuse rule + running-header/footer filter · *after 06*
 - [ ] **WP-08 Markdown parser → structure** — resolve present heading levels · *after 05*
