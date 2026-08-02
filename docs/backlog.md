@@ -37,7 +37,43 @@
 ### Leg 2 — Reading Room (reader UI & comfort)
 - [~] **WP-12 Structured renderer** — anchored paragraphs, paginated · *after 05,11*
 - [ ] **WP-13 Nav overlay (Books-style)** — tap-fade, progress slider, ToC · *after 12*
-- [ ] **WP-14 Reader conveniences** — font/spacing, day/night, in-book search, bookmarks · *after 12*
+- [ ] **WP-14 Reader conveniences** — font/spacing, day/night, in-book search, bookmarks, **page turning (see below)** · *after 12*
+
+> **Pagination — decided 2026-08-02, after the reader brainstormed four options.**
+>
+> **Location is already solved, and not by page numbers.** Anchors
+> (`[ch05-s03-p013]`) are the stable address, which is the CFI idea in a
+> stronger form: a *character offset* is counted from raw text, so any later
+> parser change shifts every stored offset and misplaces every highlight in that
+> book. An anchor is assigned at import and stored beside the text it names, so
+> it cannot drift. Open limitation: anchors are paragraph-level, so WP-17 will
+> need a character range *within* an anchor for highlights — anchor + offset.
+>
+> **Pages come from CSS columns, not from JavaScript measurement.** Lay a
+> section out in screen-wide columns and turn a page by scrolling one column.
+> The browser's layout engine picks the breaks, so they are clean, nothing is
+> measured, and a font change re-flows on its own — we then ask which column
+> holds the current anchor. This also subsumes virtual pagination: the browser
+> only renders columns near the viewport, so the memory win arrives with no
+> cache to maintain.
+>
+> Rejected: **scroll by one viewport height**. It doesn't split a paragraph, it
+> splits a *line* — every page would end mid-letterform, and fixing that needs
+> exactly the measurement being avoided. Rejected for now: **JS virtual
+> pagination** (previous/current/next) — sound reasoning, but only needed if we
+> paginate ourselves, and it buys a cache, a rebuild schedule and edge cases.
+>
+> Accepted cost: columns break awkwardly around tall figures, wide tables and
+> long code. A section is the unit, so the damage is bounded — keep plain
+> scrolling as a per-section fallback, which is nearly free since it is what
+> WP-12 already does.
+>
+> **No page numbers anywhere.** They change with the font, so they are a lie.
+> "Chapter 5, 40% through" and "about 12 minutes left" are stable, honest, and
+> computable from word counts without laying anything out.
+>
+> Ordering: this belongs in WP-14, next to the font and margin controls, because
+> surviving a font change *is* the hard half. WP-13 stays scrolling.
 - [ ] **WP-15 Reopen where left off** — persist/restore anchor position · *after 12,03*
 - [ ] **WP-16 Read-aloud** — phone built-in TTS via Web Speech API · *after 12*
 
