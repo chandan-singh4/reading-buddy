@@ -11,7 +11,9 @@ import {
   ImportError,
   formatFromFilename,
   importBook,
+  importBooks,
   titleFromFilename,
+  type BatchProgress,
   type ParserTable,
 } from './importBook.ts'
 
@@ -226,6 +228,126 @@ describe('failure is explained, never silent', () => {
     expect(await repo.listBooks()).toEqual([])
     expect(await db.sections.count()).toBe(0)
     expect(await db.manifests.count()).toBe(0)
+  })
+})
+
+// --- Many at a time ---------------------------------------------------------
+
+describe('importing many files', () => {
+  let idCounter = 0
+  const uniqueIds = () => `book-${(idCounter += 1)}`
+
+  it('imports every file and reports one outcome each', async () => {
+    const { parsers } = stubParsers()
+
+    const outcomes = await importBooks(
+      [fileOf('one.md'), fileOf('two.epub'), fileOf('three.txt')],
+      { repository: repo, parsers, newId: uniqueIds },
+    )
+
+    expect(outcomes.map((outcome) => outcome.status)).toEqual([
+      'imported',
+      'imported',
+      'imported',
+    ])
+    expect((await repo.listBooks()).length).toBe(3)
+  })
+
+  it('keeps going after a bad file, rather than losing the whole batch', async () => {
+    const { parsers } = stubParsers({
+      epub: async () => {
+        throw new Error('DRM')
+      },
+    })
+
+    const outcomes = await importBooks(
+      [fileOf('good.md'), fileOf('broken.epub'), fileOf('also-good.txt')],
+      { repository: repo, parsers, newId: uniqueIds },
+    )
+
+    expect(outcomes.map((outcome) => outcome.status)).toEqual([
+      'imported',
+      'failed',
+      'imported',
+    ])
+    // The failure explains itself, and names the file it belongs to.
+    const failure = outcomes[1]
+    expect(failure?.status === 'failed' && failure.code).toBe('unreadable-file')
+    expect(failure?.filename).toBe('broken.epub')
+    expect((await repo.listBooks()).length).toBe(2)
+  })
+
+  it('reports unreadable files that were hand-picked', async () => {
+    const { parsers } = stubParsers()
+
+    const outcomes = await importBooks([fileOf('good.md'), fileOf('kindle.azw3')], {
+      repository: repo,
+      parsers,
+      newId: uniqueIds,
+    })
+
+    expect(outcomes.length).toBe(2)
+    const failure = outcomes[1]
+    expect(failure?.status === 'failed' && failure.code).toBe('unsupported-format')
+  })
+
+  it('silently ignores the clutter that comes with a folder', async () => {
+    const { parsers } = stubParsers()
+
+    const outcomes = await importBooks(
+      [fileOf('book.epub'), fileOf('cover.jpg'), fileOf('metadata.opf'), fileOf('notes.md')],
+      { repository: repo, parsers, skipUnsupported: true, newId: uniqueIds },
+    )
+
+    // Only the two readable files produce an outcome at all — no wall of
+    // "can't open cover.jpg" to read past.
+    expect(outcomes.map((outcome) => outcome.filename)).toEqual(['book.epub', 'notes.md'])
+    expect(outcomes.every((outcome) => outcome.status === 'imported')).toBe(true)
+  })
+
+  it('counts progress against the filtered list, so it never says 4 of 12', async () => {
+    const { parsers } = stubParsers()
+    const seen: BatchProgress[] = []
+
+    await importBooks([fileOf('a.md'), fileOf('cover.jpg'), fileOf('b.md')], {
+      repository: repo,
+      parsers,
+      skipUnsupported: true,
+      newId: uniqueIds,
+      onProgress: (progress) => seen.push(progress),
+    })
+
+    expect(seen.every((progress) => progress.total === 2)).toBe(true)
+    expect(seen.at(-1)?.index).toBe(2)
+    expect(seen.at(-1)?.filename).toBe('b.md')
+  })
+
+  it('imports one strictly after another', async () => {
+    const active: string[] = []
+    let overlapped = false
+
+    const serialising = async (_data: unknown, meta: BookMeta) => {
+      active.push(meta.title)
+      if (active.length > 1) overlapped = true
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      active.pop()
+      return oneParagraphBook(meta)
+    }
+    const { parsers } = stubParsers({ md: serialising, txt: serialising })
+
+    await importBooks([fileOf('a.md'), fileOf('b.txt'), fileOf('c.md')], {
+      repository: repo,
+      parsers,
+      newId: uniqueIds,
+    })
+
+    // Parsing is CPU-bound; overlapping a folder's worth would freeze the UI.
+    expect(overlapped).toBe(false)
+  })
+
+  it('returns an empty report for an empty list', async () => {
+    const { parsers } = stubParsers()
+    expect(await importBooks([], { repository: repo, parsers })).toEqual([])
   })
 })
 

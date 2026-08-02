@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 
-import { ACCEPTED_EXTENSIONS, ImportError, importBook, type ImportStage } from '../import/index.ts'
+import {
+  ACCEPTED_EXTENSIONS,
+  dropHasDirectory,
+  filesFromDrop,
+  importBooks,
+  type BatchProgress,
+  type ImportOutcome,
+} from '../import/index.ts'
 import type { BookMeta } from '../structure/index.ts'
 import { repository } from '../storage/index.ts'
 import styles from './page.module.css'
@@ -13,22 +20,24 @@ type LoadState =
 
 type ImportState =
   | { status: 'idle' }
-  | { status: 'busy'; stage: ImportStage; filename: string }
-  | { status: 'failed'; message: string }
+  | { status: 'scanning' }
+  | { status: 'busy'; progress: BatchProgress }
+  | { status: 'done'; outcomes: ImportOutcome[] }
 
-const STAGE_LABEL: Record<ImportStage, string> = {
+const STAGE_LABEL: Record<BatchProgress['stage'], string> = {
   reading: 'Reading',
   parsing: 'Parsing',
   saving: 'Saving',
 }
 
 /**
- * The home screen: every imported book, newest first, plus the file picker that
- * puts them there. Reads and writes through the WP-03 repository.
+ * The home screen: every imported book, newest first, plus the three ways in —
+ * pick files, pick a folder, or drop either onto the page.
  */
 export default function Library() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [importing, setImporting] = useState<ImportState>({ status: 'idle' })
+  const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -53,75 +62,125 @@ export default function Library() {
     }
   }, [])
 
-  async function onPick(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    // Reset immediately so picking the same file twice still fires a change.
-    event.target.value = ''
-    if (!file) return
+  const busy = importing.status === 'busy' || importing.status === 'scanning'
 
-    setImporting({ status: 'busy', stage: 'reading', filename: file.name })
+  /**
+   * `fromFolder` decides whether an unreadable file is worth reporting: a
+   * hand-picked one is, a stray file swept up from a folder isn't.
+   */
+  async function runImport(files: File[], fromFolder: boolean) {
+    if (files.length === 0) {
+      setImporting({ status: 'done', outcomes: [] })
+      return
+    }
+
+    setImporting({ status: 'busy', progress: { index: 1, total: files.length, filename: files[0]!.name, stage: 'reading' } })
+
+    const outcomes = await importBooks(files, {
+      skipUnsupported: fromFolder,
+      onProgress: (progress) => setImporting({ status: 'busy', progress }),
+    })
+
+    setImporting({ status: 'done', outcomes })
 
     try {
-      await importBook(file, {
-        onStage: (stage) => {
-          setImporting({ status: 'busy', stage, filename: file.name })
-        },
-      })
-      setImporting({ status: 'idle' })
       setState({ status: 'ready', books: await repository.listBooks() })
     } catch (error: unknown) {
-      // `ImportError` messages are already written for a reader; anything else
-      // is unexpected, so show it rather than hide it behind a friendly lie.
-      setImporting({
+      setState({
         status: 'failed',
-        message:
-          error instanceof ImportError
-            ? error.message
-            : `Something went wrong importing “${file.name}”. ${
-                error instanceof Error ? error.message : String(error)
-              }`,
+        message: error instanceof Error ? error.message : String(error),
       })
     }
   }
 
-  const busy = importing.status === 'busy'
+  function onPick(event: React.ChangeEvent<HTMLInputElement>, fromFolder: boolean) {
+    const files = Array.from(event.target.files ?? [])
+    // Reset immediately so picking the same files twice still fires a change.
+    event.target.value = ''
+    void runImport(files, fromFolder)
+  }
+
+  async function onDrop(event: React.DragEvent) {
+    event.preventDefault()
+    setDragging(false)
+    if (busy) return
+
+    const fromFolder = dropHasDirectory(event.dataTransfer)
+    setImporting({ status: 'scanning' })
+    // Walking a dropped folder is itself async, and on a big shelf it is slow
+    // enough to need its own "looking through that folder…" state.
+    const files = await filesFromDrop(event.dataTransfer)
+    void runImport(files, fromFolder)
+  }
 
   return (
-    <>
+    <div
+      onDragOver={(event) => {
+        event.preventDefault()
+        if (!busy) setDragging(true)
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(event) => {
+        void onDrop(event)
+      }}
+    >
       <h1 className={styles.title}>Library</h1>
 
-      <div className={styles.importer}>
-        <input
-          id="import-file"
-          className={styles.fileInput}
-          type="file"
-          accept={ACCEPTED_EXTENSIONS}
-          disabled={busy}
-          onChange={(event) => {
-            void onPick(event)
-          }}
-        />
-        <label htmlFor="import-file" className={styles.importButton} aria-disabled={busy}>
-          {busy ? 'Importing…' : 'Add a book'}
-        </label>
+      <div className={`${styles.importer} ${dragging ? styles.importerDragging : ''}`}>
+        <div className={styles.importActions}>
+          <input
+            id="import-files"
+            className={styles.fileInput}
+            type="file"
+            multiple
+            accept={ACCEPTED_EXTENSIONS}
+            disabled={busy}
+            onChange={(event) => onPick(event, false)}
+          />
+          <label htmlFor="import-files" className={styles.importButton} aria-disabled={busy}>
+            {busy ? 'Importing…' : 'Add books'}
+          </label>
+
+          <input
+            id="import-folder"
+            className={styles.fileInput}
+            type="file"
+            multiple
+            disabled={busy}
+            // Not in React's typings; the attribute is what makes the picker
+            // choose a folder instead of files, so it is set directly.
+            ref={(element) => {
+              element?.setAttribute('webkitdirectory', '')
+            }}
+            onChange={(event) => onPick(event, true)}
+          />
+          <label htmlFor="import-folder" className={styles.importButton} aria-disabled={busy}>
+            Add a folder
+          </label>
+        </div>
+
         <p className={styles.pending}>
-          EPUB, PDF, Markdown, plain text or Word (.docx). Kindle books (.azw3,
-          .kfx) can’t be opened — convert one to EPUB first, with Calibre.
+          Pick several at once, choose a whole folder, or drag either onto this
+          page. EPUB, PDF, Markdown, plain text or Word (.docx) — Kindle books
+          (.azw3, .kfx) can’t be opened, so convert one to EPUB first, with
+          Calibre.
         </p>
 
-        {busy && (
+        {importing.status === 'scanning' && (
           <p className={styles.pending} role="status">
-            {STAGE_LABEL[importing.stage]} “{importing.filename}”… Large books can
-            take a few seconds.
+            Looking through that folder…
           </p>
         )}
 
-        {importing.status === 'failed' && (
-          <div className={styles.error} role="alert">
-            <p>Couldn’t import that file.</p>
-            <p className={styles.pending}>{importing.message}</p>
-          </div>
+        {importing.status === 'busy' && (
+          <p className={styles.pending} role="status">
+            {STAGE_LABEL[importing.progress.stage]} “{importing.progress.filename}” —{' '}
+            {importing.progress.index} of {importing.progress.total}. Large books
+            can take a few seconds each.
+          </p>
         )}
+
+        {importing.status === 'done' && <ImportReport outcomes={importing.outcomes} />}
       </div>
 
       {state.status === 'loading' && <p className={styles.pending}>Loading…</p>}
@@ -136,7 +195,7 @@ export default function Library() {
       {state.status === 'ready' && state.books.length === 0 && (
         <div className={styles.empty}>
           <p className={styles.emptyTitle}>No books yet</p>
-          <p>Add one with the button above.</p>
+          <p>Add some with the buttons above.</p>
         </div>
       )}
 
@@ -155,6 +214,48 @@ export default function Library() {
           ))}
         </ul>
       )}
-    </>
+    </div>
+  )
+}
+
+/**
+ * What happened, per file. A batch has no single answer — "9 imported, 3
+ * couldn't be opened" is the truth, and each of those three needs its own
+ * reason next to its own filename.
+ */
+function ImportReport({ outcomes }: { outcomes: ImportOutcome[] }) {
+  if (outcomes.length === 0) {
+    return (
+      <div className={styles.error} role="alert">
+        <p>Nothing there to import.</p>
+        <p className={styles.pending}>
+          No EPUB, PDF, Markdown, text or Word files were found.
+        </p>
+      </div>
+    )
+  }
+
+  const imported = outcomes.filter((outcome) => outcome.status === 'imported')
+  const failed = outcomes.filter((outcome) => outcome.status === 'failed')
+
+  return (
+    <div className={failed.length > 0 ? styles.error : undefined} role="status">
+      <p>
+        {imported.length > 0
+          ? `Imported ${imported.length} ${imported.length === 1 ? 'book' : 'books'}.`
+          : 'Nothing was imported.'}
+        {failed.length > 0 && ` ${failed.length} couldn’t be opened:`}
+      </p>
+
+      {failed.length > 0 && (
+        <ul className={styles.failureList}>
+          {failed.map((outcome) => (
+            <li key={outcome.filename} className={styles.pending}>
+              <strong>{outcome.filename}</strong> — {outcome.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

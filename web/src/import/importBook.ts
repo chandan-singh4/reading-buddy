@@ -209,3 +209,80 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
 
   return parsed.meta
 }
+
+// --- Many at a time -----------------------------------------------------------
+
+/** What became of one file in a batch. */
+export type ImportOutcome =
+  | { filename: string; status: 'imported'; meta: BookMeta }
+  | { filename: string; status: 'failed'; message: string; code: ImportErrorCode | 'unknown' }
+
+export interface BatchProgress {
+  /** 1-based index of the file being worked on. */
+  index: number
+  total: number
+  filename: string
+  stage: ImportStage
+}
+
+export interface ImportManyOptions extends Omit<ImportOptions, 'onStage'> {
+  onProgress?: (progress: BatchProgress) => void
+  /**
+   * Drop files whose extension we can't read instead of reporting each one as
+   * a failure. True when the list came from scanning a folder — a book folder
+   * is full of covers, `.DS_Store` and metadata, and forty "can't open this"
+   * errors would bury the one that matters. False for a hand-picked list,
+   * where an unreadable file is a question the reader actually asked.
+   */
+  skipUnsupported?: boolean
+}
+
+/**
+ * Import a list of files one after another, and report on each.
+ *
+ * Sequential on purpose. Parsing is CPU-bound and largely synchronous once it
+ * starts; running a folder's worth in parallel would compete for the one main
+ * thread and lock the screen up for the whole batch instead of a moment per
+ * book. One at a time is both faster in practice and honest about progress.
+ *
+ * One bad file never stops the run — the batch resolves with a mixed list of
+ * successes and failures, because "9 of 12 imported" is a far more useful
+ * outcome than a single thrown error.
+ */
+export async function importBooks(
+  files: readonly File[],
+  options: ImportManyOptions = {},
+): Promise<ImportOutcome[]> {
+  const { onProgress, skipUnsupported = false, ...single } = options
+
+  const queue = skipUnsupported
+    ? files.filter((file) => formatFromFilename(file.name) !== undefined)
+    : files
+
+  const outcomes: ImportOutcome[] = []
+
+  for (const [position, file] of queue.entries()) {
+    try {
+      const meta = await importBook(file, {
+        ...single,
+        onStage: (stage) => {
+          onProgress?.({ index: position + 1, total: queue.length, filename: file.name, stage })
+        },
+      })
+      outcomes.push({ filename: file.name, status: 'imported', meta })
+    } catch (error: unknown) {
+      outcomes.push(
+        error instanceof ImportError
+          ? { filename: file.name, status: 'failed', message: error.message, code: error.code }
+          : {
+              filename: file.name,
+              status: 'failed',
+              code: 'unknown',
+              message: error instanceof Error ? error.message : String(error),
+            },
+      )
+    }
+  }
+
+  return outcomes
+}

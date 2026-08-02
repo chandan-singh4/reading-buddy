@@ -8,11 +8,17 @@ export {
   ImportError,
   formatFromFilename,
   importBook,
+  importBooks,
   titleFromFilename,
 } from './importBook.ts'
 export type {
+  BatchProgress,
   ImportErrorCode,
+  ImportManyOptions,
   ImportOptions,
+  ImportOutcome,
   ImportStage,
   ParserTable,
 } from './importBook.ts'
+
+export { dropHasDirectory, filesFromDrop } from './dropped.ts'
