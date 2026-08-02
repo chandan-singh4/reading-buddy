@@ -33,7 +33,12 @@ afterEach(async () => {
 
 // --- Helpers ----------------------------------------------------------------
 
-function fileOf(name: string, contents = '# Title\n\nSome prose.\n'): File {
+/**
+ * Contents default to something unique per filename. Two files with the same
+ * bytes are now genuinely the same book, so a shared default would make every
+ * multi-file fixture a pile of duplicates.
+ */
+function fileOf(name: string, contents = `# ${name}\n\nSome prose.\n`): File {
   return new File([contents], name)
 }
 
@@ -348,6 +353,126 @@ describe('importing many files', () => {
   it('returns an empty report for an empty list', async () => {
     const { parsers } = stubParsers()
     expect(await importBooks([], { repository: repo, parsers })).toEqual([])
+  })
+})
+
+// --- Duplicates -------------------------------------------------------------
+
+describe('duplicate detection', () => {
+  let idCounter = 100
+  const uniqueIds = () => `dup-${(idCounter += 1)}`
+
+  it('refuses the same file twice, naming the book already on the shelf', async () => {
+    const { parsers } = stubParsers()
+    const contents = '# Man and His Symbols\n\nProse.\n'
+
+    await importBook(fileOf('jung.md', contents), {
+      repository: repo,
+      parsers,
+      newId: uniqueIds,
+    })
+
+    // Same bytes, different filename — still the same book.
+    const error = await importErrorFrom(
+      importBook(fileOf('jung-copy.md', contents), {
+        repository: repo,
+        parsers,
+        newId: uniqueIds,
+      }),
+    )
+
+    expect(error.code).toBe('duplicate')
+    expect(error.message).toContain('already on your shelf')
+    expect(error.message).toContain('jung')
+    expect((await repo.listBooks()).length).toBe(1)
+  })
+
+  it('does not parse a duplicate at all', async () => {
+    const { parsers, calls } = stubParsers()
+    const contents = '# Same\n\nProse.\n'
+
+    await importBook(fileOf('a.md', contents), { repository: repo, parsers, newId: uniqueIds })
+    expect(calls.length).toBe(1)
+
+    await importErrorFrom(
+      importBook(fileOf('a.md', contents), { repository: repo, parsers, newId: uniqueIds }),
+    )
+    // Still 1: the hash answered before the expensive work started.
+    expect(calls.length).toBe(1)
+  })
+
+  it('treats different content as a different book, however similar the name', async () => {
+    const { parsers } = stubParsers()
+
+    await importBook(fileOf('book.md', '# Edition one\n\nProse.\n'), {
+      repository: repo,
+      parsers,
+      newId: uniqueIds,
+    })
+    await importBook(fileOf('book.md', '# Edition two\n\nDifferent prose.\n'), {
+      repository: repo,
+      parsers,
+      newId: uniqueIds,
+    })
+
+    expect((await repo.listBooks()).length).toBe(2)
+  })
+
+  it('records the fingerprint on the stored book', async () => {
+    const meta = await importBook(fileOf('a.md', '# T\n\nProse.\n'), {
+      repository: repo,
+      newId: uniqueIds,
+    })
+
+    const stored = await repo.getBook(meta.id)
+    expect(stored?.contentHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(await repo.findByContentHash(stored!.contentHash!)).toBeDefined()
+  })
+
+  it('reports a duplicate in a batch as its own status, not as a failure', async () => {
+    const { parsers } = stubParsers()
+    const contents = '# Twice\n\nProse.\n'
+
+    const outcomes = await importBooks(
+      [fileOf('a.md', contents), fileOf('a-copy.md', contents), fileOf('b.md', '# Other\n\nX.\n')],
+      { repository: repo, parsers, newId: uniqueIds },
+    )
+
+    expect(outcomes.map((outcome) => outcome.status)).toEqual([
+      'imported',
+      'duplicate',
+      'imported',
+    ])
+    expect((await repo.listBooks()).length).toBe(2)
+  })
+})
+
+// --- Removal ----------------------------------------------------------------
+
+describe('removing a book', () => {
+  it('takes its sections and manifest with it, and frees the fingerprint', async () => {
+    const contents = '# Gone\n\nProse.\n'
+    const meta = await importBook(fileOf('gone.md', contents), {
+      repository: repo,
+      newId: () => 'gone-1',
+    })
+
+    expect(await db.sections.count()).toBeGreaterThan(0)
+
+    await repo.deleteBook(meta.id)
+
+    expect(await repo.listBooks()).toEqual([])
+    expect(await db.sections.count()).toBe(0)
+    expect(await db.manifests.count()).toBe(0)
+    expect(await db.chapters.count()).toBe(0)
+
+    // Removing then re-importing must work — otherwise a delete would blacklist
+    // the book forever.
+    const again = await importBook(fileOf('gone.md', contents), {
+      repository: repo,
+      newId: () => 'gone-2',
+    })
+    expect(again.id).toBe('gone-2')
   })
 })
 

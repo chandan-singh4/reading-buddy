@@ -38,6 +38,8 @@ export default function Library() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [importing, setImporting] = useState<ImportState>({ status: 'idle' })
   const [dragging, setDragging] = useState(false)
+  /** The book whose "Remove?" confirmation is showing, if any. */
+  const [removing, setRemoving] = useState<BookMeta['id'] | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -89,6 +91,26 @@ export default function Library() {
       setState({
         status: 'failed',
         message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  /**
+   * Deleting cascades — the book, its manifest, chapters and every section, in
+   * one transaction (see `repository.deleteBook`). Orphaned sections would be
+   * invisible and unreachable while still eating the phone's storage quota.
+   */
+  async function remove(book: BookMeta) {
+    setRemoving(null)
+    try {
+      await repository.deleteBook(book.id)
+      setState({ status: 'ready', books: await repository.listBooks() })
+    } catch (error: unknown) {
+      setState({
+        status: 'failed',
+        message: `Couldn’t remove “${book.title}”. ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       })
     }
   }
@@ -203,13 +225,42 @@ export default function Library() {
         <ul className={styles.list}>
           {state.books.map((book) => (
             <li key={book.id} className={styles.card}>
-              <Link to={`/book/${book.id}`}>
-                <span className={styles.emptyTitle}>{book.title}</span>
-                <p className={styles.pending}>
-                  {book.author ? `${book.author} · ` : ''}
-                  {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
-                </p>
-              </Link>
+              <div className={styles.cardRow}>
+                <Link to={`/book/${book.id}`} className={styles.cardLink}>
+                  <span className={styles.emptyTitle}>{book.title}</span>
+                  <p className={styles.pending}>
+                    {book.author ? `${book.author} · ` : ''}
+                    {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
+                  </p>
+                </Link>
+
+                {removing === book.id ? (
+                  <div className={styles.confirm}>
+                    <span className={styles.pending}>Remove?</span>
+                    <button
+                      type="button"
+                      className={styles.danger}
+                      onClick={() => {
+                        void remove(book)
+                      }}
+                    >
+                      Remove
+                    </button>
+                    <button type="button" onClick={() => setRemoving(null)}>
+                      Keep
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.iconButton}
+                    aria-label={`Remove ${book.title}`}
+                    onClick={() => setRemoving(book.id)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -236,14 +287,26 @@ function ImportReport({ outcomes }: { outcomes: ImportOutcome[] }) {
   }
 
   const imported = outcomes.filter((outcome) => outcome.status === 'imported')
+  const duplicates = outcomes.filter((outcome) => outcome.status === 'duplicate')
   const failed = outcomes.filter((outcome) => outcome.status === 'failed')
+
+  // A single duplicate is the common case — you re-dropped one book — and it
+  // deserves the plain sentence, not a one-item list under a summary.
+  if (outcomes.length === 1 && duplicates.length === 1) {
+    return (
+      <p className={styles.pending} role="status">
+        {duplicates[0]!.message}
+      </p>
+    )
+  }
 
   return (
     <div className={failed.length > 0 ? styles.error : undefined} role="status">
       <p>
         {imported.length > 0
           ? `Imported ${imported.length} ${imported.length === 1 ? 'book' : 'books'}.`
-          : 'Nothing was imported.'}
+          : 'Nothing new was imported.'}
+        {duplicates.length > 0 && ` ${duplicates.length} already on your shelf.`}
         {failed.length > 0 && ` ${failed.length} couldn’t be opened:`}
       </p>
 

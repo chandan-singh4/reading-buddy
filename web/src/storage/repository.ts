@@ -50,6 +50,14 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       return books.reverse()
     },
 
+    /**
+     * The book with this file fingerprint, if it's already on the shelf.
+     * Indexed, so this stays a lookup rather than a scan as the library grows.
+     */
+    async findByContentHash(hash: string): Promise<BookMeta | undefined> {
+      return database.books.where('contentHash').equals(hash).first()
+    },
+
     // --- Import --------------------------------------------------------
 
     /**

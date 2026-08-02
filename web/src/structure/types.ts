@@ -54,6 +54,14 @@ export interface BookMeta {
   subject?: string
   /** True when `type` was set by hand rather than by classification. */
   typeOverridden?: boolean
+  /**
+   * SHA-256 of the imported file's bytes — the book's fingerprint, used to
+   * recognise a re-import. Identity is the *file*, not the title: two editions
+   * of the same book are genuinely different books, while the same file
+   * downloaded twice under two names is not. Absent on books imported before
+   * this was recorded, and when the platform offers no crypto.
+   */
+  contentHash?: string
   /** ISO 8601. */
   importedAt: string
 }

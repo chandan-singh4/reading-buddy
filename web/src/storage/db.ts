@@ -47,8 +47,7 @@ export type ReadingBuddyDB = Dexie & {
 
 /**
  * Schema history. Never edit a shipped version — add a new `.version(n)` block
- * instead, so existing installs migrate rather than lose data. Highlights,
- * notes and reading position (WP-25, WP-15) arrive as version 2.
+ * instead, so existing installs migrate rather than lose data.
  *
  * In each store string the first entry is the primary key; the rest are
  * secondary indexes. `[bookId+path]` is a compound key — the exact address.
@@ -59,6 +58,14 @@ function defineSchema(db: Dexie): void {
     manifests: 'bookId',
     chapters: '[bookId+chapter], bookId',
     sections: '[bookId+path], bookId, chapter',
+  })
+
+  // v2 — `contentHash` indexed, so "have I already got this file?" is a direct
+  // lookup at import rather than a scan of every book. Books imported under v1
+  // simply have no hash; they are never reported as duplicates, which is the
+  // right way round — a false "already on your shelf" is worse than a missed one.
+  db.version(2).stores({
+    books: 'id, title, type, importedAt, contentHash',
   })
 }
 

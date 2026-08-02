@@ -6,6 +6,7 @@
 export {
   ACCEPTED_EXTENSIONS,
   ImportError,
+  fingerprint,
   formatFromFilename,
   importBook,
   importBooks,

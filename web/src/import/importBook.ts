@@ -27,6 +27,7 @@ export type ImportErrorCode =
   | 'unreadable-file'
   | 'no-text'
   | 'save-failed'
+  | 'duplicate'
 
 export class ImportError extends Error {
   readonly code: ImportErrorCode
@@ -133,6 +134,36 @@ const NO_TEXT_MESSAGE: Readonly<Record<SourceFormat, string>> = {
   txt: 'This file is empty.',
 }
 
+// --- Fingerprinting -----------------------------------------------------------
+
+/**
+ * SHA-256 of what we just read. The bytes are already in memory for parsing, so
+ * this costs one pass over them and nothing extra in I/O.
+ *
+ * Hashing the *file* rather than matching on title is the whole point: a title
+ * match would refuse a second edition or a different translation, which are
+ * real, separate books. The same download twice — under two names, from two
+ * folders — is not.
+ *
+ * Returns undefined where `crypto.subtle` isn't available (it needs a secure
+ * context). Import then proceeds without the check, because failing to import
+ * a book is a far worse outcome than importing it twice.
+ */
+export async function fingerprint(data: ArrayBuffer | string): Promise<string | undefined> {
+  const subtle = globalThis.crypto?.subtle
+  if (!subtle) return undefined
+
+  try {
+    const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data)
+    const digest = await subtle.digest('SHA-256', bytes)
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+  } catch {
+    return undefined
+  }
+}
+
 function countParagraphs(book: ParsedBook): number {
   return book.sections.reduce((total, section) => total + section.paragraphs.length, 0)
 }
@@ -174,10 +205,25 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     throw new ImportError('unreadable-file', UNREADABLE_MESSAGE[format], { cause })
   }
 
+  // Checked before parsing, not after: re-dropping a folder of books you
+  // already have should cost a hash each, not a full re-parse each.
+  const contentHash = await fingerprint(data)
+  if (contentHash !== undefined) {
+    const existing = await repository.findByContentHash(contentHash)
+    if (existing) {
+      throw new ImportError(
+        'duplicate',
+        `“${existing.title}” is already on your shelf.`,
+        { cause: existing },
+      )
+    }
+  }
+
   const meta: BookMeta = {
     id: newId() as BookId,
     title: titleFromFilename(file.name),
     source: format,
+    ...(contentHash === undefined ? {} : { contentHash }),
     // WP-10 classifies for real. Until then every book gets the richer of the
     // two modes — a wrong "dense" costs a reader nothing but extra options.
     type: 'dense-technical',
@@ -212,9 +258,14 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
 
 // --- Many at a time -----------------------------------------------------------
 
-/** What became of one file in a batch. */
+/**
+ * What became of one file in a batch. A duplicate is its own status rather than
+ * a failure: nothing went wrong, and lumping "already on your shelf" in with
+ * "this file is broken" would make a second folder drop look alarming.
+ */
 export type ImportOutcome =
   | { filename: string; status: 'imported'; meta: BookMeta }
+  | { filename: string; status: 'duplicate'; message: string }
   | { filename: string; status: 'failed'; message: string; code: ImportErrorCode | 'unknown' }
 
 export interface BatchProgress {
@@ -272,7 +323,9 @@ export async function importBooks(
       outcomes.push({ filename: file.name, status: 'imported', meta })
     } catch (error: unknown) {
       outcomes.push(
-        error instanceof ImportError
+        error instanceof ImportError && error.code === 'duplicate'
+          ? { filename: file.name, status: 'duplicate', message: error.message }
+          : error instanceof ImportError
           ? { filename: file.name, status: 'failed', message: error.message, code: error.code }
           : {
               filename: file.name,
