@@ -9,41 +9,107 @@
  * It layers *over* the text rather than sitting beside it, which is the whole
  * reason WP-12 was built bare: hiding this removes nothing and reveals nothing
  * — the text underneath never moves.
+ *
+ * WP-40 shaped the bottom half after Google Books, which the reader uses daily:
+ * a hamburger on the left opening a tabbed sheet, a tappable status line that
+ * cycles through three states, a percentage on the right, and a slider that
+ * moves one page at a time.
  */
 
+import { useRef } from 'react'
 import { Link } from 'react-router'
 
-import { chapterAt, progressLabel, progressOf } from './progress.ts'
+import { advanceBar, barLabel, showsPercent, type BarState } from './bar.ts'
+import { stepThrough, swipeOf, type Touch } from './swipe.ts'
+import { progressLabel, progressOf, type Pages } from './progress.ts'
 import type { SectionRef } from './navigation.ts'
 import type { Manifest } from '../structure/index.ts'
 import styles from './Chrome.module.css'
+
+/** The sheet's three tabs. Two are stubs until WP-14 and WP-25. */
+export type SheetTab = 'contents' | 'bookmarks' | 'notes'
 
 export interface ChromeProps {
   bookTitle: string
   manifest: Manifest
   here: SectionRef
+  /**
+   * Where you are in pages, or `null` for a book that doesn't know its own
+   * length yet. `null` costs the page number and the fine slider; the chapter
+   * line and the contents list carry on regardless.
+   *
+   * Worked out by the reading page rather than here, because it depends on
+   * which paragraph is on screen — something this component deliberately can't
+   * see. Chrome stays presentational.
+   */
+  pages: Pages | null
   /** Whether the overlay is currently on screen. */
   shown: boolean
   focusMode: boolean
-  contentsOpen: boolean
+  sheetOpen: boolean
+  sheetTab: SheetTab
+  barState: BarState
   onToggleFocus: () => void
-  onToggleContents: () => void
+  onToggleSheet: () => void
+  onSelectTab: (tab: SheetTab) => void
+  onBarStateChange: (state: BarState) => void
   /** Go to the first section of a chapter. */
   onJumpToChapter: (chapter: number) => void
+  /** Go to a page — which may be inside the section already on screen. */
+  onJumpToPage: (page: number) => void
 }
+
+const TABS: { id: SheetTab; label: string }[] = [
+  { id: 'contents', label: 'Contents' },
+  { id: 'bookmarks', label: 'Bookmarks' },
+  { id: 'notes', label: 'Notes' },
+]
 
 export function Chrome({
   bookTitle,
   manifest,
   here,
+  pages,
   shown,
   focusMode,
-  contentsOpen,
+  sheetOpen,
+  sheetTab,
+  barState,
   onToggleFocus,
-  onToggleContents,
+  onToggleSheet,
+  onSelectTab,
+  onBarStateChange,
   onJumpToChapter,
+  onJumpToPage,
 }: ChromeProps) {
-  const { chapter, chapterCount, fraction } = progressOf(manifest, here)
+  const { chapter, chapterCount } = progressOf(manifest, here)
+  const label = barLabel(barState, pages, progressLabel(manifest, here))
+
+  /**
+   * Where the finger went down on the sheet. A ref rather than state: it
+   * changes on every touch and nothing renders from it, so putting it in state
+   * would re-render the whole overlay mid-gesture.
+   */
+  const touchStart = useRef<Touch | null>(null)
+
+  const onTouchStart = (event: React.TouchEvent) => {
+    const point = event.touches[0]
+    touchStart.current = point ? { x: point.clientX, y: point.clientY } : null
+  }
+
+  const onTouchEnd = (event: React.TouchEvent) => {
+    const from = touchStart.current
+    const point = event.changedTouches[0]
+    touchStart.current = null
+    if (!from || !point) return
+
+    const next = stepThrough(
+      TABS.map((tab) => tab.id),
+      sheetTab,
+      swipeOf(from, { x: point.clientX, y: point.clientY }),
+    )
+    if (next !== sheetTab) onSelectTab(next)
+  }
 
   return (
     // `inert` rather than unmounted: the overlay keeps its scroll position in
@@ -67,53 +133,168 @@ export function Chrome({
         </button>
       </header>
 
-      {contentsOpen && (
-        <nav className={styles.contents} aria-label="Contents">
-          <ul>
-            {manifest.chapters.map((entry) => (
-              <li key={entry.chapter}>
-                <button
-                  type="button"
-                  className={styles.contentsItem}
-                  aria-current={entry.chapter === chapter ? 'true' : undefined}
-                  onClick={() => onJumpToChapter(entry.chapter)}
-                >
-                  <span className={styles.contentsNumber}>{entry.chapter}</span>
-                  {entry.title}
-                </button>
-              </li>
+      {/*
+        The space above the sheet, which closes it. Without this the sheet
+        filled everything between the two bars, so there was nowhere to tap to
+        mean "no thanks" and the only way out was to find the ☰ again.
+
+        Not a button: it is a large invisible target, so announcing it to a
+        screen reader would be noise — the ☰ toggle and the back gesture are the
+        two routes that get announced.
+      */}
+      {sheetOpen && (
+        <div
+          className={styles.scrim}
+          data-scrim="true"
+          onClick={onToggleSheet}
+          aria-hidden="true"
+        />
+      )}
+
+      {sheetOpen && (
+        // Swipe sideways to change tab — the row of tabs is a row, so a
+        // sideways gesture is what it looks like it should answer to. Tapping a
+        // tab still works and is still the announced route; this is the
+        // shortcut, not the only way.
+        <div className={styles.sheet} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          <div className={styles.tabs} role="tablist" aria-label="Book navigation">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={`sheet-tab-${tab.id}`}
+                aria-selected={tab.id === sheetTab}
+                aria-controls={`sheet-panel-${tab.id}`}
+                className={styles.tab}
+                onClick={() => onSelectTab(tab.id)}
+              >
+                {tab.label}
+              </button>
             ))}
-          </ul>
-        </nav>
+          </div>
+
+          {sheetTab === 'contents' && (
+            <nav
+              role="tabpanel"
+              id="sheet-panel-contents"
+              aria-labelledby="sheet-tab-contents"
+              className={styles.sheetPanel}
+            >
+              <ul>
+                {manifest.chapters.map((entry) => (
+                  <li key={entry.chapter}>
+                    <button
+                      type="button"
+                      className={styles.contentsItem}
+                      aria-current={entry.chapter === chapter ? 'true' : undefined}
+                      onClick={() => onJumpToChapter(entry.chapter)}
+                    >
+                      <span className={styles.contentsNumber}>{entry.chapter}</span>
+                      {entry.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+
+          {/*
+            Deliberately built as three tabs with two empty, rather than as a
+            contents list to be widened later. The empty state names the
+            waypoint so it reads as "not yet" rather than "broken".
+          */}
+          {sheetTab === 'bookmarks' && (
+            <div
+              role="tabpanel"
+              id="sheet-panel-bookmarks"
+              aria-labelledby="sheet-tab-bookmarks"
+              className={styles.sheetPanel}
+            >
+              <p className={styles.empty}>
+                Bookmarks arrive with the reading controls — you’ll be able to mark a
+                place and name it.
+              </p>
+            </div>
+          )}
+
+          {sheetTab === 'notes' && (
+            <div
+              role="tabpanel"
+              id="sheet-panel-notes"
+              aria-labelledby="sheet-tab-notes"
+              className={styles.sheetPanel}
+            >
+              <p className={styles.empty}>
+                Notes and highlights arrive with the tutor — anything you ask about gets
+                saved here, filed by chapter.
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       <footer className={styles.bar}>
-        <button
-          type="button"
-          className={styles.control}
-          aria-expanded={contentsOpen}
-          onClick={onToggleContents}
-        >
-          Contents
-        </button>
-
-        <div className={styles.progress}>
+        {/*
+          The slider moves one page at a time when the book knows its length,
+          and falls back to the coarse chapter slider when it doesn't — WP-13's
+          behaviour, kept as the floor rather than deleted.
+        */}
+        {pages ? (
           <input
             className={styles.slider}
             type="range"
-            min={0}
-            max={100}
-            // Chapters, not pages. The slider is coarse on purpose: it moves
-            // you *near* somewhere, and the contents list moves you exactly.
-            value={Math.round(fraction * 100)}
+            min={1}
+            max={pages.pageCount}
+            value={pages.page}
+            aria-label="Move through the book"
+            aria-valuetext={`Page ${pages.page} of ${pages.pageCount}`}
+            disabled={pages.pageCount <= 1}
+            onChange={(event) => onJumpToPage(Number(event.target.value))}
+          />
+        ) : (
+          <input
+            className={styles.slider}
+            type="range"
+            min={1}
+            max={Math.max(chapterCount, 1)}
+            value={chapter}
             aria-label="Move through the book"
             aria-valuetext={`Chapter ${chapter} of ${chapterCount}`}
             disabled={chapterCount <= 1}
-            onChange={(event) => {
-              onJumpToChapter(chapterAt(manifest, Number(event.target.value) / 100))
-            }}
+            onChange={(event) => onJumpToChapter(Number(event.target.value))}
           />
-          <span className={styles.progressLabel}>{progressLabel(manifest, here)}</span>
+        )}
+
+        <div className={styles.statusRow}>
+          <button
+            type="button"
+            className={styles.sheetButton}
+            aria-expanded={sheetOpen}
+            aria-label="Contents, bookmarks and notes"
+            onClick={onToggleSheet}
+          >
+            <span aria-hidden="true">☰</span>
+          </button>
+
+          {/*
+            The status line is itself the control — tapping it cycles the three
+            states, exactly as Google Books does. Keeping the button present in
+            the bare state (with an empty label) is what makes the third state
+            escapable: something has to be there to tap to get back.
+          */}
+          <button
+            type="button"
+            className={styles.status}
+            onClick={() => onBarStateChange(advanceBar(barState))}
+            aria-label={label ?? 'Show where you are in the book'}
+          >
+            {label}
+          </button>
+
+          <span className={styles.percent}>
+            {showsPercent(barState) && pages ? `${pages.percent}%` : ''}
+          </span>
         </div>
       </footer>
     </div>

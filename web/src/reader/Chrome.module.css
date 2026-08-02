@@ -82,11 +82,6 @@
   white-space: nowrap;
 }
 
-.progress {
-  display: grid;
-  gap: var(--space-1);
-}
-
 .slider {
   width: 100%;
   min-height: 44px;
@@ -94,19 +89,114 @@
   cursor: pointer;
 }
 
-.progressLabel {
+/* Hamburger · status · percentage. The status line takes the slack so the
+   other two stay pinned to the edges, which is what makes the row look stable
+   while the middle text changes length between states. */
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sheetButton {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+/* The status line is a button, styled as text — it has to read as information
+   rather than as a control, while still being the thing you tap. It keeps its
+   height in the bare state so the bar doesn't resize as you cycle through. */
+.status {
+  flex: 1;
+  min-height: 44px;
+  padding: 0;
+  font-family: inherit;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   text-align: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
 }
 
-.contents {
+.percent {
+  /* Reserved whether or not it's showing, so the status line doesn't shift
+     sideways when the percentage leaves in the bare state. */
+  min-width: 4ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The tappable gap above the sheet. Dimmed rather than clear so the sheet reads
+   as sitting on top of the book — and so it's obvious there is something behind
+   it to go back to. */
+.scrim {
   pointer-events: auto;
+  flex: 1;
+  min-height: 0;
+  background: rgb(0 0 0 / 0.35);
+}
+
+.sheet {
+  pointer-events: auto;
+  /* Was `flex: 1`, which ate every pixel between the bars and left nothing to
+     tap to dismiss. Capped instead, so the book stays visible above it. */
+  flex: 0 1 auto;
+  max-height: 65%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-surface-raised);
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  font-family: var(--font-ui);
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+  flex: 1;
+  min-height: 44px;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--color-text);
+  font-weight: 600;
+  border-bottom-color: var(--color-accent);
+}
+
+.sheetPanel {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-raised);
-  font-family: var(--font-ui);
+  min-height: 0;
+}
+
+.empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
 
 .contentsItem {

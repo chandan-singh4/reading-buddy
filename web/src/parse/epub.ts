@@ -95,6 +95,33 @@ function resolvePath(base: string, href: string): string {
   return stack.join('/')
 }
 
+/**
+ * A link's destination in the same form the ids are qualified into:
+ * `OEBPS/text/chapter3.xhtml#note12`.
+ *
+ * Three shapes arrive here and all three matter. `#note12` is a link within the
+ * same file — much the commonest, since that is what a footnote marker is.
+ * `chapter3.xhtml#note12` crosses files. `chapter4.xhtml` names a whole
+ * document, meaning its beginning.
+ *
+ * Anything with a scheme is left exactly as written: it leaves the book, and
+ * mangling `https://…` into an archive path would turn a working web link into
+ * a broken internal one.
+ */
+function absoluteHref(base: string, href: string): string {
+  const trimmed = href.trim()
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed
+
+  const hash = trimmed.indexOf('#')
+  const fragment = hash === -1 ? '' : trimmed.slice(hash + 1)
+  const file = hash === -1 ? trimmed : trimmed.slice(0, hash)
+
+  // A bare `#id` points inside the file it was written in.
+  const path = file === '' ? base : resolvePath(base, file)
+  if (!path) return trimmed
+  return fragment ? `${path}#${fragment}` : path
+}
+
 // --- XML helpers -------------------------------------------------------------
 
 function parseXml(xml: string, what: string): Document {
@@ -269,7 +296,27 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
       if (block.image) {
         block.image = { ...block.image, src: resolvePath(path, block.image.src) }
       }
+
+      // Ids and link targets get the same treatment, and for the same reason:
+      // both are written relative to the file they appear in, and that context
+      // is gone the moment these blocks join the rest of the book. Two chapters
+      // can each define `#note1` — without qualifying them, every footnote in
+      // the book would resolve to whichever chapter was parsed first.
+      if (block.ids) block.ids = block.ids.map((id) => `${path}#${id}`)
+      if (block.links) {
+        block.links = block.links.map((link) => ({
+          ...link,
+          href: absoluteHref(path, link.href),
+        }))
+      }
     }
+
+    // The document itself is a link target: `href="chapter4.xhtml"`, with no
+    // fragment, means "the start of that chapter" and is how an epub's own
+    // contents page usually points at one.
+    const first = blocks.find((block) => block.kind !== 'furniture')
+    if (first) first.ids = [path, ...(first.ids ?? [])]
+
     return { path, blocks }
   })
 

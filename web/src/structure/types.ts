@@ -115,6 +115,15 @@ export interface ManifestChapter {
   title: string
   /** One-line gist. Deliberately short — this is read on every query. */
   summary: string
+  /**
+   * Words in this chapter — the sum of its sections. What lets the reader show
+   * a page number without laying anything out or loading a single section.
+   *
+   * Optional only because books imported before word counts existed don't have
+   * it; `undefined` is precisely the signal the backfill looks for. Treat it as
+   * required for anything imported from now on.
+   */
+  words?: number
 }
 
 // --- Chapter index ----------------------------------------------------------
@@ -133,6 +142,12 @@ export interface ChapterIndexEntry {
   title?: string
   summary?: string
   path: SectionPath
+  /**
+   * Words in this section. The finer half of the page number: the manifest gets
+   * you to the start of the chapter, this gets you to the right place inside it.
+   * See `words` on `ManifestChapter` for why it's optional.
+   */
+  words?: number
   /** Set at import for dense books; absent for light fiction. */
   concepts?: string[]
   vocabulary?: string[]
@@ -195,10 +210,44 @@ export interface FigureImage {
  * That redundancy is deliberate. It means nothing downstream has to special-case
  * a block kind it doesn't understand yet.
  */
+/**
+ * A link inside a paragraph — a range of its text, and where it goes.
+ *
+ * `target` is an `Anchor` when the link points somewhere inside this book
+ * (a footnote, a cross-reference, an entry in the book's own contents), and a
+ * URL when it points out of it. Which one it is decides what a tap does, so
+ * the two are kept as separate fields rather than one string that has to be
+ * sniffed at read time.
+ *
+ * Offsets, not a copy of the link's text: a paragraph can easily contain the
+ * same word twice, and "the second occurrence of 'ibid.'" is not something a
+ * renderer should have to work out.
+ */
+export interface ParagraphLink {
+  start: number
+  end: number
+  /** Somewhere in this book. */
+  anchor?: Anchor
+  /** Somewhere outside it. */
+  url?: string
+}
+
 export interface Paragraph {
   anchor: Anchor
   text: string
   kind: BlockKind
+  /**
+   * Links found in `text`. Absent on the overwhelming majority of paragraphs,
+   * which contain none.
+   */
+  links?: ParagraphLink[]
+  /**
+   * Ids the source markup carried here — what links point at. Import-time only:
+   * `parse/links.ts` uses them to resolve every link in the book and then
+   * removes them, so they never reach storage. A book has thousands of these
+   * and nothing reads them once the links are resolved.
+   */
+  ids?: string[]
   /** Finer-grained type when it matters: `epigraph`, `pull-quote`, `footnote`… */
   label?: string
   /** `kind: 'table'` — rows of cells. The first row is often, not always, a header. */

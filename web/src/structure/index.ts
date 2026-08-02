@@ -18,11 +18,14 @@ export type {
   Manifest,
   ManifestChapter,
   Paragraph,
+  ParagraphLink,
   Section,
   SectionPath,
   Shelf,
   SourceFormat,
 } from './types.ts'
+
+export { WORDS_PER_PAGE, countWords, countWordsIn, pagesIn } from './words.ts'
 
 export {
   AnchorError,

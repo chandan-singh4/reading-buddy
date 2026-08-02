@@ -6,9 +6,23 @@
  */
 
 .reader {
-  min-height: 100dvh;
-  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
-    calc(var(--safe-bottom) + var(--space-6));
+  /* Fixed to the viewport, not `min-height`. Columns only break into pages if
+     the box they flow in has a definite height — with `min-height` the box
+     simply grows and you get one very tall column, which is the scroll we had
+     before wearing a different name. */
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--safe-top) + var(--space-4)) 0
+    calc(var(--safe-bottom) + var(--space-4));
+  /* Opening a book was a hard cut — the shelf was simply replaced by text,
+     which reads as a glitch rather than as a move. Fade only, and deliberately
+     no `transform` here: the overlay inside is `position: fixed`, and any
+     transform on an ancestor makes "fixed" mean fixed to *this box* instead of
+     to the screen — which would shift the bars for the length of the animation.
+     The rise lives on the text below, where nothing depends on it. */
+  animation: fadeIn 200ms ease-out both;
 }
 
 .back {
@@ -17,14 +31,75 @@
   color: var(--color-text-muted);
 }
 
+/*
+ * The book, laid out in pages.
+ *
+ * One column exactly as wide as the box, so the text spills sideways into a
+ * strip of screen-wide pages and the *browser* decides where each break falls —
+ * always between lines, never through one. A font change re-flows the whole
+ * thing with nothing measured on our side. (WP-14; the two rejected approaches
+ * are argued in `backlog.md`.)
+ *
+ * `overflow: hidden` rather than `auto` is deliberate. Dragging a column strip
+ * by hand leaves you stranded between two pages; every turn here is programmatic
+ * and lands exactly on a column. `scrollLeft` still works when set from code.
+ */
 .page {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   /* ~66 characters. The single most effective thing for long-form reading:
      wider and the eye loses the start of the next line. */
   max-width: var(--reading-measure);
-  margin: var(--space-6) auto 0;
+  margin: var(--space-4) auto 0;
+  columns: 1;
+  column-gap: 0;
+  /* Fill each column completely before starting the next — the default balances
+     columns against each other, which here would mean half-empty pages. */
+  column-fill: auto;
+  overflow: hidden;
+  scroll-behavior: smooth;
   font-family: var(--font-reading);
   font-size: var(--text-lg);
   line-height: var(--leading-reading);
+  /* The text rises into place. 220 ms stays under the ~250 ms where a
+     transition stops feeling like motion and starts feeling like waiting.
+     Both animations are suppressed under `prefers-reduced-motion` by the
+     global rule in `index.css`. */
+  animation: textRises 220ms ease-out both;
+}
+
+/* Gutters have to live on the children, not on the column box: padding on a
+   multi-column element indents the first and last columns only, so every page
+   in between would run to the screen edge. */
+.page > * {
+  padding-inline: var(--space-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    scroll-behavior: auto;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes textRises {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .header {
@@ -38,6 +113,17 @@
   font-size: var(--text-sm);
   line-height: var(--leading-ui);
   color: var(--color-text-muted);
+}
+
+/* Deliberately quieter than the chapter line above it: it explains one thing,
+   once, and shouldn't compete with the book for a reader's first glance. */
+.resumed {
+  margin-top: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-ui);
+  color: var(--color-text-muted);
+  opacity: 0.8;
 }
 
 .sectionTitle {
@@ -83,4 +169,22 @@
      not like a control that vanished. */
   opacity: 0.4;
   cursor: default;
+}
+
+/* The way back from a followed link. Deliberately unlike the pager buttons —
+   it undoes a jump rather than moving through the book, and it comes and goes,
+   so it must not look like a control that has gone missing when it isn't there. */
+.returnTo {
+  align-self: center;
+  margin-top: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
 }

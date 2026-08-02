@@ -8,64 +8,100 @@
 
 ---
 
-## Task — none in flight
+## Task — the rest of WP-14: how it looks
 
-WP-12 and WP-13 both shipped. Books import, file onto shelves, open, render,
-and can be moved through by Previous/Next, a contents list, a slider and a
-Focus Mode toggle. Pick the next waypoint with `/plan-task` and rewrite this
-file for it.
+Page turning, links (WP-42), bulk delete (WP-44) and the second phone round
+(WP-45) all shipped 2026-08-02. Gates: **426 tests**, typecheck, build.
 
-### The two candidates, and what each is for
+What is left of WP-14 is the *look*, which the reader has confirmed twice is the
+next thing they want:
 
-**WP-15 · Reopen where you left off** — small, and the most obviously missing
-thing in daily use: every book opens at chapter 1 today. Anchors are already in
-the DOM (`ch02-s03-p013`), so this is mostly storing the current one and
-restoring it — plus deciding *when* to save. Likely files: a new
-`web/src/reader/position.ts`, a repository method, `Reader.tsx`.
+- **Font size, line spacing, margins.** These are the reason word-counted pages
+  exist — the page number survives them, because it counts words not screens.
+- **Themes: light / dark / sepia.** Dark already follows the OS; sepia is new.
+  All of it flows from `styles/theme.css` tokens — no component hard-codes a
+  colour, so this is a `data-theme` attribute and a token block.
+- **The page-turn animation.** The seam is built (`turnPage`); only *instant* is
+  wired. Ship slide next, honour `prefers-reduced-motion`, ~200 ms ceiling, and
+  a fast tapper must be able to outrun it. Page curl stays a labelled slot.
+- **In-book search and real bookmarks** — the two stub tabs in the nav sheet,
+  which are a visible promise. Shelf search exists (WP-45); this is the other
+  one.
 
-**WP-17 → 18 → 19 → 20 · the tutor loop** — select text, assemble a prompt from
-manifest + chapter index + one section, call Claude, stream the answer back.
-This is the rest of the walking skeleton and the first thing the app does that
-an ordinary reader can't. Much bigger, and WP-19 is where the API key question
-below finally has to be answered.
+### Definition of done
+A reader can set type size, spacing and theme from the nav sheet; the choice
+persists; page numbers do not shift when they change it; pages slide rather than
+snap, and reduced-motion users still get instant.
 
-### Decisions already made — don't re-derive these
-- **Pagination (WP-14).** CSS columns, not JavaScript measurement. Anchors are
-  the stable location; page numbers are never shown. Full reasoning, plus the
-  two rejected options, in `backlog.md` under WP-14.
-- **The page turn is a seam.** Navigation and animation stay separate; ship
-  instant + slide, leave page curl a labelled slot. Same note.
-- **Focus Mode hides, never removes.** Implemented in WP-13; anything added to
-  the reading screen from here has to keep working with the overlay hidden.
-- **Shelves** are guessed at import and always manually overridable; a moved
-  book is never re-guessed.
+### Files in scope
+- `web/src/styles/theme.css` — every colour and size token lives here.
+- `web/src/reader/Chrome.tsx` + `Chrome.module.css` — where the settings go.
+- `web/src/pages/Reader.tsx` + `Reader.module.css` — the column strip and the
+  turn.
+- `web/src/reader/columns.ts` — the page arithmetic a re-flow must not break.
+- `web/src/reader/focusMode.ts` — the existing pattern for a persisted setting;
+  copy it rather than inventing a second one.
+- `web/src/reader/blocks.module.css` — per-block spacing.
 
-### Useful context (already known — don't re-derive)
-- Gates: `npm test` (281 passing), `npm run typecheck`, `npm run build`, from
-  the repo root. Main bundle 355.21 kB.
-- Retrieval path, and the whole of it: `getManifest(bookId)` →
-  `getChapterIndex(bookId, n)` → `getSection(bookId, path)`. There is
-  deliberately no "load the book" call — don't add one.
-- `web/src/reader/` is the reader: `blocks.tsx` (one component per `BlockKind`),
-  `navigation.ts` (pure next/previous section), `progress.ts` (chapters, never
-  pages), `Chrome.tsx` (the overlay), `focusMode.ts`. All via `reader/index.ts`.
-- **`Reader.tsx` has one `goTo`** — every move goes through it. That is the seam
-  WP-14 plugs the page transition into; keep it that way.
-- Anchors reach the DOM as ids with the brackets stripped (`ch02-s03-p013`),
-  which is what WP-15 and WP-17 both build on.
-- Vitest defaults to `node`; add `// @vitest-environment jsdom` per file for
-  React tests. Testing Library needs an explicit `afterEach(cleanup)` here —
-  `globals` is off, so nothing auto-cleans and `screen` otherwise accumulates
-  every previous render.
-- jsdom has no layout: stub `window.scrollTo` in any test that mounts Reader.
-- Real books for manual checks: the 15 MB Jung epub in `books/`, the Springer
-  PDF in `research-paper/`. Both untracked.
+### Out of scope
+The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39 figure images.
 
-### Open items worth raising before they bite
+---
+
+## Carried forward — things that will bite
+
+- **Books imported before a parser change keep the old parse, silently.** This
+  has now cost two rounds: links didn't appear on already-imported books, and
+  there was no way to tell. Worth stamping each book with the parser version
+  that made it and having the shelf say "re-import for links". Do this *before*
+  the next parser change.
+- **Columns break awkwardly around tall figures, wide tables and long code.**
+  The Jung epub has 141 figures. `backlog.md` accepted this and named the
+  remedy: plain scrolling as a per-section fallback. Not built — wait until it
+  is actually hit.
+- **`Reader.test.tsx` is timing-sensitive under load.** Two different tests each
+  failed once on a full run while a build was running, and passed on three clean
+  full runs plus four isolated ones. Not diagnosed. If it recurs on an idle
+  machine, it is real.
 - **The live Anthropic key is still in `Claude API/API.txt`**, inside a public
   repo's folder. Gitignored and never committed, but WP-19 is when it must move
   out and be read from an env var.
-- **Nothing has been tried on a phone.** The reader is a touch interface that
-  has only ever been used with a mouse. Tap-to-toggle, the slider and the 44px
-  targets are all guesses until then.
+- **The certificate names an address.** If the router gives this PC a new one,
+  `npm run lan` prints both the address and the mkcert command to reissue it.
 - **Figures render captions without images** until WP-39.
+
+## Decisions already made — don't re-derive these
+- **A reading place is an anchor, never a page number** (WP-15).
+- **Pages are counted in words, not screens** (WP-40, `structure/words.ts`).
+  300 words to a page; changing that constant renumbers every book.
+- **The spine is not a whole-book read.** Manifest plus chapter *indexes* only.
+- **Pagination is CSS columns**, not JavaScript measurement, and **the page turn
+  is a seam** — navigation and animation stay separate. Both in `backlog.md`
+  under WP-14.
+- **Focus Mode hides, never removes.** Anything added to the reading screen has
+  to keep working with the overlay hidden.
+- **A link is a range of a paragraph** (`start`, `end`, `anchor` or `url`),
+  resolved *after* assembly, with epub ids qualified by their source file.
+- **Position is remembered by identity, not by offset** — the shelf remembers
+  which book you opened (`useRowMemory`), not how far down you had scrolled.
+
+## Useful context (already known — don't re-derive)
+- Gates: `npm test` (426), `npm run typecheck`, `npm run build`, from the repo
+  root. App-shell precache 413.75 KiB.
+- Retrieval path, and the whole of it: `getManifest(bookId)` →
+  `getChapterIndex(bookId, n)` → `getSection(bookId, path)`. There is
+  deliberately no "load the book" call — don't add one.
+- `web/src/reader/`: `blocks.tsx` (one component per `BlockKind`, plus link
+  runs), `linkRuns.ts` (`runsOf`, `lineRunsOf`), `navigation.ts`, `progress.ts`,
+  `bar.ts`, `columns.ts`, `position.ts`, `swipe.ts`, `useBackDismiss.ts`,
+  `Chrome.tsx`, `focusMode.ts`. All via `reader/index.ts`.
+- **`Reader.tsx` has one `goTo` and one `turnPage`** — every move goes through
+  them. That is the seam the page transition plugs into; keep it that way.
+- Anchors reach the DOM as ids with the brackets stripped (`ch02-s03-p013`).
+- Vitest defaults to `node`; add `// @vitest-environment jsdom` per file for
+  React tests. Testing Library needs an explicit `afterEach(cleanup)` — `globals`
+  is off, so nothing auto-cleans.
+- jsdom has no layout: stub `window.scrollTo` **and**
+  `Element.prototype.scrollIntoView` in any test that mounts Reader.
+- Real books for manual checks: the 15 MB Jung epub in `books/`, the Springer
+  PDF in `research-paper/`. Both untracked.

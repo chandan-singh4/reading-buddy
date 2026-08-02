@@ -114,3 +114,34 @@
   background: var(--color-surface);
   font-weight: 600;
 }
+
+/*
+ * A link in the text. Underlined rather than coloured: a book's own
+ * cross-references are part of the prose, and a bright colour every few
+ * paragraphs pulls the eye off the sentence being read. The underline is offset
+ * so it doesn't cut through descenders.
+ *
+ * Sized and spaced to be tappable without being a button — a footnote marker is
+ * often two characters, so it gets padding to reach a usable target without
+ * disturbing the line.
+ */
+.link {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+  /* Keeps a link that falls at the end of a line from being split across a
+     column break, where half of it would be on the next page. */
+  box-decoration-break: clone;
+}
+
+.link:active {
+  color: var(--color-accent);
+}

@@ -37,6 +37,7 @@ that holds the Claude key.
 | `docs/backlog.md` | Planning the next task, or on `/plan-task`. All 34 waypoints + status. |
 | `docs/decisions.md` | A "why is it this way?" question, or before changing a settled choice. |
 | `docs/architecture.md` | Touching folder layout, the parsed-book structure, or anchor grammar. |
+| `docs/phone.md` | Putting the app on a phone — HTTPS, certificates, installing, offline. |
 | `…\reading-buddy` (external archive) | **Never by default — ask me first.** Deep decision reasoning. See below. |
 
 Each file opens with a ~1-paragraph "What's in here / read when" note, so you can

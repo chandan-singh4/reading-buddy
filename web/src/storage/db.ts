@@ -12,6 +12,7 @@
 import Dexie, { type Table } from 'dexie'
 
 import type {
+  Anchor,
   BookId,
   BookMeta,
   ChapterIndex,
@@ -30,6 +31,24 @@ export interface StoredSection extends Section {
   bookId: BookId
 }
 
+/**
+ * Where the reader stopped, one row per book.
+ *
+ * A table of its own rather than two more fields on `BookMeta`, for two
+ * reasons. This is the only row in the database that is written *while reading*
+ * — every few seconds, in the middle of the thing that has to stay smooth — and
+ * putting it on the book row would mean rewriting the whole book record, title,
+ * fingerprints and all, each time. It also keeps a reading habit separate from
+ * what a book *is*: "forget where I was" should not be able to damage the book.
+ */
+export interface ReadingPosition {
+  bookId: BookId
+  /** The paragraph at the top of the screen when reading stopped. */
+  anchor: Anchor
+  /** ISO 8601 — what "Continue reading" and a recently-opened list sort on. */
+  at: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -43,6 +62,7 @@ export type ReadingBuddyDB = Dexie & {
   manifests: Table<Manifest, BookId>
   chapters: Table<StoredChapterIndex, [BookId, string]>
   sections: Table<StoredSection, [BookId, SectionPath]>
+  positions: Table<ReadingPosition, BookId>
 }
 
 /**
@@ -73,6 +93,13 @@ function defineSchema(db: Dexie): void {
   // rather than from the original file, which we never keep.
   db.version(3).stores({
     books: 'id, title, type, importedAt, contentHash, textSignature',
+  })
+
+  // v4 — where you stopped reading (WP-15). `at` is indexed rather than left as
+  // a plain field so "continue reading" and a recently-opened list can be an
+  // ordered read of a few rows instead of a scan of every book on the shelf.
+  db.version(4).stores({
+    positions: 'bookId, at',
   })
 }
 

@@ -1,0 +1,12 @@
+<!--
+  The same open book as the app icons, drawn as vectors for the browser tab.
+  Kept by hand rather than generated: it is small enough to read, and a tab
+  favicon is the one place the mark is shown at 16 px, where the PNG's droop
+  needs the sharper edges a vector gives.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Reading Buddy">
+  <rect width="100" height="100" rx="18" fill="#14130f" />
+  <polygon points="18,39 48,30 48,73 18,75" fill="#ece7df" />
+  <polygon points="82,39 52,30 52,73 82,75" fill="#ece7df" />
+  <rect x="48" y="29" width="4" height="44" fill="#c9a227" />
+</svg>

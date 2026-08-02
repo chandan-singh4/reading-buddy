@@ -12,6 +12,20 @@ body,
   height: 100%;
 }
 
+html,
+body {
+  /* Reading is a vertical activity: there is never anything to the left or
+     right, so any sideways movement is drift rather than navigation. Without
+     this the page slides under a thumb and the text stops sitting still, which
+     is the first thing that makes an app feel unfinished.
+
+     `overscroll-behavior-x: none` also stops Chrome's swipe-to-go-back, which
+     on a reading screen means a horizontal swipe throwing you out of the book
+     and back to the shelf. */
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

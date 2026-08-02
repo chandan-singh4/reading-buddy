@@ -12,8 +12,72 @@
  * a table whose grid didn't survive parsing still shows its flattened text.
  */
 
-import type { Paragraph } from '../structure/index.ts'
+import type { Anchor, Paragraph } from '../structure/index.ts'
+import { lineRunsOf, runsOf, type Run } from './linkRuns.ts'
 import styles from './blocks.module.css'
+
+/** Told where a tapped link goes. Absent while nothing can follow one. */
+export type FollowLink = (anchor: Anchor) => void
+
+/**
+ * A block's text with its links made tappable.
+ *
+ * An internal link is a `<button>`, not an `<a>`: it goes to a paragraph, not
+ * to a URL, and dressing it as a link would put a meaningless address in the
+ * browser's status bar and offer "open in new tab" on something that cannot be.
+ * An external link is a real `<a>`, because it really is one.
+ */
+function Runs({ runs, onFollow }: { runs: Run[]; onFollow?: FollowLink }) {
+  return (
+    <>
+      {runs.map((run, index) => {
+        if (!run.link) return <span key={index}>{run.text}</span>
+
+        if (run.link.anchor) {
+          const target = run.link.anchor
+          return (
+            <button
+              key={index}
+              type="button"
+              className={styles.link}
+              onClick={(event) => {
+                // The reading page uses taps for turning pages and showing the
+                // overlay. A tap meant for a link is neither.
+                event.stopPropagation()
+                onFollow?.(target)
+              }}
+            >
+              {run.text}
+            </button>
+          )
+        }
+
+        return (
+          <a
+            key={index}
+            className={styles.link}
+            href={run.link.url}
+            target="_blank"
+            // Leaving the book entirely, so the new tab gets no handle back on
+            // this one.
+            rel="noreferrer noopener"
+            onClick={(event) => {
+              event.stopPropagation()
+            }}
+          >
+            {run.text}
+          </a>
+        )
+      })}
+    </>
+  )
+}
+
+function Text({ block, onFollow }: { block: Paragraph; onFollow?: FollowLink }) {
+  const runs = runsOf(block)
+  if (runs.length === 1 && !runs[0].link) return <>{block.text}</>
+  return <Runs runs={runs} onFollow={onFollow} />
+}
 
 /** `[ch02-s03-p013]` → `ch02-s03-p013`. Anchors are bracketed; ids aren't. */
 export function elementIdOf(anchor: string): string {
@@ -70,22 +134,36 @@ function Table({ block }: { block: Paragraph }) {
   )
 }
 
-function List({ block }: { block: Paragraph }) {
+function List({ block, onFollow }: { block: Paragraph; onFollow?: FollowLink }) {
   // The parser keeps a list as one block, so its items live in `text`, one per
   // line — see WP-38. Splitting here keeps that decision in the parser.
-  const items = block.text.split('\n').filter((line) => line.trim() !== '')
+  //
+  // Per-item runs rather than plain text, because a book's own contents page is
+  // a list of links and so is most of a notes section. Rendering the text alone
+  // is how those entries came out unclickable while a footnote inside an
+  // ordinary paragraph worked.
+  const items = lineRunsOf(block)
 
   return (
     <ul className={styles.list}>
-      {items.map((item, index) => (
-        <li key={index}>{item}</li>
+      {items.map((runs, index) => (
+        <li key={index}>
+          <Runs runs={runs} onFollow={onFollow} />
+        </li>
       ))}
     </ul>
   )
 }
 
-export function Block({ block }: { block: Paragraph }) {
+export function Block({
+  block,
+  onFollowLink,
+}: {
+  block: Paragraph
+  onFollowLink?: FollowLink
+}) {
   const id = elementIdOf(block.anchor)
+  const text = <Text block={block} onFollow={onFollowLink} />
 
   switch (block.kind) {
     case 'heading':
@@ -93,14 +171,14 @@ export function Block({ block }: { block: Paragraph }) {
       // internal heading levels are not the page's document outline.
       return (
         <h3 id={id} className={styles.heading}>
-          {block.text}
+          {text}
         </h3>
       )
 
     case 'quote':
       return (
         <blockquote id={id} className={styles.quote}>
-          {block.text}
+          {text}
         </blockquote>
       )
 
@@ -123,7 +201,7 @@ export function Block({ block }: { block: Paragraph }) {
     case 'note':
       return (
         <aside id={id} className={styles.note}>
-          {block.text}
+          {text}
         </aside>
       )
 
@@ -144,7 +222,7 @@ export function Block({ block }: { block: Paragraph }) {
     case 'list':
       return (
         <div id={id}>
-          <List block={block} />
+          <List block={block} onFollow={onFollowLink} />
         </div>
       )
 
@@ -155,7 +233,7 @@ export function Block({ block }: { block: Paragraph }) {
     default:
       return (
         <p id={id} className={styles.prose}>
-          {block.text}
+          {text}
         </p>
       )
   }

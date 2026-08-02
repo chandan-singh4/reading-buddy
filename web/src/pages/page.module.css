@@ -120,15 +120,33 @@
   border-radius: var(--radius-md);
 }
 
+/*
+ * The row wraps rather than overflowing.
+ *
+ * It used to be a plain non-wrapping flex row, which on a phone put the shelf
+ * picker and Remove past the right edge of the screen — reachable only by
+ * scrolling the page sideways. That went unnoticed until the sideways scroll
+ * was (correctly) removed and the controls became unreachable altogether.
+ *
+ * The basis is what decides when it wraps: the title keeps a full row to itself
+ * as soon as there isn't room for the title *and* the controls, so on a phone
+ * the controls drop to a second line and on a desktop nothing changes.
+ */
 .cardRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
 }
 
 .cardLink {
-  flex: 1;
+  flex: 1 1 12rem;
   min-width: 0;
+}
+
+.cardRow > .confirm {
+  /* Pushed to the right on a wide row; harmless once it has its own line. */
+  margin-left: auto;
 }
 
 .iconButton,
@@ -191,4 +209,78 @@
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-accent);
   border-radius: var(--radius-sm);
+}
+
+/* --- Selecting several books (bulk delete) -------------------------------- */
+
+.selectBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Pushes the destructive control away from the harmless ones, so "Remove"
+   isn't sitting under the thumb that just tapped "Select all". */
+.selectBar > .danger,
+.selectBar > .confirm {
+  margin-left: auto;
+}
+
+.tick {
+  /* Comfortably tappable without hitting the row's other controls. The default
+     checkbox is about 13px, which on a phone is a coin toss. */
+  width: 24px;
+  height: 24px;
+  flex: none;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* The title as a tick target while selecting: a button that has to look
+   exactly like the link it replaces, or the shelf visibly changes shape the
+   moment you tap Select. */
+.cardLinkPlain {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.danger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- Searching the shelf -------------------------------------------------- */
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  /* 16px or larger, or iOS Safari zooms the whole page when it takes focus. */
+  font-size: var(--text-base);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.searchInput:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }

@@ -11,6 +11,8 @@
     "build": "npm run build --workspace web",
     "typecheck": "npm run typecheck --workspace web",
     "test": "npm run test --workspace web",
-    "preview": "npm run preview --workspace web"
+    "preview": "npm run preview --workspace web",
+    "lan": "npm run lan --workspace web",
+    "icons": "npm run icons --workspace web"
   }
 }

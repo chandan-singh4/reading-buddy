@@ -9,7 +9,9 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lan": "node scripts/lan-address.mjs",
+    "icons": "node scripts/make-icons.mjs"
   },
   "dependencies": {
     "dexie": "^4.4.4",

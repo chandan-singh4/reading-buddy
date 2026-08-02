@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Anchor, BlockKind, Paragraph } from '../structure/index.ts'
@@ -142,5 +142,55 @@ describe('an unfamiliar kind still shows its text', () => {
       <Block block={blockOf('sidebar' as BlockKind, 'Something new.')} />,
     )
     expect(container.textContent).toBe('Something new.')
+  })
+})
+
+describe('links in the text', () => {
+  const target = '[ch05-s01-p001]' as Anchor
+
+  it('makes a contents entry tappable', () => {
+    // The bug this covers: a list was rendered as plain text, so every entry on
+    // a book's own contents page was dead while a footnote in a paragraph
+    // worked. Contents pages are lists.
+    const followed: Anchor[] = []
+    render(
+      <Block
+        block={blockOf('list', '• One\n• Two', {
+          links: [{ start: 2, end: 5, anchor: target }],
+        })}
+        onFollowLink={(anchor) => followed.push(anchor)}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'One' }))
+    expect(followed).toEqual([target])
+    // The entry without a link is still there, just not tappable.
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+  })
+
+  it('makes a link inside a paragraph tappable', () => {
+    const followed: Anchor[] = []
+    render(
+      <Block
+        block={blockOf('prose', 'See note 4 below.', {
+          links: [{ start: 4, end: 10, anchor: target }],
+        })}
+        onFollowLink={(anchor) => followed.push(anchor)}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'note 4' }))
+    expect(followed).toEqual([target])
+  })
+
+  it('sends an external link out as a real link, not a jump', () => {
+    render(<Block block={blockOf('prose', 'Read more here.', {
+      links: [{ start: 10, end: 14, url: 'https://example.com' }],
+    })} />)
+
+    const link = screen.getByRole('link', { name: 'here' })
+    expect(link.getAttribute('href')).toBe('https://example.com')
+    expect(link.getAttribute('rel')).toContain('noopener')
   })
 })

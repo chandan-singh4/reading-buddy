@@ -12,6 +12,7 @@ import {
 } from '../import/index.ts'
 import type { BookMeta, Shelf } from '../structure/index.ts'
 import { repository } from '../storage/index.ts'
+import { rowId, useRowMemory } from '../app/useRowMemory.ts'
 import styles from './page.module.css'
 
 type LoadState =
@@ -51,12 +52,56 @@ const SHELF_SINGULAR: Record<Shelf, string> = {
  * The home screen: every imported book, newest first, plus the three ways in —
  * pick files, pick a folder, or drop either onto the page.
  */
+/**
+ * The books a search shows.
+ *
+ * Title and author, because those are the two things a reader knows about a
+ * book they are hunting for. Every word has to match, in either field — typing
+ * "jung red" should find *The Red Book* by Jung, which a single substring test
+ * across the whole phrase would miss.
+ */
+function matching(books: readonly BookMeta[], query: string): BookMeta[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return [...books]
+
+  return books.filter((book) => {
+    const haystack = `${book.title} ${book.author ?? ''}`.toLowerCase()
+    return words.every((word) => haystack.includes(word))
+  })
+}
+
 export default function Library() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [importing, setImporting] = useState<ImportState>({ status: 'idle' })
   const [dragging, setDragging] = useState(false)
   /** The book whose "Remove?" confirmation is showing, if any. */
   const [removing, setRemoving] = useState<BookMeta['id'] | null>(null)
+
+  /**
+   * Which books are ticked, or `null` when not selecting at all.
+   *
+   * `null` rather than an empty set, because "not selecting" and "selecting
+   * nothing" have to look different: the row controls only make sense in one of
+   * them, and a shelf permanently covered in checkboxes is a worse default for
+   * the thing people do most, which is read.
+   */
+  const [selected, setSelected] = useState<Set<BookMeta['id']> | null>(null)
+
+  /** Guards the "delete these 35 books" confirmation. */
+  const [confirmingBulk, setConfirmingBulk] = useState(false)
+
+  /** What has been typed into the shelf search. Empty means "show everything". */
+  const [query, setQuery] = useState('')
+
+  const books = state.status === 'ready' ? state.books : []
+  const visible = matching(books, query)
+  const allShown = visible.length > 0 && visible.every((book) => selected?.has(book.id))
+
+  // Waits for the books, because the shelf's height depends on them — restoring
+  // a position against a half-drawn list is what put the reader at the bottom.
+  // Remembered by book rather than by pixel offset — see the hook for why
+  // the offset kept landing somewhere arbitrary.
+  const rememberRow = useRowMemory('library-row', state.status === 'ready')
 
   useEffect(() => {
     let cancelled = false
@@ -126,6 +171,42 @@ export default function Library() {
       setState({
         status: 'failed',
         message: `Couldn’t remove “${book.title}”. ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      })
+    }
+  }
+
+  function toggleSelected(id: BookMeta['id']) {
+    setSelected((current) => {
+      const next = new Set(current ?? [])
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  /**
+   * Remove everything ticked, in one transaction.
+   *
+   * Deliberately behind a confirmation that names the number. Removing one book
+   * by mistake is annoying; removing thirty-five is a small disaster, and the
+   * books are gone — there is no undo, because the original files were never
+   * kept.
+   */
+  async function removeSelected() {
+    const ids = [...(selected ?? [])]
+    setConfirmingBulk(false)
+    if (ids.length === 0) return
+
+    try {
+      await repository.deleteBooks(ids)
+      setSelected(null)
+      setState({ status: 'ready', books: await repository.listBooks() })
+    } catch (error: unknown) {
+      setState({
+        status: 'failed',
+        message: `Couldn’t remove ${ids.length === 1 ? 'that book' : `those ${ids.length} books`}. ${
           error instanceof Error ? error.message : String(error)
         }`,
       })
@@ -249,6 +330,111 @@ export default function Library() {
         </div>
       )}
 
+      {/*
+        Selecting. Hidden until asked for: a shelf permanently covered in
+        checkboxes is a worse default for the thing people do most, which is
+        open a book.
+      */}
+      {/* Only once there are enough books for finding one to be a job. Below
+          that the whole shelf is already on screen and a search box is furniture
+          between the reader and their books. */}
+      {state.status === 'ready' && books.length > 8 && (
+        <div className={styles.search}>
+          <input
+            type="search"
+            className={styles.searchInput}
+            value={query}
+            placeholder="Search by title or author"
+            aria-label="Search your shelf"
+            onChange={(event) => {
+              setQuery(event.target.value)
+            }}
+          />
+          {query !== '' && (
+            <span className={styles.pending} role="status">
+              {visible.length} of {books.length}
+            </span>
+          )}
+        </div>
+      )}
+
+      {state.status === 'ready' && state.books.length > 0 && (
+        <div className={styles.selectBar}>
+          {selected === null ? (
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={() => setSelected(new Set())}
+            >
+              Select
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => {
+                  setSelected(null)
+                  setConfirmingBulk(false)
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => {
+                  // One control, both jobs: once everything is ticked the only
+                  // thing left to want is to untick it.
+                  //
+                  // "All" means everything *on screen*. With a search typed,
+                  // ticking books the reader cannot see and then deleting them
+                  // would be the worst bug this screen could have.
+                  setSelected(allShown ? new Set() : new Set(visible.map((book) => book.id)))
+                  setConfirmingBulk(false)
+                }}
+              >
+                {allShown ? 'Select none' : 'Select all'}
+              </button>
+
+              <span className={styles.pending} role="status">
+                {selected.size} selected
+              </span>
+
+              {confirmingBulk ? (
+                <span className={styles.confirm}>
+                  <button type="button" className={styles.danger} onClick={() => void removeSelected()}>
+                    Delete {selected.size}
+                  </button>
+                  <button type="button" className={styles.iconButton} onClick={() => setConfirmingBulk(false)}>
+                    Keep
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.danger}
+                  disabled={selected.size === 0}
+                  onClick={() => setConfirmingBulk(true)}
+                >
+                  Remove
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Named rather than counted, because "35 books" is a number nobody
+          checks and there is no undo — the original files were never kept. */}
+      {confirmingBulk && selected && selected.size > 0 && (
+        <p className={styles.error} role="alert">
+          Remove {selected.size} {selected.size === 1 ? 'book' : 'books'} for good? This
+          can’t be undone.
+        </p>
+      )}
+
       {state.status === 'ready' && state.books.length === 0 && (
         <div className={styles.empty}>
           <p className={styles.emptyTitle}>No books yet</p>
@@ -256,10 +442,27 @@ export default function Library() {
         </div>
       )}
 
+      {/* An empty shelf and an empty *search* are different situations, and
+          "No books yet" over a shelf of 35 would be alarming nonsense. */}
+      {state.status === 'ready' && books.length > 0 && visible.length === 0 && (
+        <div className={styles.empty}>
+          <p className={styles.emptyTitle}>Nothing matches “{query}”</p>
+          <button
+            type="button"
+            className={styles.iconButton}
+            onClick={() => {
+              setQuery('')
+            }}
+          >
+            Clear the search
+          </button>
+        </div>
+      )}
+
       {state.status === 'ready' &&
         state.books.length > 0 &&
         SHELVES.map((shelf) => {
-          const shelved = state.books.filter((book) => shelfOf(book) === shelf)
+          const shelved = visible.filter((book) => shelfOf(book) === shelf)
           // An empty shelf isn't shown at all: someone who only reads books
           // should never see a "Research papers" heading over nothing.
           if (shelved.length === 0) return null
@@ -272,17 +475,54 @@ export default function Library() {
 
               <ul className={styles.list}>
                 {shelved.map((book) => (
-                  <li key={book.id} className={styles.card}>
+                  <li key={book.id} id={rowId(book.id)} className={styles.card}>
                     <div className={styles.cardRow}>
-                      <Link to={`/book/${book.id}`} className={styles.cardLink}>
-                        <span className={styles.emptyTitle}>{book.title}</span>
-                        <p className={styles.pending}>
-                          {book.author ? `${book.author} · ` : ''}
-                          {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
-                        </p>
-                      </Link>
+                      {selected !== null && (
+                        <input
+                          type="checkbox"
+                          className={styles.tick}
+                          checked={selected.has(book.id)}
+                          aria-label={`Select ${book.title}`}
+                          onChange={() => toggleSelected(book.id)}
+                        />
+                      )}
 
-                      {removing === book.id ? (
+                      {/*
+                        While selecting, the title ticks the box instead of
+                        opening the book. Half a screen of tappable title that
+                        does something other than what the checkboxes beside it
+                        do is how a reader loses a shelf by accident.
+                      */}
+                      {selected !== null ? (
+                        <button
+                          type="button"
+                          className={`${styles.cardLink} ${styles.cardLinkPlain}`}
+                          onClick={() => toggleSelected(book.id)}
+                        >
+                          <span className={styles.emptyTitle}>{book.title}</span>
+                          <p className={styles.pending}>
+                            {book.author ? `${book.author} · ` : ''}
+                            {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
+                          </p>
+                        </button>
+                      ) : (
+                        <Link
+                          to={`/book/${book.id}`}
+                          className={styles.cardLink}
+                          onClick={() => rememberRow(book.id)}
+                        >
+                          <span className={styles.emptyTitle}>{book.title}</span>
+                          <p className={styles.pending}>
+                            {book.author ? `${book.author} · ` : ''}
+                            {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
+                          </p>
+                        </Link>
+                      )}
+
+                      {/* The per-book controls step aside while selecting —
+                          two ways to delete on one row, one of them for a
+                          different set of books, is a trap. */}
+                      {selected !== null ? null : removing === book.id ? (
                         <div className={styles.confirm}>
                           <span className={styles.pending}>Remove?</span>
                           <button

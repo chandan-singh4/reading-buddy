@@ -4,7 +4,12 @@
  */
 
 export { DB_NAME, createDb } from './db.ts'
-export type { ReadingBuddyDB, StoredChapterIndex, StoredSection } from './db.ts'
+export type {
+  ReadingBuddyDB,
+  ReadingPosition,
+  StoredChapterIndex,
+  StoredSection,
+} from './db.ts'
 
 export { createRepository, repository } from './repository.ts'
 export type { ParsedBook, Repository } from './repository.ts'

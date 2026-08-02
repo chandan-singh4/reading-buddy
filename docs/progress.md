@@ -19,6 +19,220 @@ Get that loop working before building any breadth.
   streamed answer (WP-17 → 18 → 19 → 20).
 
 ### Recently done
+- **WP-45 · Second phone session: four fixes** — 2026-08-02.
+  - **Links inside lists were being thrown away.** `readList` and
+    `containerText` built their block from `textContent`, which keeps the words
+    and drops every `<a>` in them. A book's own contents page *is* a list, and
+    so is most of a notes section — which is exactly the symptom reported:
+    footnotes inside prose worked, contents entries were dead. Both now go
+    through `textAndLinks` per child and are joined by a shared `joinParts`,
+    which shifts each piece's link offsets by where that piece landed in the
+    finished string. The renderer's half is `lineRunsOf`, cutting the runs at
+    each newline so every `<li>` gets its own links.
+  - **A jump now says where it put you.** `returnTo` carries the page number it
+    will return to, so the button reads "↩ Back to page 250" — a promise the
+    reader can check rather than one they must trust — and the bar reappears on
+    a jump unless Focus Mode is on. This meant moving the `pages` calculation
+    above `jumpToAnchor`: the page you are *leaving* has to be read while you
+    are still on it.
+  - **Shelf search** (`matching`), shown only above 8 books. Every word must
+    match, in title or author, so "jung red" finds *The Red Book*. **Select all
+    means everything on screen** — ticking books hidden behind a search and then
+    deleting them would be the worst bug this screen could have.
+  - **Coming back to the shelf lands on the book you left.** `useScrollMemory`
+    is gone, replaced by `useRowMemory`. A pixel offset is only meaningful
+    against the page it was measured on: restore it while the list is short and
+    the browser clamps it; restore it after a book was removed and it points
+    somewhere else. A row id has neither failure mode — the row is there and the
+    scroll is exact, or it isn't and the reader stays at the top.
+- **WP-44 · Select several books and remove them** — added 2026-08-02, after the
+  reader imported 35 books and found one-at-a-time deletion punishing.
+  - **`repository.deleteBooks`** — one transaction for the lot, not a loop of
+    `deleteBook`. Thirty-five separate transactions means thirty-five round
+    trips, and a failure halfway leaves an arbitrary subset gone with no way to
+    tell which. Deletes by the `bookId` index rather than collecting keys first,
+    so a book's thousands of sections are never pulled into memory to be
+    thrown away.
+  - **Selection is a mode, `null` when off.** "Not selecting" and "selecting
+    nothing" have to look different, and a shelf permanently covered in
+    checkboxes is a poor default for the thing people do most.
+  - **While selecting, the title ticks the book instead of opening it**, and the
+    per-book Remove steps aside — two delete controls on one row, acting on
+    different sets, is a trap.
+  - **The confirmation names the number** ("Remove 35 books for good?"). There
+    is no undo: the original files were never kept.
+  - **`Library.test.tsx` is new** — the screen had no tests, and it is the one
+    screen that destroys things.
+- **WP-42 · Links inside the text** — footnotes and cross-references are tappable.
+  - **A link is a range of a paragraph** (`start`, `end`, plus `anchor` for
+    inside the book or `url` for outside). Offsets rather than a copy of the
+    words, because a paragraph can contain the same word twice.
+  - **Resolved after assembly, not during it** (`parse/links.ts`, called from
+    `assembleBook`). A footnote marker points at a paragraph that doesn't exist
+    yet while its own chapter is being assembled.
+  - **Epub qualifies ids and hrefs with their file** before assembly. Two
+    chapters can each define `#note1`; unqualified, every footnote in the book
+    would land in whichever chapter parsed first.
+  - **Unresolvable links are dropped**, and `ids` are stripped once resolved so
+    thousands of them never reach storage.
+  - **Internal links render as buttons, external as anchors**, and following one
+    offers *"↩ Back to where you were"* — without it a footnote is a trap.
+- **Page turning (the core of WP-14)** — the reader turns pages instead of
+  scrolling.
+  - **CSS columns, one per screen**, `column-fill: auto`. The browser picks the
+    breaks, so they land between lines; a font change re-flows on its own.
+  - **`reader/columns.ts`** holds the arithmetic — page count, which page is
+    showing, where to scroll — pure and unit-tested, because that is where
+    off-by-ones and unreachable last pages live.
+  - **`overflow: hidden`, not `auto`.** A hand-dragged strip strands you between
+    two pages; every turn is programmatic and lands on a column.
+  - **One `turnPage` for swipe, edge taps and Previous/Next**, falling through to
+    the neighbouring section at either end. Turning *back* into a section lands
+    on its last page.
+  - Gutters live on the children: padding on a multi-column box indents only the
+    first and last columns.
+- **The app updates itself now.** Closing an installed app suspends it rather
+  than ending it, so the page never loaded again and the injected registration —
+  which only ran on `load` — could never find a new build. Registration is ours
+  (`app/updates.ts`) and checks whenever the app becomes visible.
+- **WP-32 · It is on a phone, installed, and it works.** Import worked, folder
+  import brought a whole shelf in at once and felt smooth, and duplicate
+  detection correctly caught the one book already there.
+- **WP-41 (second round) · What the fixes themselves broke, and three more.**
+  - **The Remove button had been off-screen all along.** The book row was a
+    non-wrapping flex row, so on a phone the shelf picker and Remove sat past
+    the right edge — reachable *only* by scrolling the page sideways. Removing
+    the sideways scroll made them unreachable, which is how it was found. The
+    row wraps now. A reminder that a layout bug can hide behind a second bug and
+    look like a feature.
+  - **Coming back from a book landed at the bottom of the shelf.** The browser
+    restores scroll at mount, when the library is still loading and a fraction
+    of its final height, so it restores against a page that doesn't exist yet.
+    `history.scrollRestoration = 'manual'` plus `useScrollMemory`, which waits
+    for the books before restoring.
+  - **Opening a book was a hard cut.** A 200 ms fade with the text rising into
+    place. Deliberately no `transform` on the reader itself — the overlay is
+    `position: fixed`, and a transform on an ancestor redefines what "fixed"
+    means, which would shift the bars for the length of the animation.
+  - **The sheet's tabs answer to a sideways swipe** (`reader/swipe.ts`). The
+    judgement — swipe vs scroll vs unsteady thumb — is pure and unit-tested;
+    only the touch plumbing lives in the component. Stops at the ends rather
+    than wrapping, because the row of tabs visibly doesn't loop.
+- **WP-41 · Swipe and gesture fixes** — all three straight from that session.
+  - **The page drifted sideways under a thumb.** `overflow-x: hidden` +
+    `overscroll-behavior-x: none` on the document. Reading is vertical; there is
+    never anything to the left or right, so any sideways movement is drift.
+  - **A back swipe with the sheet open threw the reader onto the shelf.** It
+    cannot be refused — in an installed app that gesture belongs to the system.
+    So `useBackDismiss` gives it something of its own to close: an open panel
+    pushes a history entry, Back consumes that, and the entry is taken back if
+    the panel is closed by a tap instead (otherwise the *next* back gesture is
+    silently swallowed).
+  - **The sheet had nowhere to tap to dismiss it**, being `flex: 1` between the
+    two bars. Capped at 65% with a dimmed scrim above it.
+- **WP-30 + WP-31 · Installable, and reachable from a phone.** Everything the
+  PC side needs; WP-32 (actually installing it) is now the reader's step.
+  - **Manifest and service worker configured** — name, icons, standalone
+    display, portrait, dark theme colour. `registerType: 'autoUpdate'`, Workbox
+    `generateSW`; writing a service worker by hand would mean owning cache
+    invalidation, and a stale build after an update is a bug with no visible
+    cause.
+  - **pdf.js and mammoth are excluded from the precache.** They are 934 kB
+    between them; precaching would nearly triple the install download to
+    support importing a format the reader may never use on the phone. App shell
+    precache is **394 kB**, down from 1301 kB before the exclusion.
+  - **`navigateFallback: 'index.html'`** — without it, an installed app
+    reopening on `/book/abc` 404s offline.
+  - **Icons are generated, not committed as blobs** (`web/scripts/make-icons.mjs`,
+    `npm run icons`). An open book drawn from the theme's own colours, in ~150
+    lines with no image library — PNG is a few chunks around a zlib stream and
+    Node ships zlib. Includes a *maskable* variant, without which Android crops
+    the launcher shape straight through the mark.
+  - **iOS ignores the manifest**, so the `<link rel="apple-touch-icon">` and
+    `apple-mobile-web-app-*` tags in `index.html` are not duplication — they are
+    the only version iOS reads.
+  - **mkcert installed and the local CA trusted on this PC**; certificate issued
+    for `192.168.1.26`, `localhost`, `127.0.0.1` into `web/certs/` (gitignored —
+    private key, and it names this machine). `vite.config.ts` picks it up if
+    present and falls back to HTTP if not, so a fresh checkout still runs.
+  - **`npm run lan`** prints this machine's address and the exact mkcert command,
+    because the certificate names an address and the router's lease changes it.
+  - **Verified over the LAN**: chain verifies against the mkcert root, and
+    `manifest.webmanifest`, `sw.js`, all four icons and a deep link all serve
+    200 over HTTPS on `https://192.168.1.26:4173`.
+  - **`docs/phone.md`** is the install path end to end, including the iOS step
+    everyone misses (a trusted profile still does nothing until it is enabled
+    under About → Certificate Trust Settings).
+- **WP-15 · Reopen where you left off** — every book used to open at chapter 1.
+  - **A place is an anchor, not a page number.** Page numbers can be renumbered
+    (change `WORDS_PER_PAGE`) or invalidated (re-import); `[ch02-s03-p013]`
+    names a paragraph, so it's either still there or plainly gone.
+  - **Its own `positions` table** (schema v4), one row per book. It's the only
+    row written *while reading*; on `BookMeta` it would rewrite the whole book
+    record every few seconds. `listPositions` is already there for WP-24's
+    "Continue reading".
+  - **Saved 800 ms after reading settles**, so a page of scrolling is one write
+    rather than one per paragraph. **Restored before the first section is
+    fetched**, so there's no wasted read, no flash of chapter 1, and no chance
+    of saving chapter 1 over the position still being looked up.
+  - **A stale place is refused, not repaired** — a malformed anchor, or a
+    chapter the book no longer has, opens at the beginning. The alternative was
+    landing the reader on "That part of the book is missing", which looks like
+    the book broke rather than the bookmark aged.
+  - **Deleting a book takes its place with it.** An orphaned position would be
+    handed straight back on re-import — a fresh copy opening partway through
+    someone's previous read.
+  - **A bug found on the way:** the landing effect re-ran when the spine
+    arrived, scrolling a reader back to the top of the section a moment after
+    they got there. Now guarded on the section's path, so arriving happens once.
+  - One quiet line — *"Picked up where you left off."* — shown only for a place
+    saved a while ago, and gone at the first tap.
+  - Gates: 344 tests, typecheck, build. Bundle 363.06 kB (was 361.61).
+- **WP-40 · Navigation feel** — the reading screen now navigates like Google
+  Books, which the reader uses daily and sent screenshots of.
+  - **Page numbers came back, counted in words.** This reverses the previous
+    day's "no page numbers anywhere". The old rule was right that a page derived
+    from the *screen* describes the phone rather than the book; a page defined as
+    a fixed 300-word slice of the text doesn't move when the font does. Kindle's
+    "locations" under a name people know. Accepted, explicitly, by the reader: a
+    visible page turn sometimes won't advance the number.
+  - **Nothing measured or laid out.** `words` is recorded at import in
+    `assemble.ts`; `reader/progress.ts` builds a *spine* of every section with
+    its running offset, from the manifest plus chapter indexes. A chapter index
+    is titles and paths, never prose — this is not the forbidden whole-book read.
+  - **One-shot backfill** for books imported before counts existed
+    (`repository.backfillWordCounts`). The only function that reads a whole book,
+    fenced off and labelled as such. Atomic, idempotent, and it re-checks inside
+    the transaction that the book still exists — otherwise deleting a book
+    mid-migration resurrected its manifest.
+  - **Three-state bottom bar** (`reader/bar.ts`): page → pages left in this
+    chapter → nothing, with the percentage riding along and leaving with the
+    third. The cycle closes, so the bare state is never a trap.
+  - **The slider moves inside a section, not just between sections** — fixed
+    after the reader hit it on the real book. Nudging 176 → 177 did nothing,
+    then a little further jumped to 190. Cause: chapter 13 of that epub is a
+    *single section* spanning fourteen pages, so every page in it resolved to
+    the same place and `goTo` correctly dropped the move as a no-op. A page now
+    resolves in two steps — `refAtPage` picks the section to load,
+    `anchorAtPage` picks the paragraph inside it — and the reading page scrolls
+    to that anchor. Paragraph offsets are computed from the section already in
+    memory, so no schema change and no extra read.
+  - **The page number follows your scrolling.** Once a page can be a spot inside
+    a section, a bar frozen at the section's start would contradict the slider.
+    A throttled scroll handler tracks the last paragraph past the reading line,
+    and every figure — page, percent, pages-left — derives from that one word
+    offset so they can't disagree.
+  - **The fine slider moves one page at a time**; the coarse chapter slider
+    survives as the fallback for a book with no counts, rather than being
+    deleted. `goTo` now drops a move to where you already are, so dragging
+    across a long section doesn't refetch it once per step.
+  - **Nav sheet with Contents / Bookmarks / Notes tabs**, the latter two showing
+    a one-line "not yet, and here's what it'll do" rather than being hidden.
+  - Gates: 325 tests, typecheck, build. Bundle 361.61 kB (was 355.21).
+  - **Verified on the real Jung epub** — the backfill ran, page numbers and the
+    three-state bar were what the reader wanted. The long-section slider bug was
+    found there and fixed; the fix itself has not been re-checked on the real
+    book yet. Still nothing tried on an actual phone.
 - **WP-13 · Nav overlay + Focus Mode** — `web/src/reader/Chrome.tsx`. Tap the
   text to show or hide the overlay; it layers *over* the page, so toggling it
   never moves a word. Contents list jumps to a chapter, a coarse slider moves
@@ -112,8 +326,8 @@ Get that loop working before building any breadth.
 - Repo published: **github.com/chandan-singh4/reading-buddy** (public). Product
   renamed Reading Buddy — *Wayfinder* was the planning method, not the product.
 
-**Gates:** `npm test` (281), `npm run typecheck`, `npm run build` — all passing.
-Main bundle 355.21 kB. The parsers are called now, but every one of them stays
+**Gates:** `npm test` (426), `npm run typecheck`, `npm run build` — all passing.
+Main bundle 368.7 kB. The parsers are called now, but every one of them stays
 behind a dynamic `import()`, so pdf.js (434 kB) and mammoth (500 kB) remain in
 their own chunks and are fetched only when a file of that type is imported.
 
@@ -121,10 +335,16 @@ their own chunks and are fetched only when a file of that type is imported.
 - None.
 
 ### Next up
-Two sensible candidates, and they answer different questions:
-- **WP-15 · Reopen where you left off** — small, and the most obviously missing
-  thing in daily use: every book currently opens at chapter 1. Anchors are
-  already in the DOM, so this is mostly storing one and restoring it.
+**The reader's order, set 2026-08-02: make it a proper reading app first, then
+AI.**
+- **Page turning (the core of WP-14)** — the app scrolls; it should turn pages.
+  CSS columns, and the horizontal swipe now that it no longer drifts or exits.
+  This is the single biggest gap between what exists and something that feels
+  like a reading app.
+- **Reading comfort (rest of WP-14)** — font size, line spacing, margins, sepia.
+- **WP-42 · Links inside the text** — footnotes and cross-references are dead
+  text today; the parser discards every `href`.
+- **WP-43 · Re-scan a folder + name what's new.**
 - **WP-17 → 18 → 19 → 20 · the tutor loop** — select text → assemble a prompt →
   call Claude → stream an answer. This is the rest of the walking skeleton and
   the first time the app does anything an ordinary reader can't.
@@ -147,9 +367,9 @@ Two sensible candidates, and they answer different questions:
   repo's folder. Gitignored, never committed (history scanned clean), but it
   should move outside the project and be read from an env var when `api/` is
   built.
-- Nothing has been checked on a real phone yet — WP-31/32 territory, and now
-  overdue: there is something to render, and the reader is a touch interface
-  that has only ever been used with a mouse.
+- **It has now been used on a real phone** (2026-08-02): installed, books
+  imported, folder import smooth, duplicates caught. What that session found is
+  WP-41 (fixed), WP-42 and WP-43, plus page turning as the top priority.
 - **Figures show captions but no images.** Epub records an archive path
   (`OEBPS/images/fig1.png`) which the browser can't fetch — resolving those to
   displayable bytes is WP-39. Affects all 141 images in the Jung epub.

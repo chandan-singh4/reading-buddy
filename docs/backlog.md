@@ -37,7 +37,21 @@
 ### Leg 2 — Reading Room (reader UI & comfort)
 - [x] **WP-12 Structured renderer** — anchored paragraphs, paginated · *after 05,11*
 - [x] **WP-13 Nav overlay (Books-style)** — tap-fade, progress slider, ToC, Focus Mode toggle · *after 12*
-- [ ] **WP-14 Reader conveniences** — font/spacing, day/night, in-book search, bookmarks, **page turning (see below)** · *after 12*
+- [~] **WP-14 Reader conveniences** — font/spacing, day/night, in-book search, bookmarks, **page turning (see below)** · *after 12*
+
+> **Page turning shipped 2026-08-02**, exactly as the note below decided: CSS
+> columns, one column per screen, `column-fill: auto`. `reader/columns.ts` holds
+> the arithmetic (how many pages, which one is showing, where to scroll) and is
+> pure and unit-tested — that is where off-by-ones live. `overflow: hidden`
+> rather than `auto`, so a strip can't be dragged to a half-page; every turn is
+> programmatic and lands on a column. Swipe, edge taps (outer quarter each side)
+> and Previous/Next all go through one `turnPage`, which falls through to the
+> neighbouring *section* at either end — the seam, working as intended. Turning
+> back into a section lands on its **last** page.
+>
+> **Still open in WP-14:** font size, line spacing, margins, sepia, in-book
+> search, real bookmarks, and the page-turn *animation* (the seam is built; only
+> instant is wired).
 
 > **Pagination — decided 2026-08-02, after the reader brainstormed four options.**
 >
@@ -68,9 +82,14 @@
 > scrolling as a per-section fallback, which is nearly free since it is what
 > WP-12 already does.
 >
-> **No page numbers anywhere.** They change with the font, so they are a lie.
-> "Chapter 5, 40% through" and "about 12 minutes left" are stable, honest, and
-> computable from word counts without laying anything out.
+> ~~**No page numbers anywhere.**~~ **Superseded later the same day — see
+> `decisions.md`, session 3.** The diagnosis held (a *screen*-derived page number
+> changes with the font, so it describes the phone), but the reader wants Google
+> Books' "Page 250 of 338" and there is an honest version: count a page as a
+> fixed chunk of the book's own **words**. That is stable under font changes and
+> computable from word counts without laying anything out — the same sentence
+> this note already used to argue the opposite. "Chapter 5, 40% through" survives
+> as one state of the bottom bar rather than the only thing it can say.
 >
 > Ordering: this belongs in WP-14, next to the font and margin controls, because
 > surviving a font change *is* the hard half. WP-13 stays scrolling.
@@ -103,8 +122,58 @@
 >   fast tapper must be able to outrun it: the next turn starts even if the last
 >   hasn't finished. A per-page delay is what makes a reader feel heavy after an
 >   hour.
-- [ ] **WP-15 Reopen where left off** — persist/restore anchor position · *after 12,03*
+- [x] **WP-40 Navigation feel (Google-Books-style bar, fine slider, nav sheet)** — carved out of WP-14 on 2026-08-02 because WP-14 had grown to several sessions and this is the half the reader feels every minute. Three-state bottom bar (page → pages left in chapter → nothing), percentage riding with states 1–2, one-page-at-a-time slider, hamburger sheet with Contents / Bookmarks / Notes tabs · *after 13; **needs the word-count schema change below***
+
+> **Resolved 2026-08-02 — both halves shipped.** `structure/words.ts` holds the
+> counting and `WORDS_PER_PAGE = 300`; `assemble.ts` records a `words` count per
+> section and per chapter at import; `repository.backfillWordCounts` fills in
+> books imported earlier, once, atomically, and refuses to write if the book was
+> deleted while it counted. `reader/progress.ts` gained a *spine* (every section
+> with its running word offset, built from the manifest plus chapter indexes —
+> no prose) which drives both the page number and the fine slider.
+>
+> The original note, kept because it explains the shape:
+>
+> **Blocker found 2026-08-02: nothing counts words yet.** `ManifestChapter` is
+> `{chapter, title, summary}` and `ChapterIndexEntry` has no length either, so a
+> word-derived page number has nothing to divide. Two halves:
+> 1. **Record it at import.** `assemble.ts` already walks every block, so a
+>    `words` field on each section entry (and a chapter total on the manifest) is
+>    nearly free there. Metadata only — it touches no anchor, so it is safe to add
+>    after books exist, unlike WP-38.
+> 2. **Backfill the books already on the shelf.** The Jung epub and the Springer
+>    PDF were imported without counts. Reading every section once, on first open,
+>    to fill them in is a one-time local IndexedDB pass — it costs no tokens (the
+>    token rule is about what reaches Claude, not what reaches the browser) but it
+>    *is* the "load the whole book" call the architecture has deliberately avoided,
+>    so it must be a clearly-labelled one-shot migration, never a read path.
+>
+> Until this lands, the bar can ship states 2 and 3 (pages-left is chapter-local)
+> but not state 1.
+- [x] **WP-15 Reopen where left off** — persist/restore anchor position · *after 12,03*
+
+> **Shipped 2026-08-02.** A `positions` table (schema v4), one row per book,
+> holding an anchor and a timestamp. Saved 800 ms after reading settles, so a
+> page of scrolling is one write rather than one per paragraph; restored before
+> the first section is fetched, so there's no wasted read and no flash of
+> chapter 1. A saved place is refused if the anchor is malformed or names a
+> chapter the book no longer has — otherwise re-importing a book would open it
+> to "That part of the book is missing". Deleting a book takes its place with
+> it, so re-importing the same book never resumes a previous read.
 - [ ] **WP-16 Read-aloud** — phone built-in TTS via Web Speech API · *after 12*
+- [x] **WP-41 Swipe and gesture fixes** — added 2026-08-02, straight off the first real phone session. The page drifted sideways under a thumb; a back swipe with the contents sheet open threw the reader out of the book onto the shelf; and the sheet filled the screen with nothing to tap to dismiss it · *after 32*
+- [x] **WP-42 Links inside the text** — added 2026-08-02, from the phone session. `<a href>` is discarded by the HTML parser today, so footnote markers, cross-references and the book's own contents page are dead text. Resolve an epub's internal hrefs to anchors and render them as taps. **Note the trap:** restoring the book's internal ToC *page* would renumber every paragraph after it and invalidate saved positions and highlights — so links in prose first, and treat the in-book contents page as a separate decision · *after 12; needs 15's positions to be considered*
+
+> **Folder import does not watch the folder — clarified for the reader
+> 2026-08-02.** Folder import is a one-time scan. A web app is only alive while
+> it is open and cannot look at the disk unprompted; the File System Access API
+> can remember a directory handle, but still only notices changes when the app
+> next opens and asks. iOS Safari doesn't support it at all. Hence WP-43 below
+> being a *button*, not a watcher.
+
+- [x] **WP-44 Select several books and remove them** — added 2026-08-02, straight from use: importing 35 books made one-at-a-time deletion punishing. Selection mode with select-all, one transaction for the whole batch, and a confirmation that names the number — there is no undo · *after 11*
+- [x] **WP-45 Links in lists, the page you landed on, shelf search, and coming back to the right row** — added 2026-08-02 from the second phone session. Four findings: (a) list blocks were built from `textContent`, so every link inside one was silently discarded — and a book's own contents page *is* a list, which is why contents entries were dead while footnotes in prose worked; (b) after following a link a reader has no idea what page they landed on, so the way back now names the page it returns to and the bar reappears on a jump; (c) 35 books with no way to find one; (d) returning from a book landed at the bottom of the shelf — a remembered pixel offset is meaningless against a page whose height has changed, so the shelf remembers the *book* and scrolls that row into view · *after 44*
+- [ ] **WP-43 Re-scan a folder + tell me what's new** — added 2026-08-02. Remember the folder that was imported from, offer "Check folder for new books", skip what's already on the shelf (duplicate detection already does this), and name what arrived: "2 new books: …". On iOS the handle can't be remembered between sessions, so it degrades to re-picking the folder · *after 11*
 
 ### Leg 3 — The Tutor (inline explain + Claude)
 - [ ] **WP-17 Selection menu** — Highlight / Copy / Define (local) / Ask · *after 12*
@@ -125,9 +194,9 @@
 
 ### Leg 5 — Landfall (deploy, install, backup)
 - [ ] **WP-29 Tiny key backend** — one endpoint holding the API key · *after 19*
-- [ ] **WP-30 PWA manifest + service worker** — installable, offline caching · *after 04*
-- [ ] **WP-31 mkcert HTTPS + phone trust** — local cert, one-time trust, LAN serve · *after 30*
-- [ ] **WP-32 Install on iOS + Android** — add-to-home-screen, verify offline · *after 31*
+- [x] **WP-30 PWA manifest + service worker** — installable, offline caching · *after 04*
+- [x] **WP-31 mkcert HTTPS + phone trust** — local cert, one-time trust, LAN serve · *after 30*
+- [x] **WP-32 Install on iOS + Android** — add-to-home-screen, verify offline · *after 31*
 - [ ] **WP-33 Google Drive backup/restore** — opt-in Settings toggle, off by default · *after 25*
 - [ ] **WP-34 Retire the Tauri shell** — drop the disposable harness · *last, after 32*
 
