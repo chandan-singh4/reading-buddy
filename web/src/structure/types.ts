@@ -62,6 +62,17 @@ export interface BookMeta {
    * this was recorded, and when the platform offers no crypto.
    */
   contentHash?: string
+  /**
+   * SHA-256 of the opening of the book's *text*, once parsed. The second line
+   * of duplicate defence, and the one that can be worked out after the fact:
+   * the original file is never kept, but the text always is — so a book
+   * imported before fingerprinting existed can still be given one of these.
+   *
+   * It also catches what `contentHash` can't: the same book from a *different*
+   * file — re-downloaded, re-wrapped, or converted — where the bytes differ but
+   * the words don't.
+   */
+  textSignature?: string
   /** ISO 8601. */
   importedAt: string
 }

@@ -12,6 +12,8 @@ import {
   formatFromFilename,
   importBook,
   importBooks,
+  backfillTextSignatures,
+  textSignatureOf,
   titleFromFilename,
   type BatchProgress,
   type ParserTable,
@@ -443,6 +445,97 @@ describe('duplicate detection', () => {
       'duplicate',
       'imported',
     ])
+    expect((await repo.listBooks()).length).toBe(2)
+  })
+})
+
+// --- Books that predate fingerprinting --------------------------------------
+
+/** Enough prose to clear the signature's minimum-length guard. */
+function longMarkdown(title: string): string {
+  const sentence =
+    'The unconscious speaks in images, and the dreamer must learn to listen to them carefully. '
+  return `# ${title}\n\n${sentence.repeat(6)}\n`
+}
+
+describe('a book imported before fingerprinting existed', () => {
+  it('is still recognised on re-import, via its stored text', async () => {
+    const contents = longMarkdown('Man and His Symbols')
+
+    // Exactly the state the app was in before this feature: a book on the
+    // shelf, with real sections, and no fingerprint of any kind.
+    await importBook(fileOf('jung.md', contents), { repository: repo, newId: () => 'legacy-1' })
+    const legacy = (await repo.listBooks())[0]!
+    await repo.saveBook({
+      ...legacy,
+      contentHash: undefined,
+      textSignature: undefined,
+    })
+    expect((await repo.getBook(legacy.id))?.textSignature).toBeUndefined()
+
+    // Re-importing the very same file used to sail straight through.
+    const error = await importErrorFrom(
+      importBook(fileOf('jung.md', contents), { repository: repo, newId: () => 'legacy-2' }),
+    )
+
+    expect(error.code).toBe('duplicate')
+    expect((await repo.listBooks()).length).toBe(1)
+  })
+
+  it('gives older books a signature without touching anything else', async () => {
+    const contents = longMarkdown('Backfill Me')
+    await importBook(fileOf('a.md', contents), { repository: repo, newId: () => 'old-1' })
+
+    const stored = (await repo.listBooks())[0]!
+    await repo.saveBook({ ...stored, textSignature: undefined })
+
+    expect(await backfillTextSignatures(repo)).toBe(1)
+
+    const after = await repo.getBook(stored.id)
+    expect(after?.textSignature).toMatch(/^[0-9a-f]{64}$/)
+    expect(after?.title).toBe(stored.title)
+    expect(after?.importedAt).toBe(stored.importedAt)
+    // Nothing to do the second time.
+    expect(await backfillTextSignatures(repo)).toBe(0)
+  })
+
+  it('catches the same book arriving as a different file', async () => {
+    const contents = longMarkdown('Same Words')
+    await importBook(fileOf('from-one-source.md', contents), {
+      repository: repo,
+      newId: () => 'text-1',
+    })
+
+    // Different bytes — a trailing newline is enough to change the file hash —
+    // but the same words, so the text signature still catches it.
+    const error = await importErrorFrom(
+      importBook(fileOf('from-another-source.md', `${contents}\n`), {
+        repository: repo,
+        newId: () => 'text-2',
+      }),
+    )
+
+    expect(error.code).toBe('duplicate')
+  })
+
+  it('refuses to judge a book with too little opening text', async () => {
+    // A false "already on your shelf" would lock a real book out, so a thin
+    // opening — a title page, a "Contents" line — makes no claim at all.
+    expect(await textSignatureOf(['Contents'])).toBeUndefined()
+    expect(await textSignatureOf([])).toBeUndefined()
+
+    const { parsers } = stubParsers()
+    await importBook(fileOf('thin-one.md', '# A\n\nShort.\n'), {
+      repository: repo,
+      parsers,
+      newId: () => 'thin-1',
+    })
+    await importBook(fileOf('thin-two.md', '# B\n\nAlso short.\n'), {
+      repository: repo,
+      parsers,
+      newId: () => 'thin-2',
+    })
+
     expect((await repo.listBooks()).length).toBe(2)
   })
 })

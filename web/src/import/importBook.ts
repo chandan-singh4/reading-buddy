@@ -164,6 +164,91 @@ export async function fingerprint(data: ArrayBuffer | string): Promise<string | 
   }
 }
 
+/**
+ * How much of the opening text the signature is taken from. Enough to be
+ * distinctive, little enough that it's the same work for a pamphlet and for a
+ * 600-page book.
+ */
+const SIGNATURE_PARAGRAPHS = 20
+
+/**
+ * Below this many characters the opening isn't distinctive enough to judge by —
+ * a title page reading "Contents" would collide with every other book that
+ * starts the same way, and a false "already on your shelf" locks a real book
+ * out of the library. No signature means no claim.
+ */
+const SIGNATURE_MIN_CHARS = 200
+
+function normaliseForSignature(texts: readonly string[]): string {
+  return texts
+    .slice(0, SIGNATURE_PARAGRAPHS)
+    .join('\n')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+/**
+ * Fingerprint the opening of a book's text. Undefined when there isn't enough
+ * of it to be sure — see `SIGNATURE_MIN_CHARS`.
+ */
+export async function textSignatureOf(texts: readonly string[]): Promise<string | undefined> {
+  const opening = normaliseForSignature(texts)
+  if (opening.length < SIGNATURE_MIN_CHARS) return undefined
+  return fingerprint(opening)
+}
+
+/** The same rule applied to a freshly parsed book: its first section's prose. */
+function openingOf(book: ParsedBook): string[] {
+  return (book.sections[0]?.paragraphs ?? []).map((paragraph) => paragraph.text)
+}
+
+/**
+ * Give a text fingerprint to every book that hasn't got one — the books that
+ * were imported before fingerprinting existed. Their original files are long
+ * gone, but their text is in storage, so the same opening rule can be applied
+ * to it after the fact.
+ *
+ * Without this, an older book is invisible to the duplicate check forever, and
+ * re-importing it quietly makes a second copy.
+ */
+export async function backfillTextSignatures(repository: Repository): Promise<number> {
+  const pending = await repository.listBooksWithoutTextSignature()
+  let filled = 0
+
+  for (const book of pending) {
+    const section = await repository.getSection(book.id, 'ch01/s01' as never)
+    if (!section) continue
+
+    const signature = await textSignatureOf(section.paragraphs.map((p) => p.text))
+    if (signature === undefined) continue
+
+    await repository.saveBook({ ...book, textSignature: signature })
+    filled += 1
+  }
+
+  return filled
+}
+
+/**
+ * Run the backfill before a duplicate check, swallowing any failure.
+ *
+ * Deliberately *not* memoised per repository. Caching it was the first thing I
+ * reached for and it was wrong: it makes the result depend on whether some
+ * earlier import in the same page load happened to run it, which is exactly the
+ * kind of "worked the third time" behaviour this whole change exists to kill.
+ * The query behind it only scans the books table, which holds one small row per
+ * book — cheap enough to pay every time and be certain.
+ */
+async function backfillQuietly(repository: Repository): Promise<void> {
+  try {
+    await backfillTextSignatures(repository)
+  } catch {
+    // Never block an import: worst case the older books stay unrecognised,
+    // which is where we started.
+  }
+}
+
 function countParagraphs(book: ParsedBook): number {
   return book.sections.reduce((total, section) => total + section.paragraphs.length, 0)
 }
@@ -205,18 +290,16 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     throw new ImportError('unreadable-file', UNREADABLE_MESSAGE[format], { cause })
   }
 
-  // Checked before parsing, not after: re-dropping a folder of books you
-  // already have should cost a hash each, not a full re-parse each.
+  // Older books have no fingerprint of their own; give them one before asking
+  // any "have I seen this?" question, or they can never answer it.
+  await backfillQuietly(repository)
+
+  // First check, before parsing: identical bytes. Re-dropping a folder of books
+  // you already have should cost a hash each, not a full re-parse each.
   const contentHash = await fingerprint(data)
   if (contentHash !== undefined) {
     const existing = await repository.findByContentHash(contentHash)
-    if (existing) {
-      throw new ImportError(
-        'duplicate',
-        `“${existing.title}” is already on your shelf.`,
-        { cause: existing },
-      )
-    }
+    if (existing) throw duplicateOf(existing)
   }
 
   const meta: BookMeta = {
@@ -242,9 +325,26 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     throw new ImportError('no-text', NO_TEXT_MESSAGE[format])
   }
 
+  // Second check, now that there is text to compare. This is the one that
+  // recognises a book imported before fingerprinting existed, and the same book
+  // arriving as a different file.
+  const textSignature = await textSignatureOf(openingOf(parsed))
+  if (textSignature !== undefined) {
+    const existing = await repository.findByTextSignature(textSignature)
+    if (existing) throw duplicateOf(existing)
+  }
+
+  const toSave: ParsedBook = {
+    ...parsed,
+    meta: {
+      ...parsed.meta,
+      ...(textSignature === undefined ? {} : { textSignature }),
+    },
+  }
+
   onStage?.('saving')
   try {
-    await repository.saveParsedBook(parsed)
+    await repository.saveParsedBook(toSave)
   } catch (cause) {
     throw new ImportError(
       'save-failed',
@@ -253,7 +353,13 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     )
   }
 
-  return parsed.meta
+  return toSave.meta
+}
+
+function duplicateOf(existing: BookMeta): ImportError {
+  return new ImportError('duplicate', `“${existing.title}” is already on your shelf.`, {
+    cause: existing,
+  })
 }
 
 // --- Many at a time -----------------------------------------------------------

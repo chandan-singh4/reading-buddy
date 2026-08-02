@@ -6,8 +6,10 @@
 export {
   ACCEPTED_EXTENSIONS,
   ImportError,
+  backfillTextSignatures,
   fingerprint,
   formatFromFilename,
+  textSignatureOf,
   importBook,
   importBooks,
   titleFromFilename,

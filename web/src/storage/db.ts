@@ -67,6 +67,13 @@ function defineSchema(db: Dexie): void {
   db.version(2).stores({
     books: 'id, title, type, importedAt, contentHash',
   })
+
+  // v3 — `textSignature` indexed. Unlike `contentHash` this one can be filled
+  // in for books that predate it, because it is derived from the stored text
+  // rather than from the original file, which we never keep.
+  db.version(3).stores({
+    books: 'id, title, type, importedAt, contentHash, textSignature',
+  })
 }
 
 export function createDb(name: string = DB_NAME): ReadingBuddyDB {

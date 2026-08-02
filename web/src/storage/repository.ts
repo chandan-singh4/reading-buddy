@@ -58,6 +58,16 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       return database.books.where('contentHash').equals(hash).first()
     },
 
+    /** The same, by the fingerprint of the book's opening text. */
+    async findByTextSignature(signature: string): Promise<BookMeta | undefined> {
+      return database.books.where('textSignature').equals(signature).first()
+    },
+
+    /** Books with no text fingerprint yet — imported before it was recorded. */
+    async listBooksWithoutTextSignature(): Promise<BookMeta[]> {
+      return database.books.filter((book) => book.textSignature === undefined).toArray()
+    },
+
     // --- Import --------------------------------------------------------
 
     /**
