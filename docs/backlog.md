@@ -35,8 +35,8 @@
 > EPUB in Calibre; the import UI (WP-11) should say so in one line.
 
 ### Leg 2 — Reading Room (reader UI & comfort)
-- [~] **WP-12 Structured renderer** — anchored paragraphs, paginated · *after 05,11*
-- [ ] **WP-13 Nav overlay (Books-style)** — tap-fade, progress slider, ToC · *after 12*
+- [x] **WP-12 Structured renderer** — anchored paragraphs, paginated · *after 05,11*
+- [x] **WP-13 Nav overlay (Books-style)** — tap-fade, progress slider, ToC, Focus Mode toggle · *after 12*
 - [ ] **WP-14 Reader conveniences** — font/spacing, day/night, in-book search, bookmarks, **page turning (see below)** · *after 12*
 
 > **Pagination — decided 2026-08-02, after the reader brainstormed four options.**

@@ -8,17 +8,41 @@
 
 ---
 
-**Current leg:** Leg 0 — Basecamp
+**Current leg:** Leg 2 — Reading Room
 **Near-term arc:** the *walking skeleton* — import a `.md` → render → select →
 Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 → 18 → 19 → 20).
 Get that loop working before building any breadth.
 
 ### In flight
-- **WP-12 · Structured renderer** — the first half of the walking skeleton
-  (import → store → list) now works end to end on real books. Nothing displays
-  one yet; that is WP-12, and it is the whole of the current task.
+- Nothing. **The walking skeleton now walks on the reading side**: import →
+  store → list → *read*. What remains of the original loop is select → Ask →
+  streamed answer (WP-17 → 18 → 19 → 20).
 
 ### Recently done
+- **WP-13 · Nav overlay + Focus Mode** — `web/src/reader/Chrome.tsx`. Tap the
+  text to show or hide the overlay; it layers *over* the page, so toggling it
+  never moves a word. Contents list jumps to a chapter, a coarse slider moves
+  you near one.
+  - **Focus Mode is a toggle that hides, never removes** (the reader's own
+    decision). It only sets what's showing when you arrive; a tap brings it all
+    back, and Previous/Next never leave. Hidden chrome is `inert`, so an
+    invisible control can't be tabbed to or announced.
+  - **Progress is chapters, never pages.** A page number changes with the font,
+    so it describes the device rather than the book.
+  - **One `goTo`.** Next, Previous, the slider and the contents list all move
+    through it — the single point WP-14's page transition plugs into.
+- **WP-12 · Structured renderer** — `web/src/reader/`. Loads a manifest, one
+  chapter index and one section, and nothing else; no "load the book" call was
+  added, which is the token strategy rather than a gap.
+  - Blocks render by kind, with every unknown kind falling through to readable
+    text, so a kind added to the parser later can't silently vanish. Tables keep
+    their grid and scroll inside themselves; figures degrade to their caption.
+  - **Every block carries its anchor as a DOM id** — the contract WP-15 and
+    WP-17 both depend on.
+  - Navigation is pure and knows only the chapter count. Forward costs one
+    lookup (the next chapter always starts at section 1); back across a boundary
+    costs one too, because the previous chapter's last section could be its 3rd
+    or its 30th.
 - **WP-11 · In-app import + auto-parse** — `web/src/import/`. Pick files, pick a
   folder, or drop either on the page → parser chosen by extension → parsed →
   `repository.saveParsedBook` → the book appears. Verified on the real 15 MB
@@ -88,8 +112,8 @@ Get that loop working before building any breadth.
 - Repo published: **github.com/chandan-singh4/reading-buddy** (public). Product
   renamed Reading Buddy — *Wayfinder* was the planning method, not the product.
 
-**Gates:** `npm test` (214), `npm run typecheck`, `npm run build` — all passing.
-Main bundle 343.01 kB. The parsers are called now, but every one of them stays
+**Gates:** `npm test` (281), `npm run typecheck`, `npm run build` — all passing.
+Main bundle 355.21 kB. The parsers are called now, but every one of them stays
 behind a dynamic `import()`, so pdf.js (434 kB) and mammoth (500 kB) remain in
 their own chunks and are fetched only when a file of that type is imported.
 
@@ -97,15 +121,15 @@ their own chunks and are fetched only when a file of that type is imported.
 - None.
 
 ### Next up
-- **WP-12 · Structured renderer** — books are in storage and unreadable. Render
-  a section's blocks with their anchors, move between sections, and never load
-  a whole book. Then WP-13/15 make it navigable and resumable.
-- **Build it bare, with the chrome on demand** — see Focus Mode in `backlog.md`.
-  The reader has decided Focus Mode is a toggle that hides but never removes:
-  progress, chapter, back and highlights all stay reachable while it's on.
-  Building bare-first and adding chrome as a layer gets that for free; building
-  full chrome and hiding it means retrofitting a route back to each control.
-  Same screen with the toggle off, materially different work later.
+Two sensible candidates, and they answer different questions:
+- **WP-15 · Reopen where you left off** — small, and the most obviously missing
+  thing in daily use: every book currently opens at chapter 1. Anchors are
+  already in the DOM, so this is mostly storing one and restoring it.
+- **WP-17 → 18 → 19 → 20 · the tutor loop** — select text → assemble a prompt →
+  call Claude → stream an answer. This is the rest of the walking skeleton and
+  the first time the app does anything an ordinary reader can't.
+- **WP-14** holds the pagination work, and both decisions it needs are already
+  written down in `backlog.md` (CSS columns; the page turn as a seam).
 - WP-09/10 (summaries, classification) need a model call and can follow.
   WP-02 (Tauri) stays skipped.
 
@@ -123,5 +147,9 @@ their own chunks and are fetched only when a file of that type is imported.
   repo's folder. Gitignored, never committed (history scanned clean), but it
   should move outside the project and be read from an env var when `api/` is
   built.
-- Nothing has been checked on a real phone yet — WP-31/32 territory, but worth
-  an early look once something renders.
+- Nothing has been checked on a real phone yet — WP-31/32 territory, and now
+  overdue: there is something to render, and the reader is a touch interface
+  that has only ever been used with a mouse.
+- **Figures show captions but no images.** Epub records an archive path
+  (`OEBPS/images/fig1.png`) which the browser can't fetch — resolving those to
+  displayable bytes is WP-39. Affects all 141 images in the Jung epub.
