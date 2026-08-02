@@ -13,7 +13,7 @@
 - [x] **WP-01 Scaffold the stack** — Vite + React + TS, PWA plugin, monorepo web/shell/api · *start here*
 - [ ] **WP-02 Wrap the Tauri dev shell** — disposable desktop harness · *after 01*
 - [x] **WP-03 Local storage layer** — IndexedDB/Dexie seam for all persistence · *after 01, **05*** 
-- [ ] **WP-04 App shell + routing** — Library/Reader/Settings + theme tokens · *after 01*
+- [x] **WP-04 App shell + routing** — Library/Reader/Settings + theme tokens · *after 01*
 
 ### Leg 1 — Cartography (parsing pipeline)
 - [x] **WP-05 Shared structure schema** — path-as-address, manifest, anchor grammar · *KEYSTONE, **before 03** (reordered 2026-08-01)*

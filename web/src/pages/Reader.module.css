@@ -1,0 +1,35 @@
+.reader {
+  min-height: 100dvh;
+  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
+    calc(var(--safe-bottom) + var(--space-6));
+}
+
+.back {
+  display: inline-block;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.page {
+  max-width: var(--reading-measure);
+  margin: var(--space-6) auto 0;
+  font-family: var(--font-reading);
+  line-height: var(--leading-reading);
+}
+
+.bookTitle {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+}
+
+.byline {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.note {
+  margin-top: var(--space-5);
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}

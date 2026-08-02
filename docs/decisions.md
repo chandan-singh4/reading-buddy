@@ -52,6 +52,30 @@
   `docs/backlog.md` is the single source of truth — `/wrap-session` mirrors any
   flipped checkbox into the board's baked-in `state` object. — 2026-08-01
 
+### Settled 2026-08-01 (build session 1)
+- **WP-05 runs before WP-03**, reversing the backlog's order, so the storage
+  layer is built to fit a settled schema rather than the reverse. — 2026-08-01
+- **The parsed-book folder tree is a mental model, not a filesystem.** A browser
+  PWA has no disk; paths are realised as IndexedDB keys (`ch02/s03`). The
+  address rule is unchanged — only the lookup mechanism. — 2026-08-01
+- **One row per section**, keyed `[bookId+path]`. Compound key so identical
+  addresses in different books can't collide; direct lookup, no scan. Chosen
+  over a per-book blob, which would defeat the token strategy *and* be slower on
+  a phone. — 2026-08-01
+- **No `loadBook()` in the repository, deliberately.** Retrieval is manifest +
+  chapter index + one section. A whole-book read would get used the moment it
+  existed and quietly undo the token strategy. — 2026-08-01
+- **Anchors are strict, not forgiving.** `[ch2-s3-p13]` is rejected rather than
+  repaired into canonical form: anchors are permanent, and two spellings of one
+  paragraph would silently mis-address saved highlights. — 2026-08-01
+- **Vitest is the test runner**; component tests opt into jsdom per file so pure
+  unit tests stay on the faster node environment. — 2026-08-01
+- **All styling flows from tokens in `web/src/styles/theme.css`** — no hard-coded
+  colour or spacing in components, so WP-14's day/night toggle is one
+  `data-theme` attribute. — 2026-08-01
+- **Product is "Reading Buddy".** *Wayfinder* was the planning method used to map
+  the build; it survives only in planning artefacts. — 2026-08-01
+
 ### UX misc
 - **Select → inline popup** (not a side panel). Ask is the only action that calls
   Claude; every Ask auto-saves a plain-language Q&A note.

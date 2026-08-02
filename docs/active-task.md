@@ -8,41 +8,43 @@
 
 ---
 
-## Task — WP-03 · Local storage layer
+## Task — WP-08 · Markdown parser → structure
 
-The single door to all persistence: a Dexie/IndexedDB seam that stores the
-WP-05 structure. Nothing outside `web/src/storage/` may touch the database.
-
-**Order note (2026-08-01):** run after WP-05, not before — reordered by Chandan
-so storage is built to fit a settled schema.
+Turn a `.md` file into the WP-05 structure: chapters, sections, anchored
+paragraphs. Chosen ahead of epub/pdf because it needs no binary decoding, so it
+proves the parse → store → render loop end-to-end at the lowest cost.
 
 ### Definition of done
-- [ ] `web/src/storage/db.ts` declares a versioned Dexie database with tables
-      for books, manifests, chapter indexes and sections — **one row per
-      section**, keyed by `[bookId+path]` so `ch02/s03` is a direct lookup.
-- [ ] `web/src/storage/repository.ts` is the only public API: put/get for each
-      shape, `listBooks`, bulk `putSections`, and a `deleteBook` that cascades
-      in a transaction so no orphan sections survive.
-- [ ] Tests against a real IndexedDB implementation (`fake-indexeddb`) cover
-      round-trip, section-level retrieval, bulk insert and cascade delete.
+- [ ] `web/src/parse/markdown.ts` takes raw markdown + `BookMeta` and returns a
+      `ParsedBook` (meta, manifest, chapter indexes, sections) ready to hand
+      straight to `repository.saveParsedBook`.
+- [ ] Heading levels are **resolved from what the document actually contains**
+      (`decisions.md`): the shallowest heading present becomes chapters, the
+      next becomes sections. A file with no headings falls back to fixed-size
+      bucketing so it still parses.
+- [ ] Anchors are assigned via `structure/anchor.ts` — never hand-built — and
+      are stable: re-parsing identical input yields identical anchors.
+- [ ] Tests cover a normal `#`/`##` document, a `##`/`###`-only document, a
+      heading-free document (fallback), and anchor stability across two runs.
 - [ ] `npm test`, `npm run typecheck`, `npm run build` all pass.
 
 ### Files in scope
-- `web/src/storage/db.ts` (new)
-- `web/src/storage/repository.ts` (new)
-- `web/src/storage/index.ts` (new — the single public entry point)
-- `web/src/storage/repository.test.ts` (new)
-- `web/package.json` (add `dexie`, `fake-indexeddb`)
-- `docs/architecture.md` (record the storage layout)
+- `web/src/parse/markdown.ts` (new)
+- `web/src/parse/index.ts` (new — public entry point)
+- `web/src/parse/markdown.test.ts` (new)
+- `web/src/structure/index.ts` (read only — the target shape and anchor helpers)
+- `web/src/storage/index.ts` (read only — the `ParsedBook` shape to produce)
 - *(create as needed — add any new path to this list)*
 
 ### Out of scope
-- Highlights, notes and reading-position tables — WP-25 and WP-15 add these via
-  a Dexie version bump; that mechanism is what this task exists to provide.
-- Any parser, retrieval assembler or UI. Nothing renders yet.
-- Google Drive backup (WP-33).
+- Epub (WP-06) and PDF (WP-07). One shared structure, but their front-ends come
+  later; don't generalise prematurely for formats not yet written.
+- Manifest **summaries** and crossrefs (WP-09) and classification (WP-10) — emit
+  placeholder summaries, leave the fields present but unfilled.
+- The import UI (WP-11) and the renderer (WP-12). This task ends at a
+  `ParsedBook` in memory, verified by tests.
 
-### Deferred, don't lose
-- `docs/backlog.md` and `docs/progress.md` are stale: WP-01 and WP-05 are done
-  but still show `[ ]`, and the 05-before-03 reorder isn't recorded. Chandan
-  asked to sync these once WP-03 lands.
+### Useful context (already known — don't re-derive)
+- Gates: `npm test`, `npm run typecheck`, `npm run build`, all from the repo root.
+- `books/` holds a real EPUB and `research-paper/` a PDF for later format work;
+  neither is tracked by git.

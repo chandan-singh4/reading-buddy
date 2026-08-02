@@ -1,0 +1,61 @@
+// @vitest-environment jsdom
+//
+// Component tests need a DOM; the pure unit tests elsewhere stay on the faster
+// node environment. fake-indexeddb must load first — Library reads through the
+// real repository, so there has to be a real database underneath it.
+import 'fake-indexeddb/auto'
+
+import { cleanup, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import { AppRoutes } from '../App.tsx'
+
+afterEach(cleanup)
+
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AppRoutes />
+    </MemoryRouter>,
+  )
+}
+
+describe('app shell', () => {
+  it('lands on the Library and reports an empty shelf', async () => {
+    renderAt('/')
+
+    expect(screen.getByRole('heading', { name: 'Library' })).toBeDefined()
+    // Resolves only once the repository has actually answered.
+    expect(await screen.findByText('No books yet')).toBeDefined()
+  })
+
+  it('shows the tab bar on shell routes', () => {
+    renderAt('/')
+
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    expect(nav).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeDefined()
+  })
+
+  it('renders Settings on its route', () => {
+    renderAt('/settings')
+
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeDefined()
+  })
+
+  it('renders the Reader full-bleed, outside the shell', async () => {
+    renderAt('/book/does-not-exist')
+
+    // No tab bar while reading — that is the point of the route sitting
+    // outside AppShell.
+    expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()
+    expect(await screen.findByRole('alert')).toBeDefined()
+  })
+
+  it('falls back to the Library for an unknown route', () => {
+    renderAt('/nowhere')
+
+    expect(screen.getByRole('heading', { name: 'Library' })).toBeDefined()
+  })
+})

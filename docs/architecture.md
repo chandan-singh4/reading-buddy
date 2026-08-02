@@ -50,6 +50,25 @@ other code should import from. Anchor rules are strict — malformed input throw
 rather than being repaired, since a plausible-but-wrong permanent id would
 silently mis-address saved highlights forever.
 
+### UI (WP-04)
+
+```
+web/src/
+├─ app/       AppShell — tab bar + <Outlet>, wraps Library and Settings
+├─ pages/     Library · Reader · Settings
+├─ styles/    theme.css — all design tokens
+├─ structure/ WP-05 schema
+└─ storage/   WP-03 persistence
+```
+
+- **Routes:** `/` Library · `/settings` · `/book/:bookId` Reader · `*` → Library.
+- **Reader renders outside `AppShell`** so reading is full-bleed; navigation
+  appears on tap instead (WP-13).
+- **No hard-coded colours or spacing in components** — everything reads a token
+  from `theme.css`, so the WP-14 day/night toggle is a single `data-theme`
+  attribute on `<html>`. Dark currently follows the OS setting.
+- Styling is CSS Modules, co-located with each component.
+
 ### Storage (WP-03)
 
 `web/src/storage/` is the only code allowed to touch IndexedDB. Dexie database

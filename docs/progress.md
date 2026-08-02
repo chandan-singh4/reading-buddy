@@ -14,37 +14,41 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- Nothing. WP-03 just landed; next task not yet planned.
+- Nothing. **Leg 0 is complete** (bar WP-02, deliberately skipped). WP-08 is
+  planned and scoped in `active-task.md`, not started.
 
 ### Recently done
-- **WP-03 · Local storage layer** — Dexie database (`reading-buddy`, v1) with
-  `books` / `manifests` / `chapters` / `sections`, one row per section keyed
-  `[bookId+path]`. `storage/repository.ts` is the only door; import and delete
-  are transactional. 13 tests against `fake-indexeddb`.
+- **WP-04 · App shell + routing** — three routes (Library `/`, Settings, Reader
+  `/book/:bookId`), bottom tab bar, Reader full-bleed outside the shell.
+  `theme.css` holds all design tokens, dark follows the OS. Library reads real
+  data via the WP-03 repository. 5 jsdom smoke tests.
+- **WP-03 · Local storage layer** — Dexie `reading-buddy` v1: books /
+  manifests / chapters / sections, one row per section keyed `[bookId+path]`.
+  `storage/repository.ts` is the only door; import and delete transactional.
 - **WP-05 · Shared structure schema (KEYSTONE)** — `web/src/structure/`:
-  parsed-book types with book-type gating, and a strict `[ch02-s03-p013]`
-  anchor grammar that throws on malformed input. 26 tests. **Reordered to run
-  before WP-03** so storage was built to a settled schema.
+  parsed-book types with book-type gating, strict `[ch02-s03-p013]` anchors.
+  **Reordered before WP-03** so storage fit a settled schema.
 - **WP-01 · Scaffold the stack** — Vite 7 + React 19 + TS, PWA plugin wired but
   unconfigured, `shell/`/`api/` placeholders.
-- Vitest added; `npm test` runs from the root. 39 tests total.
 - Repo published: **github.com/chandan-singh4/reading-buddy** (public). Product
   renamed Reading Buddy — *Wayfinder* was the planning method, not the product.
-- Repo reorganized into the lightweight context system: `CLAUDE.md` +
-  `.claude/skills/` + `docs/*`.
+
+**Gates:** `npm test` (44), `npm run typecheck`, `npm run build` — all passing.
 
 ### Blockers
 - None.
 
 ### Next up
-- **WP-04 · App shell + routing** (Library/Reader/Settings + theme tokens) —
-  the last Leg 0 piece, and the first thing that puts pixels on screen.
-- Then Leg 1 parsing: WP-08 (markdown, simplest) is the fastest route to the
-  walking skeleton; WP-06/07 (epub/pdf) follow.
+- **WP-08 · Markdown parser → structure** — scoped in `active-task.md`. The
+  shortest path to the walking skeleton: it's the only format that needs no
+  binary decoding, so it proves the whole parse → store → render loop first.
+- Then WP-11 (import) → WP-12 (renderer). WP-06/07 (epub/pdf) follow once the
+  loop is real. WP-02 (Tauri) stays skipped until it's actually needed.
 
 ### Open items
 - **The live Anthropic key still sits in `Claude API/API.txt`** inside a public
-  repo's folder. It is gitignored and has never been committed (history was
-  scanned), but it should move outside the project and be read from an env var
-  when `api/` is built.
-- `wayfinder_build_board.html` checkboxes not yet mirrored (WP-01/03/05 done).
+  repo's folder. Gitignored, never committed (history scanned clean), but it
+  should move outside the project and be read from an env var when `api/` is
+  built.
+- Nothing has been checked on a real phone yet — WP-31/32 territory, but worth
+  an early look once something renders.

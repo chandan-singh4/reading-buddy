@@ -1,0 +1,95 @@
+/**
+ * Design tokens. Every colour, space and type value in the app comes from here
+ * — no hard-coded hex or px in components, so the WP-14 day/night toggle and
+ * any future re-theme are a single change.
+ *
+ * Light is the default. Dark applies automatically from the OS setting, and
+ * `data-theme="light" | "dark"` on <html> overrides it — that attribute is the
+ * hook the WP-14 toggle will set. Both directions are defined explicitly so the
+ * override beats the media query regardless of which way the user flips it.
+ */
+
+:root {
+  /* Surfaces and text */
+  --color-bg: #fbfaf8;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f2f0ec;
+  --color-text: #1a1815;
+  --color-text-muted: #6b6660;
+  --color-border: #e2ded7;
+  --color-accent: #7a5c3e;
+  --color-accent-contrast: #ffffff;
+  --color-focus: #3b6ea5;
+
+  /* Spacing — a 4px scale keeps rhythm consistent across screens */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+
+  /* Type */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-reading: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --leading-ui: 1.5;
+  --leading-reading: 1.7;
+
+  /* Shape and depth */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+
+  /* Layout */
+  --reading-measure: 34rem; /* comfortable line length for body text */
+  --tab-bar-height: 3.5rem;
+
+  /* Phone chrome: keeps content clear of notch and home indicator.
+     Needs viewport-fit=cover in index.html, which is already set. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  color-scheme: light;
+}
+
+/* Dark values, shared by the OS preference and the explicit override. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: #14130f;
+    --color-surface: #1c1a16;
+    --color-surface-raised: #26231e;
+    --color-text: #ece7df;
+    --color-text-muted: #9a938a;
+    --color-border: #33302a;
+    --color-accent: #c9a227;
+    --color-accent-contrast: #14130f;
+    --color-focus: #7fb0e8;
+
+    --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #14130f;
+  --color-surface: #1c1a16;
+  --color-surface-raised: #26231e;
+  --color-text: #ece7df;
+  --color-text-muted: #9a938a;
+  --color-border: #33302a;
+  --color-accent: #c9a227;
+  --color-accent-contrast: #14130f;
+  --color-focus: #7fb0e8;
+
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
+
+  color-scheme: dark;
+}
