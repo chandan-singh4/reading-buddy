@@ -84,11 +84,17 @@
 - Cover images → WP-24
 - Continue Reading → WP-24, needs WP-15
 - Reading progress (% and last location) → WP-24, needs WP-15
-- Import folder / watch a directory → **NEW.** Folder *import* shipped in WP-11; *watching* a directory is a different thing and the browser can't do it unaided — needs the Tauri shell or the File System Access API. Decide before promising it.
+- Import folder / watch a directory → **NEW, low priority.** Folder *import* shipped in WP-11: a one-time scan when you point at a folder. *Watching* means new files landing in that folder appear on the shelf by themselves, and a web page can't do that — it can't look at the disk unprompted and isn't running with the tab closed. Possible via the Tauri shell, or via the File System Access API, which still only notices on next open. The gap it closes is one drag of a folder; revisit only if books start arriving often and to a fixed folder.
 - Favourites / pin important books → **NEW** (small, sits in WP-24)
 - Archive instead of delete → **NEW** (small, sits in WP-24)
 - Recently opened list → **NEW** (small, needs WP-15)
-- Rate a book on finishing, then 5 recommendations: 2 by the same author, 3 on the topic by others → **NEW, and the largest item here.** Needs a book-metadata source we don't have — the shelf only knows what's been imported, so recommendations must come from Claude or an external catalogue. Worth its own waypoint and its own decision, including whether it violates "no book recommendations everywhere" below. The reader's framing is *at the end of a book only*, which is the version that survives that rule.
+- Rate a book on finishing, then 5 recommendations: 2 by the same author, 3 on the topic by others → **NEW, and the largest item here.** Needs a book-metadata source we don't have — the shelf only knows what's been imported, so recommendations must come from Claude. Worth its own waypoint, after WP-19.
+
+  **Decided 2026-08-02 — the trigger and cost rules, which are the whole design:**
+  - Reaching the last page shows a prompt only: *"Would you like recommendations?"* No API call happens until it's accepted. Landing on the last page by accident costs nothing.
+  - On acceptance, Claude is called **once per book, ever**, and the answer is stored with the book. Reopening the finished book shows the saved list; it never calls again.
+  - So the recommendation is a stored property of a finished book, not a live lookup. Design it that way from the start — a call-and-cache added afterwards tends to leak repeat calls.
+  - Only ever at the end of a book. That is what keeps it clear of "no recommendations everywhere" below.
 
 ### Reading experience
 - Adjustable font, line spacing, margins → WP-14
@@ -136,13 +142,19 @@ challenges · streak pressure · notifications while reading · infinite discove
 pages. All of these pull attention toward the app and away from the book.
 
 ### Focus Mode — **NEW**, and the reader's own idea
-The default reading mode. Hides library, settings, AI panel, progress statistics
-and chapter list, leaving text and Previous / Next. AI stays available but only
-on an explicit selection or shortcut — it never appears on its own.
+A toggle the reader turns on and off. While on, the screen is text and
+Previous / Next: no library, settings, AI panel, progress statistics or chapter
+list on display. AI stays available but only on an explicit selection or
+shortcut — it never appears on its own.
 
-> Worth noting this is less a feature than the shape of the whole reader: if
-> Focus Mode is the *default*, WP-12 and WP-13 should be built with it as the
-> baseline and the chrome as the thing that appears on demand, rather than
-> building full chrome and hiding it afterwards. That is a cheaper decision to
-> make now than later. **The goal: less a content platform, more a quiet reading
-> desk.**
+**Decided 2026-08-02 — hidden, not removed.** Everything stays *reachable* while
+Focus Mode is on: pages left, progress, current chapter, going back, highlights,
+all of it, on demand. Focus Mode quiets the interface; it doesn't amputate it.
+
+> Which settles the shape of the reader, and it's cheaper to settle now than
+> after WP-12: build the bare page as the baseline and let the chrome appear on
+> demand, rather than building full chrome and adding a switch that hides it.
+> Both look identical with the toggle off — but only the first one makes
+> "everything is still one gesture away" fall out naturally instead of needing to
+> be retrofitted per control. **The goal: less a content platform, more a quiet
+> reading desk.**
