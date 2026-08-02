@@ -3,11 +3,14 @@ import { Link, useParams } from 'react-router'
 
 import {
   Block,
+  Chrome,
   chapterTitle,
   firstSection,
   nextSection,
   pathOf,
   previousSection,
+  readFocusMode,
+  writeFocusMode,
   type SectionRef,
 } from '../reader/index.ts'
 import { repository } from '../storage/index.ts'
@@ -55,6 +58,12 @@ export default function Reader() {
     next?: SectionRef
   }>({})
 
+  const [focusMode, setFocusMode] = useState(readFocusMode)
+  // Focus Mode decides only what's showing when you arrive. A tap still brings
+  // everything back, which is the difference between hiding and removing.
+  const [chromeShown, setChromeShown] = useState(() => !readFocusMode())
+  const [contentsOpen, setContentsOpen] = useState(false)
+
   /**
    * How many sections each chapter has, remembered as we go. Navigation asks
    * this on every move, and re-reading the same chapter index to answer "am I
@@ -77,6 +86,29 @@ export default function Reader() {
     },
     [id],
   )
+
+  /**
+   * The one door to "go somewhere else in this book". Next, Previous, the
+   * contents list and the slider all come through here, and WP-14's page
+   * transition plugs in at this single point — which is exactly why they
+   * don't each move `here` themselves.
+   */
+  const goTo = useCallback((ref: SectionRef) => {
+    setHere(ref)
+    setContentsOpen(false)
+  }, [])
+
+  const toggleFocus = useCallback(() => {
+    setFocusMode((on) => !on)
+  }, [])
+
+  // Saved here rather than inside the updater above. React is free to run a
+  // state updater more than once, and a *write* in there ran twice flips the
+  // stored setting back — it looked like the toggle simply didn't stick.
+  // Writing the settled value is idempotent, so repeating it costs nothing.
+  useEffect(() => {
+    writeFocusMode(focusMode)
+  }, [focusMode])
 
   // The frame: book + manifest, once per book.
   useEffect(() => {
@@ -154,9 +186,13 @@ export default function Reader() {
 
   return (
     <div className={styles.reader}>
-      <Link to="/" className={styles.back}>
-        ← Library
-      </Link>
+      {/* Only while there's no book to hang the overlay on — once there is,
+          the overlay owns the way back. */}
+      {frame.status !== 'ready' && (
+        <Link to="/" className={styles.back}>
+          ← Library
+        </Link>
+      )}
 
       {frame.status === 'loading' && <p className={styles.note}>Opening…</p>}
 
@@ -174,7 +210,34 @@ export default function Reader() {
 
       {frame.status === 'ready' && (
         <>
-          <article className={styles.page}>
+          <Chrome
+            bookTitle={frame.book.title}
+            manifest={frame.manifest}
+            here={here}
+            shown={chromeShown}
+            focusMode={focusMode}
+            contentsOpen={contentsOpen}
+            onToggleFocus={toggleFocus}
+            onToggleContents={() => setContentsOpen((open) => !open)}
+            onJumpToChapter={(chapter) => goTo({ chapter, section: 1 })}
+          />
+
+          {/*
+            Tapping the text shows or hides the overlay — the Books-style
+            gesture. It sits on the article rather than the whole page so the
+            pager underneath keeps working while the overlay is hidden.
+
+            WP-17 will want this tap for the selection menu; it will need to
+            distinguish a tap on a selection from a tap on bare text, which is
+            a decision best made once there's a selection to test against.
+          */}
+          <article
+            className={styles.page}
+            onClick={() => {
+              setChromeShown((shown) => !shown)
+              setContentsOpen(false)
+            }}
+          >
             <header className={styles.header}>
               <p className={styles.context}>
                 {frame.book.title}
@@ -205,7 +268,7 @@ export default function Reader() {
               className={styles.pagerButton}
               disabled={!neighbours.previous}
               onClick={() => {
-                if (neighbours.previous) setHere(neighbours.previous)
+                if (neighbours.previous) goTo(neighbours.previous)
               }}
             >
               Previous
@@ -216,7 +279,7 @@ export default function Reader() {
               className={styles.pagerButton}
               disabled={!neighbours.next}
               onClick={() => {
-                if (neighbours.next) setHere(neighbours.next)
+                if (neighbours.next) goTo(neighbours.next)
               }}
             >
               Next

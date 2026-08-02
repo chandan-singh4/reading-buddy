@@ -4,6 +4,13 @@
  */
 
 export { Block, elementIdOf } from './blocks.tsx'
+export { Chrome } from './Chrome.tsx'
+export type { ChromeProps } from './Chrome.tsx'
+
+export { readFocusMode, writeFocusMode } from './focusMode.ts'
+
+export { chapterAt, progressLabel, progressOf } from './progress.ts'
+export type { Progress } from './progress.ts'
 
 export {
   chapterTitle,

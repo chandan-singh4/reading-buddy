@@ -1,0 +1,137 @@
+/*
+ * The overlay. Fixed over the text, never in the flow — showing or hiding it
+ * must not move a single word of the book, or reading would jump every time
+ * you tapped.
+ */
+
+.chrome {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  /* The bars catch taps; the gap between them does not, so tapping the middle
+     of the screen reaches the text and dismisses the overlay. */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.chrome[data-shown='true'] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chrome {
+    transition: none;
+  }
+}
+
+.bar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-raised);
+  font-family: var(--font-ui);
+}
+
+.bar:first-child {
+  padding-top: calc(var(--safe-top) + var(--space-3));
+}
+
+.bar:last-child {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding-bottom: calc(var(--safe-bottom) + var(--space-3));
+  border-bottom: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.control {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.control[aria-pressed='true'] {
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.bookTitle {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  /* One line, ellipsised: a long title must not push the controls off screen. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.slider {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.progressLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.contents {
+  pointer-events: auto;
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-raised);
+  font-family: var(--font-ui);
+}
+
+.contentsItem {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  text-align: left;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.contentsItem[aria-current='true'] {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.contentsNumber {
+  min-width: 2ch;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
