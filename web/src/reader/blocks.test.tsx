@@ -101,33 +101,63 @@ describe('tables keep their grid', () => {
 })
 
 describe('figures', () => {
+  // What the reading page hands in: the archive path a figure was stored under,
+  // resolved to something the browser can actually show (WP-39).
+  const shown = new Map([['OEBPS/images/fig1.png', 'blob:fig1']])
+
   it('shows the image and its caption', () => {
     render(
       <Block
         block={blockOf('figure', 'Figure 1. A mandala.', {
           image: { src: 'OEBPS/images/fig1.png', alt: 'A mandala' },
         })}
+        images={shown}
       />,
     )
 
-    expect(screen.getByRole('img', { name: 'A mandala' }).getAttribute('src')).toBe(
-      'OEBPS/images/fig1.png',
-    )
+    expect(screen.getByRole('img', { name: 'A mandala' }).getAttribute('src')).toBe('blob:fig1')
     expect(screen.getByText('Figure 1. A mandala.')).toBeTruthy()
   })
 
   it('falls back to the caption as alt text when the parser recorded none', () => {
     render(
       <Block
-        block={blockOf('figure', 'Figure 2. A diagram.', { image: { src: 'fig2.png' } })}
+        block={blockOf('figure', 'Figure 2. A diagram.', {
+          image: { src: 'OEBPS/images/fig1.png' },
+        })}
+        images={shown}
       />,
     )
     expect(screen.getByRole('img', { name: 'Figure 2. A diagram.' })).toBeTruthy()
   })
 
+  it('shows an image that is already an address without looking it up', () => {
+    // docx figures arrive as `data:` URIs and markdown ones as URLs — usable as
+    // written, and nothing in storage to find.
+    render(
+      <Block
+        block={blockOf('figure', 'Figure 4. Inline.', {
+          image: { src: 'data:image/png;base64,AAAA', alt: 'Inline' },
+        })}
+      />,
+    )
+    expect(screen.getByRole('img', { name: 'Inline' }).getAttribute('src')).toBe(
+      'data:image/png;base64,AAAA',
+    )
+  })
+
+  it('degrades to the caption alone when the picture was never stored', () => {
+    // Every book imported before WP-39 is this case: the figure knows its
+    // archive path, and there are no bytes behind it. A caption is readable;
+    // a broken-image icon is not.
+    const { container } = render(
+      <Block block={blockOf('figure', 'Figure 5. A plate.', { image: { src: 'fig5.png' } })} />,
+    )
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByText('Figure 5. A plate.')).toBeTruthy()
+  })
+
   it('degrades to the caption alone when there is no image', () => {
-    // Epub archive paths aren't resolvable to bytes until WP-39, so this is
-    // the common case today, not an edge one.
     const { container } = render(<Block block={blockOf('figure', 'Figure 3. A chart.')} />)
     expect(container.querySelector('img')).toBeNull()
     expect(screen.getByText('Figure 3. A chart.')).toBeTruthy()

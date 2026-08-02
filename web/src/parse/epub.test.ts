@@ -31,6 +31,8 @@ interface EpubSpec {
   spine: string
   metadata?: string
   files?: Record<string, string>
+  /** Files that aren't text — pictures, for the WP-39 tests. */
+  binary?: Record<string, Uint8Array>
 }
 
 /** Build a minimal but structurally real epub in memory. */
@@ -50,6 +52,9 @@ function makeEpub(spec: EpubSpec): Uint8Array {
   }
   for (const [path, body] of Object.entries(spec.files ?? {})) {
     entries[path] = strToU8(body)
+  }
+  for (const [path, bytes] of Object.entries(spec.binary ?? {})) {
+    entries[path] = bytes
   }
   return zipSync(entries)
 }
@@ -239,5 +244,69 @@ describe('parseEpub — malformed input', () => {
   it('rejects a spine with no readable documents', async () => {
     const epub = makeEpub({ manifest: '', spine: '' })
     await expect(parseEpub(epub, meta())).rejects.toThrow(/no readable documents/)
+  })
+})
+
+describe('parseEpub — pictures', () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])
+
+  function bookWithFigures(body: string, binary: Record<string, Uint8Array>) {
+    return makeEpub({
+      manifest:
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>' +
+        '<item id="i1" href="images/fig1.png" media-type="image/png"/>',
+      spine: '<itemref idref="c1"/>',
+      files: { 'OEBPS/ch1.xhtml': chapterDoc(body) },
+      binary,
+    })
+  }
+
+  it('carries the bytes of a picture a figure points at', async () => {
+    const epub = bookWithFigures(
+      '<h1>One</h1><figure><img src="images/fig1.png" alt="A mandala"/>' +
+        '<figcaption>Figure 1.</figcaption></figure>',
+      { 'OEBPS/images/fig1.png': PNG },
+    )
+
+    const book = await parseEpub(epub, meta())
+    const assets = book.assets ?? []
+
+    // Keyed by the same resolved archive path the figure carries, so the
+    // reading screen needs nothing resolved at read time.
+    expect(assets.map((asset) => asset.path)).toEqual(['OEBPS/images/fig1.png'])
+    expect(assets[0].data.type).toBe('image/png')
+    expect(assets[0].data.size).toBe(PNG.length)
+
+    const figure = book.sections
+      .flatMap((section) => section.paragraphs)
+      .find((paragraph) => paragraph.image)
+    expect(figure?.image?.src).toBe('OEBPS/images/fig1.png')
+  })
+
+  it('carries a picture once however often the book shows it', async () => {
+    const twice =
+      '<h1>One</h1>' +
+      '<figure><img src="images/fig1.png"/><figcaption>Figure 1.</figcaption></figure>' +
+      '<figure><img src="images/fig1.png"/><figcaption>Figure 1, again.</figcaption></figure>'
+    const book = await parseEpub(bookWithFigures(twice, { 'OEBPS/images/fig1.png': PNG }), meta())
+
+    expect(book.assets).toHaveLength(1)
+  })
+
+  it('leaves a figure whose file is missing as a caption rather than failing', async () => {
+    // A real hazard: epubs routinely reference images they don't contain. The
+    // book is still worth reading.
+    const book = await parseEpub(
+      bookWithFigures(
+        '<h1>One</h1><figure><img src="images/gone.png"/><figcaption>Figure 1.</figcaption></figure>',
+        {},
+      ),
+      meta(),
+    )
+
+    expect(book.assets).toEqual([])
+    expect(book.sections.flatMap((s) => s.paragraphs).some((p) => p.text.includes('Figure 1.'))).toBe(
+      true,
+    )
   })
 })

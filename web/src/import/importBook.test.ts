@@ -6,12 +6,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb, createRepository, type ParsedBook, type ReadingBuddyDB } from '../storage/index.ts'
 import type { Repository } from '../storage/index.ts'
+import { PARSER_VERSION } from '../parse/version.ts'
 import type { BookMeta, SourceFormat } from '../structure/index.ts'
 import {
   ImportError,
   formatFromFilename,
   importBook,
   importBooks,
+  isOutOfDate,
+  reparseBook,
+  reparseBooks,
   backfillTextSignatures,
   textSignatureOf,
   titleFromFilename,
@@ -616,5 +620,121 @@ describe('end-to-end import', () => {
 
     const section = await repo.getSectionByAnchor(meta.id, '[ch01-s01-p001]')
     expect(section?.paragraphs[0]?.text).toBe('The first paragraph of the book.')
+  })
+})
+
+// --- Keeping the file, and re-reading a book from it -------------------------
+
+describe('re-parsing a book already on the shelf', () => {
+  it('stamps every import with the parser that made it', async () => {
+    const { parsers } = stubParsers()
+    const meta = await importBook(fileOf('a.md'), { repository: repo, parsers })
+
+    expect(meta.parserVersion).toBe(PARSER_VERSION)
+    expect(isOutOfDate(meta)).toBe(false)
+  })
+
+  // The whole set this feature exists for: books imported before any of this
+  // existed carry no stamp, and are exactly the ones needing a re-parse.
+  it('counts an unstamped book as out of date', () => {
+    expect(isOutOfDate({ ...oneParagraphBook({} as BookMeta).meta, parserVersion: undefined } as BookMeta)).toBe(true)
+  })
+
+  it('keeps the file it was imported from', async () => {
+    const { parsers } = stubParsers()
+    const meta = await importBook(fileOf('a.md', '# A\n\nSome prose.\n'), {
+      repository: repo,
+      parsers,
+    })
+
+    const source = await repo.getSource(meta.id)
+    expect(source?.filename).toBe('a.md')
+    expect(await source?.file.text()).toBe('# A\n\nSome prose.\n')
+  })
+
+  it('reads the book again from that file', async () => {
+    const { parsers } = stubParsers()
+    const meta = await importBook(fileOf('a.md'), { repository: repo, parsers })
+
+    // Pretend it was made by an older build, then hand the parser a different
+    // answer — the same thing a parser fix does.
+    await repo.saveBook({ ...meta, parserVersion: 1 })
+    const rebuilt: ParserTable = {
+      ...parsers,
+      md: async (_data, m) => ({
+        ...oneParagraphBook(m),
+        sections: [
+          {
+            chapter: 1,
+            section: 1,
+            path: 'ch01/s01' as never,
+            paragraphs: [
+              { anchor: '[ch01-s01-p001]' as never, text: 'Now with links.', kind: 'prose' },
+            ],
+          },
+        ],
+      }),
+    }
+
+    const updated = await reparseBook(meta.id, { repository: repo, parsers: rebuilt })
+
+    expect(updated.parserVersion).toBe(PARSER_VERSION)
+    const section = await repo.getSection(meta.id, 'ch01/s01' as never)
+    expect(section?.paragraphs[0]?.text).toBe('Now with links.')
+  })
+
+  // The point of an *update* rather than a delete-and-re-import: everything the
+  // reader has decided about this book has to survive it.
+  it('keeps the book’s identity, shelf and reading place', async () => {
+    const { parsers } = stubParsers()
+    const meta = await importBook(fileOf('a.md'), { repository: repo, parsers })
+    await repo.saveBook({ ...meta, shelf: 'paper', shelfOverridden: true, parserVersion: 1 })
+    await repo.savePosition(meta.id, '[ch01-s01-p001]' as never)
+
+    const updated = await reparseBook(meta.id, { repository: repo, parsers })
+
+    expect(updated.id).toBe(meta.id)
+    expect(updated.title).toBe(meta.title)
+    expect(updated.shelf).toBe('paper')
+    expect(updated.shelfOverridden).toBe(true)
+    expect(updated.importedAt).toBe(meta.importedAt)
+    expect((await repo.getPosition(meta.id))?.anchor).toBe('[ch01-s01-p001]')
+  })
+
+  it('explains itself when the file was never kept', async () => {
+    const { parsers } = stubParsers()
+    const meta = await importBook(fileOf('a.md'), { repository: repo, parsers })
+    await repo.forgetSources()
+
+    const error = await importErrorFrom(reparseBook(meta.id, { repository: repo, parsers }))
+    expect(error.code).toBe('no-source')
+    expect(error.message).toContain('import the file again')
+  })
+
+  // A failed update must never cost the reader the book they already had.
+  it('leaves the old book untouched when the new parse comes back empty', async () => {
+    const { parsers } = stubParsers()
+    const meta = await importBook(fileOf('a.md'), { repository: repo, parsers })
+
+    const broken: ParserTable = { ...parsers, md: async (_data, m) => emptyBook(m) }
+    const error = await importErrorFrom(
+      reparseBook(meta.id, { repository: repo, parsers: broken }),
+    )
+
+    expect(error.code).toBe('no-text')
+    const section = await repo.getSection(meta.id, 'ch01/s01' as never)
+    expect(section?.paragraphs[0]?.text).toBe('Some prose.')
+  })
+
+  it('reports on each book of a batch and finishes the rest', async () => {
+    const { parsers } = stubParsers()
+    const first = await importBook(fileOf('a.md'), { repository: repo, parsers })
+    const second = await importBook(fileOf('b.md'), { repository: repo, parsers })
+    await repo.forgetSources()
+    await repo.saveSource(first.id, new File(['# A\n\nSome prose.\n'], 'a.md'), 'a.md')
+
+    const outcomes = await reparseBooks([first, second], { repository: repo, parsers })
+
+    expect(outcomes.map((outcome) => outcome.status)).toEqual(['updated', 'failed'])
   })
 })

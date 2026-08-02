@@ -5,7 +5,7 @@
 // must load first — Reader goes through the app-wide repository.
 import 'fake-indexeddb/auto'
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -122,6 +122,27 @@ beforeEach(async () => {
  */
 const SHEET_BUTTON = 'Contents, bookmarks and notes'
 
+/**
+ * Turn a page, the way a reader without a touch screen does.
+ *
+ * These used to click Previous and Next. Those buttons are gone — a phone is
+ * read by swiping — and jsdom has neither a swipe nor a page wide enough to tap
+ * the edge of, so the keyboard is what drives the tests now. It goes through the
+ * same single `turnPage` every gesture goes through, which is why it can stand
+ * in for them.
+ */
+async function turnPage(key: 'ArrowRight' | 'ArrowLeft') {
+  // Settle first. Which section lies either side of this one is looked up
+  // asynchronously, a moment after the text itself appears, and a page turned
+  // before that lookup lands has nowhere to go — a race the old Previous and
+  // Next buttons hid by being disabled until it resolved.
+  await act(async () => {})
+  fireEvent.keyDown(window, { key })
+}
+
+const turnForward = () => turnPage('ArrowRight')
+const turnBack = () => turnPage('ArrowLeft')
+
 /** Whether the overlay is on screen. It stays mounted, so presence isn't the test. */
 function chromeShown(container: HTMLElement): boolean {
   return container.querySelector('[data-shown]')?.getAttribute('data-shown') === 'true'
@@ -134,9 +155,13 @@ describe('opening a book', () => {
     expect(screen.getByText('A second thought.')).toBeTruthy()
   })
 
-  it('names the book and the chapter you are in', async () => {
+  // The book's own title is deliberately *not* here — it is in the bar at the
+  // top of the screen, and printing it again above every chapter said the same
+  // thing twice, at length on a book titled after its filename.
+  it('opens a chapter with the chapter’s name', async () => {
     openReader()
-    expect(await screen.findByText(/A Test Book · The Beginning/)).toBeTruthy()
+    expect(await screen.findByText('The Beginning')).toBeTruthy()
+    expect(screen.queryByText(/A Test Book ·/)).toBeNull()
   })
 
   it('gives every paragraph its anchor as an element id', async () => {
@@ -159,7 +184,7 @@ describe('moving through the book', () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await turnForward()
 
     expect(await screen.findByText('Later in the first chapter.')).toBeTruthy()
     expect(screen.queryByText('The opening words.')).toBeNull()
@@ -169,85 +194,103 @@ describe('moving through the book', () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    const next = screen.getByRole('button', { name: 'Next' })
-    fireEvent.click(next)
+    await turnForward()
     await screen.findByText('Later in the first chapter.')
-    fireEvent.click(next)
+    await turnForward()
 
     expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
-    expect(screen.getByText(/A Test Book · The Middle/)).toBeTruthy()
+    expect(screen.getByText('The Middle')).toBeTruthy()
   })
 
   it('goes back into the previous chapter, landing on its last section', async () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    const next = screen.getByRole('button', { name: 'Next' })
-    fireEvent.click(next)
+    await turnForward()
     await screen.findByText('Later in the first chapter.')
-    fireEvent.click(next)
+    await turnForward()
     await screen.findByText('The second chapter begins.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Previous' }))
+    await turnBack()
 
     // Chapter 1 section *2*, not section 1 — going back must land where the
     // previous chapter ended, not where it started.
     expect(await screen.findByText('Later in the first chapter.')).toBeTruthy()
   })
 
-  it('offers no way back from the first section', async () => {
+  // The ends of the book used to be a greyed-out button. With the buttons gone
+  // they are simply a gesture that does nothing — which has to be *nothing*,
+  // not a blank page or a throw back to the beginning.
+  it('stays put when turned back from the first section', async () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    expect(screen.getByRole('button', { name: 'Previous' })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', false)
+    await turnBack()
+
+    expect(screen.getByText('The opening words.')).toBeTruthy()
   })
 
-  it('offers no way on from the last section', async () => {
+  it('stays put when turned on from the last section', async () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    const next = screen.getByRole('button', { name: 'Next' })
-    fireEvent.click(next)
+    await turnForward()
     await screen.findByText('Later in the first chapter.')
-    fireEvent.click(next)
+    await turnForward()
     await screen.findByText('The second chapter begins.')
 
-    // Disabled rather than hidden: the end of a book should feel like an end,
-    // not like a control that disappeared.
-    expect(screen.getByRole('button', { name: 'Next' })).toHaveProperty('disabled', true)
+    await turnForward()
+
+    expect(screen.getByText('The second chapter begins.')).toBeTruthy()
   })
 })
 
 describe('the overlay', () => {
-  it('is showing when Focus Mode is off', async () => {
+  // A book opens on the book. The overlay is a panel over the page, so starting
+  // with it up means every book begins covered — which is what the reader was
+  // complaining about, and it is not what the app it is measured against does.
+  it('is out of the way when a book opens', async () => {
     const { container } = openReader()
     await screen.findByText('The opening words.')
 
-    expect(chromeShown(container)).toBe(true)
-    expect(screen.getByRole('button', { name: SHEET_BUTTON })).toBeTruthy()
+    expect(chromeShown(container)).toBe(false)
   })
 
-  it('hides and returns when the text is tapped', async () => {
+  it('returns and hides again when the text is tapped', async () => {
     const { container } = openReader()
     const text = await screen.findByText('The opening words.')
 
     fireEvent.click(text)
-    expect(chromeShown(container)).toBe(false)
+    expect(chromeShown(container)).toBe(true)
+    expect(screen.getByRole('button', { name: SHEET_BUTTON })).toBeTruthy()
 
     // Hidden, never removed — that distinction is the whole of the Focus Mode
-    // decision, and a tap has to bring everything straight back.
+    // decision, and a tap has to work both ways.
     fireEvent.click(text)
-    expect(chromeShown(container)).toBe(true)
+    expect(chromeShown(container)).toBe(false)
   })
 
   it('stays out of reach while hidden', async () => {
     const { container } = openReader()
-    fireEvent.click(await screen.findByText('The opening words.'))
+    await screen.findByText('The opening words.')
 
     // `inert` so a hidden control can't be tabbed to or read out by a screen
     // reader. Invisible but focusable is worse than either.
     expect(container.querySelector('[data-shown]')?.hasAttribute('inert')).toBe(true)
+  })
+
+  // The point of taking the status line out of the overlay: where you are is
+  // printed on the page like a page number in a book, so seeing it never costs
+  // you the page you were reading.
+  it('keeps the page number on screen while the overlay is hidden', async () => {
+    const { container } = openReader()
+    await screen.findByText('The opening words.')
+
+    expect(chromeShown(container)).toBe(false)
+    const status = await screen.findByText(/Page \d+ of \d+/)
+    // Outside the overlay entirely — inside it, it would fade with everything
+    // else and this test would pass while showing the reader nothing.
+    expect(container.querySelector('[data-shown]')?.contains(status)).toBe(false)
   })
 
   it('says where you are as a page, counted in words', async () => {
@@ -340,7 +383,7 @@ describe('the navigation sheet', () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await turnForward()
     await screen.findByText('Later in the first chapter.')
 
     fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
@@ -411,7 +454,7 @@ describe('Focus Mode', () => {
     expect(screen.getByRole('button', { name: 'Focus on' })).toBeTruthy()
   })
 
-  it('leaves Previous and Next alone — reading never loses its controls', async () => {
+  it('leaves the book turnable — reading never loses its controls', async () => {
     openReader()
     await screen.findByText('The opening words.')
     fireEvent.click(screen.getByRole('button', { name: 'Focus off' }))
@@ -420,9 +463,10 @@ describe('Focus Mode', () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    // Focus Mode quiets the interface around the book; it does not take away
-    // the two controls the book is actually read with.
-    expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy()
+    // Focus Mode quiets the interface around the book; it does not stop the
+    // book being read.
+    await turnForward()
+    expect(await screen.findByText('Later in the first chapter.')).toBeTruthy()
   })
 })
 
@@ -492,7 +536,7 @@ describe('reopening where you left off', () => {
   it('remembers moving on to the next section', async () => {
     openReader()
     await screen.findByText('The opening words.')
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await turnForward()
     await screen.findByText('Later in the first chapter.')
 
     await vi.waitFor(

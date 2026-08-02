@@ -50,6 +50,34 @@ describe('html — tables', () => {
     expect(htmlToBlocks(table)[0].text).toBe('Results\nModel | Score\nA | 0.91\nB | 0.87')
   })
 
+  // A book's contents page is very often a two-column table, and cells built
+  // from `textContent` threw every entry's link away — the reason the app showed
+  // dead text where other readers show a tappable list of chapters.
+  it('keeps the links inside its cells, offset to the flattened text', () => {
+    const contents =
+      '<table>' +
+      '<tr><td><a href="c1.xhtml">I</a></td><td><a href="c1.xhtml">Conditions</a></td></tr>' +
+      '<tr><td><a href="c2.xhtml">II</a></td><td><a href="c2.xhtml">Motion</a></td></tr>' +
+      '</table>'
+
+    const [block] = htmlToBlocks(contents)
+    expect(block.text).toBe('I | Conditions\nII | Motion')
+    expect(block.links).toEqual([
+      { start: 0, end: 1, href: 'c1.xhtml' },
+      { start: 4, end: 14, href: 'c1.xhtml' },
+      { start: 15, end: 17, href: 'c2.xhtml' },
+      { start: 20, end: 26, href: 'c2.xhtml' },
+    ])
+  })
+
+  it('shifts cell links past a caption, which takes the first line', () => {
+    const [block] = htmlToBlocks(
+      '<table><caption>Contents</caption><tr><td><a href="c1.xhtml">I</a></td></tr></table>',
+    )
+    expect(block.text).toBe('Contents\nI')
+    expect(block.links).toEqual([{ start: 9, end: 10, href: 'c1.xhtml' }])
+  })
+
   it('never gives a bare cell value its own anchor', () => {
     const book = assembleBook(htmlToBlocks(table), meta())
     const anchored = book.sections.flatMap((s) => s.paragraphs)
@@ -93,6 +121,16 @@ describe('html — figures', () => {
     const [block] = htmlToBlocks('<p><img src="f.jpg"/>Fig 4. A dream sequence.</p>')
     expect(block.text).toBe('[Figure: Fig 4. A dream sequence.]')
     expect(block.label).toBe('Fig 4. A dream sequence.')
+  })
+
+  // An ornament or drop-cap inside a paragraph of prose used to turn the whole
+  // paragraph into a figure, which printed a page of text a second time as a
+  // caption underneath itself.
+  it('leaves a paragraph of prose as prose, image inside it or not', () => {
+    const prose = 'x'.repeat(400)
+    const [block] = htmlToBlocks(`<p><img src="ornament.png"/>${prose}</p>`)
+    expect(block.kind).toBe('prose')
+    expect(block.text).toBe(prose)
   })
 
   it('finds the image inside an svg wrapper, as epub full-page plates use', () => {

@@ -23,7 +23,7 @@
 
 import { unzipSync, strFromU8 } from 'fflate'
 
-import type { ParsedBook } from '../storage/index.ts'
+import type { BookAsset, ParsedBook } from '../storage/index.ts'
 import type { BookMeta } from '../structure/index.ts'
 import { assembleBook, type Block } from './assemble.ts'
 import { htmlToBlocks } from './html.ts'
@@ -259,6 +259,71 @@ function readTocTitles(archive: Archive, packagePath: string): Map<string, strin
   return titles
 }
 
+// --- Pictures ----------------------------------------------------------------
+
+/**
+ * Extension → media type, for the handful of formats an epub's figures are
+ * actually in. The archive doesn't record a type, and a `Blob` with none is
+ * shown by the browser as a broken image rather than guessed at.
+ *
+ * SVG is deliberately here and deliberately last-resort: it is markup, so it
+ * only ever reaches an `<img>` — never inlined into the page — which keeps any
+ * script inside a downloaded file inert.
+ */
+const MEDIA_TYPES: Readonly<Record<string, string>> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+  avif: 'image/avif',
+  bmp: 'image/bmp',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+}
+
+function mediaTypeOf(path: string): string | undefined {
+  const dot = path.lastIndexOf('.')
+  if (dot < 0) return undefined
+  return MEDIA_TYPES[path.slice(dot + 1).toLowerCase()]
+}
+
+/**
+ * Pull the bytes of every picture the book's figures point at.
+ *
+ * Only the ones referenced, and each one only once: an epub's manifest lists
+ * plenty a spine document never shows (covers already used elsewhere, unused
+ * alternates), and a plate reproduced in two chapters is one file.
+ *
+ * Anything missing, or in a format we can't name a media type for, is skipped
+ * silently — the figure then renders as it did before WP-39, caption only,
+ * which is the right failure. A picture is never worth refusing the book over.
+ */
+function readImages(
+  archive: Archive,
+  blocks: readonly { image?: { src: string } }[],
+): BookAsset[] {
+  const wanted = new Set<string>()
+  for (const block of blocks) {
+    if (block.image) wanted.add(block.image.src)
+  }
+
+  const assets: BookAsset[] = []
+  for (const path of wanted) {
+    const type = mediaTypeOf(path)
+    if (!type) continue
+
+    const bytes = readFile(archive, path)
+    if (!bytes) continue
+
+    // Copied into a plain `ArrayBuffer`: fflate hands back a view whose buffer
+    // TypeScript can't promise isn't shared, and `Blob` won't take one.
+    assets.push({ path, data: new Blob([bytes.slice().buffer as ArrayBuffer], { type }) })
+  }
+  return assets
+}
+
 // --- Public API --------------------------------------------------------------
 
 /**
@@ -338,10 +403,16 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
     blocks.push(...doc.blocks)
   }
 
-  return assembleBook(blocks, {
+  const book = assembleBook(blocks, {
     ...meta,
     source: 'epub',
     title: meta.title || spine.title || 'Untitled',
     author: meta.author ?? spine.author,
   })
+
+  // Read from the *assembled* paragraphs, not from the block stream above:
+  // assembly drops furniture, so a cover plate that never reaches a page is
+  // never carried into storage either.
+  const shown = book.sections.flatMap((section) => section.paragraphs)
+  return { ...book, assets: readImages(archive, shown) }
 }

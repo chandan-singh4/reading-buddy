@@ -67,16 +67,28 @@
   color: var(--color-text-muted);
 }
 
+/* Kept whole. A page is a CSS column with `overflow: hidden`, so a figure
+   split across the break doesn't scroll into view on the next page — it is
+   simply cut in half and gone. */
 .figure {
   margin-top: var(--space-5);
+  break-inside: avoid;
 }
 
 .image {
   display: block;
   max-width: 100%;
+  /* Capped against the *page*, not against the image. A plate taller than the
+     column would be sliced by the column edge and the part below it never
+     shown; scaled down, the whole picture lands on one page with room left for
+     its caption. `height: auto` keeps it in proportion either way. */
+  max-height: 70dvh;
   height: auto;
   margin: 0 auto;
   border-radius: var(--radius-sm);
+  /* `contain` rather than the default stretch: the cap above changes the box,
+     and a diagram distorted to fill it is worse than a small one. */
+  object-fit: contain;
 }
 
 .caption {

@@ -12,6 +12,9 @@ export {
   textSignatureOf,
   importBook,
   importBooks,
+  isOutOfDate,
+  reparseBook,
+  reparseBooks,
   titleFromFilename,
 } from './importBook.ts'
 export type {
@@ -22,7 +25,11 @@ export type {
   ImportOutcome,
   ImportStage,
   ParserTable,
+  ReparseOutcome,
+  ReparseProgress,
 } from './importBook.ts'
+
+export { PARSER_VERSION } from '../parse/version.ts'
 
 export { dropHasDirectory, filesFromDrop } from './dropped.ts'
 

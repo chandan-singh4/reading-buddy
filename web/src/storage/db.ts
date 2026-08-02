@@ -49,6 +49,52 @@ export interface ReadingPosition {
   at: string
 }
 
+/**
+ * The file a book was imported from, kept so it can be parsed again.
+ *
+ * Until now the original was read once and dropped, on the reasoning that the
+ * text is the book and the file is just how it arrived. That was wrong in one
+ * specific, repeatedly painful way: a parsed book is a *snapshot*, so every
+ * improvement to the parser leaves the existing shelf untouched, and the only
+ * way to benefit was to delete each book and find its file again. Keeping the
+ * bytes turns that into one tap.
+ *
+ * Stored as a `Blob`, which IndexedDB persists natively — no base64, no string
+ * conversion, and the browser is free to keep it out of memory until asked. The
+ * cost is real (roughly the size of the library again) and is why `deleteBook`
+ * cascades here, and why the shelf can offer to drop them.
+ */
+export interface StoredSource {
+  bookId: BookId
+  /** The original bytes, exactly as imported. */
+  file: Blob
+  /** What the reader called it — the parser is chosen by this extension. */
+  filename: string
+  /** Bytes, denormalised so "how much is this costing me?" needs no blob read. */
+  size: number
+}
+
+/**
+ * One picture from a book — a figure, a plate, a diagram.
+ *
+ * Kept as its own row rather than inlined into the paragraph that mentions it,
+ * for the reason every other table here is split the way it is: a section is
+ * read on the reading screen's critical path, and a section carrying a
+ * megabyte of base64 inside its JSON would be read in full every time the
+ * reader turned onto it, image or no image. Here the picture is fetched only
+ * by the page that actually shows it.
+ *
+ * `path` is the archive path the parser recorded in `image.src`
+ * (`OEBPS/images/fig1.png`) — the same string the block carries, so the
+ * lookup needs nothing resolved at read time.
+ */
+export interface StoredAsset {
+  bookId: BookId
+  path: string
+  /** The bytes, with their media type, exactly as they were in the file. */
+  data: Blob
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -63,6 +109,8 @@ export type ReadingBuddyDB = Dexie & {
   chapters: Table<StoredChapterIndex, [BookId, string]>
   sections: Table<StoredSection, [BookId, SectionPath]>
   positions: Table<ReadingPosition, BookId>
+  sources: Table<StoredSource, BookId>
+  assets: Table<StoredAsset, [BookId, string]>
 }
 
 /**
@@ -100,6 +148,25 @@ function defineSchema(db: Dexie): void {
   // ordered read of a few rows instead of a scan of every book on the shelf.
   db.version(4).stores({
     positions: 'bookId, at',
+  })
+
+  // v5 — the file each book was imported from, so a parser fix can be applied
+  // without the reader deleting the book and hunting down the file again. Only
+  // `bookId` is indexed: this table is never searched, only fetched by book.
+  // Books imported before v5 have no row here and can only be brought up to
+  // date the old way — which the shelf says out loud rather than leaving the
+  // reader to discover.
+  db.version(5).stores({
+    sources: 'bookId',
+  })
+
+  // v6 — the pictures inside a book (WP-39). Addressed exactly like a section,
+  // `[bookId+path]`, because that is how a figure names its image; `bookId`
+  // alone is indexed too, so deleting a book can drop all of its pictures
+  // without listing them. Books imported before v6 have no rows here and show
+  // captions only, until they are re-imported.
+  db.version(6).stores({
+    assets: '[bookId+path], bookId',
   })
 }
 

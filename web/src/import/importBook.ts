@@ -13,6 +13,7 @@
 
 import type { ParsedBook, Repository } from '../storage/index.ts'
 import { repository as defaultRepository } from '../storage/index.ts'
+import { PARSER_VERSION } from '../parse/version.ts'
 import type { BookId, BookMeta, SourceFormat } from '../structure/index.ts'
 import { shelfFor } from './shelf.ts'
 
@@ -29,6 +30,8 @@ export type ImportErrorCode =
   | 'no-text'
   | 'save-failed'
   | 'duplicate'
+  /** Asked to re-parse a book whose original file was never kept. */
+  | 'no-source'
 
 export class ImportError extends Error {
   readonly code: ImportErrorCode
@@ -250,6 +253,21 @@ async function backfillQuietly(repository: Repository): Promise<void> {
   }
 }
 
+/**
+ * Store a book's pictures, and never let them take the book down with them.
+ *
+ * Same standing as the kept file below: a book whose plates wouldn't fit is a
+ * book with captions, which is exactly what every book looked like before
+ * WP-39. A book that failed to import because of a plate is a regression.
+ */
+async function saveAssetsQuietly(repository: Repository, book: ParsedBook): Promise<void> {
+  try {
+    await repository.saveAssets(book.meta.id, book.assets ?? [])
+  } catch {
+    // Nothing the reader can act on, and nothing they had a moment ago.
+  }
+}
+
 function countParagraphs(book: ParsedBook): number {
   return book.sections.reduce((total, section) => total + section.paragraphs.length, 0)
 }
@@ -311,6 +329,7 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     // WP-10 classifies for real. Until then every book gets the richer of the
     // two modes — a wrong "dense" costs a reader nothing but extra options.
     type: 'dense-technical',
+    parserVersion: PARSER_VERSION,
     importedAt: now().toISOString(),
   }
 
@@ -357,7 +376,186 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
     )
   }
 
+  await saveAssetsQuietly(repository, toSave)
+
+  // Kept *after* the book is safely stored, and never allowed to undo it. The
+  // file is what makes a future parser fix one tap instead of a delete and a
+  // re-import; it is not what makes the book. A phone too full to hold it
+  // should still end up with the book — see `repository.saveSource`.
+  try {
+    await repository.saveSource(toSave.meta.id, file, file.name)
+  } catch {
+    // Silent on purpose. Nothing the reader can act on, and nothing they have
+    // lost that they had a moment ago.
+  }
+
   return toSave.meta
+}
+
+// --- Re-parsing an existing book ----------------------------------------------
+
+/**
+ * Whether a book was made by an older parser than the one running now.
+ *
+ * Unstamped counts as behind: `parserVersion` was added alongside the kept
+ * file, so anything without one predates both and is certainly older than the
+ * current build.
+ */
+export function isOutOfDate(book: BookMeta): boolean {
+  return (book.parserVersion ?? 0) < PARSER_VERSION
+}
+
+/**
+ * Read a book's text again from the file it came from.
+ *
+ * This is the whole point of keeping that file. A parsed book is a snapshot: no
+ * amount of improving the parser changes a book already on the shelf, so before
+ * this existed every parser fix meant deleting the book and finding the file
+ * again — three times over, on the same book, in three sessions.
+ *
+ * What it keeps: the book's id, its title, the shelf it is filed on, its place
+ * in the list, and where the reader had got to. What it replaces: every
+ * paragraph, anchor, link and chapter division. What it never does: leave the
+ * book damaged — the new parse has to succeed *and* contain text before
+ * anything is written, so a failure leaves the old book exactly as it was.
+ */
+export async function reparseBook(
+  bookId: BookId,
+  options: ImportOptions = {},
+): Promise<BookMeta> {
+  const { repository = defaultRepository, parsers = defaultParsers, onStage } = options
+
+  const book = await repository.getBook(bookId)
+  if (!book) {
+    throw new ImportError('no-source', 'That book isn’t in your library any more.')
+  }
+
+  onStage?.('reading')
+  const source = await repository.getSource(bookId)
+  if (!source) {
+    throw new ImportError(
+      'no-source',
+      `“${book.title}” was imported before Reading Buddy started keeping the original file, so it can’t be updated on its own. Remove it and import the file again to bring it up to date.`,
+    )
+  }
+
+  // The filename is what chose the parser at import, so it is what must choose
+  // it again — `book.source` is the same answer, but derived rather than
+  // recorded, and a mismatch between the two is a bug worth not hiding.
+  const format = formatFromFilename(source.filename) ?? book.source
+
+  let data: ArrayBuffer | string
+  try {
+    data = BINARY_FORMATS.has(format)
+      ? await source.file.arrayBuffer()
+      : await source.file.text()
+  } catch (cause) {
+    throw new ImportError('unreadable-file', UNREADABLE_MESSAGE[format], { cause })
+  }
+
+  // The meta handed to the parser is the *existing* one, carrying everything a
+  // reader has decided about this book — its title, its shelf, whether they
+  // moved it — with only the parser stamp moving forward. Re-guessing any of
+  // that would let an update quietly overrule a correction.
+  const meta: BookMeta = { ...book, parserVersion: PARSER_VERSION }
+
+  onStage?.('parsing')
+  let parsed: ParsedBook
+  try {
+    parsed = await parsers[format](data, meta)
+  } catch (cause) {
+    throw new ImportError('unreadable-file', UNREADABLE_MESSAGE[format], { cause })
+  }
+
+  if (countParagraphs(parsed) === 0) {
+    throw new ImportError('no-text', NO_TEXT_MESSAGE[format])
+  }
+
+  // Re-derived because the text itself may have changed — a parser that keeps
+  // furniture it used to drop, or drops some it used to keep, moves the opening
+  // this is taken from. A stale signature would make the book invisible to the
+  // duplicate check, or match a book it isn't.
+  const textSignature = await textSignatureOf(openingOf(parsed))
+
+  const toSave: ParsedBook = {
+    ...parsed,
+    meta: {
+      ...meta,
+      ...(textSignature === undefined ? {} : { textSignature }),
+    },
+  }
+
+  onStage?.('saving')
+  try {
+    await repository.replaceParsedBook(toSave)
+  } catch (cause) {
+    throw new ImportError(
+      'save-failed',
+      'The book was read, but the update couldn’t be saved. Your device may be out of storage space.',
+      { cause },
+    )
+  }
+
+  // Cleared and rewritten, not merged: a fresh parse decides afresh which
+  // pictures the book shows, and the old set may name files it no longer does.
+  await saveAssetsQuietly(repository, toSave)
+
+  return toSave.meta
+}
+
+/** What became of one book in a re-parse run. */
+export type ReparseOutcome =
+  | { bookId: BookId; title: string; status: 'updated'; meta: BookMeta }
+  | { bookId: BookId; title: string; status: 'failed'; message: string }
+
+export interface ReparseProgress {
+  /** 1-based. */
+  index: number
+  total: number
+  title: string
+  stage: ImportStage
+}
+
+/**
+ * Bring several books up to date, one after another.
+ *
+ * Sequential and failure-tolerant, for the same reasons `importBooks` is: the
+ * parse is CPU-bound and would fight itself for the one main thread, and "11 of
+ * 12 updated" is a far more useful outcome than one thrown error and no idea
+ * which books made it.
+ */
+export async function reparseBooks(
+  books: readonly BookMeta[],
+  options: ImportOptions & { onProgress?: (progress: ReparseProgress) => void } = {},
+): Promise<ReparseOutcome[]> {
+  const { onProgress, ...single } = options
+  const outcomes: ReparseOutcome[] = []
+
+  for (const [position, book] of books.entries()) {
+    try {
+      const meta = await reparseBook(book.id, {
+        ...single,
+        onStage: (stage) => {
+          onProgress?.({
+            index: position + 1,
+            total: books.length,
+            title: book.title,
+            stage,
+          })
+        },
+      })
+      outcomes.push({ bookId: book.id, title: book.title, status: 'updated', meta })
+    } catch (error: unknown) {
+      outcomes.push({
+        bookId: book.id,
+        title: book.title,
+        status: 'failed',
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  return outcomes
 }
 
 function duplicateOf(existing: BookMeta): ImportError {

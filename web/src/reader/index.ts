@@ -6,6 +6,9 @@
 export { Block, elementIdOf } from './blocks.tsx'
 export type { FollowLink } from './blocks.tsx'
 
+export { imagePathsOf, isDirectSrc, srcOf, useFigureImages } from './figures.ts'
+export type { LoadAssets } from './figures.ts'
+
 export { runsOf, lineRunsOf } from './linkRuns.ts'
 export type { Run } from './linkRuns.ts'
 export { Chrome } from './Chrome.tsx'
@@ -51,3 +54,17 @@ export {
   previousSection,
 } from './navigation.ts'
 export type { SectionCountLookup, SectionRef } from './navigation.ts'
+
+export { cancelTurn, holdOutgoing, playTurn } from './pageTurn.ts'
+export type { HeldPage } from './pageTurn.ts'
+
+export {
+  MOVE_EASING,
+  MOVE_MS,
+  MOVE_TIMING,
+  easeMove,
+  fadeIn,
+  prefersReducedMotion,
+  scrollStrip,
+} from './motion.ts'
+export type { Cancel } from './motion.ts'

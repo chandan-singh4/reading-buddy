@@ -410,3 +410,165 @@ describe('deleting several books at once', () => {
     expect(await repo.listBooks()).toHaveLength(0)
   })
 })
+
+describe('the file a book was imported from', () => {
+  it('round-trips the original bytes and records their size', async () => {
+    const parsed = makeParsedBook('a')
+    await repo.saveParsedBook(parsed)
+    await repo.saveSource(parsed.meta.id, new Blob(['hello there']), 'book.epub')
+
+    const source = await repo.getSource(parsed.meta.id)
+    expect(source?.filename).toBe('book.epub')
+    expect(source?.size).toBe(11)
+    expect(await source?.file.text()).toBe('hello there')
+  })
+
+  // Asked once for the whole shelf, and answered off the key index — a shelf
+  // of 35 books must never mean reading 35 blobs to draw a list.
+  it('says which books still have their file, without reading any of them', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.saveParsedBook(makeParsedBook('b'))
+    await repo.saveSource(bookId('a'), new Blob(['bytes']), 'a.epub')
+
+    const withSource = await repo.booksWithSource()
+    expect(withSource.has(bookId('a'))).toBe(true)
+    expect(withSource.has(bookId('b'))).toBe(false)
+  })
+
+  it('goes when the book goes — a kept file for a deleted book is dead weight', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.saveSource(bookId('a'), new Blob(['bytes']), 'a.epub')
+
+    await repo.deleteBook(bookId('a'))
+    expect(await repo.getSource(bookId('a'))).toBeUndefined()
+  })
+
+  it('goes when several books go at once', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.saveParsedBook(makeParsedBook('b'))
+    await repo.saveSource(bookId('a'), new Blob(['bytes']), 'a.epub')
+    await repo.saveSource(bookId('b'), new Blob(['bytes too']), 'b.epub')
+
+    await repo.deleteBooks([bookId('a'), bookId('b')])
+    expect(await repo.booksWithSource()).toEqual(new Set())
+  })
+
+  it('totals what the kept files are costing', async () => {
+    await repo.saveSource(bookId('a'), new Blob(['12345']), 'a.epub')
+    await repo.saveSource(bookId('b'), new Blob(['123']), 'b.epub')
+
+    expect(await repo.sourcesSize()).toBe(8)
+  })
+
+  it('can drop the files without touching the books', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.saveSource(bookId('a'), new Blob(['bytes']), 'a.epub')
+
+    await repo.forgetSources()
+    expect(await repo.getSource(bookId('a'))).toBeUndefined()
+    expect(await repo.countSections(bookId('a'))).toBe(3)
+  })
+})
+
+describe('replacing a book with a fresh parse', () => {
+  /** The same book, parsed into fewer pieces than it was the first time. */
+  function reparsedShorter(id: string): ParsedBook {
+    const parsed = makeParsedBook(id)
+    return {
+      ...parsed,
+      chapters: [makeChapter(1)],
+      sections: [makeSection(1, 1, 'Rewritten opening.')],
+    }
+  }
+
+  it('replaces the text', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.replaceParsedBook(reparsedShorter('a'))
+
+    const section = await repo.getSection(bookId('a'), sectionPath(1, 1))
+    expect(section?.paragraphs[0]?.text).toBe('Rewritten opening.')
+  })
+
+  // The failure a plain `bulkPut` would have: a shorter parse leaves the old
+  // surplus behind as sections no chapter index mentions — invisible,
+  // unreachable, and still taking up room.
+  it('clears the rows the new parse no longer has', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    expect(await repo.countSections(bookId('a'))).toBe(3)
+
+    await repo.replaceParsedBook(reparsedShorter('a'))
+    expect(await repo.countSections(bookId('a'))).toBe(1)
+    expect(await repo.getChapterIndex(bookId('a'), 2)).toBeUndefined()
+  })
+
+  it('keeps where the reader had got to', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.savePosition(bookId('a'), '[ch01-s01-p001]' as never)
+
+    await repo.replaceParsedBook(reparsedShorter('a'))
+    expect((await repo.getPosition(bookId('a')))?.anchor).toBe('[ch01-s01-p001]')
+  })
+
+  it('leaves other books alone', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.saveParsedBook(makeParsedBook('b'))
+
+    await repo.replaceParsedBook(reparsedShorter('a'))
+    expect(await repo.countSections(bookId('b'))).toBe(3)
+  })
+})
+
+describe('a book’s pictures', () => {
+  const bytes = (n: number) => new Blob([new Uint8Array([n, n, n])], { type: 'image/png' })
+
+  it('stores them and hands back only the ones asked for', async () => {
+    const parsed = makeParsedBook('a')
+    await repo.saveParsedBook(parsed)
+    await repo.saveAssets(parsed.meta.id, [
+      { path: 'OEBPS/images/fig1.png', data: bytes(1) },
+      { path: 'OEBPS/images/fig2.png', data: bytes(2) },
+    ])
+
+    // The reading screen asks for the page's figures, never for the book's.
+    const found = await repo.getAssets(parsed.meta.id, ['OEBPS/images/fig2.png'])
+    expect([...found.keys()]).toEqual(['OEBPS/images/fig2.png'])
+    expect(found.get('OEBPS/images/fig2.png')?.size).toBe(3)
+  })
+
+  it('says nothing for a path it has no picture for', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    const found = await repo.getAssets(bookId('a'), ['OEBPS/images/gone.png'])
+    expect(found.size).toBe(0)
+  })
+
+  it('replaces the old set rather than merging into it', async () => {
+    // A re-parse decides afresh which pictures a book shows; the ones it no
+    // longer names must not linger under paths nothing points at.
+    await repo.saveAssets(bookId('a'), [{ path: 'old.png', data: bytes(1) }])
+    await repo.saveAssets(bookId('a'), [{ path: 'new.png', data: bytes(2) }])
+
+    const found = await repo.getAssets(bookId('a'), ['old.png', 'new.png'])
+    expect([...found.keys()]).toEqual(['new.png'])
+  })
+
+  it('goes when the book goes, and stays when another book goes', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.saveParsedBook(makeParsedBook('b'))
+    await repo.saveAssets(bookId('a'), [{ path: 'fig.png', data: bytes(1) }])
+    await repo.saveAssets(bookId('b'), [{ path: 'fig.png', data: bytes(2) }])
+
+    await repo.deleteBook(bookId('a'))
+
+    expect((await repo.getAssets(bookId('a'), ['fig.png'])).size).toBe(0)
+    expect((await repo.getAssets(bookId('b'), ['fig.png'])).size).toBe(1)
+  })
+
+  it('goes when several books are deleted at once', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.saveAssets(bookId('a'), [{ path: 'fig.png', data: bytes(1) }])
+
+    await repo.deleteBooks([bookId('a')])
+
+    expect((await repo.getAssets(bookId('a'), ['fig.png'])).size).toBe(0)
+  })
+})

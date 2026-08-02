@@ -290,6 +290,15 @@
   ticking books the reader cannot see and then deleting them would be the worst
   bug the library screen could have. — 2026-08-02
 
+### Pictures
+- **A book's images are stored as blobs in their own table**, keyed by the
+  archive path the figure already carries — not inlined into the section, which
+  is read on every page turn and would then carry a megabyte of base64. Fetched
+  per section and revoked on the way out. — 2026-08-02
+- **Images are written outside the import transaction**, like the kept source
+  file: the text is the book and the pictures are a convenience, so a full phone
+  loses plates, never the book. — 2026-08-02
+
 ### UX misc
 - **Select → inline popup** (not a side panel). Ask is the only action that calls
   Claude; every Ask auto-saves a plain-language Q&A note.

@@ -272,25 +272,62 @@ function matchesAny(haystack: string, needles: string[]): string | undefined {
 
 // --- Self-contained element readers -----------------------------------------
 
-/** A table becomes one block: a flattened `text` plus the grid in `rows`. */
+/**
+ * The string a row's cells are joined by in the flattened text.
+ *
+ * Exported through `CELL_SEPARATOR` in `reader/linkRuns.ts` too — the renderer
+ * cuts the flattened text back into cells on exactly this string, so the two
+ * halves have to agree letter for letter.
+ */
+const CELL_SEPARATOR = ' | '
+
+/**
+ * The longest text a paragraph can hold and still count as "a paragraph that is
+ * really just an image".
+ *
+ * Generous, because real captions run long ("Figure 3.2: the distribution of…"),
+ * but far short of a paragraph of prose. The failure it prevents is the loud
+ * one: a page of text swallowed into a caption.
+ */
+const FIGURE_CAPTION_MAX = 300
+
+/**
+ * A table becomes one block: a flattened `text` plus the grid in `rows`.
+ *
+ * The flattened form is built by `joinParts`, not by pasting strings together,
+ * for the same reason lists were rewritten in WP-45: `textContent` keeps a
+ * cell's words and throws away every `<a>` inside it. That is not a corner case
+ * — **a book's contents page is very often a two-column table** (roman numeral,
+ * title), which is precisely why the app showed plain text where Google Books
+ * showed a tappable list of chapters. Cells carry their links now, offset by
+ * where each cell landed in the finished string.
+ */
 function readTable(element: Element): ContentBlock {
   const rows: string[][] = []
+  const rowParts: { text: string; links: RawLink[] }[] = []
+
   for (const row of Array.from(element.getElementsByTagName('tr'))) {
     const cells = Array.from(row.children)
       .filter((cell) => cell.tagName === 'TD' || cell.tagName === 'TH')
-      .map((cell) => normalise(cell.textContent))
-    if (cells.some((cell) => cell !== '')) rows.push(cells)
+      .map((cell) => textAndLinks(cell))
+    if (!cells.some((cell) => cell.text !== '')) continue
+
+    rows.push(cells.map((cell) => cell.text))
+    rowParts.push(joinParts(cells, CELL_SEPARATOR))
   }
 
   const caption = normalise(element.getElementsByTagName('caption')[0]?.textContent ?? '')
-  // The flattened form is what the tutor reads and what search matches. Pipes
-  // keep the columns legible without pretending to be a rendered table.
-  const grid = rows.map((cells) => cells.join(' | ')).join('\n')
-  const text = caption ? `${caption}\n${grid}` : grid
+  const grid = joinParts(rowParts, '\n')
+  // A caption is prepended as its own line, which shifts every offset behind it
+  // — so it goes through `joinParts` as well rather than being concatenated.
+  const { text, links } = caption
+    ? joinParts([{ text: caption, links: [] }, grid], '\n')
+    : grid
 
   const block: ContentBlock = { kind: 'table', text }
   if (rows.length > 0) block.rows = rows
   if (caption) block.label = caption
+  if (links.length > 0) block.links = links
   return block
 }
 
@@ -467,7 +504,13 @@ export function htmlToBlocks(html: string): Block[] {
         // leaf here, an image inside one would otherwise never be looked at,
         // and a paragraph holding nothing but an image would vanish entirely.
         const image = readImage(element)
-        if (image) {
+        // An image *inside* a paragraph of prose is not a figure — it is a
+        // drop-cap, an ornament or an inline glyph, and treating the paragraph
+        // as a figure turned a whole page of text into a caption, printed a
+        // second time under the prose it was copied from. Only a paragraph that
+        // is essentially just the image is promoted; anything with real prose in
+        // it stays prose.
+        if (image && normalise(element.textContent).length <= FIGURE_CAPTION_MAX) {
           const caption = normalise(element.textContent)
           const description = caption || image.alt || ''
           const figure: ContentBlock = {

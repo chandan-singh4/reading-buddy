@@ -23,8 +23,19 @@ import {
   type ReadingBuddyDB,
   type ReadingPosition,
   type StoredChapterIndex,
+  type StoredAsset,
   type StoredSection,
+  type StoredSource,
 } from './db.ts'
+
+/**
+ * A picture a parser pulled out of the file, on its way to storage. The same
+ * pair as `StoredAsset` minus the book, which the book itself supplies.
+ */
+export interface BookAsset {
+  path: string
+  data: Blob
+}
 
 /** Everything a parser produces for one book, written atomically. */
 export interface ParsedBook {
@@ -32,6 +43,12 @@ export interface ParsedBook {
   manifest: Manifest
   chapters: ChapterIndex[]
   sections: Section[]
+  /**
+   * The book's pictures, keyed by the path its figures point at. Absent from
+   * formats that carry their images inline (docx writes `data:` URIs) or not
+   * at all (plain text).
+   */
+  assets?: BookAsset[]
 }
 
 export function createRepository(database: ReadingBuddyDB = defaultDb) {
@@ -98,6 +115,141 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           )
         },
       )
+    },
+
+    /**
+     * Replace a book's text with a fresh parse of the same file.
+     *
+     * The difference from `saveParsedBook` is the *clearing*. A new parser can
+     * divide a book into fewer chapters or fewer sections than the old one did,
+     * and a plain `bulkPut` would leave the surplus rows behind — orphan
+     * sections that no chapter index mentions, silently eating storage, plus a
+     * manifest that disagrees with what is actually there. So the old sections
+     * and chapters go first, inside the same transaction.
+     *
+     * The book keeps its identity: same id, same shelf, same place in the list,
+     * same reading position. The position is deliberately *not* cleared — an
+     * anchor either still names a paragraph, in which case the reader is put
+     * back where they were, or it doesn't, in which case the reading screen
+     * already opens at the beginning rather than complaining (WP-15).
+     */
+    async replaceParsedBook(book: ParsedBook): Promise<void> {
+      const { meta, manifest, chapters, sections } = book
+      const bookId = meta.id
+
+      await database.transaction(
+        'rw',
+        database.books,
+        database.manifests,
+        database.chapters,
+        database.sections,
+        async () => {
+          await database.sections.where('bookId').equals(bookId).delete()
+          await database.chapters.where('bookId').equals(bookId).delete()
+
+          await database.books.put(meta)
+          await database.manifests.put({ ...manifest, bookId })
+          await database.chapters.bulkPut(
+            chapters.map((chapter): StoredChapterIndex => ({ ...chapter, bookId })),
+          )
+          await database.sections.bulkPut(
+            sections.map((section): StoredSection => ({ ...section, bookId })),
+          )
+        },
+      )
+    },
+
+    // --- Pictures ------------------------------------------------------------
+
+    /**
+     * Store a book's pictures, replacing any it already had.
+     *
+     * Outside the `saveParsedBook` transaction, and for the same reason the
+     * original file is: **the text is the book and the pictures are a
+     * convenience.** A phone too full to hold 141 plates should still end up
+     * with a readable book showing captions, which is exactly where it was
+     * before this table existed — not with the import rolled back.
+     *
+     * Always clears first, so a re-parse that finds different images can't
+     * leave the old ones orphaned under paths nothing points at any more.
+     */
+    async saveAssets(bookId: BookId, assets: readonly BookAsset[]): Promise<void> {
+      await database.transaction('rw', database.assets, async () => {
+        await database.assets.where('bookId').equals(bookId).delete()
+        if (assets.length === 0) return
+        await database.assets.bulkPut(
+          assets.map((asset): StoredAsset => ({ ...asset, bookId })),
+        )
+      })
+    },
+
+    /**
+     * The pictures for the paths asked for, and only those.
+     *
+     * Deliberately *not* "every picture in this book": the reading screen asks
+     * for the handful its current page mentions. A whole-book fetch here would
+     * be the largest read in the app by an order of magnitude, on the one
+     * screen that has to stay smooth.
+     */
+    async getAssets(bookId: BookId, paths: readonly string[]): Promise<Map<string, Blob>> {
+      const found = new Map<string, Blob>()
+      if (paths.length === 0) return found
+
+      const rows = await database.assets.bulkGet(paths.map((path) => [bookId, path]))
+      for (const row of rows) {
+        if (row) found.set(row.path, row.data)
+      }
+      return found
+    },
+
+    // --- The original file -------------------------------------------------
+
+    /**
+     * Keep the file a book came from, so it can be parsed again later.
+     *
+     * Written separately from `saveParsedBook` rather than inside its
+     * transaction, and that is the point: **the book matters and the file is a
+     * convenience.** If storing a 60 MB blob fails on a full phone, the reader
+     * should still get their book — they simply lose the ability to re-parse it
+     * without finding the file again, which is exactly where they were before
+     * this table existed. Rolling the import back over it would be trading
+     * something that matters for something that doesn't.
+     */
+    async saveSource(bookId: BookId, file: Blob, filename: string): Promise<void> {
+      await database.sources.put({ bookId, file, filename, size: file.size })
+    },
+
+    async getSource(bookId: BookId): Promise<StoredSource | undefined> {
+      return database.sources.get(bookId)
+    },
+
+    /**
+     * Which of these books still have their original file — asked once for the
+     * whole shelf rather than once per row, and answered without touching a
+     * single blob. `Dexie.Table.keys()` reads the primary key index only, so
+     * this stays cheap however large the files are.
+     */
+    async booksWithSource(): Promise<Set<BookId>> {
+      const keys = await database.sources.toCollection().primaryKeys()
+      return new Set(keys)
+    },
+
+    /** Total bytes held in kept files — what the shelf offers to reclaim. */
+    async sourcesSize(): Promise<number> {
+      let total = 0
+      await database.sources.each((source) => {
+        total += source.size
+      })
+      return total
+    },
+
+    /**
+     * Drop the kept files without touching the books themselves. Reclaims the
+     * space at the cost of the one-tap update — a trade only the reader can
+     * make, so it is offered rather than taken.
+     */
+    async forgetSources(): Promise<void> {
+      await database.sources.clear()
     },
 
     // --- Manifest & chapter index ---------------------------------------
@@ -310,19 +462,27 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
     async deleteBooks(bookIds: readonly BookId[]): Promise<void> {
       if (bookIds.length === 0) return
 
+      // The table list is an array rather than separate arguments: Dexie's
+      // variadic overload stops at five tables, and this touches seven.
       await database.transaction(
         'rw',
-        database.books,
-        database.manifests,
-        database.chapters,
-        database.sections,
-        database.positions,
+        [
+          database.books,
+          database.manifests,
+          database.chapters,
+          database.sections,
+          database.positions,
+          database.sources,
+          database.assets,
+        ],
         async () => {
           for (const bookId of bookIds) {
             await database.sections.where('bookId').equals(bookId).delete()
             await database.chapters.where('bookId').equals(bookId).delete()
             await database.manifests.delete(bookId)
             await database.positions.delete(bookId)
+            await database.sources.delete(bookId)
+            await database.assets.where('bookId').equals(bookId).delete()
             await database.books.delete(bookId)
           }
         },
@@ -335,18 +495,25 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
      * would quietly eat a phone's storage quota forever.
      */
     async deleteBook(bookId: BookId): Promise<void> {
+      // Seven tables, so the array form — see `deleteBooks` above.
       await database.transaction(
         'rw',
-        database.books,
-        database.manifests,
-        database.chapters,
-        database.sections,
-        database.positions,
+        [
+          database.books,
+          database.manifests,
+          database.chapters,
+          database.sections,
+          database.positions,
+          database.sources,
+          database.assets,
+        ],
         async () => {
           await database.sections.where('bookId').equals(bookId).delete()
           await database.chapters.where('bookId').equals(bookId).delete()
           await database.manifests.delete(bookId)
           await database.positions.delete(bookId)
+          await database.sources.delete(bookId)
+          await database.assets.where('bookId').equals(bookId).delete()
           await database.books.delete(bookId)
         },
       )

@@ -211,6 +211,31 @@
   border-radius: var(--radius-sm);
 }
 
+/* --- "These books can be improved" ---------------------------------------- */
+
+/*
+ * Deliberately not styled as an error. Nothing is broken: the books read
+ * perfectly well, they were simply made by an older parser. It sits above the
+ * shelf because it is about the whole shelf, and it goes away entirely once
+ * there is nothing left to update — a banner that is always there is furniture.
+ */
+.update {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+/* The quiet per-row twin of the banner: which books it means. */
+.outdated {
+  color: var(--color-accent);
+}
+
 /* --- Selecting several books (bulk delete) -------------------------------- */
 
 .selectBar {

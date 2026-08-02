@@ -19,6 +19,44 @@ Get that loop working before building any breadth.
   streamed answer (WP-17 → 18 → 19 → 20).
 
 ### Recently done
+- **WP-39 (first half) · Books show their pictures** — 2026-08-02. Figures had
+  captions and no image: an epub figure records an archive path
+  (`OEBPS/images/fig1.png`) and the archive is gone by reading time.
+  - **Extracted at import, stored beside the text.** `parse/epub.ts` pulls the
+    bytes of every picture an *assembled* paragraph points at — referenced only,
+    each once, media type from the extension — into `ParsedBook.assets`. A new
+    `assets` table (schema v6) keys them `[bookId+path]`, the same shape as a
+    section, so the reading screen looks a figure up without resolving anything.
+  - **Written outside the import transaction**, like the kept source file, on
+    the same rule: *the text is the book and the pictures are a convenience.* A
+    phone too full for 141 plates still gets a readable book with captions.
+  - **Fetched per section, revoked per turn.** `reader/figures.ts` resolves only
+    the handful of paths the current section names into `blob:` URLs and revokes
+    every one on the way out — otherwise a reader turning through a picture book
+    pins the whole book in memory. Keyed on the paths, not the array, so a
+    re-render doesn't re-fetch. `data:` and `http(s)` srcs (docx, markdown) pass
+    through untouched.
+  - **A picture that isn't there is a caption**, never a broken-image icon.
+  - **`PARSER_VERSION` → 3**, so the shelf offers to update existing books from
+    their kept files. Books never re-imported keep captions only.
+  - **A figure is kept whole and capped at 70dvh** — a page is a CSS column with
+    `overflow: hidden`, so a plate taller than the column is sliced off, not
+    scrolled to.
+- **Third phone round · the reading screen goes bare** — 2026-08-02. Measured
+  against Google Books, on the reader's own comparison.
+  - **The overlay starts hidden and the status line left it.** "Page 84 of 350"
+    is now a permanent, background-less line at the foot (`--status-line`),
+    outside the overlay; everything else waits for a tap in the middle of the
+    page. Following a link no longer raises the bars.
+  - **Previous/Next are gone** — swipe, edge tap, or arrow keys (the keyboard
+    route is also what drives the tests, since jsdom can neither swipe nor be
+    wide enough to edge-tap).
+  - **No blue tap flash** on the status line (`-webkit-tap-highlight-color`),
+    with keyboard focus still shown.
+  - **"Back to page N" lands on the exact screen.** Third and final cause: the
+    landing scroll was applied the instant React committed, before columns had
+    re-flowed. `settleOn` re-checks over two frames and a move counter stops a
+    late correction overriding a newer move.
 - **WP-45 · Second phone session: four fixes** — 2026-08-02.
   - **Links inside lists were being thrown away.** `readList` and
     `containerText` built their block from `textContent`, which keeps the words
@@ -370,6 +408,7 @@ AI.**
 - **It has now been used on a real phone** (2026-08-02): installed, books
   imported, folder import smooth, duplicates caught. What that session found is
   WP-41 (fixed), WP-42 and WP-43, plus page turning as the top priority.
-- **Figures show captions but no images.** Epub records an archive path
-  (`OEBPS/images/fig1.png`) which the browser can't fetch — resolving those to
-  displayable bytes is WP-39. Affects all 141 images in the Jung epub.
+- **Pictures need a re-import to appear.** Fixed 2026-08-02 for new imports;
+  books already on the shelf have no bytes stored, so the shelf's "Update"
+  (kept source file, `PARSER_VERSION` 3) is what fills them in. Storage grows by
+  roughly the images again — the Jung epub's 141 plates are most of its 15 MB.
