@@ -37,6 +37,18 @@
   Permanent once assigned.
 - **The path is the address:** a query loads `manifest.md` + the chapter's
   `index.md` + one `sNN.md`, never the whole tree.
+
+> **The tree above is a mental model, not a filesystem.** A browser PWA has no
+> disk to write folders to, so the paths are realised as **storage keys** — a
+> section lives in one IndexedDB row keyed `ch02/s03`, one row per section. The
+> address rule is unchanged and load-bearing; only the lookup mechanism differs.
+> Don't go looking for these files on disk. — WP-05, 2026-08-01
+
+Implemented in `web/src/structure/` (WP-05): `types.ts` holds the shape,
+`anchor.ts` the grammar and address helpers, `index.ts` is the only entry point
+other code should import from. Anchor rules are strict — malformed input throws
+rather than being repaired, since a plausible-but-wrong permanent id would
+silently mis-address saved highlights forever.
 - **Book metadata set at import:** type (`light-fiction` | `dense/technical`),
   subject/domain tag, and per-chapter concepts / vocabulary / themes.
 

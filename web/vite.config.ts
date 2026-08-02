@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -7,4 +8,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 // off so the service worker never gets in the way during development.
 export default defineConfig({
   plugins: [react(), VitePWA({ devOptions: { enabled: false } })],
+  test: {
+    // Node is enough for now: the structure layer is pure functions. Swap to
+    // 'jsdom' when the first component test lands.
+    environment: 'node',
+    include: ['src/**/*.test.{ts,tsx}'],
+  },
 })

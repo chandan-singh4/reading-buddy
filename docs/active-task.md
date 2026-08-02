@@ -8,22 +8,44 @@
 
 ---
 
-## Task — WP-01 · Scaffold the stack
+## Task — WP-05 · Shared structure schema  ·  KEYSTONE
 
-Set up the monorepo and toolchain so every later waypoint has a home.
+Define the one shape every other waypoint reads and writes: the parsed-book
+structure, the path-as-address rule, and the anchor grammar. Types and pure
+helpers only — no parser, no database, no UI.
+
+**Order note (2026-08-01):** the backlog lists WP-05 as *after 03*. Reordered by
+Chandan to run **before** WP-03, so the storage layer is built to fit a settled
+schema rather than the reverse. WP-03 becomes *after 05*.
 
 ### Definition of done
-- [x] `web/` runs a blank Vite + React + TypeScript app with `vite-plugin-pwa`
-      installed and wired (not yet configured).
-- [x] Root scripts `dev`, `typecheck`, and `build` all pass.
-- [x] Empty `shell/` and `api/` folders committed with placeholder READMEs.
+- [ ] `web/src/structure/types.ts` declares the full parsed-book shape —
+      `BookMeta`, `Manifest`, `ChapterIndex`, `Section`, `Paragraph` — with
+      book-type gating (`light-fiction` | `dense-technical`) present from the
+      start.
+- [ ] `web/src/structure/anchor.ts` provides pure `formatAnchor` /
+      `parseAnchor` / `isAnchor` over the `[ch02-s03-p013]` grammar, plus
+      `sectionPath()` returning the `ch02/s03` address used as the storage key.
+      Malformed input fails loudly rather than returning a wrong anchor.
+- [ ] Vitest installed, `npm test` wired at the root, and the anchor grammar
+      covered by tests — round-trip, padding, and loud failure on malformed
+      input. (Approved by Chandan 2026-08-01 as a rider on this task, since the
+      anchor rules are permanent and every Leg 1 parser depends on them.)
+- [ ] `npm run typecheck`, `npm run build` and `npm test` all pass, and
+      `docs/architecture.md` is updated to record that the on-disk folder tree
+      is realised as **keys**, not files, in the browser.
 
 ### Files in scope
-- `package.json`, `tsconfig.json`, `vite.config.ts`
-- `web/` (new)
-- `README.md` (record the monorepo layout)
+- `web/src/structure/types.ts` (new)
+- `web/src/structure/anchor.ts` (new)
+- `web/src/structure/anchor.test.ts` (new)
+- `web/src/structure/index.ts` (new — the single public entry point)
+- `web/package.json`, `package.json`, `web/vite.config.ts` (wire up Vitest)
+- `docs/architecture.md` (record path-as-key; it currently implies real files)
 - *(create as needed — add any new path to this list)*
 
 ### Out of scope
-- Any parser, reader UI, or Claude call — those are later waypoints.
-- Tauri wiring — that's WP-02.
+- Any parser (WP-06/07/08), the storage layer (WP-03), and all UI.
+- `crossrefs.md` / `learner.md` shapes — later waypoints; leave them undeclared.
+- Syncing `docs/backlog.md` / `docs/progress.md` — deferred to after WP-03 at
+  Chandan's request.
