@@ -14,11 +14,31 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- Nothing. **Leg 0 complete** (bar WP-02, skipped) and **the whole parsing side
-  of Leg 1 is complete**: every format now parses. WP-09/10 (summaries,
-  classification) and WP-11 (import UI) are what remain in Leg 1.
+- **WP-12 · Structured renderer** — the first half of the walking skeleton
+  (import → store → list) now works end to end on real books. Nothing displays
+  one yet; that is WP-12, and it is the whole of the current task.
 
 ### Recently done
+- **WP-11 · In-app import + auto-parse** — `web/src/import/`. Pick files, pick a
+  folder, or drop either on the page → parser chosen by extension → parsed →
+  `repository.saveParsedBook` → the book appears. Verified on the real 15 MB
+  Jung epub and the Springer PDF.
+  - **Failure is always explained.** A distinct plain sentence per case, and the
+    scanned PDF — which parses "successfully" into zero blocks — is caught
+    *before* the write, so an empty book never reaches the library.
+  - **Duplicates, two fingerprints.** `contentHash` (SHA-256 of the file) is
+    checked before parsing; `textSignature` (SHA-256 of the opening text) after.
+    The second exists because the first can't be backfilled — the original file
+    is never kept, but the text is — and it catches what bytes can't: the same
+    book from a different file. Under 200 characters of opening text it makes no
+    claim at all, since a false "already on your shelf" locks a real book out.
+  - **Delete**, cascading through sections → chapters → manifest → book.
+  - **Three shelves** — books / research papers / documents, guessed at import
+    from the format plus first-page signals (DOI, arXiv, abstract), inspected
+    only for the two ambiguous formats. Every book can be moved, and a moved
+    book is never re-guessed.
+  - Beyond the original scope: multi-file, folder and drag-drop import,
+    duplicates, delete, shelves. All reader-requested mid-task.
 - **WP-38 · Non-prose blocks** — `Paragraph` gains a required `kind`
   (`prose | heading | quote | list | code | figure | table | formula | note |
   furniture`), plus `rows` for tables and `image` for figures. Each of those is
@@ -68,20 +88,26 @@ Get that loop working before building any breadth.
 - Repo published: **github.com/chandan-singh4/reading-buddy** (public). Product
   renamed Reading Buddy — *Wayfinder* was the planning method, not the product.
 
-**Gates:** `npm test` (168), `npm run typecheck`, `npm run build` — all passing.
-Main bundle still 333.74 kB: nothing imports the parsers yet (WP-11), and pdf
-and docx stay behind dynamic imports so they never enter the main chunk.
+**Gates:** `npm test` (214), `npm run typecheck`, `npm run build` — all passing.
+Main bundle 343.01 kB. The parsers are called now, but every one of them stays
+behind a dynamic `import()`, so pdf.js (434 kB) and mammoth (500 kB) remain in
+their own chunks and are fetched only when a file of that type is imported.
 
 ### Blockers
 - None.
 
 ### Next up
-- **WP-11 · In-app import + auto-parse** — now unblocked (WP-38 done), so the
-  anchors a real import produces are the ones we intend to keep. The parsers
-  exist but nothing in the app calls them yet. This is the step that makes them real: file picker →
-  pick parser by extension → `repository.saveParsedBook` → land in the library.
-- Then WP-12 (renderer) to finish the walking skeleton. WP-09/10 (summaries,
-  classification) need a model call and can follow. WP-02 (Tauri) stays skipped.
+- **WP-12 · Structured renderer** — books are in storage and unreadable. Render
+  a section's blocks with their anchors, move between sections, and never load
+  a whole book. Then WP-13/15 make it navigable and resumable.
+- **Build it bare, with the chrome on demand** — see Focus Mode in `backlog.md`.
+  The reader has decided Focus Mode is a toggle that hides but never removes:
+  progress, chapter, back and highlights all stay reachable while it's on.
+  Building bare-first and adding chrome as a layer gets that for free; building
+  full chrome and hiding it means retrofitting a route back to each control.
+  Same screen with the toggle off, materially different work later.
+- WP-09/10 (summaries, classification) need a model call and can follow.
+  WP-02 (Tauri) stays skipped.
 
 ### Known parser limits (accepted, not bugs)
 - **PDF is lossy by nature** — it stores positioned glyphs, not paragraphs.

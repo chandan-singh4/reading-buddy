@@ -23,7 +23,7 @@
 - [ ] **WP-09 Manifest + crossrefs at import** — per-chapter summaries, crossrefs once · *after 06,07,08*
 - [ ] **WP-10 Import classification** — fiction vs dense, subject tag, concepts/vocab/themes · *after 09*
 - [x] **WP-38 Non-prose blocks (KEYSTONE-ADJACENT)** — add `kind` to `Paragraph`; keep tables, figures, formulas, code, quotes, footnotes as *one* block each instead of shattering them · ***before 11** — anchors are permanent, and this changes paragraph numbering*
-- [ ] **WP-11 In-app import + auto-parse** — phone picker, parse-on-import, land in library · *after 06,07,08,**38***
+- [x] **WP-11 In-app import + auto-parse** — phone picker, parse-on-import, land in library · *after 06,07,08,**38***
 - [x] **WP-35 HTML → structure (shared step)** — one heading/paragraph walker reused by epub + docx · *after 08 (inherits its level-resolution rule)*
 - [x] **WP-36 TXT parser → structure** — conservative CHAPTER/PART detection, else WP-08's fallback · *after 08*
 - [x] **WP-37 DOCX parser → structure** — mammoth (lazy-loaded) maps Word heading styles → HTML, then WP-35 · *after 35*
@@ -35,7 +35,7 @@
 > EPUB in Calibre; the import UI (WP-11) should say so in one line.
 
 ### Leg 2 — Reading Room (reader UI & comfort)
-- [ ] **WP-12 Structured renderer** — anchored paragraphs, paginated · *after 05,11*
+- [~] **WP-12 Structured renderer** — anchored paragraphs, paginated · *after 05,11*
 - [ ] **WP-13 Nav overlay (Books-style)** — tap-fade, progress slider, ToC · *after 12*
 - [ ] **WP-14 Reader conveniences** — font/spacing, day/night, in-book search, bookmarks · *after 12*
 - [ ] **WP-15 Reopen where left off** — persist/restore anchor position · *after 12,03*
