@@ -14,10 +14,45 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- Nothing. **Leg 0 is complete** (bar WP-02, deliberately skipped). WP-08 is
-  planned and scoped in `active-task.md`, not started.
+- Nothing. **Leg 0 complete** (bar WP-02, skipped) and **the whole parsing side
+  of Leg 1 is complete**: every format now parses. WP-09/10 (summaries,
+  classification) and WP-11 (import UI) are what remain in Leg 1.
 
 ### Recently done
+- **WP-38 · Non-prose blocks** — `Paragraph` gains a required `kind`
+  (`prose | heading | quote | list | code | figure | table | formula | note |
+  furniture`), plus `rows` for tables and `image` for figures. Each of those is
+  now **one** block: a table keeps its grid instead of becoming one anchored
+  paragraph per cell, a display formula stops exploding into one block per
+  symbol, and `furniture` (ToC, running heads, index) is dropped *before*
+  anchors are assigned so it never consumes one. Every block still carries a
+  readable `text`, so nothing downstream has to understand a kind it hasn't met.
+  Done before WP-11 deliberately — it changes paragraph numbering, and anchors
+  are permanent once a book is imported.
+  - Real-book check found the bug that mattered: epub producers write
+    `<p class="image"><img/></p>`, and a paragraph was a leaf, so **131 of the
+    Jung book's 141 images were being silently dropped**. All 131 now resolve to
+    an archive path.
+- **All five parsers + the shared assembler** — `web/src/parse/`. One pipeline:
+  each format produces a flat `Block` stream, `assemble.ts` turns any stream
+  into a `ParsedBook`. Heading-level resolution, the heading-free bucketing
+  fallback and anchor assignment therefore exist in exactly one place.
+  - **WP-08 markdown** — ATX headings, code fences can't fake a chapter break.
+  - **WP-35 HTML → blocks** — browser `DOMParser`, no dependency. Shared by
+    epub and docx.
+  - **WP-06 epub** — own ZIP + OPF spine reader (`fflate`), *not* epub.js,
+    which is a renderer and would fight our own. ToC titles are used only when
+    the markup has no headings at all. Verified on the real 15 MB Jung epub:
+    12 chapters / 32 sections / 1503 paragraphs in ~0.5 s.
+  - **WP-36 txt** — conservative `CHAPTER`/`PART`/shouted-line detection,
+    gated on word count so prose starting "Chapter four was…" isn't promoted.
+  - **WP-37 docx** — `mammoth`, lazy-loaded; maps Word's *semantic* heading
+    styles, plus Title/Subtitle. Aliased to its browser build in vite.config.
+  - **WP-07 pdf** — `pdfjs-dist`, lazy-loaded. Split into `pdf.ts` (thin
+    pdf.js wrapper) and `pdf-layout.ts` (pure geometry: line rebuilding,
+    two-column ordering, running header/footer stripping, hyphen healing,
+    heading inference by font size). Verified on the real research paper.
+- **`SourceFormat`** widened with `'txt' | 'docx'`.
 - **WP-04 · App shell + routing** — three routes (Library `/`, Settings, Reader
   `/book/:bookId`), bottom tab bar, Reader full-bleed outside the shell.
   `theme.css` holds all design tokens, dark follows the OS. Library reads real
@@ -33,17 +68,29 @@ Get that loop working before building any breadth.
 - Repo published: **github.com/chandan-singh4/reading-buddy** (public). Product
   renamed Reading Buddy — *Wayfinder* was the planning method, not the product.
 
-**Gates:** `npm test` (44), `npm run typecheck`, `npm run build` — all passing.
+**Gates:** `npm test` (168), `npm run typecheck`, `npm run build` — all passing.
+Main bundle still 333.74 kB: nothing imports the parsers yet (WP-11), and pdf
+and docx stay behind dynamic imports so they never enter the main chunk.
 
 ### Blockers
 - None.
 
 ### Next up
-- **WP-08 · Markdown parser → structure** — scoped in `active-task.md`. The
-  shortest path to the walking skeleton: it's the only format that needs no
-  binary decoding, so it proves the whole parse → store → render loop first.
-- Then WP-11 (import) → WP-12 (renderer). WP-06/07 (epub/pdf) follow once the
-  loop is real. WP-02 (Tauri) stays skipped until it's actually needed.
+- **WP-11 · In-app import + auto-parse** — now unblocked (WP-38 done), so the
+  anchors a real import produces are the ones we intend to keep. The parsers
+  exist but nothing in the app calls them yet. This is the step that makes them real: file picker →
+  pick parser by extension → `repository.saveParsedBook` → land in the library.
+- Then WP-12 (renderer) to finish the walking skeleton. WP-09/10 (summaries,
+  classification) need a model call and can follow. WP-02 (Tauri) stays skipped.
+
+### Known parser limits (accepted, not bugs)
+- **PDF is lossy by nature** — it stores positioned glyphs, not paragraphs.
+  Publisher furniture that appears on only one or two pages (e.g. Springer's
+  `Vol.:(0123456789)` sidebar) survives the repeat-based filter, which needs 3+
+  pages to act. Not worth over-fitting to one publisher.
+- **Scanned PDFs yield nothing.** No text layer, and OCR is out of scope — this
+  surfaces as an empty book, so WP-11 should catch and explain it.
+- **`.azw3` / `.kfx` declined** — DRM; see the note in `backlog.md`.
 
 ### Open items
 - **The live Anthropic key still sits in `Claude API/API.txt`** inside a public

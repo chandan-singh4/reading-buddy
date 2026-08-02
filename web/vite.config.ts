@@ -8,6 +8,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 // off so the service worker never gets in the way during development.
 export default defineConfig({
   plugins: [react(), VitePWA({ devOptions: { enabled: false } })],
+  resolve: {
+    alias: {
+      // mammoth's default entry is its Node build, which reads docx files from
+      // disk and rejects the ArrayBuffer a browser file picker gives us. Point
+      // at the prebuilt browser bundle instead — in the app *and* under test,
+      // so the tests exercise the same code path the phone will run.
+      // TypeScript still resolves the package's own types from the main entry.
+      mammoth: 'mammoth/mammoth.browser.js',
+    },
+  },
   test: {
     // Node is enough for now: the structure layer is pure functions. Swap to
     // 'jsdom' when the first component test lands.

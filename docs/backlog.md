@@ -1,5 +1,5 @@
 > **What's in here (read when planning the next task or on `/plan-task`).** The
-> full build backlog — all 34 waypoints across the six legs, each with a status
+> full build backlog — all 39 waypoints across the six legs, each with a status
 > box, a one-line description, and its dependencies ("after N"). This is the
 > master list `/plan-task` picks from; respect the dependency notes so nothing
 > gets built before its foundation. Don't read this during a normal build session
@@ -17,12 +17,22 @@
 
 ### Leg 1 — Cartography (parsing pipeline)
 - [x] **WP-05 Shared structure schema** — path-as-address, manifest, anchor grammar · *KEYSTONE, **before 03** (reordered 2026-08-01)*
-- [ ] **WP-06 Epub parser → structure** — inference + fixed-size fallback, permanent anchors · *after 05*
-- [ ] **WP-07 PDF parser → structure** — reuse rule + running-header/footer filter · *after 06*
-- [ ] **WP-08 Markdown parser → structure** — resolve present heading levels · *after 05*
+- [x] **WP-06 Epub parser → structure** — unzip + OPF spine, chapters via WP-35 · *after 05,35*
+- [x] **WP-07 PDF parser → structure** — pdf.js, lazy-loaded; reuse rule + running-header/footer filter · *after 06*
+- [x] **WP-08 Markdown parser → structure** — resolve present heading levels · *after 05*
 - [ ] **WP-09 Manifest + crossrefs at import** — per-chapter summaries, crossrefs once · *after 06,07,08*
 - [ ] **WP-10 Import classification** — fiction vs dense, subject tag, concepts/vocab/themes · *after 09*
-- [ ] **WP-11 In-app import + auto-parse** — phone picker, parse-on-import, land in library · *after 06,07,08*
+- [x] **WP-38 Non-prose blocks (KEYSTONE-ADJACENT)** — add `kind` to `Paragraph`; keep tables, figures, formulas, code, quotes, footnotes as *one* block each instead of shattering them · ***before 11** — anchors are permanent, and this changes paragraph numbering*
+- [ ] **WP-11 In-app import + auto-parse** — phone picker, parse-on-import, land in library · *after 06,07,08,**38***
+- [x] **WP-35 HTML → structure (shared step)** — one heading/paragraph walker reused by epub + docx · *after 08 (inherits its level-resolution rule)*
+- [x] **WP-36 TXT parser → structure** — conservative CHAPTER/PART detection, else WP-08's fallback · *after 08*
+- [x] **WP-37 DOCX parser → structure** — mammoth (lazy-loaded) maps Word heading styles → HTML, then WP-35 · *after 35*
+
+> **Declined: `.azw3` / `.kfx` (Kindle).** `.kfx` is a proprietary DRM-encrypted
+> container — reading it means circumventing DRM, which we won't build, and
+> Amazon's 2025 scheme change breaks even the third-party tooling. `.azw3` is
+> technically parseable but has no maintained browser library. Users convert to
+> EPUB in Calibre; the import UI (WP-11) should say so in one line.
 
 ### Leg 2 — Reading Room (reader UI & comfort)
 - [ ] **WP-12 Structured renderer** — anchored paragraphs, paginated · *after 05,11*
@@ -36,6 +46,7 @@
 - [ ] **WP-18 Retrieval assembler** — manifest + chapter index + one section + learner.md · *after 05,09*
 - [ ] **WP-19 Claude API call shape** — Haiku→Sonnet tier, caching, streaming, retry · *after 18*
 - [ ] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19*
+- [ ] **WP-39 Ask about a picture** — tap a figure/table/formula → send that image + surrounding text to Claude. Source image from the epub/docx archive where it exists; pdf.js renders the region for PDFs. The escape hatch for everything WP-38 can only describe · *after 19,20,38*
 - [ ] **WP-21 Tutor persona + teaching modes** — subject-driven, 12 modes, dense books only · *after 19,10*
 - [ ] **WP-22 learner.md adaptive model** — understood/struggled/analogies/misconceptions · *after 20*
 - [ ] **WP-23 Chapter recap** — zero-token summary + things learned + cheap quiz · *after 21,22*

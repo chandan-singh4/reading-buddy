@@ -15,9 +15,10 @@
   section file — never the whole book. This is the entire token strategy.
 - **Anchors are permanent** once assigned.
 - **Books stay fully separate** — no cross-book memory or lookups, ever.
-- **One shared parser, three front-ends.** epub / pdf / md all feed one structure.
-  PDF adds a running-header/footer filter; md resolves to whichever heading levels
-  exist; all fall back to fixed-size bucketing.
+- **One shared parser, five front-ends.** epub / pdf / md / txt / docx all feed one
+  structure. PDF adds a running-header/footer filter; md resolves to whichever
+  heading levels exist; all fall back to fixed-size bucketing. *(Was three
+  front-ends; txt and docx added 2026-08-02.)*
 
 ### Product / platform
 - **Target is a mobile-first installable PWA.** The Tauri desktop shell is a
@@ -75,6 +76,41 @@
   `data-theme` attribute. — 2026-08-01
 - **Product is "Reading Buddy".** *Wayfinder* was the planning method used to map
   the build; it survives only in planning artefacts. — 2026-08-01
+
+### Settled 2026-08-02 (build session 2 — the parsing front)
+- **Waypoint numbers are never reused or renumbered.** New work is appended
+  (WP-35…39) and build order is carried by the `after N` dependency notes, not by
+  the number. Renumbering would have meant rewriting ~79 references across 13
+  files including source, and every older note would silently point at the wrong
+  task. — 2026-08-02
+- **`.azw3` / `.kfx` declined.** KFX is a proprietary DRM-encrypted container;
+  reading it means circumventing DRM. Users convert to EPUB in Calibre. — 2026-08-02
+- **Epub is parsed directly (`fflate` + the OPF spine), not with epub.js.**
+  epub.js is a *renderer* that wants to paginate into an iframe and own the
+  screen; we have our own renderer and anchor grammar. ~200 lines we control beats
+  fighting a library over layout. — 2026-08-02
+- **One shared block stream.** Every format's front end emits `Block[]`;
+  `parse/assemble.ts` turns any stream into a `ParsedBook`. Level resolution, the
+  heading-free fallback and anchoring therefore exist in exactly one place. — 2026-08-02
+- **PDF is split pure/impure**: `pdf.ts` wraps pdf.js, `pdf-layout.ts` is pure
+  geometry. The heuristics are the risk, and this makes them unit-testable without
+  a binary fixture. — 2026-08-02
+- **pdf and docx are lazy-loaded**, and `mammoth` is aliased to its browser build
+  in `vite.config.ts` so tests exercise the same path the phone runs. — 2026-08-02
+- **Plain-text heading detection is gated on word count**, not just length: a
+  58-character sentence opening "Chapter four was…" otherwise became a chapter.
+  False positives mis-anchor prose permanently; missed headings only cost a
+  break. — 2026-08-02
+- **Columns are separated before lines are formed** in PDF. Both columns share
+  baselines, so grouping by `y` first welds text across the gutter. — 2026-08-02
+- **`Paragraph.kind` is required, not optional** (WP-38). Ten values; finer
+  distinctions go in `label`. Required forces every parser to say what a block is
+  rather than defaulting silently. — 2026-08-02
+- **Furniture is dropped before anchoring.** Running heads, page numbers, the ToC
+  and the index are recognised only so they never consume a permanent anchor. — 2026-08-02
+- **WP-38 runs before WP-11.** Block kinds change paragraph numbering, and anchors
+  are permanent once a real book is imported — doing it after would silently
+  mis-address every highlight following the first table in a book. — 2026-08-02
 
 ### UX misc
 - **Select → inline popup** (not a side panel). Ask is the only action that calls

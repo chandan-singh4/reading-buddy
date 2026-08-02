@@ -7,9 +7,11 @@
 export type {
   Anchor,
   AnchorParts,
+  BlockKind,
   BookId,
   BookMeta,
   BookType,
+  FigureImage,
   ChapterIndex,
   ChapterIndexEntry,
   ChapterPath,

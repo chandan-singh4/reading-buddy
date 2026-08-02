@@ -52,7 +52,9 @@ function makeSection(chapter: number, section: number, text: string): Section {
     chapter,
     section,
     path: sectionPath(chapter, section),
-    paragraphs: [{ anchor: formatAnchor({ chapter, section, paragraph: 1 }), text }],
+    paragraphs: [
+      { anchor: formatAnchor({ chapter, section, paragraph: 1 }), text, kind: 'prose' },
+    ],
   }
 }
 

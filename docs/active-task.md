@@ -8,43 +8,59 @@
 
 ---
 
-## Task — WP-08 · Markdown parser → structure
+## Task — WP-11 · In-app import + auto-parse
 
-Turn a `.md` file into the WP-05 structure: chapters, sections, anchored
-paragraphs. Chosen ahead of epub/pdf because it needs no binary decoding, so it
-proves the parse → store → render loop end-to-end at the lowest cost.
+Nothing in the app calls the parsers yet. This is the step that makes them real:
+pick a file on the phone → choose the parser by extension → save through
+`repository.saveParsedBook` → the book appears in the Library.
+
+This closes the walking skeleton's first half (import → store → list). WP-12
+(the renderer) is what makes it readable.
 
 ### Definition of done
-- [ ] `web/src/parse/markdown.ts` takes raw markdown + `BookMeta` and returns a
-      `ParsedBook` (meta, manifest, chapter indexes, sections) ready to hand
-      straight to `repository.saveParsedBook`.
-- [ ] Heading levels are **resolved from what the document actually contains**
-      (`decisions.md`): the shallowest heading present becomes chapters, the
-      next becomes sections. A file with no headings falls back to fixed-size
-      bucketing so it still parses.
-- [ ] Anchors are assigned via `structure/anchor.ts` — never hand-built — and
-      are stable: re-parsing identical input yields identical anchors.
-- [ ] Tests cover a normal `#`/`##` document, a `##`/`###`-only document, a
-      heading-free document (fallback), and anchor stability across two runs.
+- [ ] `web/src/import/importBook.ts` takes a `File`, picks the parser from the
+      extension (`.epub .pdf .md .txt .docx`), builds `BookMeta` (new `BookId`,
+      `importedAt`, `type` defaulting to `dense-technical` until WP-10), and
+      saves via `repository.saveParsedBook`.
+- [ ] A file input on the Library page — accepts the five extensions, handles one
+      file at a time, and shows progress. Parsing a large epub blocks briefly;
+      the UI must not look frozen.
+- [ ] **Failure is explained, never silent.** An unsupported extension, a
+      DRM/corrupt file (`EpubError` / `DocxError` / `PdfError`), and a scanned
+      PDF that yields *zero* blocks each produce a distinct, plain-language
+      message. The scanned-PDF case is the one most likely to look like a bug.
+- [ ] A one-line note in the picker that Kindle files should be converted to EPUB
+      first (see the declined `.azw3`/`.kfx` entry in `backlog.md`).
+- [ ] Import is atomic — a failure part-way leaves no half-parsed book (the
+      repository already handles this; the UI must not defeat it).
+- [ ] Library lists the imported book and it survives a reload.
+- [ ] Tests: extension routing, each failure path, and one end-to-end import into
+      a fake-indexeddb repository.
 - [ ] `npm test`, `npm run typecheck`, `npm run build` all pass.
 
 ### Files in scope
-- `web/src/parse/markdown.ts` (new)
-- `web/src/parse/index.ts` (new — public entry point)
-- `web/src/parse/markdown.test.ts` (new)
-- `web/src/structure/index.ts` (read only — the target shape and anchor helpers)
-- `web/src/storage/index.ts` (read only — the `ParsedBook` shape to produce)
+- `web/src/import/importBook.ts` (new)
+- `web/src/import/importBook.test.ts` (new)
+- `web/src/import/index.ts` (new — public entry point)
+- `web/src/pages/Library.tsx` (edit — the picker + progress + error states)
+- `web/src/pages/Library.module.css` (edit — if it exists; create if not)
+- `web/src/parse/index.ts` (read only — the five parser entry points)
+- `web/src/storage/index.ts` (read only — `repository`, `ParsedBook`)
+- `web/src/structure/index.ts` (read only — `BookMeta`, `BookId`, `SourceFormat`)
 - *(create as needed — add any new path to this list)*
 
 ### Out of scope
-- Epub (WP-06) and PDF (WP-07). One shared structure, but their front-ends come
-  later; don't generalise prematurely for formats not yet written.
-- Manifest **summaries** and crossrefs (WP-09) and classification (WP-10) — emit
-  placeholder summaries, leave the fields present but unfilled.
-- The import UI (WP-11) and the renderer (WP-12). This task ends at a
-  `ParsedBook` in memory, verified by tests.
+- The renderer (WP-12). This task ends at "the book is in the library".
+- Manifest summaries (WP-09) and classification (WP-10) — both need a model call.
+  Leave summaries empty and `type` at its default.
+- Cover extraction, multi-file import, drag-and-drop, and import progress *inside*
+  a parse (the parsers are synchronous once started).
 
 ### Useful context (already known — don't re-derive)
 - Gates: `npm test`, `npm run typecheck`, `npm run build`, all from the repo root.
-- `books/` holds a real EPUB and `research-paper/` a PDF for later format work;
-  neither is tracked by git.
+- Parsers are `parseEpub` / `parsePdf` / `parseDocx` (async) and `parseMarkdown` /
+  `parseTxt` (sync). All take `(data, meta)` and return a `ParsedBook`.
+- `books/` holds a real EPUB and `research-paper/` a PDF, both untracked — useful
+  for manual checking, not for tests.
+- Vitest defaults to the `node` environment; add `// @vitest-environment jsdom`
+  per file when a DOM is needed (epub/docx/html parsing and React tests).

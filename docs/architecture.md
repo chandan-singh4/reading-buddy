@@ -34,7 +34,8 @@
 ```
 
 - **Anchor grammar:** `[ch02-s03-p013]` = chapter 02, section 03, paragraph 013.
-  Permanent once assigned.
+  Permanent once assigned. A "paragraph" is any block — a table or figure takes
+  exactly one anchor, same as a prose paragraph (WP-38, 2026-08-02).
 - **The path is the address:** a query loads `manifest.md` + the chapter's
   `index.md` + one `sNN.md`, never the whole tree.
 
@@ -50,6 +51,36 @@ other code should import from. Anchor rules are strict — malformed input throw
 rather than being repaired, since a plausible-but-wrong permanent id would
 silently mis-address saved highlights forever.
 
+### Parsing (WP-06/07/08/35/36/37/38)
+
+```
+web/src/parse/
+├─ assemble.ts    Block[] → ParsedBook. Level resolution, bucketing fallback,
+│                 anchoring, furniture removal. The only place these rules live.
+├─ html.ts        HTML → Block[] via the browser's DOMParser (no dependency)
+├─ markdown.ts    markdown → Block[]
+├─ txt.ts         plain text → Block[]
+├─ epub.ts        ZIP + OPF spine → per-chapter HTML → Block[]   (fflate)
+├─ docx.ts        Word styles → HTML → Block[]                   (mammoth, lazy)
+├─ pdf.ts         pdf.js wrapper — glyph geometry only           (pdfjs, lazy)
+├─ pdf-layout.ts  pure geometry: lines, columns, furniture, headings
+└─ index.ts       the only entry point other code should import from
+```
+
+Every format does the same thing: **bytes → `Block[]` → `assembleBook`.** A block
+is a heading or one of nine content kinds (`prose`, `quote`, `list`, `code`,
+`figure`, `table`, `formula`, `note`, `furniture`) — see `structure/types.ts`.
+
+- **A table, figure, list or formula is one block**, never one per cell/item/
+  symbol. Each carries a readable `text` *plus* its structure (`rows`, `image`),
+  so nothing downstream must understand a kind it hasn't met.
+- **`furniture` is dropped in `assembleBook`, before anchors are assigned** — the
+  ToC and running heads must never consume a permanent anchor.
+- **Epub figure `src` values are archive paths**, resolved against the chapter
+  that referenced them while that context still exists.
+- **PDF emits only `heading` and `prose`.** It has no structural markup — tables
+  and figures there are geometry, not tags.
+
 ### UI (WP-04)
 
 ```
@@ -58,6 +89,7 @@ web/src/
 ├─ pages/     Library · Reader · Settings
 ├─ styles/    theme.css — all design tokens
 ├─ structure/ WP-05 schema
+├─ parse/     WP-06/07/08/35–38 parsers
 └─ storage/   WP-03 persistence
 ```
 

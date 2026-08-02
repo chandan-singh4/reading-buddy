@@ -1,0 +1,369 @@
+/**
+ * HTML → `Block` stream. The shared front end for every format that arrives as
+ * markup: epub chapters (XHTML) and Word documents (via mammoth) both land
+ * here, so the "which tag is a paragraph" question is answered once.
+ *
+ * This deliberately does *not* produce a `ParsedBook` on its own. A single HTML
+ * file is usually one chapter, not a whole book — epub hands us a dozen of them
+ * and concatenates the streams. Assembly stays in `assemble.ts`.
+ *
+ * We use the browser's own `DOMParser` rather than a dependency: it is the same
+ * battle-tested parser the reader will render with, it is free, and it recovers
+ * from the malformed markup that real epubs are full of. Parsing as `text/html`
+ * even for XHTML is intentional — the HTML parser never throws on a stray
+ * unclosed tag, whereas the XML one refuses the whole file.
+ *
+ * The walk is structured around one rule: **an element that owns its contents
+ * is a single block.** A table is one block with its rows, not one block per
+ * cell; a list is one block, not one per item; a formula is one block, not one
+ * per symbol. Anything else gets recursed into.
+ */
+
+import type { ParsedBook } from '../storage/index.ts'
+import type { BookMeta, FigureImage } from '../structure/index.ts'
+import { assembleBook, type Block, type ContentBlock } from './assemble.ts'
+
+/** Presentational or non-prose — never contributes text to a book. */
+const SKIP = new Set([
+  'SCRIPT',
+  'STYLE',
+  'NOSCRIPT',
+  'TEMPLATE',
+  'HEAD',
+  'TITLE',
+  'IFRAME',
+  'AUDIO',
+  'VIDEO',
+])
+
+/**
+ * Elements that own their contents: each becomes exactly one block, and the walk
+ * does not descend into it. This is the heart of WP-38 — every entry here is a
+ * structure that used to be shattered into one anchored paragraph per fragment.
+ */
+const SELF_CONTAINED: Record<string, ContentBlock['kind']> = {
+  TABLE: 'table',
+  FIGURE: 'figure',
+  IMG: 'figure',
+  SVG: 'figure',
+  BLOCKQUOTE: 'quote',
+  PRE: 'code',
+  UL: 'list',
+  OL: 'list',
+  DL: 'list',
+  MATH: 'formula',
+  ASIDE: 'note',
+}
+
+/** Elements that end a paragraph: their text content is one prose block. */
+const PARAGRAPH = new Set(['P', 'DD', 'DT', 'FIGCAPTION', 'CAPTION', 'TD', 'TH'])
+
+/**
+ * Inline elements are *not* recursed into. Splitting on them would shatter
+ * "the <em>real</em> question" into three paragraphs, which would then be
+ * anchored separately and be unaskable as a single thought.
+ */
+const INLINE = new Set([
+  'A',
+  'ABBR',
+  'B',
+  'BR',
+  'CITE',
+  'CODE',
+  'DEL',
+  'EM',
+  'I',
+  'INS',
+  'KBD',
+  'MARK',
+  'Q',
+  'RP',
+  'RT',
+  'RUBY',
+  'S',
+  'SAMP',
+  'SMALL',
+  'SPAN',
+  'STRONG',
+  'SUB',
+  'SUP',
+  'TIME',
+  'U',
+  'VAR',
+  'WBR',
+])
+
+const HEADING = /^H([1-6])$/
+
+/**
+ * Navigation and back-matter that is *about* the book rather than part of it.
+ * EPUB marks these with `epub:type`; the equivalent ARIA `role` covers HTML5
+ * and the docx path. Matched as substrings because real files combine values
+ * (`epub:type="frontmatter toc"`).
+ */
+const FURNITURE_TYPES = [
+  'toc',
+  'landmarks',
+  'page-list',
+  'index',
+  'colophon',
+  'cover',
+  'copyright-page',
+]
+
+const NOTE_TYPES = ['footnote', 'endnote', 'rearnote', 'note']
+
+/**
+ * Collapse the incidental whitespace of source markup. HTML treats newlines and
+ * indentation as a single space, and a book's prose should read the same way.
+ */
+function normalise(text: string | null): string {
+  return (text ?? '').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Text of a container that holds block-level children, one child per line.
+ *
+ * `textContent` alone is wrong here: it concatenates with no separator, so a
+ * two-paragraph quote comes back as `One.Two.` and the last word of one
+ * paragraph fuses with the first word of the next. Only falls back to
+ * `textContent` when there are no block children to join.
+ */
+function containerText(element: Element): string {
+  const parts = Array.from(element.children)
+    .filter((child) => ['P', 'DIV', 'BLOCKQUOTE', 'LI'].includes(child.tagName))
+    .map((child) => normalise(child.textContent))
+    .filter(Boolean)
+
+  return parts.length > 0 ? parts.join('\n') : normalise(element.textContent)
+}
+
+/** The semantic role an element declares, from either EPUB or ARIA vocabulary. */
+function semanticType(element: Element): string {
+  const epubType = element.getAttribute('epub:type') ?? element.getAttributeNS?.(
+    'http://www.idpf.org/2007/ops',
+    'type',
+  )
+  const role = element.getAttribute('role') ?? ''
+  return `${epubType ?? ''} ${role}`.toLowerCase()
+}
+
+function matchesAny(haystack: string, needles: string[]): string | undefined {
+  return needles.find((needle) => haystack.includes(needle))
+}
+
+// --- Self-contained element readers -----------------------------------------
+
+/** A table becomes one block: a flattened `text` plus the grid in `rows`. */
+function readTable(element: Element): ContentBlock {
+  const rows: string[][] = []
+  for (const row of Array.from(element.getElementsByTagName('tr'))) {
+    const cells = Array.from(row.children)
+      .filter((cell) => cell.tagName === 'TD' || cell.tagName === 'TH')
+      .map((cell) => normalise(cell.textContent))
+    if (cells.some((cell) => cell !== '')) rows.push(cells)
+  }
+
+  const caption = normalise(element.getElementsByTagName('caption')[0]?.textContent ?? '')
+  // The flattened form is what the tutor reads and what search matches. Pipes
+  // keep the columns legible without pretending to be a rendered table.
+  const grid = rows.map((cells) => cells.join(' | ')).join('\n')
+  const text = caption ? `${caption}\n${grid}` : grid
+
+  const block: ContentBlock = { kind: 'table', text }
+  if (rows.length > 0) block.rows = rows
+  if (caption) block.label = caption
+  return block
+}
+
+/**
+ * Find the image inside a `<figure>`, or the element itself if it is one.
+ *
+ * Handles both spellings: an ordinary `<img src>`, and the `<svg><image
+ * xlink:href></svg>` wrapper that epub producers use for full-page artwork —
+ * covers and plates in real books are almost always the second form.
+ */
+function readImage(element: Element): FigureImage | undefined {
+  const img = element.tagName === 'IMG' ? element : element.getElementsByTagName('img')[0]
+  if (img) {
+    const src = img.getAttribute('src') ?? ''
+    if (src) {
+      const alt = normalise(img.getAttribute('alt'))
+      return alt ? { src, alt } : { src }
+    }
+  }
+
+  const svgImage = element.getElementsByTagName('image')[0]
+  const href =
+    svgImage?.getAttribute('href') ?? svgImage?.getAttribute('xlink:href') ?? ''
+  if (!href) return undefined
+
+  // SVG has no alt attribute; `<title>` is its accessible-name equivalent.
+  const title = normalise(element.getElementsByTagName('title')[0]?.textContent ?? '')
+  return title ? { src: href, alt: title } : { src: href }
+}
+
+/**
+ * A figure becomes one block. Its `text` is the caption, or the alt text, or a
+ * placeholder — so a reader always sees *something* where the image is, rather
+ * than a silent hole, even before the renderer can display images.
+ */
+function readFigure(element: Element): ContentBlock {
+  const image = readImage(element)
+  const caption = normalise(
+    element.getElementsByTagName('figcaption')[0]?.textContent ?? '',
+  )
+
+  const description = caption || image?.alt || ''
+  const text = description ? `[Figure: ${description}]` : '[Figure]'
+
+  const block: ContentBlock = { kind: 'figure', text }
+  if (image) block.image = image
+  if (caption) block.label = caption
+  return block
+}
+
+/** A list becomes one block, one item per line. */
+function readList(element: Element): ContentBlock {
+  const ordered = element.tagName === 'OL'
+  const items = Array.from(element.children)
+    .filter((child) => ['LI', 'DT', 'DD'].includes(child.tagName))
+    .map((child) => normalise(child.textContent))
+    .filter(Boolean)
+
+  const text = items
+    .map((item, index) => (ordered ? `${index + 1}. ${item}` : `• ${item}`))
+    .join('\n')
+
+  const label = element.tagName === 'DL' ? 'definition' : ordered ? 'ordered' : 'unordered'
+  return { kind: 'list', text, label }
+}
+
+// --- The walk ----------------------------------------------------------------
+
+/**
+ * Convert an HTML fragment or document into blocks, in reading order.
+ *
+ * Runs in the browser (and in jsdom under test) — it needs a DOM. Callers on a
+ * non-DOM runtime should convert to markdown first instead.
+ */
+export function htmlToBlocks(html: string): Block[] {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const blocks: Block[] = []
+  let inline: string[] = []
+
+  /**
+   * Emit whatever inline text has accumulated. Runs of text and inline elements
+   * between two block-level tags form one paragraph, which is what lets loose
+   * prose inside a bare `<div>` survive intact.
+   */
+  function flushInline(): void {
+    const text = normalise(inline.join(' '))
+    if (text) blocks.push({ kind: 'prose', text })
+    inline = []
+  }
+
+  function walk(node: Node): void {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3 /* text */) {
+        inline.push(child.textContent ?? '')
+        continue
+      }
+      if (child.nodeType !== 1 /* element */) continue
+
+      const element = child as Element
+      const tag = element.tagName.toUpperCase()
+
+      if (SKIP.has(tag)) continue
+      if (INLINE.has(tag)) {
+        inline.push(element.textContent ?? '')
+        continue
+      }
+
+      flushInline()
+
+      // Navigation and back matter are recognised only to be discarded — the
+      // assembler drops furniture before any anchor is assigned.
+      const semantics = semanticType(element)
+      if (tag === 'NAV' || matchesAny(semantics, FURNITURE_TYPES)) {
+        blocks.push({ kind: 'furniture', text: normalise(element.textContent) })
+        continue
+      }
+
+      const heading = HEADING.exec(tag)
+      if (heading) {
+        const text = normalise(element.textContent)
+        if (text) blocks.push({ kind: 'heading', level: Number(heading[1]), text })
+        continue
+      }
+
+      const contained = SELF_CONTAINED[tag]
+      if (contained) {
+        const block =
+          contained === 'table'
+            ? readTable(element)
+            : contained === 'figure'
+              ? readFigure(element)
+              : contained === 'list'
+                ? readList(element)
+                : contained === 'code'
+                  ? // `<pre>` is the one place whitespace is the content.
+                    { kind: 'code' as const, text: (element.textContent ?? '').replace(/\s+$/, '') }
+                  : { kind: contained, text: containerText(element) }
+
+        // A footnote marked up as a plain element still reads as a note.
+        const noteType = matchesAny(semantics, NOTE_TYPES)
+        if (noteType && block.kind !== 'figure' && block.kind !== 'table') {
+          blocks.push({ ...block, kind: 'note', label: noteType })
+        } else if (block.text) {
+          blocks.push(block)
+        }
+        continue
+      }
+
+      if (PARAGRAPH.has(tag)) {
+        // `<p class="image"><img/></p>` is *the* way epub producers place
+        // artwork — far more common than `<figure>`. Because a paragraph is a
+        // leaf here, an image inside one would otherwise never be looked at,
+        // and a paragraph holding nothing but an image would vanish entirely.
+        const image = readImage(element)
+        if (image) {
+          const caption = normalise(element.textContent)
+          const description = caption || image.alt || ''
+          const figure: ContentBlock = {
+            kind: 'figure',
+            text: description ? `[Figure: ${description}]` : '[Figure]',
+            image,
+          }
+          if (caption) figure.label = caption
+          blocks.push(figure)
+          continue
+        }
+
+        const text = normalise(element.textContent)
+        if (!text) continue
+        const noteType = matchesAny(semantics, NOTE_TYPES)
+        blocks.push(
+          noteType ? { kind: 'note', text, label: noteType } : { kind: 'prose', text },
+        )
+        continue
+      }
+
+      walk(element)
+    }
+    flushInline()
+  }
+
+  walk(doc.body)
+  return blocks
+}
+
+/**
+ * Parse a single self-contained HTML document into the shared structure. Used
+ * by docx (WP-37), where mammoth hands back the whole book as one document.
+ * Epub goes the other way — many files, one book — so it calls `htmlToBlocks`
+ * per chapter and assembles the concatenation itself.
+ */
+export function parseHtml(html: string, meta: BookMeta): ParsedBook {
+  return assembleBook(htmlToBlocks(html), meta)
+}

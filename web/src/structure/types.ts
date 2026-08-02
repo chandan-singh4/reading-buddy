@@ -42,7 +42,7 @@ export interface AnchorParts {
  */
 export type BookType = 'light-fiction' | 'dense-technical'
 
-export type SourceFormat = 'epub' | 'pdf' | 'md'
+export type SourceFormat = 'epub' | 'pdf' | 'md' | 'txt' | 'docx'
 
 export interface BookMeta {
   id: BookId
@@ -114,7 +114,56 @@ export interface Section {
   paragraphs: Paragraph[]
 }
 
+/**
+ * What a block *is*, not what it looks like. Ten values on purpose: enough to
+ * stop destroying non-prose content, few enough to keep in your head. Finer
+ * distinctions (epigraph vs. pull quote vs. sidebar) go in `label`, because the
+ * renderer and the tutor treat them the same way.
+ *
+ * `furniture` is the odd one out: it marks content that is *not* part of the
+ * book — running headers, page numbers, the table of contents, the index. It is
+ * recognised so it can be dropped before anchors are assigned, never stored.
+ */
+export type BlockKind =
+  | 'prose'
+  | 'heading'
+  | 'quote'
+  | 'list'
+  | 'code'
+  | 'figure'
+  | 'table'
+  | 'formula'
+  | 'note'
+  | 'furniture'
+
+/** A figure's image. `src` is resolved by the parser; see `kind: 'figure'`. */
+export interface FigureImage {
+  /**
+   * Where the bytes are. An archive path for epub (`OEBPS/images/fig1.png`), a
+   * `data:` URI for docx, or a URL for markdown. The reader resolves it; the
+   * parser only records it.
+   */
+  src: string
+  alt?: string
+}
+
+/**
+ * The atom of anchoring. Every block carries `text` — a readable form that is
+ * always safe to render or send to the tutor — plus the structure needed to do
+ * better when we can. A table has both a flattened `text` *and* its `rows`; a
+ * figure has a caption in `text` *and* its `image`.
+ *
+ * That redundancy is deliberate. It means nothing downstream has to special-case
+ * a block kind it doesn't understand yet.
+ */
 export interface Paragraph {
   anchor: Anchor
   text: string
+  kind: BlockKind
+  /** Finer-grained type when it matters: `epigraph`, `pull-quote`, `footnote`… */
+  label?: string
+  /** `kind: 'table'` — rows of cells. The first row is often, not always, a header. */
+  rows?: string[][]
+  /** `kind: 'figure'` — the image itself, when the source format carries one. */
+  image?: FigureImage
 }
