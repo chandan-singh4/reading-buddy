@@ -61,10 +61,226 @@
   font-size: var(--text-sm);
 }
 
+/* --- Import (WP-11) ------------------------------------------------------ */
+
+.importer {
+  margin-top: var(--space-4);
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* Visually hidden, still focusable and still reachable by its label — the
+   native file input can't be styled, so the label is the button. */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.importButton {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  text-align: center;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+  /* Comfortable thumb target on a phone. */
+  min-height: 44px;
+}
+
+.fileInput:focus-visible + .importButton {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.importButton[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.importActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+/* The whole page is the drop target; this is the only visible cue. */
+.importerDragging {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+/*
+ * The row wraps rather than overflowing.
+ *
+ * It used to be a plain non-wrapping flex row, which on a phone put the shelf
+ * picker and Remove past the right edge of the screen — reachable only by
+ * scrolling the page sideways. That went unnoticed until the sideways scroll
+ * was (correctly) removed and the controls became unreachable altogether.
+ *
+ * The basis is what decides when it wraps: the title keeps a full row to itself
+ * as soon as there isn't room for the title *and* the controls, so on a phone
+ * the controls drop to a second line and on a desktop nothing changes.
+ */
+.cardRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.cardLink {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.cardRow > .confirm {
+  /* Pushed to the right on a wide row; harmless once it has its own line. */
+  margin-left: auto;
+}
+
+.iconButton,
+.danger {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.danger {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.shelfHeading {
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* Matches .iconButton's height so the row doesn't jog when the two sit side
+   by side. Left native rather than restyled: the OS picker is the best thing
+   available on a phone. */
+.shelfSelect {
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.failureList {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  display: grid;
+  gap: var(--space-2);
+}
+
 .error {
   margin-top: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-accent);
   border-radius: var(--radius-sm);
+}
+
+/* --- Selecting several books (bulk delete) -------------------------------- */
+
+.selectBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Pushes the destructive control away from the harmless ones, so "Remove"
+   isn't sitting under the thumb that just tapped "Select all". */
+.selectBar > .danger,
+.selectBar > .confirm {
+  margin-left: auto;
+}
+
+.tick {
+  /* Comfortably tappable without hitting the row's other controls. The default
+     checkbox is about 13px, which on a phone is a coin toss. */
+  width: 24px;
+  height: 24px;
+  flex: none;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* The title as a tick target while selecting: a button that has to look
+   exactly like the link it replaces, or the shelf visibly changes shape the
+   moment you tap Select. */
+.cardLinkPlain {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.danger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- Searching the shelf -------------------------------------------------- */
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  /* 16px or larger, or iOS Safari zooms the whole page when it takes focus. */
+  font-size: var(--text-base);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.searchInput:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }

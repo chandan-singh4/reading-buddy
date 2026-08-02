@@ -12,6 +12,7 @@
 import Dexie, { type Table } from 'dexie'
 
 import type {
+  Anchor,
   BookId,
   BookMeta,
   ChapterIndex,
@@ -30,6 +31,24 @@ export interface StoredSection extends Section {
   bookId: BookId
 }
 
+/**
+ * Where the reader stopped, one row per book.
+ *
+ * A table of its own rather than two more fields on `BookMeta`, for two
+ * reasons. This is the only row in the database that is written *while reading*
+ * — every few seconds, in the middle of the thing that has to stay smooth — and
+ * putting it on the book row would mean rewriting the whole book record, title,
+ * fingerprints and all, each time. It also keeps a reading habit separate from
+ * what a book *is*: "forget where I was" should not be able to damage the book.
+ */
+export interface ReadingPosition {
+  bookId: BookId
+  /** The paragraph at the top of the screen when reading stopped. */
+  anchor: Anchor
+  /** ISO 8601 — what "Continue reading" and a recently-opened list sort on. */
+  at: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -43,12 +62,12 @@ export type ReadingBuddyDB = Dexie & {
   manifests: Table<Manifest, BookId>
   chapters: Table<StoredChapterIndex, [BookId, string]>
   sections: Table<StoredSection, [BookId, SectionPath]>
+  positions: Table<ReadingPosition, BookId>
 }
 
 /**
  * Schema history. Never edit a shipped version — add a new `.version(n)` block
- * instead, so existing installs migrate rather than lose data. Highlights,
- * notes and reading position (WP-25, WP-15) arrive as version 2.
+ * instead, so existing installs migrate rather than lose data.
  *
  * In each store string the first entry is the primary key; the rest are
  * secondary indexes. `[bookId+path]` is a compound key — the exact address.
@@ -59,6 +78,28 @@ function defineSchema(db: Dexie): void {
     manifests: 'bookId',
     chapters: '[bookId+chapter], bookId',
     sections: '[bookId+path], bookId, chapter',
+  })
+
+  // v2 — `contentHash` indexed, so "have I already got this file?" is a direct
+  // lookup at import rather than a scan of every book. Books imported under v1
+  // simply have no hash; they are never reported as duplicates, which is the
+  // right way round — a false "already on your shelf" is worse than a missed one.
+  db.version(2).stores({
+    books: 'id, title, type, importedAt, contentHash',
+  })
+
+  // v3 — `textSignature` indexed. Unlike `contentHash` this one can be filled
+  // in for books that predate it, because it is derived from the stored text
+  // rather than from the original file, which we never keep.
+  db.version(3).stores({
+    books: 'id, title, type, importedAt, contentHash, textSignature',
+  })
+
+  // v4 — where you stopped reading (WP-15). `at` is indexed rather than left as
+  // a plain field so "continue reading" and a recently-opened list can be an
+  // ordered read of a few rows instead of a scan of every book on the shelf.
+  db.version(4).stores({
+    positions: 'bookId, at',
   })
 }
 

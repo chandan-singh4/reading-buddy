@@ -25,6 +25,7 @@
  */
 
 import type { ParsedBook } from '../storage/index.ts'
+import { resolveLinks } from './links.ts'
 import type {
   BlockKind,
   BookMeta,
@@ -36,7 +37,7 @@ import type {
   Paragraph,
   Section,
 } from '../structure/index.ts'
-import { chapterPath, formatAnchor, sectionPath } from '../structure/index.ts'
+import { chapterPath, countWordsIn, formatAnchor, sectionPath } from '../structure/index.ts'
 
 /**
  * Fallback bucket sizes, used only when a document has no headings to divide
@@ -49,6 +50,20 @@ const SECTIONS_PER_CHAPTER = 10
 
 // --- The format-neutral input ------------------------------------------------
 
+/**
+ * A link as the parser found it: a range of the block's text, and wherever the
+ * source document said it pointed (`chapter3.xhtml#note12`, `#note12`, or an
+ * ordinary web address). Turned into a permanent anchor by `parse/links.ts`
+ * once every block has one — which can't happen until the whole book is
+ * assembled, because a link often points at a different chapter.
+ */
+export interface RawLink {
+  /** Character offsets into the block's `text`. */
+  start: number
+  end: number
+  href: string
+}
+
 interface BlockFields {
   kind: BlockKind
   /** A readable form of the block. Always present, whatever the kind. */
@@ -56,6 +71,10 @@ interface BlockFields {
   label?: string
   rows?: string[][]
   image?: FigureImage
+  /** Links inside `text`, as the source wrote them. */
+  links?: RawLink[]
+  /** Ids the source markup put on or inside this block — what links point at. */
+  ids?: string[]
 }
 
 export interface HeadingBlock extends BlockFields {
@@ -237,6 +256,7 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
 
   drafts.forEach((draft, chapterIndex) => {
     const chapterNumber = chapterIndex + 1
+    let chapterWords = 0
 
     const entries: ChapterIndexEntry[] = draft.sections.map((draftSection, sectionIndex) => {
       const sectionNumber = sectionIndex + 1
@@ -257,8 +277,26 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
         if (block.label !== undefined) paragraph.label = block.label
         if (block.rows !== undefined) paragraph.rows = block.rows
         if (block.image !== undefined) paragraph.image = block.image
+        // Carried through unresolved — as bare destinations, which is all the
+        // parser knows. `parse/links.ts` upgrades the ones that turn out to
+        // point inside this book into anchors, once every block has one: a link
+        // into chapter 9 can't be resolved while chapter 2 is being assembled.
+        if (block.links !== undefined) {
+          paragraph.links = block.links.map((link) => ({
+            start: link.start,
+            end: link.end,
+            url: link.href,
+          }))
+        }
+        if (block.ids !== undefined) paragraph.ids = block.ids
         return paragraph
       })
+
+      // Counted from the same `text` every block is guaranteed to carry, so a
+      // table or a formula contributes its readable form rather than nothing —
+      // getting past a 40-row table really is a chunk of reading.
+      const words = countWordsIn(paragraphs.map((paragraph) => paragraph.text))
+      chapterWords += words
 
       sections.push({
         chapter: chapterNumber,
@@ -268,7 +306,7 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
         paragraphs,
       })
 
-      return { section: sectionNumber, title: draftSection.title, path }
+      return { section: sectionNumber, title: draftSection.title, path, words }
     })
 
     chapters.push({
@@ -279,7 +317,14 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
     })
 
     // Summary is WP-09's job; the field is present but deliberately empty.
-    manifestChapters.push({ chapter: chapterNumber, title: draft.title, summary: '' })
+    // `words` is not — the manifest is the only thing the reader has in memory,
+    // so the page number has to be answerable from here alone.
+    manifestChapters.push({
+      chapter: chapterNumber,
+      title: draft.title,
+      summary: '',
+      words: chapterWords,
+    })
   })
 
   const manifest: Manifest = {
@@ -288,5 +333,10 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
     chapters: manifestChapters,
   }
 
-  return { meta, manifest, chapters, sections }
+  // Last, and here rather than at each format's call site: resolution needs the
+  // *finished* book, because a link usually points at a chapter that didn't
+  // exist yet when its own chapter was assembled. Doing it here also means no
+  // parser can forget to — and a book whose ids reached storage unresolved
+  // would carry thousands of rows of dead weight.
+  return resolveLinks({ meta, manifest, chapters, sections })
 }

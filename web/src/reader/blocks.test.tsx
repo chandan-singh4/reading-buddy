@@ -1,0 +1,196 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import type { Anchor, BlockKind, Paragraph } from '../structure/index.ts'
+import { Block, elementIdOf } from './blocks.tsx'
+
+function blockOf(kind: BlockKind, text: string, extra: Partial<Paragraph> = {}): Paragraph {
+  return { anchor: '[ch02-s03-p013]' as Anchor, kind, text, ...extra }
+}
+
+// Explicit because Testing Library only auto-cleans when Vitest runs with
+// `globals: true`, and this project doesn't. Without it `screen` sees every
+// previous test's output too, and counting elements quietly over-reports.
+afterEach(cleanup)
+
+describe('anchors reach the page', () => {
+  it('strips the brackets to make a usable element id', () => {
+    expect(elementIdOf('[ch02-s03-p013]')).toBe('ch02-s03-p013')
+  })
+
+  it.each<BlockKind>([
+    'prose',
+    'heading',
+    'quote',
+    'list',
+    'code',
+    'figure',
+    'table',
+    'formula',
+    'note',
+  ])('puts the anchor on a %s block', (kind) => {
+    const { container } = render(<Block block={blockOf(kind, 'Some text.')} />)
+    // WP-15 scrolls back to a position by this id and WP-17 reports a
+    // selection by it. A block without one is invisible to both.
+    expect(container.querySelector('#ch02-s03-p013')).not.toBeNull()
+  })
+})
+
+describe('each kind renders as what it is', () => {
+  it('renders prose as a paragraph', () => {
+    const { container } = render(<Block block={blockOf('prose', 'Ordinary prose.')} />)
+    expect(container.querySelector('p')?.textContent).toBe('Ordinary prose.')
+  })
+
+  it('renders a heading as a heading', () => {
+    render(<Block block={blockOf('heading', 'On Symbols')} />)
+    expect(screen.getByRole('heading', { name: 'On Symbols' })).toBeTruthy()
+  })
+
+  it('renders a quote as a blockquote', () => {
+    const { container } = render(<Block block={blockOf('quote', 'Quoted.')} />)
+    expect(container.querySelector('blockquote')).not.toBeNull()
+  })
+
+  it('keeps code in a pre so its line breaks survive', () => {
+    const { container } = render(<Block block={blockOf('code', 'a\n  b')} />)
+    expect(container.querySelector('pre code')?.textContent).toBe('a\n  b')
+  })
+
+  it('splits a list block into its items', () => {
+    // The parser keeps a list as one block with one item per line (WP-38), so
+    // the split belongs here rather than in a second pass over the text.
+    render(<Block block={blockOf('list', 'First\nSecond\nThird')} />)
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+  })
+
+  it('ignores blank lines when splitting a list', () => {
+    render(<Block block={blockOf('list', 'First\n\nSecond\n')} />)
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+  })
+})
+
+describe('tables keep their grid', () => {
+  it('renders rows and cells, with the first row as the header', () => {
+    render(
+      <Block
+        block={blockOf('table', 'Year 1990 2000', {
+          rows: [
+            ['Year', 'Value'],
+            ['1990', '3'],
+            ['2000', '7'],
+          ],
+        })}
+      />,
+    )
+
+    expect(screen.getByRole('columnheader', { name: 'Year' })).toBeTruthy()
+    expect(screen.getAllByRole('row')).toHaveLength(3)
+    expect(screen.getByRole('cell', { name: '2000' })).toBeTruthy()
+  })
+
+  it('falls back to the flattened text when the grid did not survive parsing', () => {
+    // Every block carries readable `text` precisely so this case degrades to
+    // something correct instead of to an empty box.
+    const { container } = render(<Block block={blockOf('table', 'Year 1990 2000')} />)
+    expect(container.querySelector('table')).toBeNull()
+    expect(container.textContent).toContain('Year 1990 2000')
+  })
+})
+
+describe('figures', () => {
+  it('shows the image and its caption', () => {
+    render(
+      <Block
+        block={blockOf('figure', 'Figure 1. A mandala.', {
+          image: { src: 'OEBPS/images/fig1.png', alt: 'A mandala' },
+        })}
+      />,
+    )
+
+    expect(screen.getByRole('img', { name: 'A mandala' }).getAttribute('src')).toBe(
+      'OEBPS/images/fig1.png',
+    )
+    expect(screen.getByText('Figure 1. A mandala.')).toBeTruthy()
+  })
+
+  it('falls back to the caption as alt text when the parser recorded none', () => {
+    render(
+      <Block
+        block={blockOf('figure', 'Figure 2. A diagram.', { image: { src: 'fig2.png' } })}
+      />,
+    )
+    expect(screen.getByRole('img', { name: 'Figure 2. A diagram.' })).toBeTruthy()
+  })
+
+  it('degrades to the caption alone when there is no image', () => {
+    // Epub archive paths aren't resolvable to bytes until WP-39, so this is
+    // the common case today, not an edge one.
+    const { container } = render(<Block block={blockOf('figure', 'Figure 3. A chart.')} />)
+    expect(container.querySelector('img')).toBeNull()
+    expect(screen.getByText('Figure 3. A chart.')).toBeTruthy()
+  })
+})
+
+describe('an unfamiliar kind still shows its text', () => {
+  it('renders as a paragraph rather than as nothing', () => {
+    // The guarantee that lets new block kinds be added to the parser without
+    // the reader silently dropping them.
+    const { container } = render(
+      <Block block={blockOf('sidebar' as BlockKind, 'Something new.')} />,
+    )
+    expect(container.textContent).toBe('Something new.')
+  })
+})
+
+describe('links in the text', () => {
+  const target = '[ch05-s01-p001]' as Anchor
+
+  it('makes a contents entry tappable', () => {
+    // The bug this covers: a list was rendered as plain text, so every entry on
+    // a book's own contents page was dead while a footnote in a paragraph
+    // worked. Contents pages are lists.
+    const followed: Anchor[] = []
+    render(
+      <Block
+        block={blockOf('list', '• One\n• Two', {
+          links: [{ start: 2, end: 5, anchor: target }],
+        })}
+        onFollowLink={(anchor) => followed.push(anchor)}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'One' }))
+    expect(followed).toEqual([target])
+    // The entry without a link is still there, just not tappable.
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+  })
+
+  it('makes a link inside a paragraph tappable', () => {
+    const followed: Anchor[] = []
+    render(
+      <Block
+        block={blockOf('prose', 'See note 4 below.', {
+          links: [{ start: 4, end: 10, anchor: target }],
+        })}
+        onFollowLink={(anchor) => followed.push(anchor)}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'note 4' }))
+    expect(followed).toEqual([target])
+  })
+
+  it('sends an external link out as a real link, not a jump', () => {
+    render(<Block block={blockOf('prose', 'Read more here.', {
+      links: [{ start: 10, end: 14, url: 'https://example.com' }],
+    })} />)
+
+    const link = screen.getByRole('link', { name: 'here' })
+    expect(link.getAttribute('href')).toBe('https://example.com')
+    expect(link.getAttribute('rel')).toContain('noopener')
+  })
+})

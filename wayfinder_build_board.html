@@ -106,12 +106,13 @@
 <div class="wrap">
   <p class="eyebrow">Reading&#8202;Buddy &middot; Build&nbsp;Route</p>
   <h1>Wayfinder Map</h1>
-  <p class="lede">Six legs from empty repo to an installed phone app. Tap any waypoint to move it
+  <p class="lede">Six legs from empty repo to an installed phone app &mdash; 45 waypoints, eleven of them
+     (35&ndash;45) added mid-build as the real formats, real books and real reading demanded them. Tap any waypoint to move it
      <b>To&nbsp;do &rarr; In&nbsp;progress &rarr; Done</b> (shift-tap steps back). The trail up top fills as you go.</p>
 
   <div class="spine">
     <div class="spine-top">
-      <div class="pct"><span id="pctNum">0</span>%&nbsp;<small id="pctCount">0 / 34 waypoints</small></div>
+      <div class="pct"><span id="pctNum">0</span>%&nbsp;<small id="pctCount">0 / 45 waypoints</small></div>
     </div>
     <div class="trail" id="trail"></div>
   </div>
@@ -165,18 +166,29 @@ const CARDS = [
   {id:"08",leg:1,eff:"M",title:"Markdown parser → structure",what:"Resolve to whichever heading levels are actually present; fall back to fixed-size bucketing. Cheapest format — build it first.",skills:["remark / unified"],dep:"after 05"},
   {id:"09",leg:1,eff:"M",title:"Manifest + crossrefs at import",what:"Generate manifest.md (title + one-line summary per chapter) and build crossrefs.md once, automatically, on import.",skills:["batch import job","summary call"],dep:"after 06,07,08"},
   {id:"10",leg:1,eff:"M",title:"Import classification pass",what:"Tag light-fiction vs dense/technical + subject/domain, extract per-chapter concepts/vocab/themes, expose a manual override.",skills:["classification prompt","import UX"],dep:"after 09"},
-  {id:"11",leg:1,eff:"M",title:"In-app import + auto-parse",what:"Phone file picker, parse-on-import with progress, land the finished book in the library.",skills:["File API","async job UX"],dep:"after 06,07,08"},
+  {id:"35",leg:1,eff:"M",title:"HTML → structure (shared step)",what:"One heading/paragraph walker on the browser's own DOMParser, reused by both epub and docx. No dependency.",skills:["DOMParser","shared pipeline"],dep:"after 08"},
+  {id:"36",leg:1,eff:"S",title:"TXT parser → structure",what:"Conservative CHAPTER / PART / shouted-line detection, gated on word count; otherwise WP-08's bucketing fallback.",skills:["heuristics","regex"],dep:"after 08"},
+  {id:"37",leg:1,eff:"M",title:"DOCX parser → structure",what:"mammoth (lazy-loaded) maps Word's semantic heading styles to HTML, then hands off to WP-35.",skills:["mammoth","lazy import"],dep:"after 35"},
+  {id:"38",leg:1,eff:"M",title:"Non-prose blocks",what:"Every Paragraph gains a kind (prose/heading/quote/list/code/figure/table/formula/note/furniture). A table stays one block, not one per cell; furniture is dropped before anchors are assigned.",skills:["schema change","real-book QA"],dep:"KEYSTONE-ADJACENT — before 11",key:true},
+  {id:"11",leg:1,eff:"M",title:"In-app import + auto-parse",what:"File / folder / drag-drop import, parser picked by extension, duplicate detection on two fingerprints, three guessed shelves, delete. Every failure explained in one plain sentence.",skills:["File API","SHA-256","async job UX"],dep:"after 06,07,08,38"},
   // LEG 2
-  {id:"12",leg:2,eff:"L",title:"Structured renderer",what:"Render the parsed tree with addressable, anchored paragraphs. Virtualize for long books; paginate for the Books-style feel.",skills:["virtualized render","pagination"],dep:"after 05,11"},
-  {id:"13",leg:2,eff:"M",title:"Nav overlay (Books-style)",what:"Tap fades the page → bottom progress slider (\"44/287\") + left-side ToC icon with current position marked.",skills:["gesture handling","overlay UI"],dep:"after 12"},
-  {id:"14",leg:2,eff:"M",title:"Reader conveniences",what:"Font size / line spacing, day/night, in-book search, and bookmarks (kept distinct from highlights and from resume).",skills:["settings state","text search"],dep:"after 12"},
-  {id:"15",leg:2,eff:"S",title:"Reopen where you left off",what:"Persist and restore the last anchor/scroll position per book.",skills:["IndexedDB","anchor mapping"],dep:"after 12,03"},
+  {id:"12",leg:2,eff:"L",title:"Structured renderer",what:"One block component per kind, every block carrying its anchor as a DOM id. Loads a manifest, one chapter index and one section — never \"the book\". Unknown kinds fall through to readable text.",skills:["React","anchors","token budget"],dep:"after 05,11"},
+  {id:"13",leg:2,eff:"M",title:"Nav overlay + Focus Mode",what:"Tap the text to show/hide an overlay that layers over the page, so toggling it never moves a word. Contents list, coarse slider, and a Focus Mode that hides but never removes — hidden chrome is inert.",skills:["overlay UI","a11y/inert"],dep:"after 12"},
+  {id:"14",leg:2,eff:"L",title:"Reader conveniences + page turning",what:"Pages from CSS columns (the browser picks the breaks, a font change re-flows itself). The page turn is a seam: instant + slide now, page curl a labelled slot. Plus font / spacing / sepia, in-book search, bookmarks.",skills:["CSS columns","reduced-motion","settings state"],dep:"after 12"},
+  {id:"40",leg:2,eff:"M",title:"Navigation feel (Google-Books-style)",what:"Three-state bottom bar — page position → pages left in chapter → nothing — with the percentage riding along. A one-page-at-a-time slider, and a nav sheet with Contents / Bookmarks / Notes tabs. Pages are counted in words, so the font can't move them.",skills:["state machine","touch slider","bottom sheet"],dep:"carved out of 14 — after 13"},
+  {id:"15",leg:2,eff:"S",title:"Reopen where you left off",what:"One row per book holding the paragraph you stopped at. Saved once reading settles, restored before the first section is fetched. A place naming a chapter the book no longer has is refused, not repaired.",skills:["IndexedDB","anchor mapping","debounced writes"],dep:"after 12,03"},
+  {id:"41",leg:2,eff:"S",title:"Swipe and gesture fixes",what:"Straight off the first real phone session. The page drifted sideways under a thumb; a back swipe with the contents sheet open threw you out of the book onto the shelf; and the sheet covered the screen with nothing to tap to dismiss it.",skills:["overscroll","History API","bottom sheet"],dep:"after 32"},
+  {id:"42",leg:2,eff:"M",title:"Links inside the text",what:"Footnote markers, cross-references and the book's own contents page are dead text — the HTML parser throws every href away. Resolve an epub's internal links to anchors. Restoring the in-book contents page would renumber every paragraph after it, so that half is a separate decision.",skills:["href → anchor","epub internals"],dep:"after 12 — mind 15's saved positions"},
+  {id:"44",leg:4,eff:"S",title:"Select and remove several books",what:"Importing 35 books made deleting them one at a time punishing. Selection mode with select-all, the whole batch in one transaction, and a confirmation that names the number — the books are gone for good, since the original files were never kept.",skills:["bulk transaction","selection mode"],dep:"after 11"},
+  {id:"45",leg:4,eff:"S",title:"Links in lists, the page you landed on, shelf search, coming back to the right row",what:"Second phone session. List blocks were built from textContent, so every link inside one was thrown away — and a book's own contents page is a list, which is why contents entries were dead while footnotes in prose worked. Plus: a jump now names the page it will take you back to, the shelf can be searched, and returning from a book lands on the book you left rather than an arbitrary scroll offset.",skills:["offset arithmetic","search","scroll restoration"],dep:"after 44"},
+  {id:"43",leg:4,eff:"S",title:"Re-scan a folder, name what's new",what:"Folder import is a one-time scan — a web app can't watch a folder. So: remember the folder, offer a 'check for new books' button, skip what's already on the shelf, and say what arrived by name.",skills:["File System Access API"],dep:"after 11"},
   {id:"16",leg:2,eff:"S",title:"Read-aloud",what:"Phone's own built-in TTS voice via the Web Speech API — no paid or cloud voice.",skills:["SpeechSynthesis API"],dep:"after 12"},
   // LEG 3
   {id:"17",leg:3,eff:"M",title:"Selection menu",what:"Tap selects a paragraph, drag selects precise text; menu offers Highlight, Copy, Define (local, no API) and Ask.",skills:["Selection API","touch drag"],dep:"after 12"},
   {id:"18",leg:3,eff:"M",title:"Retrieval assembler",what:"For an Ask, load manifest + chapter index + one section file + learner.md. Never the whole book — this is the token strategy.",skills:["your schema","context budget"],dep:"after 05,09"},
   {id:"19",leg:3,eff:"M",title:"Claude API call shape",what:"Tiered Haiku 4.5 (first 5 exchanges/thread) → Sonnet 5, prompt caching on, streamed concise responses, errors as a retry button.",skills:["Messages API","streaming","caching"],dep:"after 18"},
   {id:"20",leg:3,eff:"M",title:"Inline popup + streaming UI",what:"Popup (not a side panel) with a streamed answer, a follow-up question box, and auto-saved plain-language Q&A notes.",skills:["streaming UI","popover"],dep:"after 17,19"},
+  {id:"39",leg:3,eff:"M",title:"Ask about a picture",what:"Tap a figure, table or formula → send that image plus the surrounding text to Claude. Epub/docx supply the archived image; pdf.js renders the region. The escape hatch for everything WP-38 can only describe.",skills:["vision prompt","image extraction"],dep:"after 19,20,38"},
   {id:"21",leg:3,eff:"L",title:"Tutor persona + teaching modes",what:"Subject-tag-driven domain-expert tutor prompt, 12 quick-tap modes, live prerequisite-gap detection. Dense/technical books only.",skills:["prompt engineering","gating"],dep:"after 19,10"},
   {id:"22",leg:3,eff:"L",title:"learner.md adaptive model",what:"Track understood/struggled concepts, working analogies, misconceptions; read into every Ask; actively shorten re-explanations.",skills:["state compression","prompt assembly"],dep:"after 20"},
   {id:"23",leg:3,eff:"M",title:"Chapter recap",what:"Tap-triggered zero-token summary + \"things learned\" (from saved notes) + an optional cheap live quiz whose misses feed learner.md.",skills:["precompute","scoped quiz call"],dep:"after 21,22"},
@@ -198,7 +210,13 @@ const CARDS = [
 const KEY="wayfinder-progress";
 // Synced from docs/backlog.md by /wrap-session — hand-edits here get overwritten
 // next session. Empty means every waypoint is still "todo".
-let state={"01":"done","03":"done","04":"done","05":"done","06":"done","07":"done","08":"done"};
+let state={
+  "01":"done","03":"done","04":"done",
+  "05":"done","06":"done","07":"done","08":"done",
+  "35":"done","36":"done","37":"done","38":"done","11":"done",
+  "12":"done","13":"done","40":"done","15":"done",
+  "30":"done","31":"done","32":"done","41":"done","42":"done","44":"done","45":"done","14":"doing",
+};
 
 async function load(){
   // No live storage on a static file — this always falls back to the baked-in

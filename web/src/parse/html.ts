@@ -21,7 +21,7 @@
 
 import type { ParsedBook } from '../storage/index.ts'
 import type { BookMeta, FigureImage } from '../structure/index.ts'
-import { assembleBook, type Block, type ContentBlock } from './assemble.ts'
+import { assembleBook, type Block, type ContentBlock, type RawLink } from './assemble.ts'
 
 /** Presentational or non-prose — never contributes text to a book. */
 const SKIP = new Set([
@@ -96,6 +96,92 @@ const INLINE = new Set([
 const HEADING = /^H([1-6])$/
 
 /**
+ * The text of an element, plus where its links sit inside that text.
+ *
+ * This exists because `textContent` throws away the one thing a link needs:
+ * *where* it was. A footnote marker and a cross-reference are both a few
+ * characters in the middle of a sentence, so a link has to be recorded as a
+ * range within the paragraph, not as a separate block — splitting the sentence
+ * around it would shatter one thought into three, and anchor them separately.
+ *
+ * Whitespace is collapsed as it goes rather than afterwards, because collapsing
+ * afterwards would move every offset already recorded.
+ */
+function textAndLinks(element: Element): { text: string; links: RawLink[] } {
+  let text = ''
+  const links: RawLink[] = []
+
+  function push(raw: string): void {
+    const collapsed = raw.replace(/\s+/g, ' ')
+    if (collapsed === '') return
+    // No leading space, and never two in a row — the same result `normalise`
+    // reaches by collapsing the finished string.
+    if ((text === '' || text.endsWith(' ')) && collapsed.startsWith(' ')) {
+      text += collapsed.slice(1)
+      return
+    }
+    text += collapsed
+  }
+
+  function walk(node: Node): void {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3 /* text */) {
+        push(child.textContent ?? '')
+        continue
+      }
+      if (child.nodeType !== 1 /* element */) continue
+
+      const el = child as Element
+      if (SKIP.has(el.tagName.toUpperCase())) continue
+
+      if (el.tagName.toUpperCase() === 'A') {
+        const href = el.getAttribute('href') ?? ''
+        const start = text.length
+        walk(el)
+        // A link with no text is a bookmark target, not something to tap.
+        if (href && text.length > start) links.push({ start, end: text.length, href })
+        continue
+      }
+
+      walk(el)
+    }
+  }
+
+  walk(element)
+
+  const trimmed = text.trimEnd()
+  return {
+    text: trimmed,
+    // Trailing whitespace was just removed, so a link that ended on it has to
+    // be pulled back inside the string it now points into.
+    links: links
+      .filter((link) => link.start < trimmed.length)
+      .map((link) => ({ ...link, end: Math.min(link.end, trimmed.length) })),
+  }
+}
+
+/**
+ * Every id inside an element — the things links point *at*.
+ *
+ * Recorded per block so that, once anchors are assigned, `#footnote12` can be
+ * turned into the permanent anchor of whichever block contained it.
+ */
+function idsIn(element: Element): string[] {
+  const ids = element.id ? [element.id] : []
+  for (const node of Array.from(element.querySelectorAll('[id]'))) {
+    if (node.id) ids.push(node.id)
+  }
+  return ids
+}
+
+/** Attach text, links and ids to a block, leaving absent fields off. */
+function withLinks(block: ContentBlock, element: Element): ContentBlock {
+  const ids = idsIn(element)
+  if (ids.length > 0) block.ids = ids
+  return block
+}
+
+/**
  * Navigation and back-matter that is *about* the book rather than part of it.
  * EPUB marks these with `epub:type`; the equivalent ARIA `role` covers HTML5
  * and the docx path. Matched as substrings because real files combine values
@@ -122,20 +208,52 @@ function normalise(text: string | null): string {
 }
 
 /**
+ * Join several pieces into one block, keeping every link on the words it began
+ * on.
+ *
+ * Lists and multi-paragraph quotes are each *one* block built from many
+ * elements, and both used to be assembled with `textContent` — which silently
+ * threw every link inside them away. That is exactly why an epub's own contents
+ * page had no tappable entries while a footnote in a paragraph did: a contents
+ * page is a list.
+ *
+ * The arithmetic is the whole job. Each piece lands at a known offset in the
+ * finished string, so every link inside it moves by precisely that much.
+ */
+function joinParts(
+  parts: readonly { text: string; links: RawLink[]; prefix?: string }[],
+  separator: string,
+): { text: string; links: RawLink[] } {
+  const links: RawLink[] = []
+  let text = ''
+
+  for (const part of parts) {
+    if (text !== '') text += separator
+    const at = text.length + (part.prefix?.length ?? 0)
+    text += `${part.prefix ?? ''}${part.text}`
+    for (const link of part.links) {
+      links.push({ ...link, start: link.start + at, end: link.end + at })
+    }
+  }
+
+  return { text, links }
+}
+
+/**
  * Text of a container that holds block-level children, one child per line.
  *
  * `textContent` alone is wrong here: it concatenates with no separator, so a
  * two-paragraph quote comes back as `One.Two.` and the last word of one
- * paragraph fuses with the first word of the next. Only falls back to
- * `textContent` when there are no block children to join.
+ * paragraph fuses with the first word of the next. Only falls back to the
+ * element itself when there are no block children to join.
  */
-function containerText(element: Element): string {
+function containerContent(element: Element): { text: string; links: RawLink[] } {
   const parts = Array.from(element.children)
     .filter((child) => ['P', 'DIV', 'BLOCKQUOTE', 'LI'].includes(child.tagName))
-    .map((child) => normalise(child.textContent))
-    .filter(Boolean)
+    .map((child) => textAndLinks(child))
+    .filter((part) => part.text !== '')
 
-  return parts.length > 0 ? parts.join('\n') : normalise(element.textContent)
+  return parts.length > 0 ? joinParts(parts, '\n') : textAndLinks(element)
 }
 
 /** The semantic role an element declares, from either EPUB or ARIA vocabulary. */
@@ -223,20 +341,36 @@ function readFigure(element: Element): ContentBlock {
   return block
 }
 
-/** A list becomes one block, one item per line. */
+/**
+ * A list becomes one block, one item per line.
+ *
+ * Links matter more here than anywhere else in the parser: a book's own
+ * contents page is a list of links, and so is most of a notes section.
+ */
 function readList(element: Element): ContentBlock {
   const ordered = element.tagName === 'OL'
-  const items = Array.from(element.children)
+  const parts = Array.from(element.children)
     .filter((child) => ['LI', 'DT', 'DD'].includes(child.tagName))
-    .map((child) => normalise(child.textContent))
-    .filter(Boolean)
+    .map((child) => textAndLinks(child))
+    .filter((part) => part.text !== '')
+    .map((part, index) => ({ ...part, prefix: ordered ? `${index + 1}. ` : '• ' }))
 
-  const text = items
-    .map((item, index) => (ordered ? `${index + 1}. ${item}` : `• ${item}`))
-    .join('\n')
-
+  const { text, links } = joinParts(parts, '\n')
   const label = element.tagName === 'DL' ? 'definition' : ordered ? 'ordered' : 'unordered'
-  return { kind: 'list', text, label }
+
+  const block: ContentBlock = { kind: 'list', text, label }
+  if (links.length > 0) block.links = links
+  return block
+}
+
+/** A block of the given kind, carrying its links only when it has any. */
+function contentBlockOf(
+  kind: ContentBlock['kind'],
+  content: { text: string; links: RawLink[] },
+): ContentBlock {
+  const block: ContentBlock = { kind, text: content.text }
+  if (content.links.length > 0) block.links = content.links
+  return block
 }
 
 // --- The walk ----------------------------------------------------------------
@@ -293,7 +427,13 @@ export function htmlToBlocks(html: string): Block[] {
       const heading = HEADING.exec(tag)
       if (heading) {
         const text = normalise(element.textContent)
-        if (text) blocks.push({ kind: 'heading', level: Number(heading[1]), text })
+        if (!text) continue
+        const block: Block = { kind: 'heading', level: Number(heading[1]), text }
+        // Headings are the commonest link target in a book: every entry in an
+        // epub's own contents points at one.
+        const ids = idsIn(element)
+        if (ids.length > 0) block.ids = ids
+        blocks.push(block)
         continue
       }
 
@@ -309,14 +449,14 @@ export function htmlToBlocks(html: string): Block[] {
                 : contained === 'code'
                   ? // `<pre>` is the one place whitespace is the content.
                     { kind: 'code' as const, text: (element.textContent ?? '').replace(/\s+$/, '') }
-                  : { kind: contained, text: containerText(element) }
+                  : contentBlockOf(contained, containerContent(element))
 
         // A footnote marked up as a plain element still reads as a note.
         const noteType = matchesAny(semantics, NOTE_TYPES)
         if (noteType && block.kind !== 'figure' && block.kind !== 'table') {
-          blocks.push({ ...block, kind: 'note', label: noteType })
+          blocks.push(withLinks({ ...block, kind: 'note', label: noteType }, element))
         } else if (block.text) {
-          blocks.push(block)
+          blocks.push(withLinks(block, element))
         }
         continue
       }
@@ -340,12 +480,14 @@ export function htmlToBlocks(html: string): Block[] {
           continue
         }
 
-        const text = normalise(element.textContent)
+        const { text, links } = textAndLinks(element)
         if (!text) continue
         const noteType = matchesAny(semantics, NOTE_TYPES)
-        blocks.push(
-          noteType ? { kind: 'note', text, label: noteType } : { kind: 'prose', text },
-        )
+        const block: ContentBlock = noteType
+          ? { kind: 'note', text, label: noteType }
+          : { kind: 'prose', text }
+        if (links.length > 0) block.links = links
+        blocks.push(withLinks(block, element))
         continue
       }
 

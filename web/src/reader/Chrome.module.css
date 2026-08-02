@@ -1,0 +1,227 @@
+/*
+ * The overlay. Fixed over the text, never in the flow — showing or hiding it
+ * must not move a single word of the book, or reading would jump every time
+ * you tapped.
+ */
+
+.chrome {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  /* The bars catch taps; the gap between them does not, so tapping the middle
+     of the screen reaches the text and dismisses the overlay. */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.chrome[data-shown='true'] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chrome {
+    transition: none;
+  }
+}
+
+.bar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-raised);
+  font-family: var(--font-ui);
+}
+
+.bar:first-child {
+  padding-top: calc(var(--safe-top) + var(--space-3));
+}
+
+.bar:last-child {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding-bottom: calc(var(--safe-bottom) + var(--space-3));
+  border-bottom: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.control {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.control[aria-pressed='true'] {
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.bookTitle {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  /* One line, ellipsised: a long title must not push the controls off screen. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slider {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* Hamburger · status · percentage. The status line takes the slack so the
+   other two stay pinned to the edges, which is what makes the row look stable
+   while the middle text changes length between states. */
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sheetButton {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+/* The status line is a button, styled as text — it has to read as information
+   rather than as a control, while still being the thing you tap. It keeps its
+   height in the bare state so the bar doesn't resize as you cycle through. */
+.status {
+  flex: 1;
+  min-height: 44px;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.percent {
+  /* Reserved whether or not it's showing, so the status line doesn't shift
+     sideways when the percentage leaves in the bare state. */
+  min-width: 4ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The tappable gap above the sheet. Dimmed rather than clear so the sheet reads
+   as sitting on top of the book — and so it's obvious there is something behind
+   it to go back to. */
+.scrim {
+  pointer-events: auto;
+  flex: 1;
+  min-height: 0;
+  background: rgb(0 0 0 / 0.35);
+}
+
+.sheet {
+  pointer-events: auto;
+  /* Was `flex: 1`, which ate every pixel between the bars and left nothing to
+     tap to dismiss. Capped instead, so the book stays visible above it. */
+  flex: 0 1 auto;
+  max-height: 65%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-surface-raised);
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  font-family: var(--font-ui);
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+  flex: 1;
+  min-height: 44px;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--color-text);
+  font-weight: 600;
+  border-bottom-color: var(--color-accent);
+}
+
+.sheetPanel {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4);
+  min-height: 0;
+}
+
+.empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.contentsItem {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  text-align: left;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.contentsItem[aria-current='true'] {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.contentsNumber {
+  min-width: 2ch;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

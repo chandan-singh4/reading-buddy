@@ -13,6 +13,10 @@ dist-ssr/
 # TypeScript incremental build info
 *.tsbuildinfo
 
+# Local HTTPS certificates (WP-31). Private keys, and machine-specific anyway —
+# they name this computer's LAN address and are signed by its own root CA.
+web/certs/
+
 # vite-plugin-pwa generated output
 web/dev-dist/
 web/public/sw.js

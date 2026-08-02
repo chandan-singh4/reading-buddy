@@ -7,11 +7,17 @@ import 'fake-indexeddb/auto'
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
 
 afterEach(cleanup)
+
+// The Reader scrolls to the top of each new section. jsdom has no layout, so
+// its `scrollTo` exists only to complain — stubbed rather than left to warn.
+beforeAll(() => {
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+})
 
 function renderAt(path: string) {
   return render(

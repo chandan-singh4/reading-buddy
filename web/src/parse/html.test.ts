@@ -60,6 +60,43 @@ describe('htmlToBlocks', () => {
     ])
   })
 
+  it('keeps the links inside list items, offset for the bullet and the joins', () => {
+    // A book's own contents page is a list of links. Building the block from
+    // `textContent` dropped every one of them, which is why contents entries
+    // were unclickable while a footnote inside a paragraph worked.
+    const [block] = htmlToBlocks(
+      '<ul><li><a href="#c1">One</a></li><li>see <a href="#c2">Two</a></li></ul>',
+    )
+
+    expect(block.text).toBe('• One\n• see Two')
+    const links = (block as { links?: { start: number; end: number; href: string }[] }).links
+    expect(links).toEqual([
+      { start: 2, end: 5, href: '#c1' },
+      { start: 12, end: 15, href: '#c2' },
+    ])
+    // The offsets are only meaningful if they still point at the right words.
+    expect(block.text.slice(2, 5)).toBe('One')
+    expect(block.text.slice(12, 15)).toBe('Two')
+  })
+
+  it('numbers an ordered list and shifts its links past the number', () => {
+    const [block] = htmlToBlocks('<ol><li>a</li><li><a href="#x">b</a></li></ol>')
+
+    expect(block.text).toBe('1. a\n2. b')
+    const links = (block as { links?: { start: number; end: number }[] }).links ?? []
+    expect(block.text.slice(links[0].start, links[0].end)).toBe('b')
+  })
+
+  it('keeps the links inside a multi-paragraph quote', () => {
+    const [block] = htmlToBlocks(
+      '<blockquote><p>One.</p><p>See <a href="#n1">this</a>.</p></blockquote>',
+    )
+
+    expect(block.text).toBe('One.\nSee this.')
+    const links = (block as { links?: { start: number; end: number }[] }).links ?? []
+    expect(block.text.slice(links[0].start, links[0].end)).toBe('this')
+  })
+
   it('preserves whitespace inside <pre>', () => {
     expect(texts('<pre>def f():\n    return 1\n</pre>')).toEqual(['def f():\n    return 1'])
   })

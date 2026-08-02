@@ -8,59 +8,100 @@
 
 ---
 
-## Task — WP-11 · In-app import + auto-parse
+## Task — the rest of WP-14: how it looks
 
-Nothing in the app calls the parsers yet. This is the step that makes them real:
-pick a file on the phone → choose the parser by extension → save through
-`repository.saveParsedBook` → the book appears in the Library.
+Page turning, links (WP-42), bulk delete (WP-44) and the second phone round
+(WP-45) all shipped 2026-08-02. Gates: **426 tests**, typecheck, build.
 
-This closes the walking skeleton's first half (import → store → list). WP-12
-(the renderer) is what makes it readable.
+What is left of WP-14 is the *look*, which the reader has confirmed twice is the
+next thing they want:
+
+- **Font size, line spacing, margins.** These are the reason word-counted pages
+  exist — the page number survives them, because it counts words not screens.
+- **Themes: light / dark / sepia.** Dark already follows the OS; sepia is new.
+  All of it flows from `styles/theme.css` tokens — no component hard-codes a
+  colour, so this is a `data-theme` attribute and a token block.
+- **The page-turn animation.** The seam is built (`turnPage`); only *instant* is
+  wired. Ship slide next, honour `prefers-reduced-motion`, ~200 ms ceiling, and
+  a fast tapper must be able to outrun it. Page curl stays a labelled slot.
+- **In-book search and real bookmarks** — the two stub tabs in the nav sheet,
+  which are a visible promise. Shelf search exists (WP-45); this is the other
+  one.
 
 ### Definition of done
-- [ ] `web/src/import/importBook.ts` takes a `File`, picks the parser from the
-      extension (`.epub .pdf .md .txt .docx`), builds `BookMeta` (new `BookId`,
-      `importedAt`, `type` defaulting to `dense-technical` until WP-10), and
-      saves via `repository.saveParsedBook`.
-- [ ] A file input on the Library page — accepts the five extensions, handles one
-      file at a time, and shows progress. Parsing a large epub blocks briefly;
-      the UI must not look frozen.
-- [ ] **Failure is explained, never silent.** An unsupported extension, a
-      DRM/corrupt file (`EpubError` / `DocxError` / `PdfError`), and a scanned
-      PDF that yields *zero* blocks each produce a distinct, plain-language
-      message. The scanned-PDF case is the one most likely to look like a bug.
-- [ ] A one-line note in the picker that Kindle files should be converted to EPUB
-      first (see the declined `.azw3`/`.kfx` entry in `backlog.md`).
-- [ ] Import is atomic — a failure part-way leaves no half-parsed book (the
-      repository already handles this; the UI must not defeat it).
-- [ ] Library lists the imported book and it survives a reload.
-- [ ] Tests: extension routing, each failure path, and one end-to-end import into
-      a fake-indexeddb repository.
-- [ ] `npm test`, `npm run typecheck`, `npm run build` all pass.
+A reader can set type size, spacing and theme from the nav sheet; the choice
+persists; page numbers do not shift when they change it; pages slide rather than
+snap, and reduced-motion users still get instant.
 
 ### Files in scope
-- `web/src/import/importBook.ts` (new)
-- `web/src/import/importBook.test.ts` (new)
-- `web/src/import/index.ts` (new — public entry point)
-- `web/src/pages/Library.tsx` (edit — the picker + progress + error states)
-- `web/src/pages/Library.module.css` (edit — if it exists; create if not)
-- `web/src/parse/index.ts` (read only — the five parser entry points)
-- `web/src/storage/index.ts` (read only — `repository`, `ParsedBook`)
-- `web/src/structure/index.ts` (read only — `BookMeta`, `BookId`, `SourceFormat`)
-- *(create as needed — add any new path to this list)*
+- `web/src/styles/theme.css` — every colour and size token lives here.
+- `web/src/reader/Chrome.tsx` + `Chrome.module.css` — where the settings go.
+- `web/src/pages/Reader.tsx` + `Reader.module.css` — the column strip and the
+  turn.
+- `web/src/reader/columns.ts` — the page arithmetic a re-flow must not break.
+- `web/src/reader/focusMode.ts` — the existing pattern for a persisted setting;
+  copy it rather than inventing a second one.
+- `web/src/reader/blocks.module.css` — per-block spacing.
 
 ### Out of scope
-- The renderer (WP-12). This task ends at "the book is in the library".
-- Manifest summaries (WP-09) and classification (WP-10) — both need a model call.
-  Leave summaries empty and `type` at its default.
-- Cover extraction, multi-file import, drag-and-drop, and import progress *inside*
-  a parse (the parsers are synchronous once started).
+The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39 figure images.
 
-### Useful context (already known — don't re-derive)
-- Gates: `npm test`, `npm run typecheck`, `npm run build`, all from the repo root.
-- Parsers are `parseEpub` / `parsePdf` / `parseDocx` (async) and `parseMarkdown` /
-  `parseTxt` (sync). All take `(data, meta)` and return a `ParsedBook`.
-- `books/` holds a real EPUB and `research-paper/` a PDF, both untracked — useful
-  for manual checking, not for tests.
-- Vitest defaults to the `node` environment; add `// @vitest-environment jsdom`
-  per file when a DOM is needed (epub/docx/html parsing and React tests).
+---
+
+## Carried forward — things that will bite
+
+- **Books imported before a parser change keep the old parse, silently.** This
+  has now cost two rounds: links didn't appear on already-imported books, and
+  there was no way to tell. Worth stamping each book with the parser version
+  that made it and having the shelf say "re-import for links". Do this *before*
+  the next parser change.
+- **Columns break awkwardly around tall figures, wide tables and long code.**
+  The Jung epub has 141 figures. `backlog.md` accepted this and named the
+  remedy: plain scrolling as a per-section fallback. Not built — wait until it
+  is actually hit.
+- **`Reader.test.tsx` is timing-sensitive under load.** Two different tests each
+  failed once on a full run while a build was running, and passed on three clean
+  full runs plus four isolated ones. Not diagnosed. If it recurs on an idle
+  machine, it is real.
+- **The live Anthropic key is still in `Claude API/API.txt`**, inside a public
+  repo's folder. Gitignored and never committed, but WP-19 is when it must move
+  out and be read from an env var.
+- **The certificate names an address.** If the router gives this PC a new one,
+  `npm run lan` prints both the address and the mkcert command to reissue it.
+- **Figures render captions without images** until WP-39.
+
+## Decisions already made — don't re-derive these
+- **A reading place is an anchor, never a page number** (WP-15).
+- **Pages are counted in words, not screens** (WP-40, `structure/words.ts`).
+  300 words to a page; changing that constant renumbers every book.
+- **The spine is not a whole-book read.** Manifest plus chapter *indexes* only.
+- **Pagination is CSS columns**, not JavaScript measurement, and **the page turn
+  is a seam** — navigation and animation stay separate. Both in `backlog.md`
+  under WP-14.
+- **Focus Mode hides, never removes.** Anything added to the reading screen has
+  to keep working with the overlay hidden.
+- **A link is a range of a paragraph** (`start`, `end`, `anchor` or `url`),
+  resolved *after* assembly, with epub ids qualified by their source file.
+- **Position is remembered by identity, not by offset** — the shelf remembers
+  which book you opened (`useRowMemory`), not how far down you had scrolled.
+
+## Useful context (already known — don't re-derive)
+- Gates: `npm test` (426), `npm run typecheck`, `npm run build`, from the repo
+  root. App-shell precache 413.75 KiB.
+- Retrieval path, and the whole of it: `getManifest(bookId)` →
+  `getChapterIndex(bookId, n)` → `getSection(bookId, path)`. There is
+  deliberately no "load the book" call — don't add one.
+- `web/src/reader/`: `blocks.tsx` (one component per `BlockKind`, plus link
+  runs), `linkRuns.ts` (`runsOf`, `lineRunsOf`), `navigation.ts`, `progress.ts`,
+  `bar.ts`, `columns.ts`, `position.ts`, `swipe.ts`, `useBackDismiss.ts`,
+  `Chrome.tsx`, `focusMode.ts`. All via `reader/index.ts`.
+- **`Reader.tsx` has one `goTo` and one `turnPage`** — every move goes through
+  them. That is the seam the page transition plugs into; keep it that way.
+- Anchors reach the DOM as ids with the brackets stripped (`ch02-s03-p013`).
+- Vitest defaults to `node`; add `// @vitest-environment jsdom` per file for
+  React tests. Testing Library needs an explicit `afterEach(cleanup)` — `globals`
+  is off, so nothing auto-cleans.
+- jsdom has no layout: stub `window.scrollTo` **and**
+  `Element.prototype.scrollIntoView` in any test that mounts Reader.
+- Real books for manual checks: the 15 MB Jung epub in `books/`, the Springer
+  PDF in `research-paper/`. Both untracked.
