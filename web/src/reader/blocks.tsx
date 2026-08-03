@@ -12,6 +12,8 @@
  * a table whose grid didn't survive parsing still shows its flattened text.
  */
 
+import { useState } from 'react'
+
 import type { Anchor, Paragraph } from '../structure/index.ts'
 import { NO_IMAGES, srcOf } from './figures.ts'
 import { cellRunsOf, lineRunsOf, runsOf, type Run } from './linkRuns.ts'
@@ -95,22 +97,31 @@ function Figure({
   // A figure whose picture isn't there degrades to its caption — no image, or
   // one stored under a path this book has no bytes for, which is every book
   // imported before WP-39. A caption alone is readable; a broken-image icon
-  // is not.
+  // is not. State, not just a check at render, because a picture that *does*
+  // have a src can still fail to load once the browser tries it.
+  const [broken, setBroken] = useState(false)
   const src = block.image ? srcOf(block.image.src, images) : undefined
+  const showsImage = Boolean(block.image && src) && !broken
+
+  // `block.text` is the parser's placeholder — `[Figure: caption]` or
+  // `[Figure]` — written so something readable exists before an image can be
+  // shown at all. Once a picture is actually on the page, showing that
+  // placeholder underneath it just repeats "[Figure]" next to a plate that
+  // needs no introduction; the real figcaption (`label`), if the book had
+  // one, is what belongs there instead.
+  const caption = showsImage ? block.label : block.text
 
   return (
     <figure className={styles.figure}>
-      {block.image && src && (
+      {showsImage && (
         <img
           className={styles.image}
           src={src}
-          alt={block.image.alt ?? block.text}
-          onError={(event) => {
-            event.currentTarget.hidden = true
-          }}
+          alt={block.image!.alt ?? block.label ?? block.text}
+          onError={() => setBroken(true)}
         />
       )}
-      {block.text && <figcaption className={styles.caption}>{block.text}</figcaption>}
+      {caption && <figcaption className={styles.caption}>{caption}</figcaption>}
     </figure>
   )
 }

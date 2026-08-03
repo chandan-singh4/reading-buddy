@@ -108,8 +108,9 @@ describe('figures', () => {
   it('shows the image and its caption', () => {
     render(
       <Block
-        block={blockOf('figure', 'Figure 1. A mandala.', {
+        block={blockOf('figure', '[Figure: Figure 1. A mandala.]', {
           image: { src: 'OEBPS/images/fig1.png', alt: 'A mandala' },
+          label: 'Figure 1. A mandala.',
         })}
         images={shown}
       />,
@@ -117,6 +118,23 @@ describe('figures', () => {
 
     expect(screen.getByRole('img', { name: 'A mandala' }).getAttribute('src')).toBe('blob:fig1')
     expect(screen.getByText('Figure 1. A mandala.')).toBeTruthy()
+  })
+
+  it('shows the image without a redundant placeholder caption when there is no figcaption', () => {
+    // Reader-reported bug: a picture that renders fine still had "[Figure]"
+    // printed underneath it, because the caption fell back to the parser's
+    // placeholder text instead of the real (absent) figcaption.
+    render(
+      <Block
+        block={blockOf('figure', '[Figure]', {
+          image: { src: 'OEBPS/images/fig1.png', alt: 'A mandala' },
+        })}
+        images={shown}
+      />,
+    )
+
+    expect(screen.getByRole('img', { name: 'A mandala' })).toBeTruthy()
+    expect(screen.queryByText('[Figure]')).toBeNull()
   })
 
   it('falls back to the caption as alt text when the parser recorded none', () => {

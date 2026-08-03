@@ -67,6 +67,12 @@
      columns against each other, which here would mean half-empty pages. */
   column-fill: auto;
   overflow: hidden;
+  /* Every turn is driven from JS (`touchend`, edge tap, arrow keys) — the
+     browser is never asked to pan or scroll this box on its own. Without this,
+     a swipe that isn't perfectly horizontal (a finger arcs) reads to the
+     browser as an attempt to scroll the *page*, which is what was making the
+     screen visibly bob up and down while turning. */
+  touch-action: pan-x;
   /* Deliberately *not* `scroll-behavior: smooth`. The browser times that one,
      and lengthens it with the distance travelled, so a turn inside a chapter
      ran visibly longer than a turn between two. Every move on this screen is
