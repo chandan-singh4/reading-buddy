@@ -21,9 +21,16 @@ body {
 
      `overscroll-behavior-x: none` also stops Chrome's swipe-to-go-back, which
      on a reading screen means a horizontal swipe throwing you out of the book
-     and back to the shelf. */
+     and back to the shelf.
+
+     The `y` half matters just as much on the reading screen, which has
+     nothing of its own to scroll (`Reader.module.css`'s box is a fixed
+     `100dvh` with `overflow: hidden`). Without it, a thumb resting slightly
+     off-horizontal during a page-turn swipe still reaches the browser's own
+     rubber-band/pull-to-refresh handling — which is what was making the whole
+     screen bob up and down while reading. */
   overflow-x: hidden;
-  overscroll-behavior-x: none;
+  overscroll-behavior: none;
 }
 
 body {
