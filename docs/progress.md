@@ -19,6 +19,39 @@ Get that loop working before building any breadth.
   streamed answer (WP-17 → 18 → 19 → 20).
 
 ### Recently done
+- **Shelf/detail redesign (WP-46→49) shipped, then fast-followed against the
+  reader's live reaction** — 2026-08-03, all merged straight to `main`.
+  - **WP-46→49**: bigger cover-forward Home tiles with a raised
+    currently-reading card; a new `/book/:id/info` detail page (title,
+    author, format, status/dates, a 1–5 rating); typed-in favorite quotes
+    (`quotes` table, schema v7); notes/reflections. Mood tags and
+    multi-axis secondary ratings shipped as part of WP-49 too, then were
+    **removed again the same day** once the reader saw them live and called
+    them clutter — UI, repository methods and the `BookMeta` fields all
+    pulled, not just hidden.
+  - **The garbled-title bug, in full.** First fix: strip a stray hash from
+    filename-guessed and epub-`<dc:title>` titles (`PARSER_VERSION` → 5).
+    Second, deeper fix once the reader showed a worse case: some epubs
+    (Anna's Archive-style downloads) carry a `<dc:title>` that's a whole
+    citation dump — title run into author/publisher/ISBN/hash/source-credit
+    with no punctuation between fields. `cleanTitle` now recognises each
+    field and cuts at the earliest one found (`PARSER_VERSION` → 6) — a best
+    effort, not a guarantee, since a subtitle with none of those markers
+    can't be told apart from the real title algorithmically. A manual
+    rename (pencil on the detail page, `repository.renameBook`) is the
+    guaranteed fallback.
+  - **A real theme bug, found and fixed.** `data-theme` on `<html>` used to
+    be applied only inside `Reader.tsx`, so Home showed the OS's
+    `prefers-color-scheme` guess until a book was opened for the first
+    time, at which point the reader's actual saved choice suddenly took
+    over globally — read as "opening a book changed my theme." Fixed with
+    `applyStoredTheme()` called once at boot in `main.tsx`; verified with
+    Playwright against the dev server in both directions before shipping.
+  - **Tabs are now Home / All Books / Stats / Settings.** `Journal.tsx`
+    (an unused placeholder) deleted outright. The All Books list
+    (`Library.tsx`) gained cover thumbnails and "N% read" per row.
+  - Gates re-run after each change; final state 525/525 tests, typecheck
+    and build clean.
 - **Two phone-reported bugs fixed, and the first real deploy** — 2026-08-03.
   - **Figure captions no longer repeat "[Figure]" next to a picture that
     rendered fine.** `reader/blocks.tsx`'s `Figure` always showed `block.text`
@@ -118,26 +151,8 @@ Get that loop working before building any breadth.
     the browser clamps it; restore it after a book was removed and it points
     somewhere else. A row id has neither failure mode — the row is there and the
     scroll is exact, or it isn't and the reader stays at the top.
-- **WP-44 · Select several books and remove them** — added 2026-08-02, after the
-  reader imported 35 books and found one-at-a-time deletion punishing.
-  - **`repository.deleteBooks`** — one transaction for the lot, not a loop of
-    `deleteBook`. Thirty-five separate transactions means thirty-five round
-    trips, and a failure halfway leaves an arbitrary subset gone with no way to
-    tell which. Deletes by the `bookId` index rather than collecting keys first,
-    so a book's thousands of sections are never pulled into memory to be
-    thrown away.
-  - **Selection is a mode, `null` when off.** "Not selecting" and "selecting
-    nothing" have to look different, and a shelf permanently covered in
-    checkboxes is a poor default for the thing people do most.
-  - **While selecting, the title ticks the book instead of opening it**, and the
-    per-book Remove steps aside — two delete controls on one row, acting on
-    different sets, is a trap.
-  - **The confirmation names the number** ("Remove 35 books for good?"). There
-    is no undo: the original files were never kept.
-  - **`Library.test.tsx` is new** — the screen had no tests, and it is the one
-    screen that destroys things.
-**Gates:** `npm test` (473), `npm run typecheck`, `npm run build` — all passing.
-Main bundle 383.4 kB. The parsers are called now, but every one of them stays
+**Gates:** `npm test` (525), `npm run typecheck`, `npm run build` — all passing.
+Main bundle 402.8 kB. The parsers are called now, but every one of them stays
 behind a dynamic `import()`, so pdf.js (434 kB) and mammoth (500 kB) remain in
 their own chunks and are fetched only when a file of that type is imported.
 
@@ -146,11 +161,14 @@ their own chunks and are fetched only when a file of that type is imported.
 
 ### Next up
 **The reader's order, set 2026-08-02: make it a proper reading app first, then
-AI.** Page turning and links (WP-42) are both done now — see `active-task.md`
-for the task in flight.
+AI.** Nothing is in flight right now — see `active-task.md`: the shelf/detail
+detour (WP-46→49 plus its same-day fast-follow) just shipped and the reader
+hasn't reacted to this latest round yet. Check that before picking anything
+below.
 - **Reading comfort (rest of WP-14)** — font size, line spacing, margins,
   sepia, the page-turn animation (seam is built, only instant is wired),
-  in-book search, real bookmarks. **This is the active task.**
+  in-book search, real bookmarks. The natural next task once the shelf/detail
+  work is settled.
 - **WP-43 · Re-scan a folder + name what's new.**
 - **WP-17 → 18 → 19 → 20 · the tutor loop** — select text → assemble a prompt →
   call Claude → stream an answer. This is the rest of the walking skeleton and
