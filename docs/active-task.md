@@ -8,47 +8,48 @@
 
 ---
 
-## Task — WP-46: shelf visual redesign
+## Task — the shelf/detail arc (WP-46→49) is done; nothing in flight
 
 The garbled-title bug (a hash baked into some epubs' own `<dc:title>`
-metadata, not just the filename — a follow-on from the earlier title-priority
-fix) was found and fixed 2026-08-03, `PARSER_VERSION` → 5. Deployed to `main`.
+metadata, not just the filename) was fixed 2026-08-03, `PARSER_VERSION` → 5.
 
-The reader shared a reference design (warm, illustrated "wood shelf" library
-view, cover-forward grid, plus a per-book detail screen with rating/notes/
-quotes/mood) and asked for it broken into waypoints rather than attempted in
-one shot. Backlog now carries this as WP-24 (mostly shipped: status grouping,
-progress %, real covers) → **WP-46 (this task, visual only)** → WP-47 (book
-detail page) → WP-48 (favorite quotes, blocked on WP-17/25) → WP-49 (mood +
-notes + secondary ratings). See `backlog.md` Leg 4 for the full breakdown and
-dependency notes.
+The reader then shared a reference design (warm, illustrated "wood shelf"
+library view, cover-forward grid, plus a per-book detail screen with rating/
+notes/quotes/mood) and asked for it broken into waypoints. All four shipped
+and merged to `main` the same session, 2026-08-03:
 
-**WP-46 itself is visual only — no new data, no new screens.** Make the
-existing Home shelves (`Shelves`/`BookTile` in `Home.tsx`) read closer to the
-reference: covers as the dominant element, less competing chrome, a warmer
-surface treatment. Stay inside the existing token system
-(`styles/theme.css`) — WP-14's light/dark/sepia theming is separate,
-unfinished work; don't fork a second colour mechanism to chase the reference
-image's specific wood/cream palette without checking with the reader first,
-since that's a bigger branding call than this waypoint's "make it look more
-like a shelf" scope.
+- **WP-46** — Home shelves: bigger cover-forward tiles, the currently-reading
+  book in its own raised card. Visual only, existing theme tokens.
+- **WP-47** — new `/book/:bookId/info` route (`BookInfo.tsx`), reached from a
+  "ⓘ" on each shelf tile (tapping the cover still opens the reader directly).
+  Title/author/format/subject/status/dates + a 1–5 overall rating
+  (`BookMeta.rating`, `repository.rateBook`).
+- **WP-48** — favorite quotes on that page. Scoped down to a typed-in MVP (a
+  new `quotes` table, schema v7) rather than waiting on true in-reader
+  selection, which still needs WP-17/25 (unbuilt — see `backlog.md`).
+- **WP-49** — `BookMeta.notes` / `.moods` / `.secondaryRatings`
+  (writingStyle/pacing/emotionalImpact — genre-neutral stand-ins for the
+  reference's romance-specific axes) on the same page, via a shared
+  `StarRow` widget.
 
-### Definition of done
-Home's shelves read as cover-forward and less spartan than before, using only
-existing theme tokens (or new tokens added the same way `--text-xs` was).
-Reader has seen it and confirmed direction before WP-47 starts.
+Gates re-run after each waypoint: typecheck clean, full suite green (the one
+`docx.test.ts` failure is a pre-existing mammoth/environment flake, unrelated
+— confirmed present on `main` before this arc started too), build clean.
+
+**Not yet done:** the reader hasn't seen any of this live yet. Next session
+should open with checking their reaction before picking the next task —
+resist starting something new off assumption.
 
 ### Files in scope
-- `web/src/pages/Home.tsx` + `Home.module.css` — the shelves and tiles.
-- `web/src/app/Cover.tsx` + `Cover.module.css` — the cover component itself.
-- `web/src/styles/theme.css` — tokens only; no hard-coded colour/space/size in
-  a component.
+None right now — no task is in flight. If the reader wants adjustments to
+what shipped, start from `web/src/pages/BookInfo.tsx` (+ `.module.css`) and
+`web/src/pages/Home.tsx` (+ `.module.css`), the two screens this arc touched.
 
 ### Out of scope
-WP-47's detail page, WP-48's quotes, WP-49's mood/ratings/notes — all need the
-reader's go-ahead on WP-46's direction first. The rest of WP-14 (reader font
-size/spacing/theme, page-turn animation, in-book search, bookmarks) is parked,
-not abandoned — still `[~]` in `backlog.md`, resume after this arc.
+The rest of WP-14 (reader font size/spacing/theme, page-turn animation,
+in-book search, bookmarks) is parked, not abandoned — still `[~]` in
+`backlog.md`, and is the natural next task if the reader has nothing further
+on the shelf/detail screens.
 
 ---
 
