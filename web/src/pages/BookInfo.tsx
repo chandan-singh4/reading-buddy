@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
 import { useCovers } from '../app/useCovers.ts'
-import { repository } from '../storage/index.ts'
+import { repository, type StoredQuote } from '../storage/index.ts'
 import type { ReadingPosition } from '../storage/db.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 import styles from './BookInfo.module.css'
@@ -48,13 +48,17 @@ export default function BookInfo() {
   const { bookId } = useParams<{ bookId: string }>()
   const id = bookId as BookId
   const [state, setState] = useState<LoadState>({ status: 'loading' })
+  const [quotes, setQuotes] = useState<StoredQuote[]>([])
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([repository.getBook(id), repository.getPosition(id)]).then(([book, position]) => {
-      if (cancelled) return
-      setState(book ? { status: 'ready', book, position } : { status: 'missing' })
-    })
+    Promise.all([repository.getBook(id), repository.getPosition(id), repository.listQuotes(id)]).then(
+      ([book, position, savedQuotes]) => {
+        if (cancelled) return
+        setState(book ? { status: 'ready', book, position } : { status: 'missing' })
+        setQuotes(savedQuotes)
+      },
+    )
     return () => {
       cancelled = true
     }
@@ -152,9 +156,87 @@ export default function BookInfo() {
         </div>
       </section>
 
+      <Quotes
+        bookId={id}
+        quotes={quotes}
+        onAdd={async (text) => {
+          await repository.addQuote(id, text)
+          setQuotes(await repository.listQuotes(id))
+        }}
+        onRemove={async (quoteId) => {
+          setQuotes((current) => current.filter((quote) => quote.id !== quoteId))
+          await repository.deleteQuote(id, quoteId)
+        }}
+      />
+
       <Link to={`/book/${id}`} className={styles.readButton}>
         {startLabel}
       </Link>
     </div>
+  )
+}
+
+/**
+ * Favorite quotes (WP-48). Typed in by hand — see the doc comment on
+ * `StoredQuote` for why this isn't a "select text in the reader" flow yet.
+ */
+function Quotes({
+  quotes,
+  onAdd,
+  onRemove,
+}: {
+  bookId: BookId
+  quotes: readonly StoredQuote[]
+  onAdd: (text: string) => Promise<void>
+  onRemove: (quoteId: string) => Promise<void>
+}) {
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    const text = draft.trim()
+    if (!text) return
+    setSaving(true)
+    await onAdd(text)
+    setDraft('')
+    setSaving(false)
+  }
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionHeading}>Favorite quotes</h2>
+
+      {quotes.length > 0 && (
+        <ul className={styles.quoteList}>
+          {quotes.map((quote) => (
+            <li key={quote.id} className={styles.quote}>
+              <blockquote className={styles.quoteText}>“{quote.text}”</blockquote>
+              <button
+                type="button"
+                className={styles.quoteRemove}
+                aria-label="Remove this quote"
+                onClick={() => onRemove(quote.id)}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form className={styles.quoteForm} onSubmit={submit}>
+        <textarea
+          className={styles.quoteInput}
+          placeholder="Add a passage worth remembering…"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          rows={2}
+        />
+        <button type="submit" className={styles.quoteSave} disabled={saving || draft.trim() === ''}>
+          Save quote
+        </button>
+      </form>
+    </section>
   )
 }

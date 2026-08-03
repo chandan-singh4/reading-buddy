@@ -595,3 +595,44 @@ describe('a book’s pictures', () => {
     expect((await repo.getAssets(bookId('a'), ['fig.png'])).size).toBe(0)
   })
 })
+
+describe('favorite quotes', () => {
+  it('saves one and lists it back', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.addQuote(bookId('a'), 'A line worth keeping.')
+
+    const quotes = await repo.listQuotes(bookId('a'))
+    expect(quotes).toHaveLength(1)
+    expect(quotes[0]?.text).toBe('A line worth keeping.')
+  })
+
+  it('lists newest first', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.addQuote(bookId('a'), 'First saved.')
+    await repo.addQuote(bookId('a'), 'Second saved.')
+
+    const quotes = await repo.listQuotes(bookId('a'))
+    expect(quotes.map((q) => q.text)).toEqual(['Second saved.', 'First saved.'])
+  })
+
+  it('removes one quote without touching the rest', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.addQuote(bookId('a'), 'Keep this one.')
+    await repo.addQuote(bookId('a'), 'Remove this one.')
+
+    const [toRemove] = (await repo.listQuotes(bookId('a'))).filter((q) => q.text === 'Remove this one.')
+    await repo.deleteQuote(bookId('a'), toRemove!.id)
+
+    const remaining = await repo.listQuotes(bookId('a'))
+    expect(remaining.map((q) => q.text)).toEqual(['Keep this one.'])
+  })
+
+  it('goes when the book goes', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.addQuote(bookId('a'), 'Gone with the book.')
+
+    await repo.deleteBook(bookId('a'))
+
+    expect(await repo.listQuotes(bookId('a'))).toEqual([])
+  })
+})

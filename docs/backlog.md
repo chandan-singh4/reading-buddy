@@ -203,11 +203,14 @@
   "single overall book rating prompted at Finished" already agreed as a
   future milestone. Foundation the next two waypoints hang their UI off of ·
   *after 46*
-- [ ] **WP-48 Favorite quotes on the detail page** — surface saved highlights
-  on WP-47's screen. Genuinely blocked, not just sequenced: nothing saves a
-  highlight yet — needs WP-17 (selection menu) and WP-25 (highlights list)
-  first, or at least a minimal capture path carved out of them · *after
-  17,25,47*
+- [x] **WP-48 Favorite quotes on the detail page** — shipped 2026-08-03 as a
+  typed-in MVP rather than waiting on WP-17/25: a `quotes` table (schema v7,
+  `[bookId+id]`, cascades on delete) plus `addQuote`/`listQuotes`/
+  `deleteQuote`, and a form + list on WP-47's screen. Selecting a passage
+  *from the reading screen itself* is still real, unbuilt work — that needs a
+  character range within an anchor (WP-17's job) — so this table just gains a
+  second way to be filled once WP-17/25 land, nothing about its shape changes
+  · *after 47*
 - [ ] **WP-49 Mood tags + notes/reflections + multi-axis ratings** — free-text
   reflections, mood tags, and secondary rating axes (e.g. pacing, writing
   style) alongside WP-47's single overall rating. The most bespoke, least

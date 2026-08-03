@@ -114,4 +114,34 @@ describe('BookInfo', () => {
       expect((await repository.getBook(BOOK_ID))?.rating).toBeUndefined()
     })
   })
+
+  it('saves a typed quote and lists it', async () => {
+    await repository.saveParsedBook(bookOf())
+    openInfo()
+
+    const input = await screen.findByPlaceholderText('Add a passage worth remembering…')
+    fireEvent.change(input, { target: { value: 'A line worth keeping.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save quote' }))
+
+    expect(await screen.findByText('“A line worth keeping.”')).toBeTruthy()
+    await waitFor(async () => {
+      expect((await repository.listQuotes(BOOK_ID)).map((q) => q.text)).toEqual([
+        'A line worth keeping.',
+      ])
+    })
+  })
+
+  it('removes a saved quote', async () => {
+    await repository.saveParsedBook(bookOf())
+    await repository.addQuote(BOOK_ID, 'Take this one away.')
+    openInfo()
+
+    await screen.findByText('“Take this one away.”')
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this quote' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('“Take this one away.”')).toBeNull()
+    })
+    expect(await repository.listQuotes(BOOK_ID)).toEqual([])
+  })
 })

@@ -24,6 +24,7 @@ import {
   type ReadingPosition,
   type StoredChapterIndex,
   type StoredAsset,
+  type StoredQuote,
   type StoredSection,
   type StoredSource,
 } from './db.ts'
@@ -485,7 +486,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       if (bookIds.length === 0) return
 
       // The table list is an array rather than separate arguments: Dexie's
-      // variadic overload stops at five tables, and this touches seven.
+      // variadic overload stops at five tables, and this touches eight.
       await database.transaction(
         'rw',
         [
@@ -496,6 +497,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.positions,
           database.sources,
           database.assets,
+          database.quotes,
         ],
         async () => {
           for (const bookId of bookIds) {
@@ -505,6 +507,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
             await database.positions.delete(bookId)
             await database.sources.delete(bookId)
             await database.assets.where('bookId').equals(bookId).delete()
+            await database.quotes.where('bookId').equals(bookId).delete()
             await database.books.delete(bookId)
           }
         },
@@ -517,7 +520,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
      * would quietly eat a phone's storage quota forever.
      */
     async deleteBook(bookId: BookId): Promise<void> {
-      // Seven tables, so the array form — see `deleteBooks` above.
+      // Eight tables, so the array form — see `deleteBooks` above.
       await database.transaction(
         'rw',
         [
@@ -528,6 +531,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.positions,
           database.sources,
           database.assets,
+          database.quotes,
         ],
         async () => {
           await database.sections.where('bookId').equals(bookId).delete()
@@ -536,9 +540,32 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           await database.positions.delete(bookId)
           await database.sources.delete(bookId)
           await database.assets.where('bookId').equals(bookId).delete()
+          await database.quotes.where('bookId').equals(bookId).delete()
           await database.books.delete(bookId)
         },
       )
+    },
+
+    // --- Quotes ----------------------------------------------------------
+
+    /** Save a favorite passage, typed in from the detail page (WP-48). */
+    async addQuote(bookId: BookId, text: string): Promise<void> {
+      await database.quotes.put({
+        bookId,
+        id: crypto.randomUUID(),
+        text,
+        addedAt: new Date().toISOString(),
+      })
+    },
+
+    /** Newest first — how the detail page lists them. */
+    async listQuotes(bookId: BookId): Promise<StoredQuote[]> {
+      const quotes = await database.quotes.where('bookId').equals(bookId).toArray()
+      return quotes.sort((a, b) => b.addedAt.localeCompare(a.addedAt))
+    },
+
+    async deleteQuote(bookId: BookId, id: string): Promise<void> {
+      await database.quotes.delete([bookId, id])
     },
   }
 }

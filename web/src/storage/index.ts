@@ -9,6 +9,7 @@ export type {
   ReadingPosition,
   StoredAsset,
   StoredChapterIndex,
+  StoredQuote,
   StoredSection,
   StoredSource,
 } from './db.ts'

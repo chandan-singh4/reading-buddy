@@ -111,6 +111,67 @@
   padding: var(--space-1);
 }
 
+.quoteList {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.quote {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-md);
+}
+
+.quoteText {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-reading);
+  font-style: italic;
+  line-height: var(--leading-reading);
+}
+
+.quoteRemove {
+  flex: none;
+  font-size: var(--text-lg);
+  line-height: 1;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  padding: var(--space-1);
+}
+
+.quoteForm {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.quoteInput {
+  font: inherit;
+  color: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  resize: vertical;
+}
+
+.quoteSave {
+  justify-self: start;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: var(--space-1) 0;
+}
+
+.quoteSave:disabled {
+  color: var(--color-text-muted);
+}
+
 .readButton {
   justify-self: stretch;
   text-align: center;
