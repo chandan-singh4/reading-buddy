@@ -17,7 +17,9 @@
 .heading {
   margin-top: var(--space-6);
   font-family: var(--font-ui);
-  font-size: var(--text-lg);
+  /* Scaled off the reading text size, not fixed at --text-lg — otherwise a
+     reader who sizes body text up sees in-book headings shrink below it. */
+  font-size: calc(var(--reading-text-size) * 1.1);
   font-weight: 700;
   line-height: var(--leading-ui);
 }

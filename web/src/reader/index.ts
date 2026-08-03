@@ -19,6 +19,19 @@ export type { BarState } from './bar.ts'
 
 export { readFocusMode, writeFocusMode } from './focusMode.ts'
 
+export {
+  DEFAULT_SETTINGS,
+  MAX_TEXT_STEP,
+  MIN_TEXT_STEP,
+  TEXT_STEPS,
+  leadingOf,
+  measureOf,
+  readReaderSettings,
+  textSizeOf,
+  writeReaderSettings,
+} from './readerSettings.ts'
+export type { Margins, ReaderSettings, ReadingFont, Spacing, Theme } from './readerSettings.ts'
+
 export { useBackDismiss } from './useBackDismiss.ts'
 
 export { stepThrough, swipeOf } from './swipe.ts'

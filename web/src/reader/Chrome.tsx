@@ -24,10 +24,19 @@ import { stepThrough, swipeOf, type Touch } from './swipe.ts'
 import { progressLabel, progressOf, type Pages } from './progress.ts'
 import type { SectionRef } from './navigation.ts'
 import type { Manifest } from '../structure/index.ts'
+import {
+  MAX_TEXT_STEP,
+  MIN_TEXT_STEP,
+  type Margins,
+  type ReaderSettings,
+  type ReadingFont,
+  type Spacing,
+  type Theme,
+} from './readerSettings.ts'
 import styles from './Chrome.module.css'
 
-/** The sheet's three tabs. Two are stubs until WP-14 and WP-25. */
-export type SheetTab = 'contents' | 'bookmarks' | 'notes'
+/** The sheet's four tabs. Two are stubs until WP-25; Aa is WP-14's own. */
+export type SheetTab = 'contents' | 'bookmarks' | 'notes' | 'aa'
 
 export interface ChromeProps {
   bookTitle: string
@@ -49,6 +58,8 @@ export interface ChromeProps {
   sheetOpen: boolean
   sheetTab: SheetTab
   barState: BarState
+  /** The reading-comfort settings: theme, font, text size, spacing, margins. */
+  settings: ReaderSettings
   onToggleFocus: () => void
   onToggleSheet: () => void
   onSelectTab: (tab: SheetTab) => void
@@ -57,12 +68,40 @@ export interface ChromeProps {
   onJumpToChapter: (chapter: number) => void
   /** Go to a page — which may be inside the section already on screen. */
   onJumpToPage: (page: number) => void
+  /** Change one or more reading-comfort settings at once. */
+  onSettingsChange: (patch: Partial<ReaderSettings>) => void
 }
 
 const TABS: { id: SheetTab; label: string }[] = [
   { id: 'contents', label: 'Contents' },
   { id: 'bookmarks', label: 'Bookmarks' },
   { id: 'notes', label: 'Notes' },
+  { id: 'aa', label: 'Aa' },
+]
+
+const THEME_OPTIONS: { id: Theme; label: string }[] = [
+  { id: 'auto', label: 'Auto' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+  { id: 'sepia', label: 'Sepia' },
+]
+
+const FONT_OPTIONS: { id: ReadingFont; label: string }[] = [
+  { id: 'serif', label: 'Serif' },
+  { id: 'serif-alt', label: 'Serif (alt)' },
+  { id: 'sans', label: 'Sans' },
+]
+
+const SPACING_OPTIONS: { id: Spacing; label: string }[] = [
+  { id: 'compact', label: 'Compact' },
+  { id: 'normal', label: 'Normal' },
+  { id: 'relaxed', label: 'Relaxed' },
+]
+
+const MARGIN_OPTIONS: { id: Margins; label: string }[] = [
+  { id: 'narrow', label: 'Narrow' },
+  { id: 'normal', label: 'Normal' },
+  { id: 'wide', label: 'Wide' },
 ]
 
 export function Chrome({
@@ -75,12 +114,14 @@ export function Chrome({
   sheetOpen,
   sheetTab,
   barState,
+  settings,
   onToggleFocus,
   onToggleSheet,
   onSelectTab,
   onBarStateChange,
   onJumpToChapter,
   onJumpToPage,
+  onSettingsChange,
 }: ChromeProps) {
   const { chapter, chapterCount } = progressOf(manifest, here)
   const label = barLabel(barState, pages, progressLabel(manifest, here))
@@ -230,6 +271,110 @@ export function Chrome({
                 Notes and highlights arrive with the tutor — anything you ask about gets
                 saved here, filed by chapter.
               </p>
+            </div>
+          )}
+
+          {sheetTab === 'aa' && (
+            <div
+              role="tabpanel"
+              id="sheet-panel-aa"
+              aria-labelledby="sheet-tab-aa"
+              className={styles.sheetPanel}
+            >
+              <div className={styles.settingRow}>
+                <span className={styles.settingLabel}>Theme</span>
+                <div className={styles.settingOptions} role="group" aria-label="Theme">
+                  {THEME_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={styles.settingButton}
+                      aria-pressed={settings.theme === option.id}
+                      onClick={() => onSettingsChange({ theme: option.id })}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.settingRow}>
+                <span className={styles.settingLabel}>Font</span>
+                <div className={styles.settingOptions} role="group" aria-label="Reading font">
+                  {FONT_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={styles.settingButton}
+                      aria-pressed={settings.font === option.id}
+                      onClick={() => onSettingsChange({ font: option.id })}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.settingRow}>
+                <span className={styles.settingLabel}>Text size</span>
+                <div className={styles.stepper}>
+                  <button
+                    type="button"
+                    className={styles.stepperButton}
+                    aria-label="Smaller text"
+                    disabled={settings.textStep <= MIN_TEXT_STEP}
+                    onClick={() => onSettingsChange({ textStep: settings.textStep - 1 })}
+                  >
+                    A−
+                  </button>
+                  <span className={styles.stepperValue} aria-live="polite">
+                    {settings.textStep}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.stepperButton}
+                    aria-label="Larger text"
+                    disabled={settings.textStep >= MAX_TEXT_STEP}
+                    onClick={() => onSettingsChange({ textStep: settings.textStep + 1 })}
+                  >
+                    A+
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.settingRow}>
+                <span className={styles.settingLabel}>Line spacing</span>
+                <div className={styles.settingOptions} role="group" aria-label="Line spacing">
+                  {SPACING_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={styles.settingButton}
+                      aria-pressed={settings.spacing === option.id}
+                      onClick={() => onSettingsChange({ spacing: option.id })}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.settingRow}>
+                <span className={styles.settingLabel}>Margins</span>
+                <div className={styles.settingOptions} role="group" aria-label="Margins">
+                  {MARGIN_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={styles.settingButton}
+                      aria-pressed={settings.margins === option.id}
+                      onClick={() => onSettingsChange({ margins: option.id })}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>

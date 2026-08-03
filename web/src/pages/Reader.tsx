@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
 import {
@@ -30,11 +30,17 @@ import {
   placeOf,
   previousSection,
   readFocusMode,
+  leadingOf,
+  measureOf,
+  readReaderSettings,
+  textSizeOf,
+  writeReaderSettings,
   type FollowLink,
   useBackDismiss,
   useFigureImages,
   writeFocusMode,
   type BarState,
+  type ReaderSettings,
   type SectionRef,
   type SheetTab,
   type Spine,
@@ -207,6 +213,14 @@ export default function Reader() {
   )
 
   const [focusMode, setFocusMode] = useState(readFocusMode)
+
+  /** Theme, font, text size, line spacing, margins — the Aa tab's settings. */
+  const [settings, setSettings] = useState<ReaderSettings>(readReaderSettings)
+
+  const changeSettings = useCallback((patch: Partial<ReaderSettings>) => {
+    setSettings((current) => ({ ...current, ...patch }))
+  }, [])
+
   /**
    * A book opens on the book, not on the interface.
    *
@@ -695,6 +709,44 @@ export default function Reader() {
     writeFocusMode(focusMode)
   }, [focusMode])
 
+  useEffect(() => {
+    writeReaderSettings(settings)
+  }, [settings])
+
+  /**
+   * Theme and reading font, applied to `<html>` rather than to the reader
+   * screen alone — the same scope the existing dark-mode media query already
+   * uses, so an explicit choice here behaves exactly like that one. Left in
+   * place when the reader navigates away, like `focusMode`: it is a setting
+   * about the app, not something that should revert on leaving the page.
+   */
+  useEffect(() => {
+    const root = document.documentElement
+    if (settings.theme === 'auto') root.removeAttribute('data-theme')
+    else root.dataset.theme = settings.theme
+
+    if (settings.font === 'serif') root.removeAttribute('data-reading-font')
+    else root.dataset.readingFont = settings.font
+  }, [settings.theme, settings.font])
+
+  /**
+   * Text size, line spacing and margins, scoped to this element and its
+   * descendants only — unlike theme and font above, these three share their
+   * underlying tokens (`--text-lg`, `--reading-measure`) with other pages, so
+   * they're set as an inline override here rather than globally on `<html>`.
+   * See `theme.css`'s `--reading-text-size` etc. for the defaults this
+   * overrides.
+   */
+  const readingVars = useMemo(
+    () =>
+      ({
+        '--reading-text-size': textSizeOf(settings.textStep),
+        '--reading-leading': leadingOf(settings.spacing),
+        '--reading-column-width': measureOf(settings.margins),
+      }) as unknown as React.CSSProperties,
+    [settings.textStep, settings.spacing, settings.margins],
+  )
+
   // The frame: book + manifest, once per book.
   useEffect(() => {
     if (!id) return
@@ -1047,7 +1099,7 @@ export default function Reader() {
     frame.status === 'ready' ? chapterTitle(frame.manifest, here.chapter) : undefined
 
   return (
-    <div className={styles.reader}>
+    <div className={styles.reader} style={readingVars}>
       {/* Only while there's no book to hang the overlay on — once there is,
           the overlay owns the way back. */}
       {frame.status !== 'ready' && (
@@ -1082,12 +1134,14 @@ export default function Reader() {
             sheetOpen={sheetOpen}
             sheetTab={sheetTab}
             barState={barState}
+            settings={settings}
             onToggleFocus={toggleFocus}
             onToggleSheet={() => setSheetOpen((open) => !open)}
             onSelectTab={setSheetTab}
             onBarStateChange={setBarState}
             onJumpToChapter={(chapter) => goTo({ chapter, section: 1 })}
             onJumpToPage={jumpToPage}
+            onSettingsChange={changeSettings}
           />
 
           {/*

@@ -51,6 +51,19 @@
   --reading-measure: 34rem; /* comfortable line length for body text */
   --tab-bar-height: 3.5rem;
 
+  /*
+   * Reading-comfort defaults (WP-14's Aa tab: text size, line spacing,
+   * margins). Defined here so the value that exists before a reader ever opens
+   * the tab is exactly the value the page already used — but read only by
+   * `Reader.module.css`/`blocks.module.css`, and only ever *overridden* inline
+   * on the `.reader` element by `readerSettings.ts`, never here. That keeps a
+   * reader's choice scoped to the book they're reading and out of the shelf,
+   * which shares `--text-lg` and `--reading-measure` for its own layout.
+   */
+  --reading-text-size: var(--text-lg);
+  --reading-leading: var(--leading-reading);
+  --reading-column-width: var(--reading-measure);
+
   /* Phone chrome: keeps content clear of notch and home indicator.
      Needs viewport-fit=cover in index.html, which is already set. */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -98,4 +111,37 @@
   --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
 
   color-scheme: dark;
+}
+
+/* Sepia — the reading-comfort theme (WP-14): warm paper rather than white
+   screen glare. Explicit override only; it never follows a media query the way
+   dark does, because no OS setting means "reader wants sepia". */
+:root[data-theme='sepia'] {
+  --color-bg: #f2e8d3;
+  --color-surface: #f8f1de;
+  --color-surface-raised: #ece0c4;
+  --color-text: #3b2f20;
+  --color-text-muted: #7a6a50;
+  --color-border: #ddceac;
+  --color-accent: #7a5c3e;
+  --color-accent-contrast: #ffffff;
+  --color-focus: #3b6ea5;
+
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+
+  color-scheme: light;
+}
+
+/*
+ * Reading font family (WP-14's Aa tab). `--font-reading` is touched only here
+ * and in `Reader.module.css`/`blocks.module.css` — nothing on the shelf or
+ * elsewhere reads it — so switching it is safe to do globally rather than
+ * scoping it to the reading screen the way size/spacing/margins are below.
+ */
+:root[data-reading-font='serif-alt'] {
+  --font-reading: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+}
+
+:root[data-reading-font='sans'] {
+  --font-reading: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
