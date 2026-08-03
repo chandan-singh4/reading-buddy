@@ -186,7 +186,32 @@
 - [ ] **WP-23 Chapter recap** — zero-token summary + things learned + cheap quiz · *after 21,22*
 
 ### Leg 4 — The Archive (library & persistence)
-- [ ] **WP-24 Multi-book library** — covers, progress, status grouping · *after 04,11*
+- [~] **WP-24 Multi-book library** — covers, progress, status grouping · *after 04,11*
+  > Status grouping (Currently Reading / Up Next / Unread / Finished) and
+  > progress % shipped with the Home redesign, 2026-08-03. Real cover
+  > extraction (epub2/3) shipped 2026-08-03. **Left:** the shelf's visual
+  > language itself — the reader wants it to feel like the reference design
+  > they shared (illustrated, warm, cover-forward), not just "dark theme with
+  > covers now filled in." Carved into **WP-46** below so it can move without
+  > blocking the rest of this list.
+- [ ] **WP-46 Shelf visual redesign** — bring Home closer to the reference look
+  the reader shared: cover-forward grid/card layout, warmer surface
+  treatment, decorative touches. Purely visual — no new data. · *after 24*
+- [ ] **WP-47 Book detail page** — tap a book off the shelf to a dedicated
+  screen (today a tap opens the reader directly): title, author, format,
+  genre/subject tag, date-range read, **one overall rating** — the
+  "single overall book rating prompted at Finished" already agreed as a
+  future milestone. Foundation the next two waypoints hang their UI off of ·
+  *after 46*
+- [ ] **WP-48 Favorite quotes on the detail page** — surface saved highlights
+  on WP-47's screen. Genuinely blocked, not just sequenced: nothing saves a
+  highlight yet — needs WP-17 (selection menu) and WP-25 (highlights list)
+  first, or at least a minimal capture path carved out of them · *after
+  17,25,47*
+- [ ] **WP-49 Mood tags + notes/reflections + multi-axis ratings** — free-text
+  reflections, mood tags, and secondary rating axes (e.g. pacing, writing
+  style) alongside WP-47's single overall rating. The most bespoke, least
+  essential piece of the reference design — last on purpose · *after 47*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*

@@ -23,10 +23,12 @@
 }
 
 /* Scrolls sideways rather than wrapping — a shelf of covers reads as a shelf
-   only if it behaves like one. */
+   only if it behaves like one. Wider gap than a plain list: covers are the
+   thing being browsed, so each one gets room to read as its own object
+   rather than a row of edge-to-edge thumbnails. */
 .row {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-4);
   overflow-x: auto;
   padding-bottom: var(--space-2);
   scroll-snap-type: x proximity;
@@ -34,7 +36,7 @@
 
 .tile {
   flex: 0 0 auto;
-  width: 7rem;
+  width: 8.5rem;
   display: grid;
   gap: var(--space-2);
   color: inherit;
@@ -44,7 +46,9 @@
 
 /* Currently Reading's single hero tile: cover and text side by side rather
    than stacked, so it reads as the one thing on the shelf that matters most
-   right now, not as one more card in a row. */
+   right now, not as one more card in a row. Its cover runs larger than a
+   shelf tile's — the one book in progress earns the biggest cover on the
+   page. */
 .tileLarge {
   width: 100%;
   display: flex;
@@ -53,8 +57,12 @@
 }
 
 .tileMedia {
-  width: 7rem;
+  width: 8.5rem;
   flex: none;
+}
+
+.tileLarge .tileMedia {
+  width: 10rem;
 }
 
 .tileInfo {

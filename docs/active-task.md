@@ -8,50 +8,47 @@
 
 ---
 
-## Task — the rest of WP-14: how it looks
+## Task — WP-46: shelf visual redesign
 
-Page turning, links (WP-42), bulk delete (WP-44), the second and third phone
-rounds (WP-45; bare reading screen, no pager, permanent status line) and book
-pictures (WP-39's first half) all shipped 2026-08-02. Two phone-reported bugs
-(redundant `[Figure]` caption text; the reading screen bobbing mid-swipe) were
-fixed and merged to `main` 2026-08-03, alongside the app's first production
-deploy (Vercel, auto-deploying from `main` — see `progress.md`). Gates:
-**473 tests**, typecheck, build. App-shell precache ~425.3 KiB.
+The garbled-title bug (a hash baked into some epubs' own `<dc:title>`
+metadata, not just the filename — a follow-on from the earlier title-priority
+fix) was found and fixed 2026-08-03, `PARSER_VERSION` → 5. Deployed to `main`.
 
-What is left of WP-14 is the *look*, which the reader has confirmed twice is the
-next thing they want:
+The reader shared a reference design (warm, illustrated "wood shelf" library
+view, cover-forward grid, plus a per-book detail screen with rating/notes/
+quotes/mood) and asked for it broken into waypoints rather than attempted in
+one shot. Backlog now carries this as WP-24 (mostly shipped: status grouping,
+progress %, real covers) → **WP-46 (this task, visual only)** → WP-47 (book
+detail page) → WP-48 (favorite quotes, blocked on WP-17/25) → WP-49 (mood +
+notes + secondary ratings). See `backlog.md` Leg 4 for the full breakdown and
+dependency notes.
 
-- **Font size, line spacing, margins.** These are the reason word-counted pages
-  exist — the page number survives them, because it counts words not screens.
-- **Themes: light / dark / sepia.** Dark already follows the OS; sepia is new.
-  All of it flows from `styles/theme.css` tokens — no component hard-codes a
-  colour, so this is a `data-theme` attribute and a token block.
-- **The page-turn animation.** The seam is built (`turnPage`); only *instant* is
-  wired. Ship slide next, honour `prefers-reduced-motion`, ~200 ms ceiling, and
-  a fast tapper must be able to outrun it. Page curl stays a labelled slot.
-- **In-book search and real bookmarks** — the two stub tabs in the nav sheet,
-  which are a visible promise. Shelf search exists (WP-45); this is the other
-  one.
+**WP-46 itself is visual only — no new data, no new screens.** Make the
+existing Home shelves (`Shelves`/`BookTile` in `Home.tsx`) read closer to the
+reference: covers as the dominant element, less competing chrome, a warmer
+surface treatment. Stay inside the existing token system
+(`styles/theme.css`) — WP-14's light/dark/sepia theming is separate,
+unfinished work; don't fork a second colour mechanism to chase the reference
+image's specific wood/cream palette without checking with the reader first,
+since that's a bigger branding call than this waypoint's "make it look more
+like a shelf" scope.
 
 ### Definition of done
-A reader can set type size, spacing and theme from the nav sheet; the choice
-persists; page numbers do not shift when they change it; pages slide rather than
-snap, and reduced-motion users still get instant.
+Home's shelves read as cover-forward and less spartan than before, using only
+existing theme tokens (or new tokens added the same way `--text-xs` was).
+Reader has seen it and confirmed direction before WP-47 starts.
 
 ### Files in scope
-- `web/src/styles/theme.css` — every colour and size token lives here.
-- `web/src/reader/Chrome.tsx` + `Chrome.module.css` — where the settings go.
-- `web/src/pages/Reader.tsx` + `Reader.module.css` — the column strip and the
-  turn.
-- `web/src/reader/columns.ts` — the page arithmetic a re-flow must not break.
-- `web/src/reader/focusMode.ts` — the existing pattern for a persisted setting;
-  copy it rather than inventing a second one.
-- `web/src/reader/blocks.module.css` — per-block spacing, and the figure cap
-  (`max-height: 70dvh`) that a change to type size or margins interacts with.
+- `web/src/pages/Home.tsx` + `Home.module.css` — the shelves and tiles.
+- `web/src/app/Cover.tsx` + `Cover.module.css` — the cover component itself.
+- `web/src/styles/theme.css` — tokens only; no hard-coded colour/space/size in
+  a component.
 
 ### Out of scope
-The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half (tap a
-figure → ask Claude about it), pdf.js region rendering.
+WP-47's detail page, WP-48's quotes, WP-49's mood/ratings/notes — all need the
+reader's go-ahead on WP-46's direction first. The rest of WP-14 (reader font
+size/spacing/theme, page-turn animation, in-book search, bookmarks) is parked,
+not abandoned — still `[~]` in `backlog.md`, resume after this arc.
 
 ---
 
