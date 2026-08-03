@@ -21,6 +21,7 @@ export type {
   ParagraphLink,
   Section,
   SectionPath,
+  SecondaryRatingAxis,
   Shelf,
   SourceFormat,
 } from './types.ts'

@@ -14,6 +14,7 @@ import type {
   BookMeta,
   ChapterIndex,
   Manifest,
+  SecondaryRatingAxis,
   Section,
   SectionPath,
 } from '../structure/index.ts'
@@ -79,6 +80,43 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       const book = await database.books.get(id)
       if (!book) return
       await database.books.put({ ...book, rating })
+    },
+
+    /** Set or clear (`undefined`) a book's free-text reflections (WP-49). */
+    async setNotes(id: BookId, notes: string | undefined): Promise<void> {
+      const book = await database.books.get(id)
+      if (!book) return
+      await database.books.put({ ...book, notes: notes || undefined })
+    },
+
+    /** Replace a book's mood tags outright — the picker always sends the full set. */
+    async setMoods(id: BookId, moods: readonly string[]): Promise<void> {
+      const book = await database.books.get(id)
+      if (!book) return
+      await database.books.put({ ...book, moods: moods.length > 0 ? [...moods] : undefined })
+    },
+
+    /**
+     * Set or clear (`undefined`) one secondary rating axis, leaving the
+     * others as they were (WP-49) — unlike `setMoods`, a caller only ever
+     * knows about the one axis it's touching.
+     */
+    async rateBookAxis(
+      id: BookId,
+      axis: SecondaryRatingAxis,
+      value: number | undefined,
+    ): Promise<void> {
+      const book = await database.books.get(id)
+      if (!book) return
+
+      const secondaryRatings = { ...book.secondaryRatings }
+      if (value === undefined) delete secondaryRatings[axis]
+      else secondaryRatings[axis] = value
+
+      await database.books.put({
+        ...book,
+        secondaryRatings: Object.keys(secondaryRatings).length > 0 ? secondaryRatings : undefined,
+      })
     },
 
     /** Newest import first — the order the library screen wants. */

@@ -5,7 +5,7 @@ import { Cover } from '../app/Cover.tsx'
 import { useCovers } from '../app/useCovers.ts'
 import { repository, type StoredQuote } from '../storage/index.ts'
 import type { ReadingPosition } from '../storage/db.ts'
-import type { BookId, BookMeta } from '../structure/index.ts'
+import type { BookId, BookMeta, SecondaryRatingAxis } from '../structure/index.ts'
 import styles from './BookInfo.module.css'
 
 type LoadState =
@@ -22,6 +22,25 @@ const FORMAT_LABELS: Readonly<Record<BookMeta['source'], string>> = {
 }
 
 const STARS = [1, 2, 3, 4, 5] as const
+
+/** A fixed candidate list rather than free text — a shelf of tags only stays
+    scannable if the reader picks from the same small set every time. */
+const MOOD_OPTIONS = [
+  'Cozy',
+  'Nostalgic',
+  'Thoughtful',
+  'Emotional',
+  'Inspiring',
+  'Melancholic',
+  'Exciting',
+  'Calming',
+] as const
+
+const SECONDARY_AXES: ReadonlyArray<{ axis: SecondaryRatingAxis; label: string }> = [
+  { axis: 'writingStyle', label: 'Writing style' },
+  { axis: 'pacing', label: 'Pacing' },
+  { axis: 'emotionalImpact', label: 'Emotional impact' },
+]
 
 function readingStatus(position: ReadingPosition | undefined): string {
   if (!position) return 'Not started'
@@ -66,14 +85,33 @@ export default function BookInfo() {
 
   const covers = useCovers(useMemo(() => (state.status === 'ready' ? [id] : []), [state.status, id]))
 
-  async function rate(value: number) {
+  async function rate(value: number | undefined) {
     if (state.status !== 'ready') return
-    // Tapping the star that already sets the rating clears it, so a
-    // misplaced tap has a way back without a separate "clear" control.
-    const next = state.book.rating === value ? undefined : value
-    const book = state.book
-    setState({ ...state, book: { ...book, rating: next } })
-    await repository.rateBook(id, next)
+    setState({ ...state, book: { ...state.book, rating: value } })
+    await repository.rateBook(id, value)
+  }
+
+  async function rateAxis(axis: SecondaryRatingAxis, value: number | undefined) {
+    if (state.status !== 'ready') return
+    setState({
+      ...state,
+      book: { ...state.book, secondaryRatings: { ...state.book.secondaryRatings, [axis]: value } },
+    })
+    await repository.rateBookAxis(id, axis, value)
+  }
+
+  async function toggleMood(mood: string) {
+    if (state.status !== 'ready') return
+    const current = state.book.moods ?? []
+    const next = current.includes(mood) ? current.filter((m) => m !== mood) : [...current, mood]
+    setState({ ...state, book: { ...state.book, moods: next } })
+    await repository.setMoods(id, next)
+  }
+
+  async function saveNotes(notes: string) {
+    if (state.status !== 'ready') return
+    setState({ ...state, book: { ...state.book, notes: notes || undefined } })
+    await repository.setNotes(id, notes)
   }
 
   if (state.status === 'loading') {
@@ -140,20 +178,46 @@ export default function BookInfo() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Your rating</h2>
-        <div className={styles.stars} role="group" aria-label="Rate this book">
-          {STARS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={styles.star}
-              aria-pressed={book.rating !== undefined && value <= book.rating}
-              aria-label={`${value} star${value === 1 ? '' : 's'}`}
-              onClick={() => rate(value)}
-            >
-              {book.rating !== undefined && value <= book.rating ? '★' : '☆'}
-            </button>
+        <StarRow label="Overall" value={book.rating} onChange={rate} />
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionHeading}>Mood</h2>
+        <div className={styles.moods}>
+          {MOOD_OPTIONS.map((mood) => {
+            const active = book.moods?.includes(mood) ?? false
+            return (
+              <button
+                key={mood}
+                type="button"
+                className={active ? `${styles.mood} ${styles.moodActive}` : styles.mood}
+                aria-pressed={active}
+                onClick={() => toggleMood(mood)}
+              >
+                {mood}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionHeading}>More ratings</h2>
+        <div className={styles.axisList}>
+          {SECONDARY_AXES.map(({ axis, label }) => (
+            <StarRow
+              key={axis}
+              label={label}
+              value={book.secondaryRatings?.[axis]}
+              onChange={(value) => rateAxis(axis, value)}
+            />
           ))}
         </div>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionHeading}>Notes &amp; reflections</h2>
+        <NotesField initial={book.notes} onSave={saveNotes} />
       </section>
 
       <Quotes
@@ -173,6 +237,61 @@ export default function BookInfo() {
         {startLabel}
       </Link>
     </div>
+  )
+}
+
+/** A row of five tap-to-rate stars, shared by the overall rating and each
+    secondary axis (WP-49). Tapping the star that already sets the value
+    clears it, the same escape hatch the overall rating has always had. */
+function StarRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: number | undefined
+  onChange: (value: number | undefined) => void
+}) {
+  return (
+    <div className={styles.ratingRow}>
+      <span className={styles.ratingLabel}>{label}</span>
+      <div className={styles.stars} role="group" aria-label={label}>
+        {STARS.map((star) => (
+          <button
+            key={star}
+            type="button"
+            className={styles.star}
+            aria-pressed={value !== undefined && star <= value}
+            aria-label={`${star} star${star === 1 ? '' : 's'}`}
+            onClick={() => onChange(value === star ? undefined : star)}
+          >
+            {value !== undefined && star <= value ? '★' : '☆'}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Saved on blur rather than on every keystroke — a reflection is written a
+    sentence at a time, not fast enough to need debouncing. */
+function NotesField({
+  initial,
+  onSave,
+}: {
+  initial: string | undefined
+  onSave: (notes: string) => Promise<void>
+}) {
+  const [value, setValue] = useState(initial ?? '')
+  return (
+    <textarea
+      className={styles.notesInput}
+      placeholder="What did you take away from this book?"
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+      onBlur={() => onSave(value)}
+      rows={4}
+    />
   )
 }
 

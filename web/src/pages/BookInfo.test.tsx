@@ -3,7 +3,7 @@
 // The book detail page (WP-47), against a real (fake-indexeddb) database.
 import 'fake-indexeddb/auto'
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
@@ -101,17 +101,60 @@ describe('BookInfo', () => {
     await repository.saveParsedBook(bookOf())
     openInfo()
 
-    const fourthStar = await screen.findByRole('button', { name: '4 stars' })
+    const overall = within(await screen.findByRole('group', { name: 'Overall' }))
+    const fourthStar = overall.getByRole('button', { name: '4 stars' })
     fireEvent.click(fourthStar)
 
     await waitFor(async () => {
       expect((await repository.getBook(BOOK_ID))?.rating).toBe(4)
     })
-    expect(screen.getByRole('button', { name: '4 stars' }).getAttribute('aria-pressed')).toBe('true')
+    expect(fourthStar.getAttribute('aria-pressed')).toBe('true')
 
     fireEvent.click(fourthStar)
     await waitFor(async () => {
       expect((await repository.getBook(BOOK_ID))?.rating).toBeUndefined()
+    })
+  })
+
+  it('rates a secondary axis independently of the overall rating', async () => {
+    await repository.saveParsedBook(bookOf())
+    openInfo()
+
+    const pacing = within(await screen.findByRole('group', { name: 'Pacing' }))
+    fireEvent.click(pacing.getByRole('button', { name: '3 stars' }))
+
+    await waitFor(async () => {
+      expect((await repository.getBook(BOOK_ID))?.secondaryRatings).toEqual({ pacing: 3 })
+    })
+    expect((await repository.getBook(BOOK_ID))?.rating).toBeUndefined()
+  })
+
+  it('toggles a mood tag on and off', async () => {
+    await repository.saveParsedBook(bookOf())
+    openInfo()
+
+    const cozy = await screen.findByRole('button', { name: 'Cozy' })
+    fireEvent.click(cozy)
+    await waitFor(async () => {
+      expect((await repository.getBook(BOOK_ID))?.moods).toEqual(['Cozy'])
+    })
+
+    fireEvent.click(cozy)
+    await waitFor(async () => {
+      expect((await repository.getBook(BOOK_ID))?.moods).toBeUndefined()
+    })
+  })
+
+  it('saves notes on blur', async () => {
+    await repository.saveParsedBook(bookOf())
+    openInfo()
+
+    const notes = await screen.findByPlaceholderText('What did you take away from this book?')
+    fireEvent.change(notes, { target: { value: 'Changed how I think about emptiness.' } })
+    fireEvent.blur(notes)
+
+    await waitFor(async () => {
+      expect((await repository.getBook(BOOK_ID))?.notes).toBe('Changed how I think about emptiness.')
     })
   })
 

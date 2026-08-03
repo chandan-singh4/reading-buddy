@@ -140,6 +140,43 @@ describe('rateBook', () => {
   })
 })
 
+describe('reflections, moods and secondary ratings', () => {
+  it('sets and clears free-text notes', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.setNotes(bookId('a'), 'A book that changed how I read.')
+    expect((await repo.getBook(bookId('a')))?.notes).toBe('A book that changed how I read.')
+
+    await repo.setNotes(bookId('a'), '')
+    expect((await repo.getBook(bookId('a')))?.notes).toBeUndefined()
+  })
+
+  it('replaces the mood set outright', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.setMoods(bookId('a'), ['cozy', 'thoughtful'])
+    expect((await repo.getBook(bookId('a')))?.moods).toEqual(['cozy', 'thoughtful'])
+
+    await repo.setMoods(bookId('a'), ['exciting'])
+    expect((await repo.getBook(bookId('a')))?.moods).toEqual(['exciting'])
+
+    await repo.setMoods(bookId('a'), [])
+    expect((await repo.getBook(bookId('a')))?.moods).toBeUndefined()
+  })
+
+  it('rates one secondary axis without disturbing the others', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.rateBookAxis(bookId('a'), 'writingStyle', 5)
+    await repo.rateBookAxis(bookId('a'), 'pacing', 3)
+
+    expect((await repo.getBook(bookId('a')))?.secondaryRatings).toEqual({
+      writingStyle: 5,
+      pacing: 3,
+    })
+
+    await repo.rateBookAxis(bookId('a'), 'writingStyle', undefined)
+    expect((await repo.getBook(bookId('a')))?.secondaryRatings).toEqual({ pacing: 3 })
+  })
+})
+
 describe('saveParsedBook', () => {
   it('writes metadata, manifest, chapters and sections together', async () => {
     const parsed = makeParsedBook('a')
@@ -609,6 +646,11 @@ describe('favorite quotes', () => {
   it('lists newest first', async () => {
     await repo.saveParsedBook(makeParsedBook('a'))
     await repo.addQuote(bookId('a'), 'First saved.')
+    // `addedAt` is millisecond resolution; two adds back to back in a fast
+    // test can land in the same millisecond, which a stable sort then leaves
+    // in insertion order rather than reversed. A real reader never saves two
+    // quotes this close together, but the test has to force the gap itself.
+    await new Promise((resolve) => setTimeout(resolve, 5))
     await repo.addQuote(bookId('a'), 'Second saved.')
 
     const quotes = await repo.listQuotes(bookId('a'))
