@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { BookId, BookMeta } from '../structure/index.ts'
 import { isAnchor } from '../structure/index.ts'
+import { COVER_ASSET_PATH } from '../storage/index.ts'
 import { EpubError, parseEpub } from './epub.ts'
 
 function meta(overrides: Partial<BookMeta> = {}): BookMeta {
@@ -107,9 +108,23 @@ describe('parseEpub — a normal book', () => {
     expect(book.meta.author).toBe('A. Writer')
   })
 
-  it('keeps a caller-supplied title over the package one', async () => {
-    const book = await parseEpub(epub, meta({ title: 'My Name For It' }))
-    expect(book.meta.title).toBe('My Name For It')
+  it('prefers the package title even when the caller supplied a guess', async () => {
+    // `meta.title` here stands in for a filename-derived guess, which is
+    // never something a reader chose — the book's own metadata is the more
+    // trustworthy source whenever it has one.
+    const book = await parseEpub(epub, meta({ title: 'ugly-filename-guess' }))
+    expect(book.meta.title).toBe('Package Title')
+  })
+
+  it('falls back to the caller-supplied title only when the package has none', async () => {
+    const untitled = makeEpub({
+      manifest: '<item id="c1" href="Text/ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      metadata: '<dc:creator>A. Writer</dc:creator>',
+      files: { 'OEBPS/Text/ch1.xhtml': chapterDoc('<h1>Chapter One</h1><p>Opening prose.</p>') },
+    })
+    const book = await parseEpub(untitled, meta({ title: 'My Fallback Title' }))
+    expect(book.meta.title).toBe('My Fallback Title')
   })
 })
 
@@ -308,5 +323,55 @@ describe('parseEpub — pictures', () => {
     expect(book.sections.flatMap((s) => s.paragraphs).some((p) => p.text.includes('Figure 1.'))).toBe(
       true,
     )
+  })
+})
+
+describe('parseEpub — cover image', () => {
+  const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])
+
+  it('finds an EPUB 3 cover via the manifest item’s properties', async () => {
+    const epub = makeEpub({
+      manifest:
+        '<item id="cover-img" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image"/>' +
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      files: { 'OEBPS/ch1.xhtml': chapterDoc('<h1>One</h1><p>Prose.</p>') },
+      binary: { 'OEBPS/images/cover.jpg': JPEG },
+    })
+
+    const book = await parseEpub(epub, meta())
+    const cover = (book.assets ?? []).find((asset) => asset.path === COVER_ASSET_PATH)
+
+    expect(cover?.data.type).toBe('image/jpeg')
+    expect(cover?.data.size).toBe(JPEG.length)
+  })
+
+  it('finds an EPUB 2 cover via the <meta name="cover"> indirection', async () => {
+    const epub = makeEpub({
+      manifest:
+        '<item id="cover-img" href="images/cover.jpg" media-type="image/jpeg"/>' +
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      metadata:
+        '<dc:title>Package Title</dc:title><meta name="cover" content="cover-img"/>',
+      files: { 'OEBPS/ch1.xhtml': chapterDoc('<h1>One</h1><p>Prose.</p>') },
+      binary: { 'OEBPS/images/cover.jpg': JPEG },
+    })
+
+    const book = await parseEpub(epub, meta())
+    const cover = (book.assets ?? []).find((asset) => asset.path === COVER_ASSET_PATH)
+
+    expect(cover?.data.size).toBe(JPEG.length)
+  })
+
+  it('has no cover asset when the package names none', async () => {
+    const epub = makeEpub({
+      manifest: '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      files: { 'OEBPS/ch1.xhtml': chapterDoc('<h1>One</h1><p>Prose.</p>') },
+    })
+
+    const book = await parseEpub(epub, meta())
+    expect((book.assets ?? []).some((asset) => asset.path === COVER_ASSET_PATH)).toBe(false)
   })
 })

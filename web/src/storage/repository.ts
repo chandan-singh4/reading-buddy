@@ -37,6 +37,16 @@ export interface BookAsset {
   data: Blob
 }
 
+/**
+ * The reserved asset path a parser writes a book's cover image under, when it
+ * finds one. Not a real archive path — a fixed key, so the shelf can ask for
+ * "this book's cover" with `getAssets(bookId, [COVER_ASSET_PATH])` without
+ * knowing anything about the book's format or internal file layout. Absent
+ * entirely for a book with no extractable cover; the shelf falls back to a
+ * generated placeholder in that case.
+ */
+export const COVER_ASSET_PATH = '__cover__'
+
 /** Everything a parser produces for one book, written atomically. */
 export interface ParsedBook {
   meta: BookMeta
