@@ -59,8 +59,9 @@ const SHELF_SINGULAR: Record<Shelf, string> = {
 }
 
 /**
- * The home screen: every imported book, newest first, plus the three ways in —
- * pick files, pick a folder, or drop either onto the page.
+ * The full catalogue: every imported book, newest first, plus the three ways
+ * in — pick files, pick a folder, or drop either onto the page. Reached from
+ * Home's "See all books" rather than being the front door itself.
  */
 /**
  * The books a search shows.
@@ -335,7 +336,7 @@ export default function Library() {
         void onDrop(event)
       }}
     >
-      <h1 className={styles.title}>Library</h1>
+      <h1 className={styles.title}>All books</h1>
 
       <div className={`${styles.importer} ${dragging ? styles.importerDragging : ''}`}>
         <div className={styles.importActions}>

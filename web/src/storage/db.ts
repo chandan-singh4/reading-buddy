@@ -47,6 +47,13 @@ export interface ReadingPosition {
   anchor: Anchor
   /** ISO 8601 — what "Continue reading" and a recently-opened list sort on. */
   at: string
+  /**
+   * Whole-number percent through the book, 0–100, when it was known at save
+   * time. `undefined` on a position saved before this existed, or before the
+   * book's spine had built — the Home screen treats either as "still reading"
+   * rather than guessing.
+   */
+  percent?: number
 }
 
 /**

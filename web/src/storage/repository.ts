@@ -334,8 +334,13 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
      * Called repeatedly while reading, so it stays a single-row `put` with no
      * transaction and no read-before-write.
      */
-    async savePosition(bookId: BookId, anchor: Anchor): Promise<void> {
-      await database.positions.put({ bookId, anchor, at: new Date().toISOString() })
+    async savePosition(bookId: BookId, anchor: Anchor, percent?: number): Promise<void> {
+      await database.positions.put({
+        bookId,
+        anchor,
+        at: new Date().toISOString(),
+        ...(percent === undefined ? {} : { percent }),
+      })
     },
 
     async getPosition(bookId: BookId): Promise<ReadingPosition | undefined> {

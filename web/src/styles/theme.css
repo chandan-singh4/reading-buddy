@@ -64,6 +64,19 @@
   --reading-leading: var(--leading-reading);
   --reading-column-width: var(--reading-measure);
 
+  /*
+   * Placeholder cover swatches (Home, WP-24). A book with no extractable
+   * cover gets one of these, chosen deterministically from its title — see
+   * `app/cover.ts`. Muted rather than bright: they sit behind a title in
+   * small text and must not fight it for attention.
+   */
+  --cover-1: #b1876b;
+  --cover-2: #8a9a7e;
+  --cover-3: #7f9db3;
+  --cover-4: #b3907f;
+  --cover-5: #9c8bb0;
+  --cover-6: #a99a5f;
+
   /* Phone chrome: keeps content clear of notch and home indicator.
      Needs viewport-fit=cover in index.html, which is already set. */
   --safe-top: env(safe-area-inset-top, 0px);

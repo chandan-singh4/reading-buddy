@@ -1,0 +1,125 @@
+/* The curated front door — a handful of shelves, not the whole collection.
+   Full-catalogue furniture (search, import, multi-select) lives in
+   `page.module.css`, for `/library` only. */
+
+.home {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.shelfHeading {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* Scrolls sideways rather than wrapping — a shelf of covers reads as a shelf
+   only if it behaves like one. */
+.row {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scroll-snap-type: x proximity;
+}
+
+.tile {
+  flex: 0 0 auto;
+  width: 7rem;
+  display: grid;
+  gap: var(--space-2);
+  color: inherit;
+  scroll-snap-align: start;
+}
+
+/* Currently Reading's single hero tile: cover and text side by side rather
+   than stacked, so it reads as the one thing on the shelf that matters most
+   right now, not as one more card in a row. */
+.tileLarge {
+  width: 100%;
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.tileMedia {
+  width: 7rem;
+  flex: none;
+}
+
+.tileInfo {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.tileTitle {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  /* Two lines, then cut — a long title shouldn't push neighbouring tiles out
+     of alignment. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tileLarge .tileTitle {
+  font-size: var(--text-lg);
+  -webkit-line-clamp: 3;
+}
+
+.tileAuthor {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.tileProgress {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.seeAll {
+  justify-self: start;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.pending {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.empty {
+  margin-top: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+}
+
+.emptyTitle {
+  font-size: var(--text-lg);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.error {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+}

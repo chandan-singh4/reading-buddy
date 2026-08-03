@@ -28,19 +28,22 @@ function renderAt(path: string) {
 }
 
 describe('app shell', () => {
-  it('lands on the Library and reports an empty shelf', async () => {
+  it('lands on Home and reports an empty shelf', async () => {
     renderAt('/')
 
-    expect(screen.getByRole('heading', { name: 'Library' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Home' })).toBeDefined()
     // Resolves only once the repository has actually answered.
     expect(await screen.findByText('No books yet')).toBeDefined()
   })
 
-  it('shows the tab bar on shell routes', () => {
+  it('shows all four tabs on shell routes', () => {
     renderAt('/')
 
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect(nav).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Home' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Stats' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Journal' })).toBeDefined()
     expect(screen.getByRole('link', { name: 'Settings' })).toBeDefined()
   })
 
@@ -48,6 +51,25 @@ describe('app shell', () => {
     renderAt('/settings')
 
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeDefined()
+  })
+
+  it('renders the full catalogue at /library', async () => {
+    renderAt('/library')
+
+    expect(screen.getByRole('heading', { name: 'All books' })).toBeDefined()
+    expect(await screen.findByText('No books yet')).toBeDefined()
+  })
+
+  it('renders Stats on its route', () => {
+    renderAt('/stats')
+
+    expect(screen.getByRole('heading', { name: 'Stats' })).toBeDefined()
+  })
+
+  it('renders Journal on its route', () => {
+    renderAt('/journal')
+
+    expect(screen.getByRole('heading', { name: 'Journal' })).toBeDefined()
   })
 
   it('renders the Reader full-bleed, outside the shell', async () => {
@@ -59,9 +81,9 @@ describe('app shell', () => {
     expect(await screen.findByRole('alert')).toBeDefined()
   })
 
-  it('falls back to the Library for an unknown route', () => {
+  it('falls back to Home for an unknown route', () => {
     renderAt('/nowhere')
 
-    expect(screen.getByRole('heading', { name: 'Library' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Home' })).toBeDefined()
   })
 })

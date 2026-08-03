@@ -1082,9 +1082,13 @@ export default function Reader() {
    */
   useEffect(() => {
     if (!id || !restored || !anchorHere) return
+    // Read once per effect run rather than put in the dependency array as
+    // `pages` itself — that object is rebuilt every render, which would reset
+    // this debounce on every scroll frame instead of once per paragraph.
+    const percent = pages?.percent
 
     const timer = window.setTimeout(() => {
-      void repository.savePosition(id, anchorHere).catch(() => {
+      void repository.savePosition(id, anchorHere, percent).catch(() => {
         // Losing a place is a small loss; interrupting reading to report it
         // would be a larger one. The next paragraph tries again anyway.
       })
@@ -1093,7 +1097,7 @@ export default function Reader() {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [id, restored, anchorHere])
+  }, [id, restored, anchorHere, pages?.percent])
 
   const title =
     frame.status === 'ready' ? chapterTitle(frame.manifest, here.chapter) : undefined
