@@ -87,7 +87,13 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
       {shelves.currentlyReading && (
         <section>
           <h2 className={styles.shelfHeading}>Currently reading</h2>
-          <BookTile entry={shelves.currentlyReading} coverSrc={covers.get(shelves.currentlyReading.book.id)} large />
+          <div className={styles.heroCard}>
+            <BookTile
+              entry={shelves.currentlyReading}
+              coverSrc={covers.get(shelves.currentlyReading.book.id)}
+              large
+            />
+          </div>
         </section>
       )}
 

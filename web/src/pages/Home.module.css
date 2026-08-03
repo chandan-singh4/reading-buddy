@@ -44,6 +44,15 @@
   overflow: hidden;
 }
 
+/* The one book in progress gets its own panel, not just a wider row item —
+   it is the single thing on this screen the reader is most likely to act on. */
+.heroCard {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raised);
+}
+
 /* Currently Reading's single hero tile: cover and text side by side rather
    than stacked, so it reads as the one thing on the shelf that matters most
    right now, not as one more card in a row. Its cover runs larger than a

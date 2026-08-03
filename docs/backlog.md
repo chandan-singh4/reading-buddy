@@ -194,7 +194,7 @@
   > they shared (illustrated, warm, cover-forward), not just "dark theme with
   > covers now filled in." Carved into **WP-46** below so it can move without
   > blocking the rest of this list.
-- [ ] **WP-46 Shelf visual redesign** — bring Home closer to the reference look
+- [x] **WP-46 Shelf visual redesign** — bring Home closer to the reference look
   the reader shared: cover-forward grid/card layout, warmer surface
   treatment, decorative touches. Purely visual — no new data. · *after 24*
 - [ ] **WP-47 Book detail page** — tap a book off the shelf to a dedicated
