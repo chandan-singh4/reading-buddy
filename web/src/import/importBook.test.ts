@@ -134,6 +134,12 @@ describe('filename helpers', () => {
     expect(titleFromFilename('notes.md')).toBe('notes')
     expect(titleFromFilename('.gitignore')).toBe('.gitignore')
   })
+
+  it('drops a stray hash a download site left in the filename', () => {
+    expect(titleFromFilename('the_seven_husbands_60cda61f8cf1d1443efe944bb205a3a2.epub')).toBe(
+      'the seven husbands',
+    )
+  })
 })
 
 // --- Extension routing ------------------------------------------------------

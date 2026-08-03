@@ -126,6 +126,18 @@ describe('parseEpub — a normal book', () => {
     const book = await parseEpub(untitled, meta({ title: 'My Fallback Title' }))
     expect(book.meta.title).toBe('My Fallback Title')
   })
+
+  it('strips a stray hash a conversion tool left inside the package title', async () => {
+    const hashed = makeEpub({
+      manifest: '<item id="c1" href="Text/ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      metadata:
+        '<dc:title>The Fundamental Wisdom 60cda61f8cf1d1443efe944bb205a3a2 Annotated</dc:title>',
+      files: { 'OEBPS/Text/ch1.xhtml': chapterDoc('<h1>Chapter One</h1><p>Opening prose.</p>') },
+    })
+    const book = await parseEpub(hashed, meta())
+    expect(book.meta.title).toBe('The Fundamental Wisdom Annotated')
+  })
 })
 
 describe('parseEpub — spine handling', () => {

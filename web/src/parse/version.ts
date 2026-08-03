@@ -42,5 +42,8 @@
  *   the package names one, is now extracted too, for the shelf's cover art.
  *   Books parsed under 1–3 kept whatever title their filename produced and
  *   have no cover asset at all.
+ * - **5** — a stray hash some download or conversion tool left sitting inside
+ *   a title — in the filename, or baked right into the epub's own metadata —
+ *   is now stripped out. Books parsed under 1–4 may still show one.
  */
-export const PARSER_VERSION = 4
+export const PARSER_VERSION = 5

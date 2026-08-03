@@ -209,10 +209,23 @@ function readSpine(archive: Archive, packagePath: string): Spine {
   const metadata = firstByLocalName(doc, 'metadata') ?? doc
   return {
     documents,
-    title: firstByLocalName(metadata, 'title')?.textContent?.trim() || undefined,
+    title: cleanTitle(firstByLocalName(metadata, 'title')?.textContent),
     author: firstByLocalName(metadata, 'creator')?.textContent?.trim() || undefined,
     coverPath: findCoverPath(doc, metadata, packagePath, hrefById, typeById),
   }
+}
+
+/**
+ * Some epubs carry a `<dc:title>` that was itself generated from a hash-named
+ * source file, rather than typed by anyone — a long run of hex digits sits
+ * right in the metadata (`The Book 60cda61f8cf1d1443efe944bb205a3a2 Annotated`).
+ * Strip it out; it is never something a reader chose to see.
+ */
+function cleanTitle(raw: string | null | undefined): string | undefined {
+  const trimmed = raw?.trim()
+  if (!trimmed) return undefined
+  const stripped = trimmed.replace(/\b[0-9a-f]{16,40}\b/gi, ' ').replace(/\s{2,}/g, ' ').trim()
+  return stripped || undefined
 }
 
 /**

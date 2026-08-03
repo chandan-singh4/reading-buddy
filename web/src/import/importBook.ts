@@ -75,7 +75,11 @@ export function formatFromFilename(filename: string): SourceFormat | undefined {
 export function titleFromFilename(filename: string): string {
   const dot = filename.lastIndexOf('.')
   const stem = dot > 0 ? filename.slice(0, dot) : filename
-  const cleaned = stem.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
+  const cleaned = stem
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b[0-9a-f]{16,40}\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
   return cleaned === '' ? 'Untitled' : cleaned
 }
 
