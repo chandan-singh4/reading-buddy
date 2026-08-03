@@ -65,19 +65,46 @@
   align-items: center;
 }
 
-.tileMedia {
+/* Holds the cover link and the info button on top of it — `.tileMedia` is
+   decorative (the tileInfo link below is the real, keyboard-reachable route
+   to the same book), `.infoButton` is the only other interactive thing here. */
+.mediaWrap {
+  position: relative;
   width: 8.5rem;
   flex: none;
 }
 
-.tileLarge .tileMedia {
+.tileLarge .mediaWrap {
   width: 10rem;
+}
+
+.tileMedia {
+  display: block;
+}
+
+.infoButton {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: var(--text-xs);
+  line-height: 1;
+  text-decoration: none;
 }
 
 .tileInfo {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
 
 .tileTitle {

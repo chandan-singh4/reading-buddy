@@ -117,6 +117,29 @@ describe('books', () => {
   })
 })
 
+describe('rateBook', () => {
+  it('sets a rating on an existing book without touching the rest of it', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.rateBook(bookId('a'), 4)
+
+    const book = await repo.getBook(bookId('a'))
+    expect(book?.rating).toBe(4)
+    expect(book?.title).toBe(makeBook('a').title)
+  })
+
+  it('clears a rating when given undefined', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.rateBook(bookId('a'), 4)
+    await repo.rateBook(bookId('a'), undefined)
+
+    expect((await repo.getBook(bookId('a')))?.rating).toBeUndefined()
+  })
+
+  it('does nothing for a book that was never saved', async () => {
+    await expect(repo.rateBook(bookId('missing'), 5)).resolves.toBeUndefined()
+  })
+})
+
 describe('saveParsedBook', () => {
   it('writes metadata, manifest, chapters and sections together', async () => {
     const parsed = makeParsedBook('a')

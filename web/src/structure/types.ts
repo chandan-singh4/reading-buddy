@@ -110,6 +110,12 @@ export interface BookMeta {
   parserVersion?: number
   /** ISO 8601. */
   importedAt: string
+  /**
+   * The reader's own 1–5 verdict on the whole book, set from the detail page
+   * (WP-47). Absent until rated — there is no default of "unrated is zero
+   * stars", so this must stay optional rather than defaulting to `0`.
+   */
+  rating?: number
 }
 
 // --- Manifest ---------------------------------------------------------------

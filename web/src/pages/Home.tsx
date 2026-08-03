@@ -150,18 +150,27 @@ function BookTile({
 }) {
   const { book, percent } = entry
   return (
-    <Link
-      to={`/book/${book.id}`}
-      className={large ? `${styles.tile} ${styles.tileLarge}` : styles.tile}
-    >
-      <div className={styles.tileMedia}>
-        <Cover title={book.title} src={coverSrc} />
+    <div className={large ? `${styles.tile} ${styles.tileLarge}` : styles.tile}>
+      <div className={styles.mediaWrap}>
+        {/* Decorative duplicate of the tileInfo link below — the title link
+            already reaches this book by keyboard/screen reader, so this one
+            steps out of the tab order rather than announcing it twice. */}
+        <Link to={`/book/${book.id}`} className={styles.tileMedia} aria-hidden="true" tabIndex={-1}>
+          <Cover title={book.title} src={coverSrc} />
+        </Link>
+        <Link
+          to={`/book/${book.id}/info`}
+          className={styles.infoButton}
+          aria-label={`About ${book.title}`}
+        >
+          ⓘ
+        </Link>
       </div>
-      <div className={styles.tileInfo}>
+      <Link to={`/book/${book.id}`} className={styles.tileInfo}>
         <span className={styles.tileTitle}>{book.title}</span>
         {book.author && <span className={styles.tileAuthor}>{book.author}</span>}
         {percent !== undefined && <span className={styles.tileProgress}>{percent}% read</span>}
-      </div>
-    </Link>
+      </Link>
+    </div>
   )
 }

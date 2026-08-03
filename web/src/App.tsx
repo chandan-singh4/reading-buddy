@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 
 import AppShell from './app/AppShell.tsx'
+import BookInfo from './pages/BookInfo.tsx'
 import Home from './pages/Home.tsx'
 import Journal from './pages/Journal.tsx'
 import Library from './pages/Library.tsx'
@@ -10,10 +11,10 @@ import Stats from './pages/Stats.tsx'
 
 /**
  * Route table. Home, Stats, Journal, Library and Settings all nest inside
- * `AppShell` so they share the tab bar; Reader sits outside it to render
- * full-bleed. Library keeps its own route — the full catalogue — even though
- * it lost the tab bar's front-door slot to Home; nothing about the screen
- * itself changed, only how it's reached.
+ * `AppShell` so they share the tab bar; Reader and BookInfo (WP-47) sit
+ * outside it to render full-bleed. Library keeps its own route — the full
+ * catalogue — even though it lost the tab bar's front-door slot to Home;
+ * nothing about the screen itself changed, only how it's reached.
  */
 export function AppRoutes() {
   return (
@@ -26,6 +27,7 @@ export function AppRoutes() {
         <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="book/:bookId" element={<Reader />} />
+      <Route path="book/:bookId/info" element={<BookInfo />} />
       <Route path="*" element={<Home />} />
     </Routes>
   )

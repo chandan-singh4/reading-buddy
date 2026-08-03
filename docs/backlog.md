@@ -197,7 +197,7 @@
 - [x] **WP-46 Shelf visual redesign** — bring Home closer to the reference look
   the reader shared: cover-forward grid/card layout, warmer surface
   treatment, decorative touches. Purely visual — no new data. · *after 24*
-- [ ] **WP-47 Book detail page** — tap a book off the shelf to a dedicated
+- [x] **WP-47 Book detail page** — tap a book off the shelf to a dedicated
   screen (today a tap opens the reader directly): title, author, format,
   genre/subject tag, date-range read, **one overall rating** — the
   "single overall book rating prompted at Finished" already agreed as a

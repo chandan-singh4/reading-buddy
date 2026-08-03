@@ -73,6 +73,13 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       return database.books.get(id)
     },
 
+    /** Set or clear (`undefined`) the reader's 1–5 rating for a book (WP-47). */
+    async rateBook(id: BookId, rating: number | undefined): Promise<void> {
+      const book = await database.books.get(id)
+      if (!book) return
+      await database.books.put({ ...book, rating })
+    },
+
     /** Newest import first — the order the library screen wants. */
     async listBooks(): Promise<BookMeta[]> {
       const books = await database.books.orderBy('importedAt').toArray()
