@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
+import { useCovers } from '../app/useCovers.ts'
+import type { BookMeta } from '../structure/index.ts'
 import { repository } from '../storage/index.ts'
 import styles from './Home.module.css'
 
@@ -69,12 +71,23 @@ export default function Home() {
 }
 
 function Shelves({ shelves }: { shelves: HomeShelves }) {
+  const allBooks: BookMeta[] = useMemo(
+    () => [
+      ...(shelves.currentlyReading ? [shelves.currentlyReading.book] : []),
+      ...shelves.upNext.map((entry) => entry.book),
+      ...shelves.unread,
+      ...shelves.finished,
+    ],
+    [shelves],
+  )
+  const covers = useCovers(useMemo(() => allBooks.map((book) => book.id), [allBooks]))
+
   return (
     <>
       {shelves.currentlyReading && (
         <section>
           <h2 className={styles.shelfHeading}>Currently reading</h2>
-          <BookTile entry={shelves.currentlyReading} large />
+          <BookTile entry={shelves.currentlyReading} coverSrc={covers.get(shelves.currentlyReading.book.id)} large />
         </section>
       )}
 
@@ -83,7 +96,7 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
           <h2 className={styles.shelfHeading}>Up next</h2>
           <div className={styles.row}>
             {shelves.upNext.map((entry) => (
-              <BookTile key={entry.book.id} entry={entry} />
+              <BookTile key={entry.book.id} entry={entry} coverSrc={covers.get(entry.book.id)} />
             ))}
           </div>
         </section>
@@ -96,7 +109,7 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
           </h2>
           <div className={styles.row}>
             {shelves.unread.map((book) => (
-              <BookTile key={book.id} entry={{ book }} />
+              <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
             ))}
           </div>
         </section>
@@ -107,7 +120,7 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
           <h2 className={styles.shelfHeading}>Finished</h2>
           <div className={styles.row}>
             {shelves.finished.map((book) => (
-              <BookTile key={book.id} entry={{ book }} />
+              <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
             ))}
           </div>
         </section>
@@ -120,7 +133,15 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
   )
 }
 
-function BookTile({ entry, large = false }: { entry: ShelfEntry; large?: boolean }) {
+function BookTile({
+  entry,
+  coverSrc,
+  large = false,
+}: {
+  entry: ShelfEntry
+  coverSrc?: string
+  large?: boolean
+}) {
   const { book, percent } = entry
   return (
     <Link
@@ -128,7 +149,7 @@ function BookTile({ entry, large = false }: { entry: ShelfEntry; large?: boolean
       className={large ? `${styles.tile} ${styles.tileLarge}` : styles.tile}
     >
       <div className={styles.tileMedia}>
-        <Cover title={book.title} />
+        <Cover title={book.title} src={coverSrc} />
       </div>
       <div className={styles.tileInfo}>
         <span className={styles.tileTitle}>{book.title}</span>

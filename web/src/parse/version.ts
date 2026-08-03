@@ -35,5 +35,12 @@
  *   and stored beside the text, so a figure shows the plate and not just its
  *   caption. Books parsed under 1 or 2 have no pictures stored at all, which is
  *   precisely the case this stamp exists to announce.
+ * - **4** — an epub's own title metadata now wins over its filename, which
+ *   used to win by mistake — the guess a downloaded file's name makes is
+ *   sometimes a stray id or hash, never something a reader chose, and the
+ *   book's own `<dc:title>` is almost always cleaner. Its cover image, when
+ *   the package names one, is now extracted too, for the shelf's cover art.
+ *   Books parsed under 1–3 kept whatever title their filename produced and
+ *   have no cover asset at all.
  */
-export const PARSER_VERSION = 3
+export const PARSER_VERSION = 4

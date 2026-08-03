@@ -23,7 +23,7 @@
 
 import { unzipSync, strFromU8 } from 'fflate'
 
-import type { BookAsset, ParsedBook } from '../storage/index.ts'
+import { COVER_ASSET_PATH, type BookAsset, type ParsedBook } from '../storage/index.ts'
 import type { BookMeta } from '../structure/index.ts'
 import { assembleBook, type Block } from './assemble.ts'
 import { htmlToBlocks } from './html.ts'
@@ -151,6 +151,8 @@ interface Spine {
   documents: string[]
   title?: string
   author?: string
+  /** The cover image's archive path, when the package names one. */
+  coverPath?: string
 }
 
 /** `META-INF/container.xml` → the path of the `.opf` package file. */
@@ -209,7 +211,45 @@ function readSpine(archive: Archive, packagePath: string): Spine {
     documents,
     title: firstByLocalName(metadata, 'title')?.textContent?.trim() || undefined,
     author: firstByLocalName(metadata, 'creator')?.textContent?.trim() || undefined,
+    coverPath: findCoverPath(doc, metadata, packagePath, hrefById, typeById),
   }
+}
+
+/**
+ * The cover image's archive path, if the package names one.
+ *
+ * Two ways an epub says "this is the cover", and both are still common: EPUB
+ * 3 marks the manifest item itself (`properties="cover-image"`); EPUB 2 says
+ * so indirectly, with a `<meta name="cover" content="ID">` pointing at a
+ * manifest item id. Tried in that order; whichever resolves to an actual
+ * image item wins.
+ */
+function findCoverPath(
+  doc: Document,
+  metadata: Document | Element,
+  packagePath: string,
+  hrefById: Map<string, string>,
+  typeById: Map<string, string>,
+): string | undefined {
+  for (const item of byLocalName(doc, 'item')) {
+    const properties = item.getAttribute('properties') ?? ''
+    if (properties.split(/\s+/).includes('cover-image')) {
+      const href = item.getAttribute('href')
+      if (href) return resolvePath(packagePath, href)
+    }
+  }
+
+  for (const meta of byLocalName(metadata, 'meta')) {
+    if (meta.getAttribute('name') !== 'cover') continue
+    const id = meta.getAttribute('content')
+    if (!id) continue
+    const type = typeById.get(id) ?? ''
+    if (type && !type.startsWith('image/')) continue
+    const href = hrefById.get(id)
+    if (href) return href
+  }
+
+  return undefined
 }
 
 // --- Table of contents (titles only) -----------------------------------------
@@ -324,6 +364,25 @@ function readImages(
   return assets
 }
 
+/**
+ * The cover, read separately from `readImages`: it is stored under the fixed
+ * `COVER_ASSET_PATH` key rather than its own archive path, so the shelf can
+ * ask for "this book's cover" without knowing the book's internal layout —
+ * and so it is still found even when the cover's own page is `linear="no"`
+ * and therefore never reaches a figure block at all.
+ */
+function readCoverAsset(archive: Archive, coverPath: string | undefined): BookAsset | undefined {
+  if (!coverPath) return undefined
+
+  const type = mediaTypeOf(coverPath)
+  if (!type) return undefined
+
+  const bytes = readFile(archive, coverPath)
+  if (!bytes) return undefined
+
+  return { path: COVER_ASSET_PATH, data: new Blob([bytes.slice().buffer as ArrayBuffer], { type }) }
+}
+
 // --- Public API --------------------------------------------------------------
 
 /**
@@ -406,7 +465,7 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
   const book = assembleBook(blocks, {
     ...meta,
     source: 'epub',
-    title: meta.title || spine.title || 'Untitled',
+    title: spine.title || meta.title || 'Untitled',
     author: meta.author ?? spine.author,
   })
 
@@ -414,5 +473,7 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
   // assembly drops furniture, so a cover plate that never reaches a page is
   // never carried into storage either.
   const shown = book.sections.flatMap((section) => section.paragraphs)
-  return { ...book, assets: readImages(archive, shown) }
+  const cover = readCoverAsset(archive, spine.coverPath)
+  const assets = cover ? [...readImages(archive, shown), cover] : readImages(archive, shown)
+  return { ...book, assets }
 }
