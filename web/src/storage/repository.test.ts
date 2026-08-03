@@ -140,7 +140,29 @@ describe('rateBook', () => {
   })
 })
 
-describe('reflections, moods and secondary ratings', () => {
+describe('renameBook', () => {
+  it('overwrites the title, trimmed', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.renameBook(bookId('a'), '  The Quantum and the Lotus  ')
+
+    expect((await repo.getBook(bookId('a')))?.title).toBe('The Quantum and the Lotus')
+  })
+
+  it('ignores an empty title rather than blanking the book out', async () => {
+    await repo.saveBook(makeBook('a'))
+    const before = await repo.getBook(bookId('a'))
+
+    await repo.renameBook(bookId('a'), '   ')
+
+    expect((await repo.getBook(bookId('a')))?.title).toBe(before?.title)
+  })
+
+  it('does nothing for a book that was never saved', async () => {
+    await expect(repo.renameBook(bookId('missing'), 'New Title')).resolves.toBeUndefined()
+  })
+})
+
+describe('reflections', () => {
   it('sets and clears free-text notes', async () => {
     await repo.saveBook(makeBook('a'))
     await repo.setNotes(bookId('a'), 'A book that changed how I read.')
@@ -148,32 +170,6 @@ describe('reflections, moods and secondary ratings', () => {
 
     await repo.setNotes(bookId('a'), '')
     expect((await repo.getBook(bookId('a')))?.notes).toBeUndefined()
-  })
-
-  it('replaces the mood set outright', async () => {
-    await repo.saveBook(makeBook('a'))
-    await repo.setMoods(bookId('a'), ['cozy', 'thoughtful'])
-    expect((await repo.getBook(bookId('a')))?.moods).toEqual(['cozy', 'thoughtful'])
-
-    await repo.setMoods(bookId('a'), ['exciting'])
-    expect((await repo.getBook(bookId('a')))?.moods).toEqual(['exciting'])
-
-    await repo.setMoods(bookId('a'), [])
-    expect((await repo.getBook(bookId('a')))?.moods).toBeUndefined()
-  })
-
-  it('rates one secondary axis without disturbing the others', async () => {
-    await repo.saveBook(makeBook('a'))
-    await repo.rateBookAxis(bookId('a'), 'writingStyle', 5)
-    await repo.rateBookAxis(bookId('a'), 'pacing', 3)
-
-    expect((await repo.getBook(bookId('a')))?.secondaryRatings).toEqual({
-      writingStyle: 5,
-      pacing: 3,
-    })
-
-    await repo.rateBookAxis(bookId('a'), 'writingStyle', undefined)
-    expect((await repo.getBook(bookId('a')))?.secondaryRatings).toEqual({ pacing: 3 })
   })
 })
 

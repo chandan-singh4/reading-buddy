@@ -211,14 +211,14 @@
   character range within an anchor (WP-17's job) — so this table just gains a
   second way to be filled once WP-17/25 land, nothing about its shape changes
   · *after 47*
-- [x] **WP-49 Mood tags + notes/reflections + multi-axis ratings** — shipped
-  2026-08-03. `BookMeta.notes` (free text, saved on blur), `.moods` (a fixed
-  candidate list of toggle chips — a free-text tag would drift into a dozen
-  near-duplicate spellings), and `.secondaryRatings` (writing style / pacing /
-  emotional impact — the reference design's own axes were romance-specific,
-  which doesn't fit a library with philosophy and Buddhism in it, so these
-  three stand in as genre-neutral). Same `StarRow` widget as WP-47's overall
-  rating, reused rather than rebuilt three times · *after 47*
+- [x] **WP-49 Notes/reflections** — shipped 2026-08-03. `BookMeta.notes`
+  (free text, saved on blur). Originally also shipped `.moods` (toggle
+  chips) and `.secondaryRatings` (writing style / pacing / emotional
+  impact, genre-neutral stand-ins for the reference design's romance-
+  specific axes) — the reader saw the page live the same session and asked
+  for both removed as clutter, so they're gone: UI, repository methods
+  (`setMoods`/`rateBookAxis`) and the `BookMeta` fields/type all pulled
+  rather than left dead · *after 47*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*

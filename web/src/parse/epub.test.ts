@@ -138,6 +138,23 @@ describe('parseEpub — a normal book', () => {
     const book = await parseEpub(hashed, meta())
     expect(book.meta.title).toBe('The Fundamental Wisdom Annotated')
   })
+
+  it('cuts a title polluted with a citation dump — author, publisher, ISBN, hash, source credit', async () => {
+    const polluted = makeEpub({
+      manifest: '<item id="c1" href="Text/ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      metadata: [
+        '<dc:title>The Quantum and the Lotus A Journey to the Frontiers Where',
+        'Ricard, Matthieu;Trinh, Xuan Thuan Place of publication not identified, 2009',
+        '9780307566126 6402e7348bc497afb643fc7dd1a75c5b Anna’s Archive</dc:title>',
+        '<dc:creator>Matthieu Ricard</dc:creator>',
+      ].join(' '),
+      files: { 'OEBPS/Text/ch1.xhtml': chapterDoc('<h1>Chapter One</h1><p>Opening prose.</p>') },
+    })
+    const book = await parseEpub(polluted, meta())
+    expect(book.meta.title).toBe('The Quantum and the Lotus A Journey to the Frontiers Where')
+    expect(book.meta.author).toBe('Matthieu Ricard')
+  })
 })
 
 describe('parseEpub — spine handling', () => {

@@ -8,7 +8,7 @@
 
 ---
 
-## Task — the shelf/detail arc (WP-46→49) is done; nothing in flight
+## Task — WP-46→49 fast-follow (reader's first live reaction) is done
 
 The garbled-title bug (a hash baked into some epubs' own `<dc:title>`
 metadata, not just the filename) was fixed 2026-08-03, `PARSER_VERSION` → 5.
@@ -27,23 +27,61 @@ and merged to `main` the same session, 2026-08-03:
 - **WP-48** — favorite quotes on that page. Scoped down to a typed-in MVP (a
   new `quotes` table, schema v7) rather than waiting on true in-reader
   selection, which still needs WP-17/25 (unbuilt — see `backlog.md`).
-- **WP-49** — `BookMeta.notes` / `.moods` / `.secondaryRatings`
-  (writingStyle/pacing/emotionalImpact — genre-neutral stand-ins for the
-  reference's romance-specific axes) on the same page, via a shared
-  `StarRow` widget.
+- **WP-49** — `BookMeta.notes` on the same page. Originally also shipped
+  `.moods` / `.secondaryRatings`, **removed same session** — see below.
 
-Gates re-run after each waypoint: typecheck clean, full suite green (the one
-`docx.test.ts` failure is a pre-existing mammoth/environment flake, unrelated
-— confirmed present on `main` before this arc started too), build clean.
+The reader then saw it live and asked for a fast-follow, same session,
+2026-08-03:
 
-**Not yet done:** the reader hasn't seen any of this live yet. Next session
-should open with checking their reaction before picking the next task —
-resist starting something new off assumption.
+- **Title cleanup, round 2.** Some epubs (from a download/conversion
+  pipeline such as Anna's Archive) don't just have a stray hash in
+  `<dc:title>` — the whole thing is a citation dump: title run straight into
+  author, publisher, ISBN, a hash and a trailing "Anna's Archive" credit, no
+  punctuation between fields (`The Quantum and the Lotus A Journey to the
+  Frontiers Where Ricard, Matthieu;Trinh, Xuan Thuan Place of publication not
+  identified, 2009 9780307566126 6402e734… Anna's Archive`). `cleanTitle` in
+  `parse/epub.ts` now recognises each field (ISBN digit run, the "Anna's
+  Archive" / "place of publication not identified" phrases, and the known
+  author's name in "Lastname, Firstname" form) and cuts the title at the
+  earliest one found. `PARSER_VERSION` → 6.
+  **Known gap, by design:** a subtitle mashed into the same string with none
+  of those markers of its own (as in the example above — the cut lands after
+  "…Frontiers Where", not at "…the Lotus") can't be told apart from the real
+  title algorithmically; there's no delimiter left to find it by. That's what
+  the manual rename below is for.
+- **Manual title rename.** A pencil next to the title on the detail page
+  (`TitleField` in `BookInfo.tsx`, `repository.renameBook`) — the escape
+  hatch for whatever the automatic cleanup above can't get exactly right.
+- **Mood and More ratings sections removed.** The reader found them
+  unnecessary clutter after seeing the page live. Pulled the UI, the
+  `repository.setMoods` / `.rateBookAxis` methods, and the `BookMeta.moods` /
+  `.secondaryRatings` / `SecondaryRatingAxis` type entirely — same-day code
+  nobody had used yet, so a full removal rather than leaving it dead.
+- **Layout fixes on the detail page.** `.title`/`.author`/`.quoteText`/`.fact
+  dd` now all get `overflow-wrap: anywhere` and `.page` gets
+  `overflow-x: hidden`, so a long unbroken metadata string (a hash, an ISBN)
+  can never again push the page wider than the screen and clip the Status /
+  Added / Last read rows off the edge — which is what was actually happening
+  in the reader's screenshot, not a narrow-column bug.
+- **Page tightened**, not made fully static: removing Mood + More ratings
+  shrank it a lot, and textareas lost a row each. True "never scrolls" isn't
+  promised — Favorite quotes is an open-ended list by nature and will grow
+  past one screen on a book with several saved.
+
+Gates re-run: typecheck clean, full suite green (524/524 — the previously
+noted `docx.test.ts` flake did not recur this run), build clean.
+
+**Not yet done:** the reader hasn't seen *this* round live yet either.
+Next session should open the same way — check their reaction, especially
+whether the title heuristic and the manual rename together actually get them
+to "just the title" on their other Anna's Archive-sourced books, before
+picking anything new.
 
 ### Files in scope
-None right now — no task is in flight. If the reader wants adjustments to
-what shipped, start from `web/src/pages/BookInfo.tsx` (+ `.module.css`) and
-`web/src/pages/Home.tsx` (+ `.module.css`), the two screens this arc touched.
+None right now — no task is in flight. If the reader wants further
+adjustments, start from `web/src/parse/epub.ts` (title cleanup),
+`web/src/pages/BookInfo.tsx` (+ `.module.css`) and `web/src/pages/Home.tsx`
+(+ `.module.css`).
 
 ### Out of scope
 The rest of WP-14 (reader font size/spacing/theme, page-turn animation,

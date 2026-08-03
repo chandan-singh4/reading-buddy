@@ -6,8 +6,12 @@
   padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
     calc(var(--safe-bottom) + var(--space-6));
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
   align-content: start;
+  /* A book's own metadata is never fully trustworthy — a stray unbroken
+     string (a hash, an ISBN run) must never be able to force this page
+     wider than the screen and drag `.facts` off the edge with it. */
+  overflow-x: hidden;
 }
 
 .back {
@@ -37,15 +41,59 @@
   min-width: 0;
 }
 
+.titleRow {
+  display: flex;
+  align-items: start;
+  gap: var(--space-2);
+}
+
 .title {
   font-size: var(--text-xl);
   font-weight: 700;
   line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.titleEdit {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  padding: var(--space-1);
+}
+
+.titleEditForm {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.titleInput {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+.titleSave {
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
 }
 
 .author {
   font-size: var(--text-base);
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .tags {
@@ -71,16 +119,21 @@
 .fact {
   display: flex;
   justify-content: space-between;
+  gap: var(--space-3);
   font-size: var(--text-sm);
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-border);
 }
 
 .fact dt {
+  flex: none;
   color: var(--color-text-muted);
 }
 
 .fact dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
   font-weight: 600;
 }
 
@@ -123,32 +176,6 @@
   min-width: 7rem;
 }
 
-.moods {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.mood {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: none;
-}
-
-.moodActive {
-  color: var(--color-accent-contrast);
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-.axisList {
-  display: grid;
-  gap: var(--space-3);
-}
-
 .notesInput {
   font: inherit;
   color: inherit;
@@ -179,6 +206,7 @@
   font-family: var(--font-reading);
   font-style: italic;
   line-height: var(--leading-reading);
+  overflow-wrap: anywhere;
 }
 
 .quoteRemove {

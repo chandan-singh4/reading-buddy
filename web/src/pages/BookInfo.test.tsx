@@ -116,32 +116,20 @@ describe('BookInfo', () => {
     })
   })
 
-  it('rates a secondary axis independently of the overall rating', async () => {
-    await repository.saveParsedBook(bookOf())
+  it('renames a book by hand, for metadata the parser can’t fully clean', async () => {
+    await repository.saveParsedBook(bookOf({ title: 'A Book Author, Someone 1234567890 Junk' }))
     openInfo()
 
-    const pacing = within(await screen.findByRole('group', { name: 'Pacing' }))
-    fireEvent.click(pacing.getByRole('button', { name: '3 stars' }))
+    await screen.findByText('A Book Author, Someone 1234567890 Junk')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit title' }))
 
+    const input = screen.getByRole('textbox', { name: 'Title' })
+    fireEvent.change(input, { target: { value: 'A Book' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('A Book')).toBeTruthy()
     await waitFor(async () => {
-      expect((await repository.getBook(BOOK_ID))?.secondaryRatings).toEqual({ pacing: 3 })
-    })
-    expect((await repository.getBook(BOOK_ID))?.rating).toBeUndefined()
-  })
-
-  it('toggles a mood tag on and off', async () => {
-    await repository.saveParsedBook(bookOf())
-    openInfo()
-
-    const cozy = await screen.findByRole('button', { name: 'Cozy' })
-    fireEvent.click(cozy)
-    await waitFor(async () => {
-      expect((await repository.getBook(BOOK_ID))?.moods).toEqual(['Cozy'])
-    })
-
-    fireEvent.click(cozy)
-    await waitFor(async () => {
-      expect((await repository.getBook(BOOK_ID))?.moods).toBeUndefined()
+      expect((await repository.getBook(BOOK_ID))?.title).toBe('A Book')
     })
   })
 

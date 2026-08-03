@@ -45,5 +45,13 @@
  * - **5** — a stray hash some download or conversion tool left sitting inside
  *   a title — in the filename, or baked right into the epub's own metadata —
  *   is now stripped out. Books parsed under 1–4 may still show one.
+ * - **6** — a `<dc:title>` polluted with a whole citation dump (author,
+ *   publisher, ISBN, content hash, a trailing "Anna's Archive" credit — all
+ *   run together with no punctuation between fields) is now cut back to just
+ *   the title, by recognising each of those fields and truncating at the
+ *   first one found. Not a guarantee: a subtitle mashed into the same string
+ *   with none of those markers of its own can survive — use the manual rename
+ *   on the book's detail page for those. Books parsed under 1–5 may still
+ *   show the full dump.
  */
-export const PARSER_VERSION = 5
+export const PARSER_VERSION = 6

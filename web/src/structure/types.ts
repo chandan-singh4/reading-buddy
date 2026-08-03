@@ -118,22 +118,7 @@ export interface BookMeta {
   rating?: number
   /** Free-text reflections, set from the detail page (WP-49). */
   notes?: string
-  /**
-   * Reader-picked mood tags ("cozy", "thoughtful"), set from the detail page
-   * (WP-49). A fixed candidate list lives beside the picker
-   * (`pages/BookInfo.tsx`), not here — the type only needs "some strings".
-   */
-  moods?: string[]
-  /**
-   * Finer axes than the single `rating` above, set from the detail page
-   * (WP-49). A `Partial` record, not a required one with every axis at `0`:
-   * a book with no writing-style rating yet has *no opinion*, not a bad one.
-   */
-  secondaryRatings?: Partial<Record<SecondaryRatingAxis, number>>
 }
-
-/** The secondary rating axes the detail page offers alongside `rating`. */
-export type SecondaryRatingAxis = 'writingStyle' | 'pacing' | 'emotionalImpact'
 
 // --- Manifest ---------------------------------------------------------------
 

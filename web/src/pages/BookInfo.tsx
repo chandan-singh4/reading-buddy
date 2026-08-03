@@ -5,7 +5,7 @@ import { Cover } from '../app/Cover.tsx'
 import { useCovers } from '../app/useCovers.ts'
 import { repository, type StoredQuote } from '../storage/index.ts'
 import type { ReadingPosition } from '../storage/db.ts'
-import type { BookId, BookMeta, SecondaryRatingAxis } from '../structure/index.ts'
+import type { BookId, BookMeta } from '../structure/index.ts'
 import styles from './BookInfo.module.css'
 
 type LoadState =
@@ -22,25 +22,6 @@ const FORMAT_LABELS: Readonly<Record<BookMeta['source'], string>> = {
 }
 
 const STARS = [1, 2, 3, 4, 5] as const
-
-/** A fixed candidate list rather than free text — a shelf of tags only stays
-    scannable if the reader picks from the same small set every time. */
-const MOOD_OPTIONS = [
-  'Cozy',
-  'Nostalgic',
-  'Thoughtful',
-  'Emotional',
-  'Inspiring',
-  'Melancholic',
-  'Exciting',
-  'Calming',
-] as const
-
-const SECONDARY_AXES: ReadonlyArray<{ axis: SecondaryRatingAxis; label: string }> = [
-  { axis: 'writingStyle', label: 'Writing style' },
-  { axis: 'pacing', label: 'Pacing' },
-  { axis: 'emotionalImpact', label: 'Emotional impact' },
-]
 
 function readingStatus(position: ReadingPosition | undefined): string {
   if (!position) return 'Not started'
@@ -60,8 +41,8 @@ function dateOf(iso: string): string {
 /**
  * A book's own screen (WP-47) — reached from a shelf tile's "ⓘ", not from
  * tapping the cover, which still opens straight into the reader. Title,
- * author, format, status and a 1–5 rating live here; WP-48 and WP-49 add
- * quotes, mood and notes to the same page rather than inventing new ones.
+ * author, format, status and a 1–5 rating live here; WP-48 adds quotes and
+ * WP-49 adds notes to the same page rather than inventing new ones.
  */
 export default function BookInfo() {
   const { bookId } = useParams<{ bookId: string }>()
@@ -91,21 +72,10 @@ export default function BookInfo() {
     await repository.rateBook(id, value)
   }
 
-  async function rateAxis(axis: SecondaryRatingAxis, value: number | undefined) {
+  async function rename(title: string) {
     if (state.status !== 'ready') return
-    setState({
-      ...state,
-      book: { ...state.book, secondaryRatings: { ...state.book.secondaryRatings, [axis]: value } },
-    })
-    await repository.rateBookAxis(id, axis, value)
-  }
-
-  async function toggleMood(mood: string) {
-    if (state.status !== 'ready') return
-    const current = state.book.moods ?? []
-    const next = current.includes(mood) ? current.filter((m) => m !== mood) : [...current, mood]
-    setState({ ...state, book: { ...state.book, moods: next } })
-    await repository.setMoods(id, next)
+    setState({ ...state, book: { ...state.book, title } })
+    await repository.renameBook(id, title)
   }
 
   async function saveNotes(notes: string) {
@@ -150,7 +120,7 @@ export default function BookInfo() {
           <Cover title={book.title} src={covers.get(id)} />
         </div>
         <div className={styles.heroInfo}>
-          <h1 className={styles.title}>{book.title}</h1>
+          <TitleField title={book.title} onSave={rename} />
           {book.author && <p className={styles.author}>{book.author}</p>}
           <div className={styles.tags}>
             <span className={styles.tag}>{FORMAT_LABELS[book.source]}</span>
@@ -182,40 +152,6 @@ export default function BookInfo() {
       </section>
 
       <section className={styles.section}>
-        <h2 className={styles.sectionHeading}>Mood</h2>
-        <div className={styles.moods}>
-          {MOOD_OPTIONS.map((mood) => {
-            const active = book.moods?.includes(mood) ?? false
-            return (
-              <button
-                key={mood}
-                type="button"
-                className={active ? `${styles.mood} ${styles.moodActive}` : styles.mood}
-                aria-pressed={active}
-                onClick={() => toggleMood(mood)}
-              >
-                {mood}
-              </button>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionHeading}>More ratings</h2>
-        <div className={styles.axisList}>
-          {SECONDARY_AXES.map(({ axis, label }) => (
-            <StarRow
-              key={axis}
-              label={label}
-              value={book.secondaryRatings?.[axis]}
-              onChange={(value) => rateAxis(axis, value)}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Notes &amp; reflections</h2>
         <NotesField initial={book.notes} onSave={saveNotes} />
       </section>
@@ -240,9 +176,9 @@ export default function BookInfo() {
   )
 }
 
-/** A row of five tap-to-rate stars, shared by the overall rating and each
-    secondary axis (WP-49). Tapping the star that already sets the value
-    clears it, the same escape hatch the overall rating has always had. */
+/** A row of five tap-to-rate stars. Tapping the star that already sets the
+    value clears it — rating a book requires a way to say "actually, no
+    opinion" again. */
 function StarRow({
   label,
   value,
@@ -273,6 +209,66 @@ function StarRow({
   )
 }
 
+/**
+ * The title, with a manual rename a tap away. Some epubs' own metadata
+ * mashes a subtitle, the author and a source credit into the title with no
+ * punctuation between them (`cleanTitle` in `parse/epub.ts` strips the
+ * author/ISBN/hash/credit part automatically, but can't always tell a
+ * subtitle from the real title) — this is how a reader fixes what's left,
+ * once, by hand.
+ */
+function TitleField({
+  title,
+  onSave,
+}: {
+  title: string
+  onSave: (title: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(title)
+
+  if (!editing) {
+    return (
+      <div className={styles.titleRow}>
+        <h1 className={styles.title}>{title}</h1>
+        <button
+          type="button"
+          className={styles.titleEdit}
+          aria-label="Edit title"
+          onClick={() => {
+            setValue(title)
+            setEditing(true)
+          }}
+        >
+          ✎
+        </button>
+      </div>
+    )
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = value.trim()
+    if (trimmed) await onSave(trimmed)
+    setEditing(false)
+  }
+
+  return (
+    <form className={styles.titleEditForm} onSubmit={submit}>
+      <input
+        className={styles.titleInput}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        aria-label="Title"
+        autoFocus
+      />
+      <button type="submit" className={styles.titleSave}>
+        Save
+      </button>
+    </form>
+  )
+}
+
 /** Saved on blur rather than on every keystroke — a reflection is written a
     sentence at a time, not fast enough to need debouncing. */
 function NotesField({
@@ -290,7 +286,7 @@ function NotesField({
       value={value}
       onChange={(event) => setValue(event.target.value)}
       onBlur={() => onSave(value)}
-      rows={4}
+      rows={3}
     />
   )
 }
