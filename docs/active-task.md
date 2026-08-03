@@ -12,8 +12,11 @@
 
 Page turning, links (WP-42), bulk delete (WP-44), the second and third phone
 rounds (WP-45; bare reading screen, no pager, permanent status line) and book
-pictures (WP-39's first half) all shipped 2026-08-02. Gates: **472 tests**,
-typecheck, build. App-shell precache 425.30 KiB.
+pictures (WP-39's first half) all shipped 2026-08-02. Two phone-reported bugs
+(redundant `[Figure]` caption text; the reading screen bobbing mid-swipe) were
+fixed and merged to `main` 2026-08-03, alongside the app's first production
+deploy (Vercel, auto-deploying from `main` — see `progress.md`). Gates:
+**473 tests**, typecheck, build. App-shell precache ~425.3 KiB.
 
 What is left of WP-14 is the *look*, which the reader has confirmed twice is the
 next thing they want:
@@ -70,11 +73,26 @@ figure → ask Claude about it), pdf.js region rendering.
   failed once on a full run while a build was running, and passed on three clean
   full runs plus four isolated ones. Not diagnosed. If it recurs on an idle
   machine, it is real.
-- **The live Anthropic key is still in `Claude API/API.txt`**, inside a public
-  repo's folder. Gitignored and never committed, but WP-19 is when it must move
-  out and be read from an env var.
+- **The live Anthropic key is still in `Claude API/API.txt`**, on the reader's
+  machine. `.env.example` is ready at the repo root (2026-08-03); the key
+  itself still needs a manual copy into a local `.env`, and into Vercel's
+  Environment Variables once `api/` has code. More urgent than it was — the
+  app now has a public URL, not just a home LAN.
 - **The certificate names an address.** If the router gives this PC a new one,
   `npm run lan` prints both the address and the mkcert command to reissue it.
+  Mostly moot now for phone testing — the app is live on Vercel and
+  auto-deploys from `main`, so a push + reopening the installed app is the new
+  path; LAN/mkcert only matters for testing an unpushed change.
+- **Don't strip `touch-action: pan-x` (`Reader.module.css` `.page`) or
+  `overscroll-behavior: none` (`index.css`, `html`/`body`) while reworking
+  margins, spacing or the page-turn animation.** They're what stops the
+  browser from reading a not-quite-horizontal swipe as a scroll attempt — pull
+  them out and the reading screen bobs up and down again on a phone.
+- **`deploy-vercel` branch (the `.env.example` prep) isn't merged to `main`
+  yet.** No functional change, low-risk merge whenever convenient.
+- **A garbled-diacritics report is open**, waiting on the reader to share the
+  actual epub or its title-page markup — traced to the source file's own SVG
+  `<title>`, not our parser, but unconfirmed. Don't attempt a fix blind.
 
 ## Decisions already made — don't re-derive these
 - **A reading place is an anchor, never a page number** (WP-15).
@@ -92,8 +110,8 @@ figure → ask Claude about it), pdf.js region rendering.
   which book you opened (`useRowMemory`), not how far down you had scrolled.
 
 ## Useful context (already known — don't re-derive)
-- Gates: `npm test` (426), `npm run typecheck`, `npm run build`, from the repo
-  root. App-shell precache 413.75 KiB.
+- Gates: `npm test` (473), `npm run typecheck`, `npm run build`, from the repo
+  root. App-shell precache ~425.3 KiB.
 - Retrieval path, and the whole of it: `getManifest(bookId)` →
   `getChapterIndex(bookId, n)` → `getSection(bookId, path)`. There is
   deliberately no "load the book" call — don't add one.

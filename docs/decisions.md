@@ -97,6 +97,25 @@
   a binary fixture. — 2026-08-02
 - **pdf and docx are lazy-loaded**, and `mammoth` is aliased to its browser build
   in `vite.config.ts` so tests exercise the same path the phone runs. — 2026-08-02
+
+### Settled 2026-08-03 (bug fixes + first deploy)
+- **Vercel hosts the deployed app**, connected to GitHub, auto-deploying on
+  every push to `main`. Root Directory is set to `web/` in the Vercel project
+  (the app isn't at the repo root), which lets Vercel auto-detect Vite with no
+  custom build/output config. — 2026-08-03
+- **The Anthropic key's production home is Vercel's own Environment Variables
+  setting, never a committed file.** A local `.env` (gitignored) covers dev;
+  `.env.example` is the checked-in template for both. — 2026-08-03
+- **A figure's caption shows the real `figcaption` (`label`) only once its
+  picture actually renders.** The parser's `[Figure: ...]` placeholder text is
+  for the degraded case (no picture shown at all) — showing it next to a
+  working image just repeated "[Figure]" under every plate. — 2026-08-03
+- **Every touch on the reading screen is handled by the app, never the
+  browser.** `touch-action: pan-x` on the page-turn element and
+  `overscroll-behavior: none` (both axes, was x-only) on `html`/`body` stop a
+  not-quite-horizontal swipe from being read as a scroll attempt — which on
+  mobile also animates the address bar and was making the screen visibly bob.
+  — 2026-08-03
 - **Plain-text heading detection is gated on word count**, not just length: a
   58-character sentence opening "Chapter four was…" otherwise became a chapter.
   False positives mis-anchor prose permanently; missed headings only cost a
