@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
 import {
@@ -15,9 +15,12 @@ import {
   type ReparseProgress,
 } from '../import/index.ts'
 import type { BookId, BookMeta, Shelf } from '../structure/index.ts'
-import { repository } from '../storage/index.ts'
+import { repository, type ReadingPosition } from '../storage/index.ts'
+import { Cover } from '../app/Cover.tsx'
+import { useCovers } from '../app/useCovers.ts'
 import { rowId, useRowMemory } from '../app/useRowMemory.ts'
 import styles from './page.module.css'
+import listStyles from './Library.module.css'
 
 type LoadState =
   | { status: 'loading' }
@@ -71,6 +74,15 @@ const SHELF_SINGULAR: Record<Shelf, string> = {
  * "jung red" should find *The Red Book* by Jung, which a single substring test
  * across the whole phrase would miss.
  */
+/** bookId → percent read, dropping positions with no percent recorded yet. */
+function percentMap(positions: readonly ReadingPosition[]): Map<BookId, number> {
+  const map = new Map<BookId, number>()
+  for (const position of positions) {
+    if (position.percent !== undefined) map.set(position.bookId, position.percent)
+  }
+  return map
+}
+
 function matching(books: readonly BookMeta[], query: string): BookMeta[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
   if (words.length === 0) return [...books]
@@ -117,9 +129,13 @@ export default function Library() {
    */
   const [withSource, setWithSource] = useState<Set<BookId>>(new Set())
 
+  /** How far into each book the reader has got, for the list's "N% read". */
+  const [percentByBook, setPercentByBook] = useState<ReadonlyMap<BookId, number>>(new Map())
+
   const books = state.status === 'ready' ? state.books : []
   const visible = matching(books, query)
   const allShown = visible.length > 0 && visible.every((book) => selected?.has(book.id))
+  const covers = useCovers(useMemo(() => visible.map((book) => book.id), [visible]))
 
   // Waits for the books, because the shelf's height depends on them — restoring
   // a position against a half-drawn list is what put the reader at the bottom.
@@ -130,11 +146,12 @@ export default function Library() {
   useEffect(() => {
     let cancelled = false
 
-    Promise.all([repository.listBooks(), repository.booksWithSource()])
-      .then(([books, sources]) => {
+    Promise.all([repository.listBooks(), repository.booksWithSource(), repository.listPositions()])
+      .then(([books, sources, positions]) => {
         if (cancelled) return
         setState({ status: 'ready', books })
         setWithSource(sources)
+        setPercentByBook(percentMap(positions))
       })
       .catch((error: unknown) => {
         if (cancelled) return
@@ -163,12 +180,14 @@ export default function Library() {
 
   /** Re-read the shelf and which books still have their file. */
   async function reload() {
-    const [books, sources] = await Promise.all([
+    const [books, sources, positions] = await Promise.all([
       repository.listBooks(),
       repository.booksWithSource(),
+      repository.listPositions(),
     ])
     setState({ status: 'ready', books })
     setWithSource(sources)
+    setPercentByBook(percentMap(positions))
   }
 
   /**
@@ -628,6 +647,10 @@ export default function Library() {
                         />
                       )}
 
+                      <div className={listStyles.coverMedia}>
+                        <Cover title={book.title} src={covers.get(book.id)} />
+                      </div>
+
                       {/*
                         While selecting, the title ticks the box instead of
                         opening the book. Half a screen of tappable title that
@@ -640,17 +663,7 @@ export default function Library() {
                           className={`${styles.cardLink} ${styles.cardLinkPlain}`}
                           onClick={() => toggleSelected(book.id)}
                         >
-                          <span className={styles.emptyTitle}>{book.title}</span>
-                          <p className={styles.pending}>
-                            {book.author ? `${book.author} · ` : ''}
-                            {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
-                            {/* So the banner's number has faces. Without this
-                                "4 books can be improved" is a claim the reader
-                                has no way to check. */}
-                            {isOutOfDate(book) && (
-                              <span className={styles.outdated}> · can be improved</span>
-                            )}
-                          </p>
+                          <BookRowText book={book} percent={percentByBook.get(book.id)} />
                         </button>
                       ) : (
                         <Link
@@ -658,17 +671,7 @@ export default function Library() {
                           className={styles.cardLink}
                           onClick={() => rememberRow(book.id)}
                         >
-                          <span className={styles.emptyTitle}>{book.title}</span>
-                          <p className={styles.pending}>
-                            {book.author ? `${book.author} · ` : ''}
-                            {book.type === 'dense-technical' ? 'Dense' : 'Fiction'}
-                            {/* So the banner's number has faces. Without this
-                                "4 books can be improved" is a claim the reader
-                                has no way to check. */}
-                            {isOutOfDate(book) && (
-                              <span className={styles.outdated}> · can be improved</span>
-                            )}
-                          </p>
+                          <BookRowText book={book} percent={percentByBook.get(book.id)} />
                         </Link>
                       )}
 
@@ -725,6 +728,34 @@ export default function Library() {
             </section>
           )
         })}
+    </div>
+  )
+}
+
+/**
+ * A row's title, author and progress — shared between the plain link (normal
+ * browsing) and the tick-the-row button (while selecting), so the two stay
+ * visually identical and only the wrapping element changes underneath them.
+ */
+function BookRowText({ book, percent }: { book: BookMeta; percent: number | undefined }) {
+  return (
+    <div className={listStyles.text}>
+      <span className={styles.emptyTitle}>{book.title}</span>
+      {book.author && <p className={styles.pending}>{book.author}</p>}
+      {(percent !== undefined || isOutOfDate(book)) && (
+        <p className={styles.pending}>
+          {percent !== undefined && (
+            <span className={listStyles.progress}>{percent}% read</span>
+          )}
+          {/* So the banner's number has faces. Without this "4 books can be
+              improved" is a claim the reader has no way to check. */}
+          {isOutOfDate(book) && (
+            <span className={styles.outdated}>
+              {percent !== undefined ? ' · ' : ''}can be improved
+            </span>
+          )}
+        </p>
+      )}
     </div>
   )
 }

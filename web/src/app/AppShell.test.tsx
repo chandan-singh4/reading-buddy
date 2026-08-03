@@ -42,8 +42,8 @@ describe('app shell', () => {
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect(nav).toBeDefined()
     expect(screen.getByRole('link', { name: 'Home' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'All Books' })).toBeDefined()
     expect(screen.getByRole('link', { name: 'Stats' })).toBeDefined()
-    expect(screen.getByRole('link', { name: 'Journal' })).toBeDefined()
     expect(screen.getByRole('link', { name: 'Settings' })).toBeDefined()
   })
 
@@ -64,12 +64,6 @@ describe('app shell', () => {
     renderAt('/stats')
 
     expect(screen.getByRole('heading', { name: 'Stats' })).toBeDefined()
-  })
-
-  it('renders Journal on its route', () => {
-    renderAt('/journal')
-
-    expect(screen.getByRole('heading', { name: 'Journal' })).toBeDefined()
   })
 
   it('renders the Reader full-bleed, outside the shell', async () => {

@@ -30,6 +30,7 @@ import {
   placeOf,
   previousSection,
   readFocusMode,
+  applyStoredTheme,
   leadingOf,
   measureOf,
   readReaderSettings,
@@ -719,15 +720,13 @@ export default function Reader() {
    * uses, so an explicit choice here behaves exactly like that one. Left in
    * place when the reader navigates away, like `focusMode`: it is a setting
    * about the app, not something that should revert on leaving the page.
+   * `main.tsx` applies the same persisted value at boot, before this
+   * component ever mounts — this effect is what keeps it live while the Aa
+   * tab is open and being changed.
    */
   useEffect(() => {
-    const root = document.documentElement
-    if (settings.theme === 'auto') root.removeAttribute('data-theme')
-    else root.dataset.theme = settings.theme
-
-    if (settings.font === 'serif') root.removeAttribute('data-reading-font')
-    else root.dataset.readingFont = settings.font
-  }, [settings.theme, settings.font])
+    applyStoredTheme(settings)
+  }, [settings])
 
   /**
    * Text size, line spacing and margins, scoped to this element and its

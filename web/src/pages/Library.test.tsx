@@ -106,6 +106,20 @@ describe('the shelf', () => {
 
     expect(screen.queryByRole('checkbox')).toBeNull()
   })
+
+  it('shows how far a book has been read, once it has a position', async () => {
+    await repository.savePosition('a' as BookId, formatAnchor({ chapter: 1, section: 1, paragraph: 1 }), 42)
+    openLibrary()
+
+    expect(await screen.findByText('42% read')).toBeTruthy()
+  })
+
+  it('says nothing about progress for a book with no position yet', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    expect(screen.queryByText(/% read/)).toBeNull()
+  })
 })
 
 describe('selecting several books', () => {

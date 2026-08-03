@@ -24,6 +24,7 @@ export {
   MAX_TEXT_STEP,
   MIN_TEXT_STEP,
   TEXT_STEPS,
+  applyStoredTheme,
   leadingOf,
   measureOf,
   readReaderSettings,

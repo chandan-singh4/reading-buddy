@@ -4,17 +4,17 @@ import styles from './AppShell.module.css'
 
 const TABS: { to: string; label: string; end?: boolean }[] = [
   { to: '/', label: 'Home', end: true },
+  { to: '/library', label: 'All Books' },
   { to: '/stats', label: 'Stats' },
-  { to: '/journal', label: 'Journal' },
   { to: '/settings', label: 'Settings' },
 ]
 
 /**
- * The chrome around Home, Stats, Journal and Settings: a scrolling content
+ * The chrome around Home, All Books, Stats and Settings: a scrolling content
  * area plus a bottom tab bar, which is where thumbs actually reach on a
- * phone. The full catalogue (`/library` — search, import, delete) is reached
- * from Home rather than from its own tab; it's a destination, not a place a
- * reader starts from.
+ * phone. Home's "See all books" link still points at the same `/library`
+ * route this tab does — both reach the full catalogue, one from the curated
+ * front door and one directly.
  *
  * The Reader deliberately renders outside this shell — reading should be
  * full-bleed, with navigation appearing only on tap (WP-13).

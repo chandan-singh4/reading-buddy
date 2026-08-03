@@ -120,3 +120,28 @@ export function writeReaderSettings(settings: ReaderSettings): void {
     /* Same as focusMode.ts: the setting simply won't persist. */
   }
 }
+
+/**
+ * Apply the persisted theme and reading font to `<html>`.
+ *
+ * Called from two places, on purpose. `main.tsx` calls it once at boot, before
+ * React renders anything — without that, a session that opens straight to
+ * Home shows the OS's `prefers-color-scheme` guess instead of whatever theme
+ * the reader actually chose, right up until a book happens to be opened. Since
+ * the reader's own effect writes to `<html>` rather than scoping the change to
+ * the reading screen (see its doc comment — that's deliberate, the reader's
+ * choice is a setting about the whole app), the *first* time it ran used to be
+ * the moment the reader's real choice suddenly appeared and started sticking
+ * everywhere — which read as "opening a book changed my theme," when what
+ * actually happened was Home never applying it in the first place. `Reader.tsx`
+ * still calls this too, from the effect that reacts to the Aa tab changing the
+ * setting live.
+ */
+export function applyStoredTheme(settings: ReaderSettings = readReaderSettings()): void {
+  const root = document.documentElement
+  if (settings.theme === 'auto') root.removeAttribute('data-theme')
+  else root.dataset.theme = settings.theme
+
+  if (settings.font === 'serif') root.removeAttribute('data-reading-font')
+  else root.dataset.readingFont = settings.font
+}

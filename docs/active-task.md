@@ -71,17 +71,60 @@ The reader then saw it live and asked for a fast-follow, same session,
 Gates re-run: typecheck clean, full suite green (524/524 — the previously
 noted `docx.test.ts` flake did not recur this run), build clean.
 
-**Not yet done:** the reader hasn't seen *this* round live yet either.
-Next session should open the same way — check their reaction, especially
-whether the title heuristic and the manual rename together actually get them
-to "just the title" on their other Anna's Archive-sourced books, before
-picking anything new.
+The reader looked again, same session, 2026-08-03, and reported three more
+things:
+
+- **The still-garbled title on their screen was stale, not unfixed.** They
+  compared to Google Books, which resolves metadata from its own catalogue
+  by ISBN — not by reading the epub's internal `<dc:title>` — so "Google
+  Books shows it clean" doesn't actually mean the epub's own metadata is
+  clean; the two apps are answering the question two different ways. Their
+  screenshot still showed the *full* pre-round-2 string (hash included),
+  which only happens if they hadn't tapped "Update" on the Library screen
+  since the last deploy — the fix only ever applies on reparse. Told them
+  this plainly and pointed at the manual rename as the sure thing either way.
+- **Tab bar + "All Books".** `AppShell.tsx`'s tabs are now Home / All Books
+  (`/library`) / Stats / Settings. `Journal.tsx` is deleted outright — it was
+  an unbuilt placeholder page, not a feature anyone had used, and the reader
+  asked for it gone rather than kept dark.
+- **The "All Books" list now shows cover art and reading progress**, closer
+  to the reference Google Books screenshot: a `Cover` thumbnail
+  (`useCovers`, same hook Home uses) plus "N% read" per row, computed from
+  `repository.listPositions()`. New `Library.module.css` layered on top of
+  the existing shared `page.module.css` furniture — the import buttons,
+  select-all bar, per-row shelf-move/remove controls are all unchanged, only
+  the row's own content gained a thumbnail and a progress line.
+- **Theme bug, real and fixed.** `data-theme` on `<html>` was only ever
+  applied by an effect inside `Reader.tsx`, so a session that started on
+  Home showed the OS's `prefers-color-scheme` guess right up until a book
+  was opened for the first time — at which point the reader's *actual*
+  persisted choice (set on some earlier visit to the Aa tab, and forgotten
+  about) suddenly took over globally, which read as "opening a book changed
+  my theme." Fixed by applying the persisted setting once at boot, in
+  `main.tsx`, via a new `applyStoredTheme()` in `readerSettings.ts` — `Reader.tsx`
+  now calls the same function instead of duplicating the logic, kept for live
+  updates while the Aa tab is open. Verified with Playwright against the dev
+  server, both directions (persisted dark shows immediately on a fresh Home
+  load; persisted light overrides an OS dark preference immediately too) —
+  this was cleanly reproducible and fixed, not a guess.
+
+Gates re-run: typecheck clean, full suite green (525/525), build clean.
+Also spot-checked the Library redesign live (Playwright screenshots, not
+just tests) — cover art and "N% read" render correctly on both Home and
+All Books.
+
+**Not yet done:** the reader hasn't seen *this* round live yet. Also still
+open — didn't attempt blind: whether the title heuristic actually gets
+"just the title" on their *other* Anna's Archive books once they've tapped
+Update, since only one example (The Quantum and the Lotus) has been seen.
 
 ### Files in scope
 None right now — no task is in flight. If the reader wants further
 adjustments, start from `web/src/parse/epub.ts` (title cleanup),
-`web/src/pages/BookInfo.tsx` (+ `.module.css`) and `web/src/pages/Home.tsx`
-(+ `.module.css`).
+`web/src/pages/BookInfo.tsx` (+ `.module.css`), `web/src/pages/Home.tsx`
+(+ `.module.css`), `web/src/pages/Library.tsx` (+ `.module.css`),
+`web/src/app/AppShell.tsx`, and `web/src/reader/readerSettings.ts` /
+`web/src/main.tsx` for theme.
 
 ### Out of scope
 The rest of WP-14 (reader font size/spacing/theme, page-turn animation,

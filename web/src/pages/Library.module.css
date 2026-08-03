@@ -1,0 +1,20 @@
+/* The "All books" list's own look — a thumbnail-forward row closer to what a
+   library app's book list actually looks like, layered on top of the shared
+   furniture in `page.module.css` (the importer, the empty states, the select
+   bar). Everything below is additive to `.cardRow`/`.cardLink`, never a
+   replacement for them. */
+
+.coverMedia {
+  flex: none;
+  width: 3rem;
+}
+
+.text {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.progress {
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
