@@ -227,26 +227,32 @@ export function Block({
   const id = elementIdOf(block.anchor)
   const text = <Text block={block} onFollow={onFollowLink} />
 
+  // The source divided here — a new epub spine document — so the page does too.
+  // Carried on the outermost element of every kind, because that is the one the
+  // column box sees; a class on a wrapped child would be a break instruction
+  // inside a block the browser has already decided not to split.
+  const opens = block.startsPage ? ` ${styles.startsPage}` : ''
+
   switch (block.kind) {
     case 'heading':
       // Always h3: the section's own title is the h2 above it, and a book's
       // internal heading levels are not the page's document outline.
       return (
-        <h3 id={id} className={styles.heading}>
+        <h3 id={id} className={styles.heading + opens}>
           {text}
         </h3>
       )
 
     case 'quote':
       return (
-        <blockquote id={id} className={styles.quote}>
+        <blockquote id={id} className={styles.quote + opens}>
           {text}
         </blockquote>
       )
 
     case 'code':
       return (
-        <pre id={id} className={styles.code}>
+        <pre id={id} className={styles.code + opens}>
           <code>{block.text}</code>
         </pre>
       )
@@ -255,35 +261,35 @@ export function Block({
       // Rendered as-is, centred. Real maths typesetting is a later question;
       // showing the source is honest and never wrong.
       return (
-        <p id={id} className={styles.formula}>
+        <p id={id} className={styles.formula + opens}>
           {block.text}
         </p>
       )
 
     case 'note':
       return (
-        <aside id={id} className={styles.note}>
+        <aside id={id} className={styles.note + opens}>
           {text}
         </aside>
       )
 
     case 'figure':
       return (
-        <div id={id}>
+        <div id={id} className={opens}>
           <Figure block={block} images={images} />
         </div>
       )
 
     case 'table':
       return (
-        <div id={id}>
+        <div id={id} className={opens}>
           <Table block={block} onFollow={onFollowLink} />
         </div>
       )
 
     case 'list':
       return (
-        <div id={id}>
+        <div id={id} className={opens}>
           <List block={block} onFollow={onFollowLink} />
         </div>
       )
@@ -294,7 +300,7 @@ export function Block({
     // rather than vanishing.
     default:
       return (
-        <p id={id} className={styles.prose}>
+        <p id={id} className={styles.prose + opens}>
           {text}
         </p>
       )

@@ -263,6 +263,26 @@ export interface Paragraph {
    * and nothing reads them once the links are resolved.
    */
   ids?: string[]
+  /**
+   * This block opened a new document in the source, so it opens a new page in
+   * the reader.
+   *
+   * An epub is not one file — it is a spine of separate XHTML documents, and the
+   * publisher's own division. The cover is one, the copyright page is one, the
+   * dedication is one, the preface is one. Every other reader starts each of them
+   * on a fresh page; flattening the spine into one stream is what made a cover
+   * plate run straight into the title, and the dedication run into the preface.
+   *
+   * A boundary, not a break instruction: the parser records where the source
+   * divided, and `Reader.module.css` decides what that looks like. Deliberately
+   * *not* a section boundary — sections are the navigation and anchor grammar,
+   * and books that split one chapter across three files would fragment the
+   * contents list into nonsense.
+   *
+   * `true` or absent, never `false`: most blocks are not boundaries and shouldn't
+   * pay a field for it in storage.
+   */
+  startsPage?: true
   /** Finer-grained type when it matters: `epigraph`, `pull-quote`, `footnote`… */
   label?: string
   /** `kind: 'table'` — rows of cells. The first row is often, not always, a header. */

@@ -100,6 +100,31 @@
   text-align: center;
 }
 
+/*
+ * Where the source book itself divided — an epub spine document: the cover, the
+ * copyright page, the dedication, the preface. A page here is a CSS column, so
+ * "start a new page" is `break-before: column` and the browser does the rest,
+ * leaving the remainder of the outgoing page blank exactly as print does.
+ *
+ * Page numbers are unaffected: they are counted in words, not screens (WP-40),
+ * so the blank remainder costs nothing on the bar.
+ *
+ * `margin-top: 0` because the break has already provided all the separation
+ * there is — a top margin would push the first line down a page that is already
+ * empty above it.
+ */
+.startsPage {
+  break-before: column;
+  margin-top: 0;
+}
+
+/* A forced break before the first thing in the column box would open the
+   section with a blank page. Browsers mostly drop a break at the start of a
+   fragmentation flow already, but not all of them do it for columns. */
+.startsPage:first-child {
+  break-before: auto;
+}
+
 /* A wide table scrolls within itself. Without this the whole page scrolls
    sideways, which on a phone breaks reading everything else too. */
 .tableScroll {

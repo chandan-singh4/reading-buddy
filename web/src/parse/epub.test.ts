@@ -113,6 +113,83 @@ describe('parseEpub — a normal book', () => {
   })
 })
 
+/**
+ * The front matter case, which is what this was reported as: a cover plate
+ * running straight into the title page beneath it, and a dedication running into
+ * the preface. Each of those is its own document in the file — the publisher's
+ * own page division — and until the seam was kept they were concatenated into
+ * one unbroken run of text.
+ */
+describe('parseEpub — the source book’s own page divisions', () => {
+  const frontMatter = makeEpub({
+    manifest: [
+      '<item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>',
+      '<item id="ded" href="dedication.xhtml" media-type="application/xhtml+xml"/>',
+      '<item id="pre" href="preface.xhtml" media-type="application/xhtml+xml"/>',
+    ].join(''),
+    spine: '<itemref idref="cover"/><itemref idref="ded"/><itemref idref="pre"/>',
+    files: {
+      'OEBPS/cover.xhtml': chapterDoc('<p><img src="cover.jpg" alt="Cover"/></p>'),
+      'OEBPS/dedication.xhtml': chapterDoc('<p>I dedicate this work.</p>'),
+      'OEBPS/preface.xhtml': chapterDoc('<p>This is a translation.</p>'),
+    },
+  })
+
+  it('marks each spine document after the first as starting a page', async () => {
+    const book = await parseEpub(frontMatter, meta())
+    const blocks = book.sections.flatMap((s) => s.paragraphs)
+
+    expect(blocks.map((p) => [p.text, p.startsPage === true])).toEqual([
+      ['[Figure: Cover]', false],
+      ['I dedicate this work.', true],
+      ['This is a translation.', true],
+    ])
+  })
+
+  it('never marks the opening block, which would be a blank page one', async () => {
+    const book = await parseEpub(frontMatter, meta())
+    expect(book.sections[0].paragraphs[0].startsPage).toBeUndefined()
+  })
+
+  it('leaves the flag off entirely inside a single document', async () => {
+    const epub = makeEpub({
+      manifest: '<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      files: {
+        'OEBPS/c1.xhtml': chapterDoc('<h1>One</h1><p>First.</p><p>Second.</p><p>Third.</p>'),
+      },
+    })
+
+    const book = await parseEpub(epub, meta())
+    const flagged = book.sections.flatMap((s) => s.paragraphs).filter((p) => p.startsPage)
+    expect(flagged).toEqual([])
+  })
+
+  it('puts the break on the first block that survives assembly, not on furniture', async () => {
+    // A running header is dropped before anchors are assigned, so a flag left on
+    // one would be a page break that silently disappears.
+    const epub = makeEpub({
+      manifest: [
+        '<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="c2" href="c2.xhtml" media-type="application/xhtml+xml"/>',
+      ].join(''),
+      spine: '<itemref idref="c1"/><itemref idref="c2"/>',
+      files: {
+        'OEBPS/c1.xhtml': chapterDoc('<h1>One</h1><p>First.</p>'),
+        'OEBPS/c2.xhtml': chapterDoc(
+          '<nav epub:type="toc"><ol><li>x</li></ol></nav><p>Second.</p>',
+        ),
+      },
+    })
+
+    const book = await parseEpub(epub, meta())
+    const second = book.sections.flatMap((s) => s.paragraphs).find((p) => p.text === 'Second.')
+    // The nav is gone by the time anchors are assigned; the break has to have
+    // moved onto the prose behind it rather than gone with it.
+    expect(second?.startsPage).toBe(true)
+  })
+})
+
 describe('parseEpub — spine handling', () => {
   it('follows spine order, not archive or filename order', async () => {
     const epub = makeEpub({

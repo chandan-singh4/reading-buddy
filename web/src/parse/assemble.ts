@@ -75,6 +75,13 @@ interface BlockFields {
   links?: RawLink[]
   /** Ids the source markup put on or inside this block — what links point at. */
   ids?: string[]
+  /**
+   * This block began a new document in the source. Set by the formats that have
+   * such a thing — epub's spine is the one that matters — and carried through
+   * untouched; see `startsPage` on `Paragraph` for why it is a boundary rather
+   * than a section split.
+   */
+  startsPage?: true
 }
 
 export interface HeadingBlock extends BlockFields {
@@ -125,7 +132,12 @@ function resolveLevels(blocks: readonly Block[]): Levels | null {
  * prose means no text is lost between the source file and the reader.
  */
 function demoteHeading(block: HeadingBlock): ContentBlock {
-  return { kind: 'prose', text: `${'#'.repeat(block.level)} ${block.text}` }
+  const demoted: ContentBlock = { kind: 'prose', text: `${'#'.repeat(block.level)} ${block.text}` }
+  // A demoted heading keeps its place in the book, so it keeps the fact that it
+  // opened one of the source's documents — losing that here would silently undo
+  // the page break for exactly the books that use deep heading levels.
+  if (block.startsPage) demoted.startsPage = true
+  return demoted
 }
 
 function asContent(block: Block): ContentBlock {
@@ -277,6 +289,7 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
         if (block.label !== undefined) paragraph.label = block.label
         if (block.rows !== undefined) paragraph.rows = block.rows
         if (block.image !== undefined) paragraph.image = block.image
+        if (block.startsPage) paragraph.startsPage = true
         // Carried through unresolved — as bare destinations, which is all the
         // parser knows. `parse/links.ts` upgrades the ones that turn out to
         // point inside this book into anchors, once every block has one: a link

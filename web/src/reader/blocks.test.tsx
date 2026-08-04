@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import type { Anchor, BlockKind, Paragraph } from '../structure/index.ts'
 import { Block, elementIdOf } from './blocks.tsx'
+// The same stylesheet the component uses, so these assertions hold whether or
+// not the test run hashes CSS-module class names.
+import styles from './blocks.module.css'
 
 function blockOf(kind: BlockKind, text: string, extra: Partial<Paragraph> = {}): Paragraph {
   return { anchor: '[ch02-s03-p013]' as Anchor, kind, text, ...extra }
@@ -97,6 +100,48 @@ describe('tables keep their grid', () => {
     const { container } = render(<Block block={blockOf('table', 'Year 1990 2000')} />)
     expect(container.querySelector('table')).toBeNull()
     expect(container.textContent).toContain('Year 1990 2000')
+  })
+})
+
+/**
+ * The seam between the source book's own page divisions and this screen. The
+ * parser records *that* a division was there (`startsPage`); the class is how it
+ * becomes a page, and the class has to sit on the outermost element of every
+ * kind — the one the column box can actually break before.
+ */
+describe('a block that opens a new page', () => {
+  it.each<BlockKind>([
+    'prose',
+    'heading',
+    'quote',
+    'list',
+    'code',
+    'figure',
+    'table',
+    'formula',
+    'note',
+  ])('carries the break class on the outer element of a %s block', (kind) => {
+    const { container } = render(
+      <Block block={blockOf(kind, 'Some text.', { startsPage: true })} />,
+    )
+    const outer = container.firstElementChild
+    expect(outer?.classList.contains(styles.startsPage)).toBe(true)
+  })
+
+  it('leaves the class off an ordinary block, which must not break', () => {
+    const { container } = render(<Block block={blockOf('prose', 'Some text.')} />)
+    expect(container.firstElementChild?.classList.contains(styles.startsPage)).toBe(false)
+  })
+
+  it('keeps the kind’s own styling alongside it', () => {
+    // The break is added to the class list, never in place of it — a quote that
+    // opens a page is still a quote.
+    const { container } = render(
+      <Block block={blockOf('quote', 'Some text.', { startsPage: true })} />,
+    )
+    const outer = container.firstElementChild
+    expect(outer?.classList.contains(styles.quote)).toBe(true)
+    expect(outer?.classList.contains(styles.startsPage)).toBe(true)
   })
 })
 

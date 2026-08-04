@@ -396,11 +396,31 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
     // Only synthesise titles for books that supply no headings of their own —
     // injecting them alongside real headings would compete with the level
     // resolution and split chapters in two.
+    const synthesised: Block[] = []
     if (!hasHeadings) {
       const title = tocTitles.get(doc.path)
-      if (title) blocks.push({ kind: 'heading', level: 1, text: title })
+      if (title) synthesised.push({ kind: 'heading', level: 1, text: title })
     }
-    blocks.push(...doc.blocks)
+
+    // The spine boundary, kept. Concatenating the documents is right — one
+    // stream is what the assembler wants — but until now the *seam* went with
+    // it, and a spine document is the publisher's own page division: the cover
+    // is one file, the copyright page another, the dedication another. Dropping
+    // the seam is why a cover plate ran straight into the title beneath it and
+    // the dedication ran into the preface, on a book that reads as separate
+    // pages in every other reader.
+    //
+    // Marked on the first block that will survive assembly — `furniture` is
+    // dropped before anchors are assigned, so a flag left on a running header
+    // would be a page break that silently disappears. Not on the opening
+    // document: a break before the first thing in the book is a blank page one.
+    const opening = [...synthesised, ...doc.blocks]
+    if (blocks.length > 0) {
+      const first = opening.find((block) => block.kind !== 'furniture')
+      if (first) first.startsPage = true
+    }
+
+    blocks.push(...opening)
   }
 
   const book = assembleBook(blocks, {

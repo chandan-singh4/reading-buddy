@@ -35,5 +35,11 @@
  *   and stored beside the text, so a figure shows the plate and not just its
  *   caption. Books parsed under 1 or 2 have no pictures stored at all, which is
  *   precisely the case this stamp exists to announce.
+ * - **4** — an epub's spine boundaries survive as page breaks. The cover, the
+ *   copyright page, the dedication and the preface are four separate documents
+ *   in the file and four separate pages in every other reader; they were being
+ *   concatenated into one continuous run of text, so the cover plate ran
+ *   straight into the title beneath it. Books parsed under 1–3 carry no
+ *   boundary marks at all and will keep flowing together until re-imported.
  */
-export const PARSER_VERSION = 3
+export const PARSER_VERSION = 4
