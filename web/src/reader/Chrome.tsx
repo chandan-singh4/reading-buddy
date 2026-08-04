@@ -27,11 +27,11 @@ import type { Manifest } from '../structure/index.ts'
 import {
   MAX_TEXT_STEP,
   MIN_TEXT_STEP,
+  READING_FONTS,
+  THEMES,
   type Margins,
   type ReaderSettings,
-  type ReadingFont,
   type Spacing,
-  type Theme,
 } from './readerSettings.ts'
 import styles from './Chrome.module.css'
 
@@ -79,18 +79,11 @@ const TABS: { id: SheetTab; label: string }[] = [
   { id: 'aa', label: 'Aa' },
 ]
 
-const THEME_OPTIONS: { id: Theme; label: string }[] = [
-  { id: 'auto', label: 'Auto' },
-  { id: 'light', label: 'Light' },
-  { id: 'dark', label: 'Dark' },
-  { id: 'sepia', label: 'Sepia' },
-]
-
-const FONT_OPTIONS: { id: ReadingFont; label: string }[] = [
-  { id: 'serif', label: 'Serif' },
-  { id: 'serif-alt', label: 'Serif (alt)' },
-  { id: 'sans', label: 'Sans' },
-]
+// Themes and faces come from `readerSettings.ts`, which is also what validates
+// a stored setting. Keeping a second copy here is how the tab ends up offering
+// a theme the settings file will refuse to save.
+const THEME_OPTIONS = THEMES
+const FONT_OPTIONS = READING_FONTS
 
 const SPACING_OPTIONS: { id: Spacing; label: string }[] = [
   { id: 'compact', label: 'Compact' },
@@ -286,11 +279,11 @@ export function Chrome({
                 <div className={styles.settingOptions} role="group" aria-label="Theme">
                   {THEME_OPTIONS.map((option) => (
                     <button
-                      key={option.id}
+                      key={option.value}
                       type="button"
                       className={styles.settingButton}
-                      aria-pressed={settings.theme === option.id}
-                      onClick={() => onSettingsChange({ theme: option.id })}
+                      aria-pressed={settings.theme === option.value}
+                      onClick={() => onSettingsChange({ theme: option.value })}
                     >
                       {option.label}
                     </button>
@@ -303,13 +296,17 @@ export function Chrome({
                 <div className={styles.settingOptions} role="group" aria-label="Reading font">
                   {FONT_OPTIONS.map((option) => (
                     <button
-                      key={option.id}
+                      key={option.value}
                       type="button"
-                      className={styles.settingButton}
-                      aria-pressed={settings.font === option.id}
-                      onClick={() => onSettingsChange({ font: option.id })}
+                      /* Each option is set in its own face — see
+                         `.fontButton` in the stylesheet. */
+                      className={`${styles.settingButton} ${styles.fontButton}`}
+                      data-face={option.value}
+                      aria-pressed={settings.font === option.value}
+                      onClick={() => onSettingsChange({ font: option.value })}
                     >
-                      {option.label}
+                      <span className={styles.fontName}>{option.label}</span>
+                      {option.note && <span className={styles.fontNote}>{option.note}</span>}
                     </button>
                   ))}
                 </div>

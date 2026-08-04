@@ -314,6 +314,67 @@
   border-color: var(--color-accent);
 }
 
+/*
+ * A font option shows its own name set in itself, with a short note underneath
+ * saying what it's for. Reading "Literata" in Georgia tells you nothing about
+ * Literata; the point of a font picker is to see the font.
+ */
+.fontButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  /* Two lines now, so the row can't rely on `min-height` alone for its shape. */
+  padding-block: var(--space-2);
+  line-height: 1.2;
+  text-align: left;
+}
+
+.fontName {
+  font-size: var(--text-base);
+}
+
+/*
+ * `currentColor` at reduced opacity rather than `--color-text-muted`: this text
+ * sits on the surface when unselected and on the accent when selected, and a
+ * fixed muted grey is unreadable against the second.
+ */
+.fontNote {
+  font-size: var(--text-xs);
+  font-family: var(--font-ui);
+  opacity: 0.7;
+}
+
+/* The faces themselves are declared once in `theme.css`. */
+.fontButton[data-face='serif'] .fontName {
+  font-family: var(--face-serif);
+}
+.fontButton[data-face='serif-alt'] .fontName {
+  font-family: var(--face-serif-alt);
+}
+.fontButton[data-face='sans'] .fontName {
+  font-family: var(--face-sans);
+}
+.fontButton[data-face='literata'] .fontName {
+  font-family: var(--face-literata);
+}
+.fontButton[data-face='garamond'] .fontName {
+  font-family: var(--face-garamond);
+}
+.fontButton[data-face='lora'] .fontName {
+  font-family: var(--face-lora);
+}
+.fontButton[data-face='inter'] .fontName {
+  font-family: var(--face-inter);
+}
+.fontButton[data-face='atkinson'] .fontName {
+  font-family: var(--face-atkinson);
+}
+.fontButton[data-face='dyslexic'] .fontName {
+  font-family: var(--face-dyslexic);
+}
+
 .stepper {
   display: flex;
   align-items: center;

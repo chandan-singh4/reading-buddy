@@ -13,8 +13,59 @@
  * sees no change at all.
  */
 
-export type Theme = 'auto' | 'light' | 'dark' | 'sepia'
-export type ReadingFont = 'serif' | 'serif-alt' | 'sans'
+export type Theme =
+  | 'auto'
+  | 'light'
+  | 'dark'
+  | 'sepia'
+  | 'dim'
+  | 'slate'
+  | 'forest'
+  | 'contrast'
+export type ReadingFont =
+  | 'serif'
+  | 'serif-alt'
+  | 'sans'
+  | 'literata'
+  | 'garamond'
+  | 'lora'
+  | 'inter'
+  | 'atkinson'
+  | 'dyslexic'
+
+/**
+ * Every theme, in the order the Aa tab offers them: the plain ones first, then
+ * the tinted, then the accessibility one. A single list so the type, the
+ * validator and the UI can never drift apart — adding a theme means adding it
+ * here and writing its tokens in `theme.css`, and nothing else.
+ */
+export const THEMES: readonly { value: Theme; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'dim', label: 'Dim' },
+  { value: 'sepia', label: 'Sepia' },
+  { value: 'slate', label: 'Slate' },
+  { value: 'forest', label: 'Forest' },
+  { value: 'contrast', label: 'High contrast' },
+]
+
+/**
+ * Every reading face. The three system stacks stay first and keep their names:
+ * they cost nothing to load and they are what existing readers already have
+ * selected, so they must not move or be renamed out from under a saved setting.
+ */
+export const READING_FONTS: readonly { value: ReadingFont; label: string; note?: string }[] = [
+  { value: 'serif', label: 'Serif', note: 'System' },
+  { value: 'serif-alt', label: 'Palatino', note: 'System' },
+  { value: 'sans', label: 'Sans', note: 'System' },
+  { value: 'literata', label: 'Literata', note: 'Made for reading' },
+  { value: 'garamond', label: 'EB Garamond', note: 'Classic book' },
+  { value: 'lora', label: 'Lora', note: 'Warm serif' },
+  { value: 'inter', label: 'Inter', note: 'Modern sans' },
+  { value: 'atkinson', label: 'Atkinson', note: 'Low vision' },
+  { value: 'dyslexic', label: 'OpenDyslexic', note: 'Dyslexia' },
+]
 export type Spacing = 'compact' | 'normal' | 'relaxed'
 export type Margins = 'narrow' | 'normal' | 'wide'
 
@@ -69,12 +120,15 @@ export function textSizeOf(step: number): string {
 
 const KEY = 'reading-buddy:reader-settings'
 
+// Both read from the lists above rather than repeating their members: a theme
+// added there but forgotten here would be saveable and then silently rejected
+// on the next read, which is a maddening bug to chase.
 function isTheme(value: unknown): value is Theme {
-  return value === 'auto' || value === 'light' || value === 'dark' || value === 'sepia'
+  return THEMES.some((theme) => theme.value === value)
 }
 
 function isFont(value: unknown): value is ReadingFont {
-  return value === 'serif' || value === 'serif-alt' || value === 'sans'
+  return READING_FONTS.some((font) => font.value === value)
 }
 
 function isSpacing(value: unknown): value is Spacing {

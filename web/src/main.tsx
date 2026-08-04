@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { watchForUpdates } from './app/updates.ts'
 import { applyStoredTheme } from './reader/readerSettings.ts'
+import { repository } from './storage/index.ts'
 import './index.css'
 
 watchForUpdates()
@@ -20,8 +21,36 @@ if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'm
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element #root not found')
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+/**
+ * Bring stored titles up to date before the first screen asks for them.
+ *
+ * It has to be before, not alongside: the shelf reads `listBooks()` once when
+ * it mounts and doesn't subscribe to changes, so a heal that finished a moment
+ * later would leave the reader looking at the old titles until they navigated
+ * away and back — which is precisely the "you said you fixed it" experience
+ * this is meant to end.
+ *
+ * The cost is one indexed pass over the books table — metadata only, no
+ * sections, no files — and it stamps every row it visits, so after the first
+ * boot on a new version there is nothing left to do. If storage is unavailable
+ * the app still starts: a wrong title is a blemish, a blank screen is a
+ * failure.
+ */
+async function boot(container: HTMLElement): Promise<void> {
+  try {
+    await repository.healTitles()
+  } catch {
+    // Private-mode storage, a blocked upgrade, a full disk. Nothing here is
+    // worth refusing to open the app over.
+  }
+
+  createRoot(container).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
+
+// Passed in rather than read from the outer scope: the check above doesn't
+// narrow inside a function that could be called at any later moment.
+void boot(root)

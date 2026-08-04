@@ -18,6 +18,7 @@ import type {
   SectionPath,
 } from '../structure/index.ts'
 import { countWordsIn, sectionPathOf } from '../structure/index.ts'
+import { cleanTitle, TITLE_CLEAN_VERSION } from '../parse/cleanTitle.ts'
 import {
   db as defaultDb,
   type ReadingBuddyDB,
@@ -95,7 +96,62 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       if (!trimmed) return
       const book = await database.books.get(id)
       if (!book) return
-      await database.books.put({ ...book, title: trimmed })
+      // `titleOverridden` is what stops the automatic cleanup (`healTitles`)
+      // from ever running back over this answer — see the field's note.
+      await database.books.put({ ...book, title: trimmed, titleOverridden: true })
+    },
+
+    /**
+     * Re-run the title cleanup over books already on the shelf, and report how
+     * many titles actually changed.
+     *
+     * This is the fix for a class of bug that had cost several rounds of "you
+     * said you fixed it": a title is computed once, at import, and then stored.
+     * Improving the cleanup rules therefore did nothing for any book already
+     * imported — the reader had to still own the source file and know to press
+     * Update, and if the automatic rules still couldn't crack that particular
+     * title, even that achieved nothing visible. Two devices could sit on the
+     * same version of the app showing two different titles for the same book,
+     * purely because of what each had been asked to re-import.
+     *
+     * A title doesn't need any of that ceremony. It is one short string, and
+     * everything needed to recompute it — the stored title and author — is
+     * already in the row. So this runs at boot, offline, over metadata only,
+     * and never touches a section.
+     *
+     * Two things it will not do:
+     *   - **Overrule a manual rename** (`titleOverridden`). The reader only
+     *     reaches for the pencil when the guess was wrong.
+     *   - **Blank a title.** If the rules would cut the whole string away, the
+     *     existing title is kept. A book with a bad name is findable; a book
+     *     with no name is lost on the shelf.
+     *
+     * Books are stamped with `TITLE_CLEAN_VERSION` whether or not their title
+     * changed, so this is a no-op on every boot after the first.
+     */
+    async healTitles(): Promise<number> {
+      const books = await database.books.toArray()
+
+      const rewritten: BookMeta[] = []
+      let changed = 0
+
+      for (const book of books) {
+        if (book.titleOverridden) continue
+        if (book.titleCleanVersion === TITLE_CLEAN_VERSION) continue
+
+        const cleaned = cleanTitle(book.title, book.author)
+        const keepsMeaning = cleaned && cleaned !== book.title
+        if (keepsMeaning) changed += 1
+
+        rewritten.push({
+          ...book,
+          title: keepsMeaning ? cleaned : book.title,
+          titleCleanVersion: TITLE_CLEAN_VERSION,
+        })
+      }
+
+      if (rewritten.length > 0) await database.books.bulkPut(rewritten)
+      return changed
     },
 
     /** Set or clear (`undefined`) a book's free-text reflections (WP-49). */

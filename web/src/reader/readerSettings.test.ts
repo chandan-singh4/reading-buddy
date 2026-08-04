@@ -6,6 +6,8 @@ import {
   leadingOf,
   measureOf,
   readReaderSettings,
+  READING_FONTS,
+  THEMES,
   textSizeOf,
   writeReaderSettings,
   type ReaderSettings,
@@ -69,5 +71,43 @@ describe('leadingOf', () => {
 describe('measureOf', () => {
   it('matches the reading page default for normal margins', () => {
     expect(measureOf('normal')).toBe('34rem')
+  })
+})
+
+describe('the themes and faces on offer', () => {
+  it('every theme can actually be saved and read back', () => {
+    // The bug this rules out: adding a theme to the list the Aa tab renders,
+    // but not to what `readReaderSettings` will accept — the reader taps it,
+    // it applies, and it silently reverts to the default on the next launch.
+    for (const theme of THEMES) {
+      writeReaderSettings({ ...DEFAULT_SETTINGS, theme: theme.value })
+      expect(readReaderSettings().theme).toBe(theme.value)
+    }
+  })
+
+  it('every reading face can actually be saved and read back', () => {
+    for (const font of READING_FONTS) {
+      writeReaderSettings({ ...DEFAULT_SETTINGS, font: font.value })
+      expect(readReaderSettings().font).toBe(font.value)
+    }
+  })
+
+  it('keeps the settings a reader may already have saved', () => {
+    // These four themes and three faces predate the rest. Dropping or renaming
+    // one would quietly reset a reader's choice.
+    expect(THEMES.map((t) => t.value)).toEqual(
+      expect.arrayContaining(['auto', 'light', 'dark', 'sepia']),
+    )
+    expect(READING_FONTS.map((f) => f.value)).toEqual(
+      expect.arrayContaining(['serif', 'serif-alt', 'sans']),
+    )
+  })
+
+  it('still falls back to the default for a face that does not exist', () => {
+    localStorage.setItem(
+      'reading-buddy:reader-settings',
+      JSON.stringify({ ...DEFAULT_SETTINGS, font: 'comic-sans' }),
+    )
+    expect(readReaderSettings().font).toBe(DEFAULT_SETTINGS.font)
   })
 })

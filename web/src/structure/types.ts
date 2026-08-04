@@ -118,6 +118,26 @@ export interface BookMeta {
   rating?: number
   /** Free-text reflections, set from the detail page (WP-49). */
   notes?: string
+  /**
+   * True once the reader has retyped the title by hand, on the detail page.
+   *
+   * The same rule as `shelfOverridden`, for the same reason: the automatic
+   * cleanup must never overrule a correction. A reader only reaches for the
+   * pencil when the guess was wrong, so a later, cleverer guess re-running over
+   * the top of their answer would undo the one title in the library that is
+   * certainly right.
+   */
+  titleOverridden?: boolean
+  /**
+   * Which build of the title cleanup produced this book's title — compared
+   * against `TITLE_CLEAN_VERSION` (`parse/cleanTitle.ts`) at boot.
+   *
+   * Kept apart from `parserVersion` deliberately. A title can be recomputed
+   * from the string already stored; the *text* can only be fixed by re-reading
+   * the original file. Absent means "cleaned before this was tracked, or not at
+   * all", which is exactly the set worth re-cleaning.
+   */
+  titleCleanVersion?: number
 }
 
 // --- Manifest ---------------------------------------------------------------

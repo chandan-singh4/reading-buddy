@@ -128,6 +128,26 @@
 }
 
 /*
+ * A section that opens with a picture is a plate — a cover, a frontispiece, a
+ * full-page illustration — and it gets the page to itself, the way it would in
+ * print. The text that follows starts on the next page.
+ *
+ * Without this the plate and the prose after it share a column, so whether the
+ * text "starts on a new page" is decided by arithmetic: how tall the picture
+ * happens to render against how tall this particular screen is. That is why a
+ * cover looked right on a laptop and wrong on a phone — same code, same book,
+ * different column height.
+ *
+ * An element selector rather than a class because `.figure` is defined in
+ * `blocks.module.css`, and CSS Modules hashes the two files' names separately.
+ * `.header` always renders (its *contents* are conditional, not the element),
+ * so this reliably means "the first block of the section".
+ */
+.header + figure {
+  break-after: column;
+}
+
+/*
  * A chapter's first section gets the room a title page gets in print. Enough
  * space above that the title is clearly *starting* something rather than
  * continuing it — but not a whole screen of it, because on a phone that would
