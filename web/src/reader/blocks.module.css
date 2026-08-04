@@ -16,10 +16,89 @@
 .prose {
   margin-top: var(--space-4);
   white-space: pre-line;
+  /*
+   * Justified with hyphenation, which is how a book is set. The two belong
+   * together and are close to useless apart: justifying without hyphens on a
+   * phone-width column stretches the spaces of a short line into rivers, which
+   * is worse than ragged-right. With hyphens the browser has somewhere to break
+   * and the spacing stays even.
+   */
+  text-align: justify;
+  hyphens: auto;
+  /* Keeps justification from pulling a single long word apart across the line. */
+  overflow-wrap: break-word;
+}
+
+/*
+ * A paragraph that continues the flow is indented; one that *starts* something
+ * is not. This is the oldest convention in typesetting and the reason the
+ * reader said it didn't feel like a book: the indent is what tells the eye a
+ * new paragraph began, and without it the page is an undifferentiated slab.
+ *
+ * `+` does the whole job — only a prose paragraph directly after another one
+ * gets the indent, so the first paragraph of a section, and the first after any
+ * heading, figure, quote or list, correctly stays flush.
+ */
+.prose + .prose {
+  text-indent: 1.5em;
+  /* The indent is doing the separating now, so the blank line steps back. Both
+     at once is belt-and-braces, and print uses one or the other. */
+  margin-top: 0;
 }
 
 .prose:first-child {
   margin-top: 0;
+}
+
+/*
+ * A dedication. Centred, and pushed down the page rather than sitting under the
+ * top edge — in print this page is nearly all air, with one quiet line in it,
+ * and reproducing that is most of what makes the book's opening feel like a
+ * book rather than a document.
+ */
+.dedication {
+  margin-top: 22dvh;
+  text-align: center;
+  text-indent: 0;
+  font-style: italic;
+  color: var(--color-text-muted);
+  /* Never justified and never indented, whatever it follows. */
+  white-space: pre-line;
+  hyphens: none;
+}
+
+/* An epigraph — the quotation at the head of a chapter. Set in from both sides
+   so it reads as something the book is quoting rather than saying. */
+.epigraph {
+  margin-top: var(--space-6);
+  margin-inline: auto;
+  max-width: 26em;
+  text-align: center;
+  text-indent: 0;
+  font-style: italic;
+  color: var(--color-text-muted);
+  hyphens: none;
+}
+
+/*
+ * The run-on rule above must not reach a display block in either direction: it
+ * would indent the line after a dedication as though it continued it, and — via
+ * `margin-top: 0` — flatten the air a dedication is mostly made of.
+ */
+.prose + .dedication {
+  margin-top: 22dvh;
+  text-indent: 0;
+}
+
+.prose + .epigraph {
+  margin-top: var(--space-6);
+  text-indent: 0;
+}
+
+.dedication + .prose,
+.epigraph + .prose {
+  margin-top: var(--space-5);
+  text-indent: 0;
 }
 
 .heading {

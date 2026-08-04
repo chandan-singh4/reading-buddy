@@ -46,8 +46,12 @@
  *   2 — the shelf reads as a list of *titles*: a run-together subtitle is cut
  *       as well, and the citation markers widened (a bare author name, a
  *       stray `null`, a year, a binding word, an edition parenthetical).
+ *   3 — an orphaned opening bracket left behind by a cut is removed: a shelf
+ *       full of titles ending in a lone "(" was how round 2 came back. Volume
+ *       markers join the bracket list, and `With` may open a subtitle when
+ *       what follows it is long enough to be one.
  */
-export const TITLE_CLEAN_VERSION = 2
+export const TITLE_CLEAN_VERSION = 3
 
 export function cleanTitle(
   raw: string | null | undefined,
@@ -70,7 +74,7 @@ export function cleanTitle(
   // that comes after it.
   const unbracketed = dehashed
     .replace(
-      /\s*[([][^)\]]*\b(?:edition|annotated|illustrated|revised|expanded|unabridged|reprint|translated)\b[^)\]]*[)\]]/gi,
+      /\s*[([][^)\]]*\b(?:edition|annotated|illustrated|revised|expanded|unabridged|reprint|translated|vol|volume|book \d|part \d)\b[^)\]]*[)\]]/gi,
       ' ',
     )
     .replace(/\s{2,}/g, ' ')
@@ -124,9 +128,30 @@ export function cleanTitle(
   return tidy(subtitleCut) || withoutDump || undefined
 }
 
-/** Trailing punctuation and connecting words a cut can strand at the end. */
+/**
+ * Trailing punctuation, orphaned brackets and connecting words that a cut can
+ * strand at the end.
+ *
+ * The bracket case is the visible one: cutting inside `On Love (Picador
+ * Classics)` leaves `On Love (`, and a shelf full of titles ending in a lone
+ * open bracket looks broken — which is exactly how the reader reported it. An
+ * unclosed bracket and everything after it goes, since whatever it opened was
+ * cut away.
+ */
 function tidy(value: string): string {
-  return value
+  let text = value.replace(/\s{2,}/g, ' ').trim()
+
+  // An opening bracket with no partner left. Repeated because removing one can
+  // expose another (`Title (Series (Book 2`).
+  for (;;) {
+    const opened = Math.max(text.lastIndexOf('('), text.lastIndexOf('['))
+    if (opened === -1) break
+    const closed = Math.max(text.lastIndexOf(')'), text.lastIndexOf(']'))
+    if (closed > opened) break
+    text = text.slice(0, opened)
+  }
+
+  return text
     .replace(/\s{2,}/g, ' ')
     .trim()
     .replace(/[\s,;:.\-–—&/]+$/, '')
@@ -162,6 +187,17 @@ const SUBTITLE_OPENERS = new Set([
   'translated',
 ])
 
+/**
+ * Openers that are only safe on a *long* tail.
+ *
+ * `With` starts plenty of subtitles ("The Gay Science With a Prelude in Rhymes
+ * and an Appendix of Songs") and plenty of titles ("A Room With a View",
+ * "Conversations With God"). Length tells them apart: a subtitle that runs on
+ * for another four words is a subtitle, while two or three words after `With`
+ * is the rest of a title.
+ */
+const WEAK_OPENERS = new Set(['with', 'without', 'including', 'featuring', 'edited', 'foreword'])
+
 /** Words that make a following capitalised opener part of the title, not a new phrase. */
 const CONTINUES_TITLE = new Set(['of', 'by', 'with', 'and', 'or', 'in', 'on', 'from', 'to', 'for'])
 
@@ -169,6 +205,8 @@ const CONTINUES_TITLE = new Set(['of', 'by', 'with', 'and', 'or', 'in', 'on', 'f
 const MIN_TITLE_WORDS = 2
 /** Fewest words a subtitle must have to be worth cutting at all. */
 const MIN_SUBTITLE_WORDS = 2
+/** …and how many a weak opener needs behind it before it counts. */
+const MIN_WEAK_SUBTITLE_WORDS = 4
 
 /**
  * Cut a subtitle that was run together with the title, the punctuation between
@@ -196,7 +234,10 @@ function cutSubtitle(title: string): string {
     const word = words[i]
     // Capitalised, and a word that opens phrases rather than continuing one.
     if (!/^[A-Z]/.test(word)) continue
-    if (!SUBTITLE_OPENERS.has(word.toLowerCase().replace(/[^a-z]/g, ''))) continue
+    const bare = word.toLowerCase().replace(/[^a-z]/g, '')
+    const weak = WEAK_OPENERS.has(bare)
+    if (!weak && !SUBTITLE_OPENERS.has(bare)) continue
+    if (weak && words.length - i < MIN_WEAK_SUBTITLE_WORDS) continue
 
     const before = words[i - 1]
     // `The Good, The Bad` — the comma says these are items in one phrase.

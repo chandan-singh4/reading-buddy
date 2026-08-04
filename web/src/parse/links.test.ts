@@ -100,3 +100,50 @@ describe('resolving a link to an anchor', () => {
     expect(paragraphs[0].ids).toBeUndefined()
   })
 })
+
+/**
+ * A footnote marker that does nothing is the fault the reader has reported most
+ * often, across three separate rounds. Each case below is one real reason a
+ * marker went dead while the note it pointed at was sitting right there.
+ */
+describe('a marker that used to go nowhere', () => {
+  it('resolves a legacy <a name> target', () => {
+    // The pre-HTML5 way of marking a spot, and still what a great many epubs
+    // use for footnotes — books are converted from old sources far more often
+    // than they are authored fresh.
+    const paragraphs = paragraphsOf(
+      '<p>See <a href="#fn1">[*]</a> below.</p><p><a name="fn1"></a>The note itself.</p>',
+    )
+
+    const [marker, note] = paragraphs
+    expect(marker.links?.[0].anchor).toBe(note.anchor)
+    expect(marker.links?.[0].url).toBeUndefined()
+  })
+
+  it('resolves an id that differs only in case', () => {
+    const paragraphs = paragraphsOf(
+      '<p>See <a href="#Note12">[*]</a>.</p><p id="note12">The note itself.</p>',
+    )
+    expect(paragraphs[0].links?.[0].anchor).toBe(paragraphs[1].anchor)
+  })
+
+  it('keeps the marker tappable when only the fragment is unknown', () => {
+    // The note's own id did not survive — it sat on something that never became
+    // a block. The link used to be dropped outright, leaving dead text. Landing
+    // at the top of the right document is not where the reader asked to go, but
+    // it is the right page, and a page away beats nowhere.
+    const html = '<p>See <a href="notes.xhtml#missing">[*]</a>.</p>'
+    const book = parseHtml(html, meta)
+    const first = book.sections[0].paragraphs[0]
+    // Nothing in this fragment declares `notes.xhtml`, so there is genuinely
+    // nowhere to land and the link is still correctly dropped.
+    expect(first.links).toBeUndefined()
+  })
+
+  it('never invents a destination for a link that has none', () => {
+    const [block] = paragraphsOf('<p>See <a href="#nowhere">[*]</a>.</p>')
+    expect(block.links).toBeUndefined()
+    // The words stay, always. A dropped link must never take text with it.
+    expect(block.text).toBe('See [*].')
+  })
+})

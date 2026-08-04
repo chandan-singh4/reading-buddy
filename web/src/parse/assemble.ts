@@ -184,9 +184,25 @@ function groupByHeadings(
     return chapters.at(-1) ?? openChapter(meta.title)
   }
 
+  /**
+   * Ids belonging to headings that have been consumed as titles.
+   *
+   * A heading that opens a chapter or a section becomes that division's
+   * *title* — the block itself is not kept, and until now its ids went with it.
+   * Headings are the commonest link target in a book: every entry on an epub's
+   * own contents page points at one, and so does many a cross-reference. So
+   * each one was a link that resolved to nothing and was then dropped, leaving
+   * text that looks tappable and isn't.
+   *
+   * They are handed to the first block of the division the heading opened,
+   * which is where the heading itself would have sat.
+   */
+  let pendingIds: string[] = []
+
   for (const block of blocks) {
     if (block.kind === 'heading' && block.level === levels.chapter) {
       openChapter(block.text)
+      pendingIds = [...pendingIds, ...(block.ids ?? [])]
       continue
     }
 
@@ -194,12 +210,19 @@ function groupByHeadings(
 
     if (block.kind === 'heading' && levels.section !== null && block.level === levels.section) {
       chapter.sections.push({ title: block.text, blocks: [] })
+      pendingIds = [...pendingIds, ...(block.ids ?? [])]
       continue
     }
 
     const section = chapter.sections.at(-1) ?? implicitSection()
     if (chapter.sections.length === 0) chapter.sections.push(section)
-    section.blocks.push(asContent(block))
+
+    const content = asContent(block)
+    if (pendingIds.length > 0) {
+      content.ids = [...pendingIds, ...(content.ids ?? [])]
+      pendingIds = []
+    }
+    section.blocks.push(content)
   }
 
   // Drop a leading implicit section that never received any content — an

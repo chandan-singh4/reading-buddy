@@ -43,6 +43,46 @@ describe('cleanTitle — the reader’s own shelf', () => {
 })
 
 /**
+ * The second round off the same shelf: every one of these ended in a lone open
+ * bracket, because a cut had landed inside a bracket and taken its partner.
+ */
+describe('cleanTitle — orphaned brackets', () => {
+  it.each([
+    ['On Love (', 'On Love'],
+    ['How to Speak Whale (', 'How to Speak Whale'],
+    ['Alaska (', 'Alaska'],
+    ['The World As Will And Representation (volume 1) (', 'The World As Will And Representation'],
+    [
+      'The Gay Science With a Prelude in Rhymes and an Appendix of Songs (',
+      'The Gay Science',
+    ],
+  ])('%s → %s', (raw, expected) => {
+    expect(cleanTitle(raw, undefined)).toBe(expected)
+  })
+
+  it('keeps a bracket that is genuinely closed and not an edition marker', () => {
+    expect(cleanTitle('Frankenstein (Or, The Modern Prometheus)', undefined)).toBe(
+      'Frankenstein (Or, The Modern Prometheus)',
+    )
+  })
+})
+
+/**
+ * `With` opens as many titles as subtitles, so it is only allowed to cut when
+ * what follows is long enough to be a subtitle.
+ */
+describe('cleanTitle — “With” cuts only on a long tail', () => {
+  it.each([
+    'A Room With a View',
+    'Conversations With God',
+    'Gone With the Wind',
+    'Tuesdays With Morrie',
+  ])('leaves %s alone', (title) => {
+    expect(cleanTitle(title, undefined)).toBe(title)
+  })
+})
+
+/**
  * The other half of the bargain. The reader accepted that cutting subtitles is
  * a guess; these are the cases where it must not fire, because each one would
  * be a real title cut in half.

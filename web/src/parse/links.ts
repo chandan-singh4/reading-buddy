@@ -67,7 +67,7 @@ function resolveIn(paragraph: Paragraph, anchorById: Map<string, Anchor>): void 
     // A same-document link is written `#note12` while the id it points at is
     // recorded as `note12`. (Epub qualifies both sides with the file they came
     // from — `chapter3.xhtml#note12` — so those already match.)
-    const anchor = anchorById.get(href.startsWith('#') ? href.slice(1) : href)
+    const anchor = lookUp(href.startsWith('#') ? href.slice(1) : href, anchorById)
     if (anchor) {
       link.anchor = anchor
       // Dropped once resolved: keeping both would leave two answers to "where
@@ -82,4 +82,38 @@ function resolveIn(paragraph: Paragraph, anchorById: Map<string, Anchor>): void 
     (link) => link.anchor !== undefined || (link.url && EXTERNAL.test(link.url)),
   )
   if (paragraph.links.length === 0) delete paragraph.links
+}
+
+/**
+ * Find where a destination ended up, trying progressively looser readings of it.
+ *
+ * Only the first is exact. The rest exist because a footnote marker that does
+ * nothing is the single most-reported fault on the reading screen, and every
+ * loosening below turns one real class of dead marker into a working link:
+ *
+ * 1. **Exactly as written.** The overwhelming majority.
+ * 2. **Case-insensitively.** `#Note12` against `id="note12"`. HTML ids are
+ *    case-sensitive in the spec and treated as case-insensitive by roughly
+ *    every book-production tool that has ever emitted one.
+ * 3. **The document it points into, ignoring the fragment.** This is the one
+ *    that matters. `notes.xhtml#fn12` fails whenever the note's own id didn't
+ *    survive — it sat on furniture, or on an element that never became a block
+ *    of its own — and the link then disappears entirely, which is precisely the
+ *    complaint: the marker is there, the note is there, the tap does nothing.
+ *    Landing the reader at the top of the notes page is not where they asked to
+ *    go, but it is the right page, and a page away beats nowhere.
+ */
+function lookUp(destination: string, anchorById: Map<string, Anchor>): Anchor | undefined {
+  const exact = anchorById.get(destination)
+  if (exact) return exact
+
+  const lowered = destination.toLowerCase()
+  for (const [id, anchor] of anchorById) {
+    if (id.toLowerCase() === lowered) return anchor
+  }
+
+  const hash = destination.indexOf('#')
+  if (hash <= 0) return undefined
+  const document = destination.slice(0, hash)
+  return anchorById.get(document) ?? anchorById.get(document.toLowerCase())
 }

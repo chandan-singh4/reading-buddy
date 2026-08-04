@@ -23,6 +23,19 @@ import styles from './blocks.module.css'
 export type FollowLink = (anchor: Anchor) => void
 
 /**
+ * A dedication or an epigraph, set apart the way print sets it apart —
+ * centred, with room around it — rather than run on as body text.
+ *
+ * Driven by the `label` the parser recorded, so the reading screen needs no
+ * opinion about which parts of a book these are.
+ */
+function display(block: Paragraph): string {
+  if (block.label === 'dedication') return ` ${styles.dedication}`
+  if (block.label === 'epigraph') return ` ${styles.epigraph}`
+  return ''
+}
+
+/**
  * A block's text with its links made tappable.
  *
  * An internal link is a `<button>`, not an `<a>`: it goes to a paragraph, not
@@ -300,7 +313,7 @@ export function Block({
     // rather than vanishing.
     default:
       return (
-        <p id={id} className={styles.prose + opens}>
+        <p id={id} className={styles.prose + opens + display(block)}>
           {text}
         </p>
       )

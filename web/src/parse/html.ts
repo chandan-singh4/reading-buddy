@@ -188,6 +188,17 @@ function idsIn(element: Element): string[] {
   for (const node of Array.from(element.querySelectorAll('[id]'))) {
     if (node.id) ids.push(node.id)
   }
+
+  // `<a name="fn12">` is the pre-HTML5 way of marking a spot, and it is still
+  // what a great many epubs use for footnote targets — books are converted from
+  // old sources far more often than they are authored fresh. A link pointing at
+  // one of these found nothing, so every footnote in such a book was dead text.
+  const named = element.matches('a[name]') ? [element] : []
+  for (const node of [...named, ...Array.from(element.querySelectorAll('a[name]'))]) {
+    const name = node.getAttribute('name')
+    if (name) ids.push(name)
+  }
+
   return ids
 }
 
@@ -215,6 +226,16 @@ const FURNITURE_TYPES = [
 ]
 
 const NOTE_TYPES = ['footnote', 'endnote', 'rearnote', 'note']
+
+/**
+ * Parts of a book that are *displayed* rather than read straight through — a
+ * dedication, an epigraph. Print centres these and gives them room; running
+ * them as ordinary left-aligned body text is what makes a book's opening page
+ * read like a text file. Recorded as a `label` so the renderer can set them
+ * apart without a new block kind: they are still prose, and everything that
+ * handles prose must keep working on them.
+ */
+const DISPLAY_TYPES = ['dedication', 'epigraph']
 
 /**
  * Collapse the incidental whitespace of source markup. HTML treats newlines and
@@ -451,7 +472,15 @@ export function htmlToBlocks(html: string): Block[] {
     inline = []
   }
 
-  function walk(node: Node): void {
+  /**
+   * `inherited` is the `epub:type` of the enclosing section, carried down.
+   *
+   * A dedication page marks the *section* — `<section epub:type="dedication">`
+   * — and hangs ordinary `<p>`s inside it. Reading the type off the paragraph
+   * alone therefore finds nothing, and the one block that most obviously wants
+   * setting apart from body text looks exactly like body text.
+   */
+  function walk(node: Node, inherited = ''): void {
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === 3 /* text */) {
         inline.push(child.textContent ?? '')
@@ -472,7 +501,11 @@ export function htmlToBlocks(html: string): Block[] {
 
       // Navigation and back matter are recognised only to be discarded — the
       // assembler drops furniture before any anchor is assigned.
-      const semantics = semanticType(element)
+      // Trimmed because `semanticType` joins two attributes with a space and so
+      // never returns an empty string — untrimmed, "no type of its own" is
+      // indistinguishable from " " and the inherited one could never win.
+      const own = semanticType(element).trim()
+      const semantics = own || inherited
       if (tag === 'NAV' || matchesAny(semantics, FURNITURE_TYPES)) {
         blocks.push({ kind: 'furniture', text: normalise(element.textContent) })
         continue
@@ -543,15 +576,20 @@ export function htmlToBlocks(html: string): Block[] {
         const { text, links } = textAndLinks(element)
         if (!text) continue
         const noteType = matchesAny(semantics, NOTE_TYPES)
+        const displayType = matchesAny(semantics, DISPLAY_TYPES)
         const block: ContentBlock = noteType
           ? { kind: 'note', text, label: noteType }
-          : { kind: 'prose', text }
+          : displayType
+            ? { kind: 'prose', text, label: displayType }
+            : { kind: 'prose', text }
         if (links.length > 0) block.links = links
         blocks.push(withLinks(block, element))
         continue
       }
 
-      walk(element)
+      // A container: descend, passing on whatever it says it is so the
+      // paragraphs inside a dedication or an epigraph know they are in one.
+      walk(element, matchesAny(own, DISPLAY_TYPES) ? own : inherited)
     }
     flushInline()
   }

@@ -237,6 +237,56 @@ describe('parseEpub — the source book’s own page divisions', () => {
   })
 })
 
+/**
+ * The footnote case across two files, which is the shape every real book uses:
+ * a marker in the chapter, the note in a notes document.
+ */
+describe('parseEpub — footnote markers', () => {
+  function bookWith(noteBody: string) {
+    return makeEpub({
+      manifest: [
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="nt" href="notes.xhtml" media-type="application/xhtml+xml"/>',
+      ].join(''),
+      spine: '<itemref idref="c1"/><itemref idref="nt"/>',
+      files: {
+        'OEBPS/ch1.xhtml': chapterDoc(
+          '<h1>One</h1><p>Nothing comes from nothing.<a href="notes.xhtml#fn1">[*]</a></p>',
+        ),
+        'OEBPS/notes.xhtml': chapterDoc(noteBody),
+      },
+    })
+  }
+
+  it('resolves a marker onto the note it points at', async () => {
+    const book = await parseEpub(bookWith('<h1>Notes</h1><p id="fn1">The note itself.</p>'), meta())
+    const blocks = book.sections.flatMap((s) => s.paragraphs)
+    const marker = blocks.find((p) => p.text.includes('Nothing comes from nothing'))
+    const note = blocks.find((p) => p.text === 'The note itself.')
+
+    expect(marker?.links?.[0].anchor).toBe(note?.anchor)
+  })
+
+  it('falls back to the notes document when the note’s own id did not survive', async () => {
+    // No `id="fn1"` anywhere — the commonest reason a marker goes dead. The
+    // link used to be dropped, leaving text that looks tappable and isn’t.
+    const book = await parseEpub(bookWith('<h1>Notes</h1><p>The note itself.</p>'), meta())
+    const blocks = book.sections.flatMap((s) => s.paragraphs)
+    const marker = blocks.find((p) => p.text.includes('Nothing comes from nothing'))
+
+    expect(marker?.links).toHaveLength(1)
+    expect(marker?.links?.[0].anchor).toBeDefined()
+  })
+
+  it('keeps the marker’s words whether or not the link survives', async () => {
+    const book = await parseEpub(bookWith('<h1>Notes</h1><p>The note itself.</p>'), meta())
+    const marker = book.sections
+      .flatMap((s) => s.paragraphs)
+      .find((p) => p.text.includes('Nothing comes from nothing'))
+    expect(marker?.text).toBe('Nothing comes from nothing.[*]')
+  })
+})
+
 describe('parseEpub — spine handling', () => {
   it('follows spine order, not archive or filename order', async () => {
     const epub = makeEpub({

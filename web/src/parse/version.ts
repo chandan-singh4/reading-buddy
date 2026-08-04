@@ -59,5 +59,13 @@
  *   concatenated into one continuous run of text, so the cover plate ran
  *   straight into the title beneath it. Books parsed under 1–6 carry no
  *   boundary marks at all and will keep flowing together until re-imported.
+ * - **8** — three things a book loses without a re-parse. A `<br>` is a line
+ *   break again instead of nothing at all, so the words either side of one stop
+ *   being pasted together ("Published byDell Publishinga division of"). Link
+ *   targets that used to vanish now survive: the ids on a heading that becomes
+ *   a chapter or section title are handed to the first block underneath it
+ *   rather than dropped with the heading, and the legacy `<a name="fn1">` form
+ *   is recognised. A dedication or an epigraph is labelled as such, so the
+ *   reading screen can set it apart the way print does.
  */
-export const PARSER_VERSION = 7
+export const PARSER_VERSION = 8

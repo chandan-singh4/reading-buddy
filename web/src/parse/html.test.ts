@@ -217,3 +217,37 @@ describe('parseHtml — shares the assembler with markdown', () => {
     expect(flat.sections[1].paragraphs).toHaveLength(5)
   })
 })
+
+/**
+ * A dedication marks the enclosing *section*, not the paragraph inside it, so
+ * reading the type off the paragraph alone found nothing and the book's opening
+ * page was set as ordinary body text.
+ */
+describe('htmlToBlocks — parts of a book that are displayed, not read through', () => {
+  it('labels a paragraph inside a dedication section', () => {
+    const [block] = htmlToBlocks(
+      '<section epub:type="dedication"><p>To L, and to B &amp; R.</p></section>',
+    )
+    expect(block.kind).toBe('prose')
+    expect(block.label).toBe('dedication')
+  })
+
+  it('labels an epigraph the same way', () => {
+    const [block] = htmlToBlocks('<div epub:type="epigraph"><p>Nothing comes from nothing.</p></div>')
+    expect(block.label).toBe('epigraph')
+  })
+
+  it('does not leak the label out to the paragraphs that follow the section', () => {
+    // The context has to end where the section ends, or the whole chapter after
+    // a dedication would be centred and italic.
+    const blocks = htmlToBlocks(
+      '<section epub:type="dedication"><p>To L.</p></section><p>Chapter one begins.</p>',
+    )
+    expect(blocks.map((b) => b.label)).toEqual(['dedication', undefined])
+  })
+
+  it('leaves ordinary prose unlabelled', () => {
+    const [block] = htmlToBlocks('<section><p>Ordinary prose.</p></section>')
+    expect(block.label).toBeUndefined()
+  })
+})
