@@ -115,8 +115,10 @@ function textAndLinks(element: Element): { text: string; links: RawLink[] } {
     const collapsed = raw.replace(/\s+/g, ' ')
     if (collapsed === '') return
     // No leading space, and never two in a row — the same result `normalise`
-    // reaches by collapsing the finished string.
-    if ((text === '' || text.endsWith(' ')) && collapsed.startsWith(' ')) {
+    // reaches by collapsing the finished string. A newline just written by a
+    // `<br>` counts as a space here: the next line must start at its own
+    // beginning, not one character in.
+    if ((text === '' || text.endsWith(' ') || text.endsWith('\n')) && collapsed.startsWith(' ')) {
       text += collapsed.slice(1)
       return
     }
@@ -133,6 +135,21 @@ function textAndLinks(element: Element): { text: string; links: RawLink[] } {
 
       const el = child as Element
       if (SKIP.has(el.tagName.toUpperCase())) continue
+
+      // A `<br>` is a line, and it has no text of its own to carry that with.
+      // Walking it therefore contributed nothing at all, and the words either
+      // side of it were pasted together: a title page reading `Published
+      // by<br/>Dell Publishing<br/>a division of<br/>Random House, Inc.` came
+      // out as "Published byDell Publishinga division ofRandom House, Inc."
+      //
+      // Kept as a real newline rather than smoothed into a space, because the
+      // lines of an imprint, an address or a verse are not one sentence — the
+      // renderer honours it (`white-space: pre-line`), the same newline lists
+      // already use to separate their items.
+      if (el.tagName.toUpperCase() === 'BR') {
+        if (text !== '') text = `${text.trimEnd()}\n`
+        continue
+      }
 
       if (el.tagName.toUpperCase() === 'A') {
         const href = el.getAttribute('href') ?? ''

@@ -6,8 +6,16 @@
  * never pushes the heading away from it.
  */
 
+/*
+ * `pre-line` keeps the line breaks the source book wrote with `<br>` — the
+ * lines of an imprint, an address, a verse, a dedication — while still
+ * collapsing every other run of whitespace and wrapping normally. The parser
+ * has already collapsed real whitespace, so the only newlines that reach here
+ * are ones the book meant.
+ */
 .prose {
   margin-top: var(--space-4);
+  white-space: pre-line;
 }
 
 .prose:first-child {
@@ -26,6 +34,8 @@
 
 .quote {
   margin-top: var(--space-4);
+  /* Verse is quoted far more often than not, and its line breaks are the point. */
+  white-space: pre-line;
   padding-left: var(--space-4);
   border-left: 2px solid var(--color-border);
   color: var(--color-text-muted);

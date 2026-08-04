@@ -120,6 +120,54 @@ describe('htmlToBlocks', () => {
   })
 })
 
+/**
+ * A `<br>` carries no text of its own, so walking it used to contribute
+ * nothing and the words either side were pasted together. Reported off a real
+ * title page: "Published byDell Publishinga division ofRandom House, Inc."
+ */
+describe('htmlToBlocks — line breaks', () => {
+  it('keeps the words either side of a <br> apart', () => {
+    expect(
+      texts(
+        '<p>Published by<br/>Dell Publishing<br/>a division of<br/>Random House, Inc.</p>',
+      ),
+    ).toEqual(['Published by\nDell Publishing\na division of\nRandom House, Inc.'])
+  })
+
+  it('handles the unclosed form real books are full of', () => {
+    expect(texts('<p>Editor, Carl G. Jung<br>and after his death M.-L. von Franz</p>')).toEqual([
+      'Editor, Carl G. Jung\nand after his death M.-L. von Franz',
+    ])
+  })
+
+  it('does not start a line with the space that followed the break', () => {
+    expect(texts('<p>One<br/>   Two</p>')).toEqual(['One\nTwo'])
+  })
+
+  it('collapses whitespace around a break rather than stacking it', () => {
+    expect(texts('<p>One <br/> Two</p>')).toEqual(['One\nTwo'])
+  })
+
+  it('never opens or closes a block with a stray break', () => {
+    expect(texts('<p><br/>One<br/></p>')).toEqual(['One'])
+  })
+
+  it('leaves a paragraph with no breaks exactly as it was', () => {
+    expect(texts('<p>An ordinary sentence, unbroken.</p>')).toEqual([
+      'An ordinary sentence, unbroken.',
+    ])
+  })
+
+  it('keeps a link’s offsets correct across a break', () => {
+    // The newline is a character like any other, so a link after one shifts by
+    // it. Getting this wrong underlines the wrong words.
+    const [block] = htmlToBlocks('<p>Before<br/>see <a href="#n1">note</a> here</p>')
+    expect(block.text).toBe('Before\nsee note here')
+    expect(block.links).toEqual([{ start: 11, end: 15, href: '#n1' }])
+    expect(block.text.slice(11, 15)).toBe('note')
+  })
+})
+
 describe('parseHtml — shares the assembler with markdown', () => {
   const source = [
     '<h1>Chapter One</h1>',

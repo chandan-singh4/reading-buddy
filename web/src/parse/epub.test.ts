@@ -152,7 +152,10 @@ describe('parseEpub — a normal book', () => {
       files: { 'OEBPS/Text/ch1.xhtml': chapterDoc('<h1>Chapter One</h1><p>Opening prose.</p>') },
     })
     const book = await parseEpub(polluted, meta())
-    expect(book.meta.title).toBe('The Quantum and the Lotus A Journey to the Frontiers Where')
+    // The run-together subtitle goes too, on the reader's own instruction: the
+    // shelf should read as a column of titles. `parse/cleanTitle.ts` carries
+    // the rule and the cases where it must not fire.
+    expect(book.meta.title).toBe('The Quantum and the Lotus')
     expect(book.meta.author).toBe('Matthieu Ricard')
   })
 })
