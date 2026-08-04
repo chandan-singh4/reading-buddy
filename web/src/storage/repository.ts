@@ -18,12 +18,14 @@ import type {
   SectionPath,
 } from '../structure/index.ts'
 import { countWordsIn, sectionPathOf } from '../structure/index.ts'
+import { cleanTitle, TITLE_CLEAN_VERSION } from '../parse/cleanTitle.ts'
 import {
   db as defaultDb,
   type ReadingBuddyDB,
   type ReadingPosition,
   type StoredChapterIndex,
   type StoredAsset,
+  type StoredQuote,
   type StoredSection,
   type StoredSource,
 } from './db.ts'
@@ -36,6 +38,16 @@ export interface BookAsset {
   path: string
   data: Blob
 }
+
+/**
+ * The reserved asset path a parser writes a book's cover image under, when it
+ * finds one. Not a real archive path — a fixed key, so the shelf can ask for
+ * "this book's cover" with `getAssets(bookId, [COVER_ASSET_PATH])` without
+ * knowing anything about the book's format or internal file layout. Absent
+ * entirely for a book with no extractable cover; the shelf falls back to a
+ * generated placeholder in that case.
+ */
+export const COVER_ASSET_PATH = '__cover__'
 
 /** Everything a parser produces for one book, written atomically. */
 export interface ParsedBook {
@@ -61,6 +73,92 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
 
     async getBook(id: BookId): Promise<BookMeta | undefined> {
       return database.books.get(id)
+    },
+
+    /** Set or clear (`undefined`) the reader's 1–5 rating for a book (WP-47). */
+    async rateBook(id: BookId, rating: number | undefined): Promise<void> {
+      const book = await database.books.get(id)
+      if (!book) return
+      await database.books.put({ ...book, rating })
+    },
+
+    /**
+     * Overwrite a book's title by hand — the escape hatch for metadata a
+     * parser couldn't fully clean. Some epubs (often ones that passed through
+     * a download/conversion pipeline) carry a `<dc:title>` with a subtitle
+     * mashed straight into the real title with no punctuation between them;
+     * the parser can strip a trailing hash, ISBN or author, but can't tell a
+     * subtitle apart from a title algorithmically. This is how a reader fixes
+     * the rest by hand, once, from the book's detail page.
+     */
+    async renameBook(id: BookId, title: string): Promise<void> {
+      const trimmed = title.trim()
+      if (!trimmed) return
+      const book = await database.books.get(id)
+      if (!book) return
+      // `titleOverridden` is what stops the automatic cleanup (`healTitles`)
+      // from ever running back over this answer — see the field's note.
+      await database.books.put({ ...book, title: trimmed, titleOverridden: true })
+    },
+
+    /**
+     * Re-run the title cleanup over books already on the shelf, and report how
+     * many titles actually changed.
+     *
+     * This is the fix for a class of bug that had cost several rounds of "you
+     * said you fixed it": a title is computed once, at import, and then stored.
+     * Improving the cleanup rules therefore did nothing for any book already
+     * imported — the reader had to still own the source file and know to press
+     * Update, and if the automatic rules still couldn't crack that particular
+     * title, even that achieved nothing visible. Two devices could sit on the
+     * same version of the app showing two different titles for the same book,
+     * purely because of what each had been asked to re-import.
+     *
+     * A title doesn't need any of that ceremony. It is one short string, and
+     * everything needed to recompute it — the stored title and author — is
+     * already in the row. So this runs at boot, offline, over metadata only,
+     * and never touches a section.
+     *
+     * Two things it will not do:
+     *   - **Overrule a manual rename** (`titleOverridden`). The reader only
+     *     reaches for the pencil when the guess was wrong.
+     *   - **Blank a title.** If the rules would cut the whole string away, the
+     *     existing title is kept. A book with a bad name is findable; a book
+     *     with no name is lost on the shelf.
+     *
+     * Books are stamped with `TITLE_CLEAN_VERSION` whether or not their title
+     * changed, so this is a no-op on every boot after the first.
+     */
+    async healTitles(): Promise<number> {
+      const books = await database.books.toArray()
+
+      const rewritten: BookMeta[] = []
+      let changed = 0
+
+      for (const book of books) {
+        if (book.titleOverridden) continue
+        if (book.titleCleanVersion === TITLE_CLEAN_VERSION) continue
+
+        const cleaned = cleanTitle(book.title, book.author)
+        const keepsMeaning = cleaned && cleaned !== book.title
+        if (keepsMeaning) changed += 1
+
+        rewritten.push({
+          ...book,
+          title: keepsMeaning ? cleaned : book.title,
+          titleCleanVersion: TITLE_CLEAN_VERSION,
+        })
+      }
+
+      if (rewritten.length > 0) await database.books.bulkPut(rewritten)
+      return changed
+    },
+
+    /** Set or clear (`undefined`) a book's free-text reflections (WP-49). */
+    async setNotes(id: BookId, notes: string | undefined): Promise<void> {
+      const book = await database.books.get(id)
+      if (!book) return
+      await database.books.put({ ...book, notes: notes || undefined })
     },
 
     /** Newest import first — the order the library screen wants. */
@@ -334,8 +432,13 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
      * Called repeatedly while reading, so it stays a single-row `put` with no
      * transaction and no read-before-write.
      */
-    async savePosition(bookId: BookId, anchor: Anchor): Promise<void> {
-      await database.positions.put({ bookId, anchor, at: new Date().toISOString() })
+    async savePosition(bookId: BookId, anchor: Anchor, percent?: number): Promise<void> {
+      await database.positions.put({
+        bookId,
+        anchor,
+        at: new Date().toISOString(),
+        ...(percent === undefined ? {} : { percent }),
+      })
     },
 
     async getPosition(bookId: BookId): Promise<ReadingPosition | undefined> {
@@ -463,7 +566,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       if (bookIds.length === 0) return
 
       // The table list is an array rather than separate arguments: Dexie's
-      // variadic overload stops at five tables, and this touches seven.
+      // variadic overload stops at five tables, and this touches eight.
       await database.transaction(
         'rw',
         [
@@ -474,6 +577,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.positions,
           database.sources,
           database.assets,
+          database.quotes,
         ],
         async () => {
           for (const bookId of bookIds) {
@@ -483,6 +587,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
             await database.positions.delete(bookId)
             await database.sources.delete(bookId)
             await database.assets.where('bookId').equals(bookId).delete()
+            await database.quotes.where('bookId').equals(bookId).delete()
             await database.books.delete(bookId)
           }
         },
@@ -495,7 +600,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
      * would quietly eat a phone's storage quota forever.
      */
     async deleteBook(bookId: BookId): Promise<void> {
-      // Seven tables, so the array form — see `deleteBooks` above.
+      // Eight tables, so the array form — see `deleteBooks` above.
       await database.transaction(
         'rw',
         [
@@ -506,6 +611,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.positions,
           database.sources,
           database.assets,
+          database.quotes,
         ],
         async () => {
           await database.sections.where('bookId').equals(bookId).delete()
@@ -514,9 +620,32 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           await database.positions.delete(bookId)
           await database.sources.delete(bookId)
           await database.assets.where('bookId').equals(bookId).delete()
+          await database.quotes.where('bookId').equals(bookId).delete()
           await database.books.delete(bookId)
         },
       )
+    },
+
+    // --- Quotes ----------------------------------------------------------
+
+    /** Save a favorite passage, typed in from the detail page (WP-48). */
+    async addQuote(bookId: BookId, text: string): Promise<void> {
+      await database.quotes.put({
+        bookId,
+        id: crypto.randomUUID(),
+        text,
+        addedAt: new Date().toISOString(),
+      })
+    },
+
+    /** Newest first — how the detail page lists them. */
+    async listQuotes(bookId: BookId): Promise<StoredQuote[]> {
+      const quotes = await database.quotes.where('bookId').equals(bookId).toArray()
+      return quotes.sort((a, b) => b.addedAt.localeCompare(a.addedAt))
+    },
+
+    async deleteQuote(bookId: BookId, id: string): Promise<void> {
+      await database.quotes.delete([bookId, id])
     },
   }
 }

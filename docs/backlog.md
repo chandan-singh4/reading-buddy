@@ -186,7 +186,39 @@
 - [ ] **WP-23 Chapter recap** — zero-token summary + things learned + cheap quiz · *after 21,22*
 
 ### Leg 4 — The Archive (library & persistence)
-- [ ] **WP-24 Multi-book library** — covers, progress, status grouping · *after 04,11*
+- [~] **WP-24 Multi-book library** — covers, progress, status grouping · *after 04,11*
+  > Status grouping (Currently Reading / Up Next / Unread / Finished) and
+  > progress % shipped with the Home redesign, 2026-08-03. Real cover
+  > extraction (epub2/3) shipped 2026-08-03. **Left:** the shelf's visual
+  > language itself — the reader wants it to feel like the reference design
+  > they shared (illustrated, warm, cover-forward), not just "dark theme with
+  > covers now filled in." Carved into **WP-46** below so it can move without
+  > blocking the rest of this list.
+- [x] **WP-46 Shelf visual redesign** — bring Home closer to the reference look
+  the reader shared: cover-forward grid/card layout, warmer surface
+  treatment, decorative touches. Purely visual — no new data. · *after 24*
+- [x] **WP-47 Book detail page** — tap a book off the shelf to a dedicated
+  screen (today a tap opens the reader directly): title, author, format,
+  genre/subject tag, date-range read, **one overall rating** — the
+  "single overall book rating prompted at Finished" already agreed as a
+  future milestone. Foundation the next two waypoints hang their UI off of ·
+  *after 46*
+- [x] **WP-48 Favorite quotes on the detail page** — shipped 2026-08-03 as a
+  typed-in MVP rather than waiting on WP-17/25: a `quotes` table (schema v7,
+  `[bookId+id]`, cascades on delete) plus `addQuote`/`listQuotes`/
+  `deleteQuote`, and a form + list on WP-47's screen. Selecting a passage
+  *from the reading screen itself* is still real, unbuilt work — that needs a
+  character range within an anchor (WP-17's job) — so this table just gains a
+  second way to be filled once WP-17/25 land, nothing about its shape changes
+  · *after 47*
+- [x] **WP-49 Notes/reflections** — shipped 2026-08-03. `BookMeta.notes`
+  (free text, saved on blur). Originally also shipped `.moods` (toggle
+  chips) and `.secondaryRatings` (writing style / pacing / emotional
+  impact, genre-neutral stand-ins for the reference design's romance-
+  specific axes) — the reader saw the page live the same session and asked
+  for both removed as clutter, so they're gone: UI, repository methods
+  (`setMoods`/`rateBookAxis`) and the `BookMeta` fields/type all pulled
+  rather than left dead · *after 47*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*

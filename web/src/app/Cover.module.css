@@ -1,0 +1,28 @@
+/* A placeholder book cover: a swatch of colour and one letter, sized like a
+   real cover so a real one can replace it later without reflowing the shelf. */
+
+.cover {
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-raised);
+  /* Fixed rather than themed: this sits *on* a swatch colour, not on
+     --color-surface, so it needs to read against six different backgrounds
+     rather than against the current theme. */
+  color: rgb(255 255 255 / 0.92);
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+  /* Only reached when `src` is a real `<img>`: a cover's own proportions
+     rarely match 2/3 exactly, and cropping to fill reads better on a shelf
+     than a letterboxed image with the placeholder's colour showing through
+     the gaps. */
+  object-fit: cover;
+}
+
+.initial {
+  font-family: var(--font-reading);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+}

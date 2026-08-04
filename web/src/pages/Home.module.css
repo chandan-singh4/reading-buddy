@@ -1,0 +1,182 @@
+/* The curated front door — a handful of shelves, not the whole collection.
+   Full-catalogue furniture (search, import, multi-select) lives in
+   `page.module.css`, for `/library` only. */
+
+.home {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.shelfHeading {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/* Scrolls sideways rather than wrapping — a shelf of covers reads as a shelf
+   only if it behaves like one. Wider gap than a plain list: covers are the
+   thing being browsed, so each one gets room to read as its own object
+   rather than a row of edge-to-edge thumbnails. */
+.row {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scroll-snap-type: x proximity;
+}
+
+.tile {
+  flex: 0 0 auto;
+  width: 8.5rem;
+  display: grid;
+  gap: var(--space-2);
+  color: inherit;
+  scroll-snap-align: start;
+  overflow: hidden;
+}
+
+/* The one book in progress gets its own panel, not just a wider row item —
+   it is the single thing on this screen the reader is most likely to act on. */
+.heroCard {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raised);
+}
+
+/* Currently Reading's single hero tile: cover and text side by side rather
+   than stacked, so it reads as the one thing on the shelf that matters most
+   right now, not as one more card in a row. Its cover runs larger than a
+   shelf tile's — the one book in progress earns the biggest cover on the
+   page. */
+.tileLarge {
+  width: 100%;
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+/* Holds the cover link and the info button on top of it — `.tileMedia` is
+   decorative (the tileInfo link below is the real, keyboard-reachable route
+   to the same book), `.infoButton` is the only other interactive thing here. */
+.mediaWrap {
+  position: relative;
+  width: 8.5rem;
+  flex: none;
+}
+
+.tileLarge .mediaWrap {
+  width: 10rem;
+}
+
+.tileMedia {
+  display: block;
+}
+
+.infoButton {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: var(--text-xs);
+  line-height: 1;
+  text-decoration: none;
+}
+
+.tileInfo {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tileTitle {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  /* Two lines, then cut — a long title shouldn't push neighbouring tiles out
+     of alignment. `max-height` is the backstop: on its own,
+     `-webkit-line-clamp` has been seen to let a third line bleed out of a
+     narrow flex/grid tile on some mobile browsers, so the hard height plus
+     `overflow: hidden` clips it regardless of whether the clamp itself takes
+     effect. */
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: calc(1.3em * 2);
+  word-break: break-word;
+}
+
+.tileLarge .tileTitle {
+  font-size: var(--text-lg);
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
+  max-height: calc(1.3em * 3);
+}
+
+.tileAuthor {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tileProgress {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.seeAll {
+  justify-self: start;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.pending {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.empty {
+  margin-top: var(--space-6);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+}
+
+.emptyTitle {
+  font-size: var(--text-lg);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.error {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+}

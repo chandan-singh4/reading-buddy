@@ -9,9 +9,10 @@ export type {
   ReadingPosition,
   StoredAsset,
   StoredChapterIndex,
+  StoredQuote,
   StoredSection,
   StoredSource,
 } from './db.ts'
 
-export { createRepository, repository } from './repository.ts'
+export { COVER_ASSET_PATH, createRepository, repository } from './repository.ts'
 export type { BookAsset, ParsedBook, Repository } from './repository.ts'

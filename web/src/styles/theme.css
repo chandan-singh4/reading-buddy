@@ -32,7 +32,11 @@
 
   /* Type */
   --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* The default reading face. Written as the literal stack rather than
+     `var(--face-serif)` because the `--face-*` tokens are declared further down
+     this file, and a custom property can't be read before it is declared. */
   --font-reading: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.125rem;
@@ -50,6 +54,32 @@
   /* Layout */
   --reading-measure: 34rem; /* comfortable line length for body text */
   --tab-bar-height: 3.5rem;
+
+  /*
+   * Reading-comfort defaults (WP-14's Aa tab: text size, line spacing,
+   * margins). Defined here so the value that exists before a reader ever opens
+   * the tab is exactly the value the page already used — but read only by
+   * `Reader.module.css`/`blocks.module.css`, and only ever *overridden* inline
+   * on the `.reader` element by `readerSettings.ts`, never here. That keeps a
+   * reader's choice scoped to the book they're reading and out of the shelf,
+   * which shares `--text-lg` and `--reading-measure` for its own layout.
+   */
+  --reading-text-size: var(--text-lg);
+  --reading-leading: var(--leading-reading);
+  --reading-column-width: var(--reading-measure);
+
+  /*
+   * Placeholder cover swatches (Home, WP-24). A book with no extractable
+   * cover gets one of these, chosen deterministically from its title — see
+   * `app/cover.ts`. Muted rather than bright: they sit behind a title in
+   * small text and must not fight it for attention.
+   */
+  --cover-1: #b1876b;
+  --cover-2: #8a9a7e;
+  --cover-3: #7f9db3;
+  --cover-4: #b3907f;
+  --cover-5: #9c8bb0;
+  --cover-6: #a99a5f;
 
   /* Phone chrome: keeps content clear of notch and home indicator.
      Needs viewport-fit=cover in index.html, which is already set. */
@@ -98,4 +128,170 @@
   --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
 
   color-scheme: dark;
+}
+
+/* Sepia — the reading-comfort theme (WP-14): warm paper rather than white
+   screen glare. Explicit override only; it never follows a media query the way
+   dark does, because no OS setting means "reader wants sepia". */
+:root[data-theme='sepia'] {
+  --color-bg: #f2e8d3;
+  --color-surface: #f8f1de;
+  --color-surface-raised: #ece0c4;
+  --color-text: #3b2f20;
+  --color-text-muted: #7a6a50;
+  --color-border: #ddceac;
+  --color-accent: #7a5c3e;
+  --color-accent-contrast: #ffffff;
+  --color-focus: #3b6ea5;
+
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+
+  color-scheme: light;
+}
+
+/* Dim — a softer night than `dark`. Charcoal rather than near-black, and text
+   pulled back from full white: the same reasoning as sepia, applied to the dark
+   end. Reading in bed against a pure-black screen is a lot of local contrast,
+   and it's what people reach for the "dim" setting in other readers to escape.
+   Explicit override only — no OS setting distinguishes dim from dark. */
+:root[data-theme='dim'] {
+  --color-bg: #22262b;
+  --color-surface: #2a2f35;
+  --color-surface-raised: #333940;
+  --color-text: #d6dbe1;
+  --color-text-muted: #949ca6;
+  --color-border: #3d444c;
+  --color-accent: #d9a441;
+  --color-accent-contrast: #22262b;
+  --color-focus: #7fb0e8;
+
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.4), 0 1px 2px rgb(0 0 0 / 0.25);
+
+  color-scheme: dark;
+}
+
+/* Slate — a cool, low-glare light theme. The counterpart to sepia for readers
+   who find warm paper muddy: same reduction in white glare, neutral-cool
+   instead of yellow. */
+:root[data-theme='slate'] {
+  --color-bg: #eef1f4;
+  --color-surface: #f7f9fb;
+  --color-surface-raised: #e2e7ec;
+  --color-text: #1f262d;
+  --color-text-muted: #5f6b76;
+  --color-border: #d1d8df;
+  --color-accent: #3d6b8e;
+  --color-accent-contrast: #ffffff;
+  --color-focus: #3b6ea5;
+
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+
+  color-scheme: light;
+}
+
+/* Forest — a dark theme tinted green rather than neutral. Purely a matter of
+   taste, and the one theme here that exists for pleasure rather than comfort or
+   access; a library should be allowed one. */
+:root[data-theme='forest'] {
+  --color-bg: #141d18;
+  --color-surface: #1b261f;
+  --color-surface-raised: #243128;
+  --color-text: #dfe8e0;
+  --color-text-muted: #93a396;
+  --color-border: #2f3d33;
+  --color-accent: #8fbf7f;
+  --color-accent-contrast: #141d18;
+  --color-focus: #7fb0e8;
+
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.45), 0 1px 2px rgb(0 0 0 / 0.3);
+
+  color-scheme: dark;
+}
+
+/*
+ * High contrast — the accessibility theme, and the one place in this file where
+ * "tasteful" is the wrong goal.
+ *
+ * Pure black on pure white, borders that are actually visible, and a focus ring
+ * that cannot be missed. Every other theme here trades a little contrast for
+ * comfort; this one spends all of it on legibility, for readers with low vision
+ * or in bright sunlight where the muted themes wash out entirely.
+ */
+:root[data-theme='contrast'] {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f0f0f0;
+  --color-text: #000000;
+  --color-text-muted: #333333;
+  --color-border: #000000;
+  --color-accent: #0000cc;
+  --color-accent-contrast: #ffffff;
+  --color-focus: #cc0000;
+
+  --shadow-raised: 0 0 0 1px #000000;
+
+  color-scheme: light;
+}
+
+/*
+ * Reading font family (WP-14's Aa tab). `--font-reading` is touched only here
+ * and in `Reader.module.css`/`blocks.module.css` — nothing on the shelf or
+ * elsewhere reads it — so switching it is safe to do globally rather than
+ * scoping it to the reading screen the way size/spacing/margins are below.
+ *
+ * The first three are system stacks and cost nothing. The rest are the
+ * self-hosted faces defined in `fonts.css`; each keeps a system fallback after
+ * it, so a book stays readable in the moment before the file loads — or forever,
+ * if it somehow failed to.
+ */
+/*
+ * Each face is named once, here, as its own token. Two things then read these
+ * and neither repeats the stack: the `data-reading-font` rules below, which set
+ * what the book is set in, and the Aa tab's font buttons, which render each
+ * option's *name in that option's own face* so the reader chooses by looking
+ * rather than by guessing what "Lora" means. A face added here needs its stack
+ * written exactly once.
+ */
+:root {
+  --face-serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --face-serif-alt: Palatino, 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --face-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --face-literata: 'Literata', Georgia, serif;
+  --face-garamond: 'EB Garamond', Garamond, Georgia, serif;
+  --face-lora: 'Lora', Georgia, serif;
+  --face-inter: 'Inter', system-ui, -apple-system, sans-serif;
+  --face-atkinson: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --face-dyslexic: 'OpenDyslexic', Verdana, sans-serif;
+}
+
+:root[data-reading-font='serif-alt'] {
+  --font-reading: var(--face-serif-alt);
+}
+
+:root[data-reading-font='sans'] {
+  --font-reading: var(--face-sans);
+}
+
+:root[data-reading-font='literata'] {
+  --font-reading: var(--face-literata);
+}
+
+:root[data-reading-font='garamond'] {
+  --font-reading: var(--face-garamond);
+}
+
+:root[data-reading-font='lora'] {
+  --font-reading: var(--face-lora);
+}
+
+:root[data-reading-font='inter'] {
+  --font-reading: var(--face-inter);
+}
+
+:root[data-reading-font='atkinson'] {
+  --font-reading: var(--face-atkinson);
+}
+
+:root[data-reading-font='dyslexic'] {
+  --font-reading: var(--face-dyslexic);
 }

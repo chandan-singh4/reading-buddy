@@ -1,0 +1,159 @@
+/*
+ * The reading faces, self-hosted.
+ *
+ * Three rules govern everything in this file.
+ *
+ * **No CDN.** This is an offline-first reading app. A font fetched from
+ * fonts.googleapis.com is a font that doesn't exist on a train, and it hands a
+ * third party a request every time someone opens a book. The files ship in the
+ * bundle, and `globPatterns` in `vite.config.ts` already precaches `woff2`.
+ *
+ * **Latin only, by hand.** Fontsource packages carry every subset they have —
+ * Literata alone is 42 files of Cyrillic, Greek and Vietnamese. Importing the
+ * package's own CSS would pull all of them into `dist/`, and the service worker
+ * precaches whatever it finds there, so the install would carry megabytes of
+ * alphabets this app never sets. These `@font-face` rules name the Latin file
+ * and nothing else. Adding a subset later is a deliberate line here, not an
+ * accident of a wildcard.
+ *
+ * **One file per family where possible.** The variable faces below cover every
+ * weight from one file via the `wght` axis, which is why `font-weight` is a
+ * range rather than a number.
+ */
+
+/* --- Literata ------------------------------------------------------------ */
+/* Google Play Books' own reading face, drawn for long-form screen reading. */
+
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url('@fontsource-variable/literata/files/literata-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Literata';
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url('@fontsource-variable/literata/files/literata-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+/* --- EB Garamond --------------------------------------------------------- */
+/* The classic book face — old-style, generous, at home in a novel. */
+
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('@fontsource-variable/eb-garamond/files/eb-garamond-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+/* --- Lora ---------------------------------------------------------------- */
+/* Contemporary serif with brushed contrast — warmer than Georgia. */
+
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('@fontsource-variable/lora/files/lora-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('@fontsource-variable/lora/files/lora-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+/* --- Inter --------------------------------------------------------------- */
+/* A sans drawn for screens — cleaner at small sizes than the system stack. */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
+/* --- Atkinson Hyperlegible ----------------------------------------------- */
+/*
+ * Drawn by the Braille Institute to pull confusable letterforms apart — the
+ * tail on a lowercase l, the open tail on a t — for readers with low vision.
+ * Static rather than variable, so regular and bold are separate files.
+ */
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-normal.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-italic.woff2')
+    format('woff2');
+}
+
+@font-face {
+  font-family: 'Atkinson Hyperlegible';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-700-normal.woff2')
+    format('woff2');
+}
+
+/* --- OpenDyslexic -------------------------------------------------------- */
+/*
+ * Bottom-weighted letterforms, so a b and a d are harder to flip.
+ *
+ * Regular only, and deliberately: each file is 116 kB — six times Atkinson —
+ * and dyslexia typography guidance advises against italic anyway, so shipping
+ * one would cost the most bytes in this file to add a style its own readers are
+ * told to avoid. Bold and italic are synthesised by the browser on the rare
+ * span that asks.
+ */
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@fontsource/opendyslexic/files/opendyslexic-latin-400-normal.woff2') format('woff2');
+}

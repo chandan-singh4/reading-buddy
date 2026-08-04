@@ -1,0 +1,260 @@
+/* A book's own screen — reached from a shelf tile's "ⓘ", full-bleed like the
+   reader rather than nested in the tab bar shell (see `App.tsx`). */
+
+.page {
+  min-height: 100dvh;
+  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
+    calc(var(--safe-bottom) + var(--space-6));
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  /* A book's own metadata is never fully trustworthy — a stray unbroken
+     string (a hash, an ISBN run) must never be able to force this page
+     wider than the screen and drag `.facts` off the edge with it. */
+  overflow-x: hidden;
+}
+
+.back {
+  display: inline-block;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.pending {
+  color: var(--color-text-muted);
+}
+
+.hero {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.coverMedia {
+  width: 8rem;
+  flex: none;
+}
+
+.heroInfo {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.titleEdit {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  padding: var(--space-1);
+}
+
+.titleEditForm {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.titleInput {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+.titleSave {
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+}
+
+.author {
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.tag {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.facts {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.fact {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.fact dt {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.fact dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  font-weight: 600;
+}
+
+.section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sectionHeading {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.stars {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.star {
+  font-size: var(--text-2xl);
+  line-height: 1;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: var(--space-1);
+}
+
+.ratingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.ratingLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  min-width: 7rem;
+}
+
+.notesInput {
+  font: inherit;
+  color: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  resize: vertical;
+}
+
+.quoteList {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.quote {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-md);
+}
+
+.quoteText {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-reading);
+  font-style: italic;
+  line-height: var(--leading-reading);
+  overflow-wrap: anywhere;
+}
+
+.quoteRemove {
+  flex: none;
+  font-size: var(--text-lg);
+  line-height: 1;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  padding: var(--space-1);
+}
+
+.quoteForm {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.quoteInput {
+  font: inherit;
+  color: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  resize: vertical;
+}
+
+.quoteSave {
+  justify-self: start;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: var(--space-1) 0;
+}
+
+.quoteSave:disabled {
+  color: var(--color-text-muted);
+}
+
+.readButton {
+  justify-self: stretch;
+  text-align: center;
+  padding: var(--space-3);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  text-decoration: none;
+}

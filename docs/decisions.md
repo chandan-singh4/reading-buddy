@@ -97,6 +97,39 @@
   a binary fixture. — 2026-08-02
 - **pdf and docx are lazy-loaded**, and `mammoth` is aliased to its browser build
   in `vite.config.ts` so tests exercise the same path the phone runs. — 2026-08-02
+
+### Settled 2026-08-03 (bug fixes + first deploy)
+- **Vercel hosts the deployed app**, connected to GitHub, auto-deploying on
+  every push to `main`. Root Directory is set to `web/` in the Vercel project
+  (the app isn't at the repo root), which lets Vercel auto-detect Vite with no
+  custom build/output config. — 2026-08-03
+- **The Anthropic key's production home is Vercel's own Environment Variables
+  setting, never a committed file.** A local `.env` (gitignored) covers dev;
+  `.env.example` is the checked-in template for both. — 2026-08-03
+- **A figure's caption shows the real `figcaption` (`label`) only once its
+  picture actually renders.** The parser's `[Figure: ...]` placeholder text is
+  for the degraded case (no picture shown at all) — showing it next to a
+  working image just repeated "[Figure]" under every plate. — 2026-08-03
+- **Every touch on the reading screen is handled by the app, never the
+  browser.** `touch-action: pan-x` on the page-turn element and
+  `overscroll-behavior: none` (both axes, was x-only) on `html`/`body` stop a
+  not-quite-horizontal swipe from being read as a scroll attempt — which on
+  mobile also animates the address bar and was making the screen visibly bob.
+  — 2026-08-03
+- **Theme and reading font are applied to `<html>` once at app boot**
+  (`main.tsx`'s `applyStoredTheme()`), not only while the Reader is mounted.
+  They're a whole-app setting, so every screen has to show the reader's
+  actual choice from the first paint — not the OS's `prefers-color-scheme`
+  guess until a book happens to be opened. `Reader.tsx` calls the same
+  function for live updates while the Aa tab is open. — 2026-08-03
+- **Automatic title cleanup is best-effort; manual rename is the guaranteed
+  fallback.** Some epubs' `<dc:title>` is a citation dump with no
+  punctuation between fields (title, author, publisher, ISBN, a hash, a
+  source credit) — `cleanTitle` cuts at the earliest recognisable field, but
+  a subtitle with none of those markers can't be told apart from the real
+  title algorithmically. Rather than chase a heuristic that will never be
+  perfect, the book's detail page got a manual rename
+  (`repository.renameBook`) instead. — 2026-08-03
 - **Plain-text heading detection is gated on word count**, not just length: a
   58-character sentence opening "Chapter four was…" otherwise became a chapter.
   False positives mis-anchor prose permanently; missed headings only cost a

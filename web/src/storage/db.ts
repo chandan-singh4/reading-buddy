@@ -47,6 +47,13 @@ export interface ReadingPosition {
   anchor: Anchor
   /** ISO 8601 — what "Continue reading" and a recently-opened list sort on. */
   at: string
+  /**
+   * Whole-number percent through the book, 0–100, when it was known at save
+   * time. `undefined` on a position saved before this existed, or before the
+   * book's spine had built — the Home screen treats either as "still reading"
+   * rather than guessing.
+   */
+  percent?: number
 }
 
 /**
@@ -95,6 +102,23 @@ export interface StoredAsset {
   data: Blob
 }
 
+/**
+ * A favorite passage, saved from the book detail page (WP-48).
+ *
+ * Typed in by hand for now rather than selected from the reading screen —
+ * the reader's anchors are paragraph-level (see `structure/types.ts`), and a
+ * true in-text selection needs a character range *within* an anchor, which is
+ * WP-17's job, not this one's. This table's shape doesn't change when that
+ * lands; it just gains a second way to be filled.
+ */
+export interface StoredQuote {
+  bookId: BookId
+  id: string
+  text: string
+  /** ISO 8601 — newest first is how the detail page lists them. */
+  addedAt: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -111,6 +135,7 @@ export type ReadingBuddyDB = Dexie & {
   positions: Table<ReadingPosition, BookId>
   sources: Table<StoredSource, BookId>
   assets: Table<StoredAsset, [BookId, string]>
+  quotes: Table<StoredQuote, [BookId, string]>
 }
 
 /**
@@ -167,6 +192,13 @@ function defineSchema(db: Dexie): void {
   // captions only, until they are re-imported.
   db.version(6).stores({
     assets: '[bookId+path], bookId',
+  })
+
+  // v7 — favorite quotes (WP-48). `[bookId+id]` matches every other per-book
+  // table's shape; `bookId` alone is indexed too, so deleting a book can drop
+  // its quotes without listing them first, same as `assets`.
+  db.version(7).stores({
+    quotes: '[bookId+id], bookId',
   })
 }
 

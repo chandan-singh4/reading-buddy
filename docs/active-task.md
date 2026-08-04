@@ -8,47 +8,129 @@
 
 ---
 
-## Task — the rest of WP-14: how it looks
+## Task — WP-46→49 fast-follow (reader's first live reaction) is done
 
-Page turning, links (WP-42), bulk delete (WP-44), the second and third phone
-rounds (WP-45; bare reading screen, no pager, permanent status line) and book
-pictures (WP-39's first half) all shipped 2026-08-02. Gates: **472 tests**,
-typecheck, build. App-shell precache 425.30 KiB.
+The garbled-title bug (a hash baked into some epubs' own `<dc:title>`
+metadata, not just the filename) was fixed 2026-08-03, `PARSER_VERSION` → 5.
 
-What is left of WP-14 is the *look*, which the reader has confirmed twice is the
-next thing they want:
+The reader then shared a reference design (warm, illustrated "wood shelf"
+library view, cover-forward grid, plus a per-book detail screen with rating/
+notes/quotes/mood) and asked for it broken into waypoints. All four shipped
+and merged to `main` the same session, 2026-08-03:
 
-- **Font size, line spacing, margins.** These are the reason word-counted pages
-  exist — the page number survives them, because it counts words not screens.
-- **Themes: light / dark / sepia.** Dark already follows the OS; sepia is new.
-  All of it flows from `styles/theme.css` tokens — no component hard-codes a
-  colour, so this is a `data-theme` attribute and a token block.
-- **The page-turn animation.** The seam is built (`turnPage`); only *instant* is
-  wired. Ship slide next, honour `prefers-reduced-motion`, ~200 ms ceiling, and
-  a fast tapper must be able to outrun it. Page curl stays a labelled slot.
-- **In-book search and real bookmarks** — the two stub tabs in the nav sheet,
-  which are a visible promise. Shelf search exists (WP-45); this is the other
-  one.
+- **WP-46** — Home shelves: bigger cover-forward tiles, the currently-reading
+  book in its own raised card. Visual only, existing theme tokens.
+- **WP-47** — new `/book/:bookId/info` route (`BookInfo.tsx`), reached from a
+  "ⓘ" on each shelf tile (tapping the cover still opens the reader directly).
+  Title/author/format/subject/status/dates + a 1–5 overall rating
+  (`BookMeta.rating`, `repository.rateBook`).
+- **WP-48** — favorite quotes on that page. Scoped down to a typed-in MVP (a
+  new `quotes` table, schema v7) rather than waiting on true in-reader
+  selection, which still needs WP-17/25 (unbuilt — see `backlog.md`).
+- **WP-49** — `BookMeta.notes` on the same page. Originally also shipped
+  `.moods` / `.secondaryRatings`, **removed same session** — see below.
 
-### Definition of done
-A reader can set type size, spacing and theme from the nav sheet; the choice
-persists; page numbers do not shift when they change it; pages slide rather than
-snap, and reduced-motion users still get instant.
+The reader then saw it live and asked for a fast-follow, same session,
+2026-08-03:
+
+- **Title cleanup, round 2.** Some epubs (from a download/conversion
+  pipeline such as Anna's Archive) don't just have a stray hash in
+  `<dc:title>` — the whole thing is a citation dump: title run straight into
+  author, publisher, ISBN, a hash and a trailing "Anna's Archive" credit, no
+  punctuation between fields (`The Quantum and the Lotus A Journey to the
+  Frontiers Where Ricard, Matthieu;Trinh, Xuan Thuan Place of publication not
+  identified, 2009 9780307566126 6402e734… Anna's Archive`). `cleanTitle` in
+  `parse/epub.ts` now recognises each field (ISBN digit run, the "Anna's
+  Archive" / "place of publication not identified" phrases, and the known
+  author's name in "Lastname, Firstname" form) and cuts the title at the
+  earliest one found. `PARSER_VERSION` → 6.
+  **Known gap, by design:** a subtitle mashed into the same string with none
+  of those markers of its own (as in the example above — the cut lands after
+  "…Frontiers Where", not at "…the Lotus") can't be told apart from the real
+  title algorithmically; there's no delimiter left to find it by. That's what
+  the manual rename below is for.
+- **Manual title rename.** A pencil next to the title on the detail page
+  (`TitleField` in `BookInfo.tsx`, `repository.renameBook`) — the escape
+  hatch for whatever the automatic cleanup above can't get exactly right.
+- **Mood and More ratings sections removed.** The reader found them
+  unnecessary clutter after seeing the page live. Pulled the UI, the
+  `repository.setMoods` / `.rateBookAxis` methods, and the `BookMeta.moods` /
+  `.secondaryRatings` / `SecondaryRatingAxis` type entirely — same-day code
+  nobody had used yet, so a full removal rather than leaving it dead.
+- **Layout fixes on the detail page.** `.title`/`.author`/`.quoteText`/`.fact
+  dd` now all get `overflow-wrap: anywhere` and `.page` gets
+  `overflow-x: hidden`, so a long unbroken metadata string (a hash, an ISBN)
+  can never again push the page wider than the screen and clip the Status /
+  Added / Last read rows off the edge — which is what was actually happening
+  in the reader's screenshot, not a narrow-column bug.
+- **Page tightened**, not made fully static: removing Mood + More ratings
+  shrank it a lot, and textareas lost a row each. True "never scrolls" isn't
+  promised — Favorite quotes is an open-ended list by nature and will grow
+  past one screen on a book with several saved.
+
+Gates re-run: typecheck clean, full suite green (524/524 — the previously
+noted `docx.test.ts` flake did not recur this run), build clean.
+
+The reader looked again, same session, 2026-08-03, and reported three more
+things:
+
+- **The still-garbled title on their screen was stale, not unfixed.** They
+  compared to Google Books, which resolves metadata from its own catalogue
+  by ISBN — not by reading the epub's internal `<dc:title>` — so "Google
+  Books shows it clean" doesn't actually mean the epub's own metadata is
+  clean; the two apps are answering the question two different ways. Their
+  screenshot still showed the *full* pre-round-2 string (hash included),
+  which only happens if they hadn't tapped "Update" on the Library screen
+  since the last deploy — the fix only ever applies on reparse. Told them
+  this plainly and pointed at the manual rename as the sure thing either way.
+- **Tab bar + "All Books".** `AppShell.tsx`'s tabs are now Home / All Books
+  (`/library`) / Stats / Settings. `Journal.tsx` is deleted outright — it was
+  an unbuilt placeholder page, not a feature anyone had used, and the reader
+  asked for it gone rather than kept dark.
+- **The "All Books" list now shows cover art and reading progress**, closer
+  to the reference Google Books screenshot: a `Cover` thumbnail
+  (`useCovers`, same hook Home uses) plus "N% read" per row, computed from
+  `repository.listPositions()`. New `Library.module.css` layered on top of
+  the existing shared `page.module.css` furniture — the import buttons,
+  select-all bar, per-row shelf-move/remove controls are all unchanged, only
+  the row's own content gained a thumbnail and a progress line.
+- **Theme bug, real and fixed.** `data-theme` on `<html>` was only ever
+  applied by an effect inside `Reader.tsx`, so a session that started on
+  Home showed the OS's `prefers-color-scheme` guess right up until a book
+  was opened for the first time — at which point the reader's *actual*
+  persisted choice (set on some earlier visit to the Aa tab, and forgotten
+  about) suddenly took over globally, which read as "opening a book changed
+  my theme." Fixed by applying the persisted setting once at boot, in
+  `main.tsx`, via a new `applyStoredTheme()` in `readerSettings.ts` — `Reader.tsx`
+  now calls the same function instead of duplicating the logic, kept for live
+  updates while the Aa tab is open. Verified with Playwright against the dev
+  server, both directions (persisted dark shows immediately on a fresh Home
+  load; persisted light overrides an OS dark preference immediately too) —
+  this was cleanly reproducible and fixed, not a guess.
+
+Gates re-run: typecheck clean, full suite green (525/525), build clean.
+Also spot-checked the Library redesign live (Playwright screenshots, not
+just tests) — cover art and "N% read" render correctly on both Home and
+All Books.
+
+**Not yet done:** the reader hasn't seen *this* round live yet. Also still
+open — didn't attempt blind: whether the title heuristic actually gets
+"just the title" on their *other* Anna's Archive books once they've tapped
+Update, since only one example (The Quantum and the Lotus) has been seen.
 
 ### Files in scope
-- `web/src/styles/theme.css` — every colour and size token lives here.
-- `web/src/reader/Chrome.tsx` + `Chrome.module.css` — where the settings go.
-- `web/src/pages/Reader.tsx` + `Reader.module.css` — the column strip and the
-  turn.
-- `web/src/reader/columns.ts` — the page arithmetic a re-flow must not break.
-- `web/src/reader/focusMode.ts` — the existing pattern for a persisted setting;
-  copy it rather than inventing a second one.
-- `web/src/reader/blocks.module.css` — per-block spacing, and the figure cap
-  (`max-height: 70dvh`) that a change to type size or margins interacts with.
+None right now — no task is in flight. If the reader wants further
+adjustments, start from `web/src/parse/epub.ts` (title cleanup),
+`web/src/pages/BookInfo.tsx` (+ `.module.css`), `web/src/pages/Home.tsx`
+(+ `.module.css`), `web/src/pages/Library.tsx` (+ `.module.css`),
+`web/src/app/AppShell.tsx`, and `web/src/reader/readerSettings.ts` /
+`web/src/main.tsx` for theme.
 
 ### Out of scope
-The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half (tap a
-figure → ask Claude about it), pdf.js region rendering.
+The rest of WP-14 (reader font size/spacing/theme, page-turn animation,
+in-book search, bookmarks) is parked, not abandoned — still `[~]` in
+`backlog.md`, and is the natural next task if the reader has nothing further
+on the shelf/detail screens.
 
 ---
 
@@ -70,11 +152,26 @@ figure → ask Claude about it), pdf.js region rendering.
   failed once on a full run while a build was running, and passed on three clean
   full runs plus four isolated ones. Not diagnosed. If it recurs on an idle
   machine, it is real.
-- **The live Anthropic key is still in `Claude API/API.txt`**, inside a public
-  repo's folder. Gitignored and never committed, but WP-19 is when it must move
-  out and be read from an env var.
+- **The live Anthropic key is still in `Claude API/API.txt`**, on the reader's
+  machine. `.env.example` is ready at the repo root (2026-08-03); the key
+  itself still needs a manual copy into a local `.env`, and into Vercel's
+  Environment Variables once `api/` has code. More urgent than it was — the
+  app now has a public URL, not just a home LAN.
 - **The certificate names an address.** If the router gives this PC a new one,
   `npm run lan` prints both the address and the mkcert command to reissue it.
+  Mostly moot now for phone testing — the app is live on Vercel and
+  auto-deploys from `main`, so a push + reopening the installed app is the new
+  path; LAN/mkcert only matters for testing an unpushed change.
+- **Don't strip `touch-action: pan-x` (`Reader.module.css` `.page`) or
+  `overscroll-behavior: none` (`index.css`, `html`/`body`) while reworking
+  margins, spacing or the page-turn animation.** They're what stops the
+  browser from reading a not-quite-horizontal swipe as a scroll attempt — pull
+  them out and the reading screen bobs up and down again on a phone.
+- **`deploy-vercel` branch (the `.env.example` prep) isn't merged to `main`
+  yet.** No functional change, low-risk merge whenever convenient.
+- **A garbled-diacritics report is open**, waiting on the reader to share the
+  actual epub or its title-page markup — traced to the source file's own SVG
+  `<title>`, not our parser, but unconfirmed. Don't attempt a fix blind.
 
 ## Decisions already made — don't re-derive these
 - **A reading place is an anchor, never a page number** (WP-15).
@@ -92,8 +189,8 @@ figure → ask Claude about it), pdf.js region rendering.
   which book you opened (`useRowMemory`), not how far down you had scrolled.
 
 ## Useful context (already known — don't re-derive)
-- Gates: `npm test` (426), `npm run typecheck`, `npm run build`, from the repo
-  root. App-shell precache 413.75 KiB.
+- Gates: `npm test` (473), `npm run typecheck`, `npm run build`, from the repo
+  root. App-shell precache ~425.3 KiB.
 - Retrieval path, and the whole of it: `getManifest(bookId)` →
   `getChapterIndex(bookId, n)` → `getSection(bookId, path)`. There is
   deliberately no "load the book" call — don't add one.

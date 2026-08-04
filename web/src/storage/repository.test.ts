@@ -117,6 +117,62 @@ describe('books', () => {
   })
 })
 
+describe('rateBook', () => {
+  it('sets a rating on an existing book without touching the rest of it', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.rateBook(bookId('a'), 4)
+
+    const book = await repo.getBook(bookId('a'))
+    expect(book?.rating).toBe(4)
+    expect(book?.title).toBe(makeBook('a').title)
+  })
+
+  it('clears a rating when given undefined', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.rateBook(bookId('a'), 4)
+    await repo.rateBook(bookId('a'), undefined)
+
+    expect((await repo.getBook(bookId('a')))?.rating).toBeUndefined()
+  })
+
+  it('does nothing for a book that was never saved', async () => {
+    await expect(repo.rateBook(bookId('missing'), 5)).resolves.toBeUndefined()
+  })
+})
+
+describe('renameBook', () => {
+  it('overwrites the title, trimmed', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.renameBook(bookId('a'), '  The Quantum and the Lotus  ')
+
+    expect((await repo.getBook(bookId('a')))?.title).toBe('The Quantum and the Lotus')
+  })
+
+  it('ignores an empty title rather than blanking the book out', async () => {
+    await repo.saveBook(makeBook('a'))
+    const before = await repo.getBook(bookId('a'))
+
+    await repo.renameBook(bookId('a'), '   ')
+
+    expect((await repo.getBook(bookId('a')))?.title).toBe(before?.title)
+  })
+
+  it('does nothing for a book that was never saved', async () => {
+    await expect(repo.renameBook(bookId('missing'), 'New Title')).resolves.toBeUndefined()
+  })
+})
+
+describe('reflections', () => {
+  it('sets and clears free-text notes', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.setNotes(bookId('a'), 'A book that changed how I read.')
+    expect((await repo.getBook(bookId('a')))?.notes).toBe('A book that changed how I read.')
+
+    await repo.setNotes(bookId('a'), '')
+    expect((await repo.getBook(bookId('a')))?.notes).toBeUndefined()
+  })
+})
+
 describe('saveParsedBook', () => {
   it('writes metadata, manifest, chapters and sections together', async () => {
     const parsed = makeParsedBook('a')
@@ -570,5 +626,104 @@ describe('a book’s pictures', () => {
     await repo.deleteBooks([bookId('a')])
 
     expect((await repo.getAssets(bookId('a'), ['fig.png'])).size).toBe(0)
+  })
+})
+
+describe('favorite quotes', () => {
+  it('saves one and lists it back', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.addQuote(bookId('a'), 'A line worth keeping.')
+
+    const quotes = await repo.listQuotes(bookId('a'))
+    expect(quotes).toHaveLength(1)
+    expect(quotes[0]?.text).toBe('A line worth keeping.')
+  })
+
+  it('lists newest first', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.addQuote(bookId('a'), 'First saved.')
+    // `addedAt` is millisecond resolution; two adds back to back in a fast
+    // test can land in the same millisecond, which a stable sort then leaves
+    // in insertion order rather than reversed. A real reader never saves two
+    // quotes this close together, but the test has to force the gap itself.
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    await repo.addQuote(bookId('a'), 'Second saved.')
+
+    const quotes = await repo.listQuotes(bookId('a'))
+    expect(quotes.map((q) => q.text)).toEqual(['Second saved.', 'First saved.'])
+  })
+
+  it('removes one quote without touching the rest', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.addQuote(bookId('a'), 'Keep this one.')
+    await repo.addQuote(bookId('a'), 'Remove this one.')
+
+    const [toRemove] = (await repo.listQuotes(bookId('a'))).filter((q) => q.text === 'Remove this one.')
+    await repo.deleteQuote(bookId('a'), toRemove!.id)
+
+    const remaining = await repo.listQuotes(bookId('a'))
+    expect(remaining.map((q) => q.text)).toEqual(['Keep this one.'])
+  })
+
+  it('goes when the book goes', async () => {
+    await repo.saveParsedBook(makeParsedBook('a'))
+    await repo.addQuote(bookId('a'), 'Gone with the book.')
+
+    await repo.deleteBook(bookId('a'))
+
+    expect(await repo.listQuotes(bookId('a'))).toEqual([])
+  })
+})
+
+describe('healing titles already on the shelf', () => {
+  // The real shape of the bug: a citation dump in the epub's own `<dc:title>`.
+  const DUMP =
+    "The Quantum and the Lotus Ricard, Matthieu;Trinh, Xuan Thuan Place of " +
+    'publication not identified, 2009 9780307566126 ' +
+    '6402e734ab1c4d9e8f0a1b2c3d4e5f60 Anna’s Archive'
+
+  it('cleans a stored title without anyone re-importing the book', async () => {
+    await db.books.put(makeBook('a', { title: DUMP, author: 'Matthieu Ricard' }))
+
+    const changed = await repo.healTitles()
+
+    expect(changed).toBe(1)
+    expect((await db.books.get(bookId('a')))!.title).toBe('The Quantum and the Lotus')
+  })
+
+  it('never overrules a title the reader typed by hand', async () => {
+    await db.books.put(makeBook('a', { title: DUMP, author: 'Matthieu Ricard' }))
+    await repo.renameBook(bookId('a'), 'Man and His Symbols')
+
+    const changed = await repo.healTitles()
+
+    expect(changed).toBe(0)
+    expect((await db.books.get(bookId('a')))!.title).toBe('Man and His Symbols')
+  })
+
+  it('keeps the old title rather than blanking it', async () => {
+    // Nothing but markers: cleaning this to the letter would leave an empty
+    // string, and a book with no name is lost on the shelf.
+    await db.books.put(makeBook('a', { title: '9780307566126 Anna’s Archive' }))
+
+    await repo.healTitles()
+
+    expect((await db.books.get(bookId('a')))!.title).toBe('9780307566126 Anna’s Archive')
+  })
+
+  it('leaves an already-clean title exactly as it is', async () => {
+    await db.books.put(makeBook('a', { title: 'Man and His Symbols', author: 'Carl Jung' }))
+
+    const changed = await repo.healTitles()
+
+    expect(changed).toBe(0)
+    expect((await db.books.get(bookId('a')))!.title).toBe('Man and His Symbols')
+  })
+
+  it('does nothing on the next boot, having stamped what it visited', async () => {
+    await db.books.put(makeBook('a', { title: DUMP, author: 'Matthieu Ricard' }))
+
+    expect(await repo.healTitles()).toBe(1)
+    expect(await repo.healTitles()).toBe(0)
   })
 })

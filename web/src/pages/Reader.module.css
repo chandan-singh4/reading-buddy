@@ -58,8 +58,9 @@
   min-height: 0;
   width: 100%;
   /* ~66 characters. The single most effective thing for long-form reading:
-     wider and the eye loses the start of the next line. */
-  max-width: var(--reading-measure);
+     wider and the eye loses the start of the next line. The Aa tab's margins
+     setting overrides `--reading-column-width` inline on `.reader`, below. */
+  max-width: var(--reading-column-width);
   margin: var(--space-4) auto 0;
   columns: 1;
   column-gap: 0;
@@ -78,8 +79,11 @@
      ran visibly longer than a turn between two. Every move on this screen is
      driven from the single duration in `reader/motion.ts` instead. */
   font-family: var(--font-reading);
-  font-size: var(--text-lg);
-  line-height: var(--leading-reading);
+  /* The Aa tab's text-size and spacing settings override these two inline on
+     `.reader`; the theme.css defaults keep the page looking exactly as it
+     always did until a reader actually opens that tab. */
+  font-size: var(--reading-text-size);
+  line-height: var(--reading-leading);
   /* The text rises into place. 220 ms stays under the ~250 ms where a
      transition stops feeling like motion and starts feeling like waiting.
      Both animations are suppressed under `prefers-reduced-motion` by the
@@ -121,6 +125,26 @@
 .header {
   margin-bottom: var(--space-6);
   text-align: center;
+}
+
+/*
+ * A section that opens with a picture is a plate — a cover, a frontispiece, a
+ * full-page illustration — and it gets the page to itself, the way it would in
+ * print. The text that follows starts on the next page.
+ *
+ * Without this the plate and the prose after it share a column, so whether the
+ * text "starts on a new page" is decided by arithmetic: how tall the picture
+ * happens to render against how tall this particular screen is. That is why a
+ * cover looked right on a laptop and wrong on a phone — same code, same book,
+ * different column height.
+ *
+ * An element selector rather than a class because `.figure` is defined in
+ * `blocks.module.css`, and CSS Modules hashes the two files' names separately.
+ * `.header` always renders (its *contents* are conditional, not the element),
+ * so this reliably means "the first block of the section".
+ */
+.header + figure {
+  break-after: column;
 }
 
 /*
