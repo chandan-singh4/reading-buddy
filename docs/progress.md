@@ -14,10 +14,78 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing in the code.** One thing is unverified on the phone: the reader was
-  still on an old build at the end of the session — see "Blockers".
+- **Nothing in the code.** The nav/Home redesign below is merged and on Vercel
+  but not yet seen on the phone, and neither is the second of the two text-
+  escaping fixes — see the top two "Recently done" entries.
 
 ### Recently done
+- **WP-52 · Drawer navigation and the bookshelf Home** — 2026-08-05, merged to
+  `main`. Asked for against a reference screenshot the reader shared; purely
+  UI and navigation, no data or repository change.
+  - **The bottom tab bar is gone.** Four tabs spent the screen's most reachable
+    strip on three screens a reader visits occasionally. Home is the front door
+    and stays the front door; All Books / Stats / Settings moved into a left
+    drawer behind a ☰ in a new sticky top bar. Home is deliberately *not* in
+    the drawer — it is the screen the ☰ is sitting on.
+  - **The frosted-glass blur is on a sibling of the drawer, not its parent.**
+    A CSS `filter` makes an element a containing block for fixed-position
+    descendants, so a drawer nested inside the blurred wrapper would be blurred
+    along with the page. The filter is also written at no-op values rather than
+    `none`, so the browser has two filter lists of the same shape to
+    interpolate between — `none → blur()` snaps.
+  - **Open means open**: body scroll locked, page behind `pointer-events:
+    none`, drawer `inert` while closed so a keyboard user can't tab into
+    off-screen links, focus moved in on open and back to the ☰ on close.
+    Escape, the scrim, and any navigation all close it. Reduced-motion keeps
+    the dim and drops the blur and the slide.
+  - **Home is three shelves** — Current Reading, Up Next, Unread — each its own
+    card with a gradient "plank" drawn under the covers, which is the edge that
+    makes the screen read as a bookshelf rather than a list of cards. Covers
+    carry a shadow and press down on tap. **Finished no longer appears on
+    Home** (still on `/library`) — the reader asked for three shelves, and the
+    reference screenshot does show a Finished shelf, so this is the one thing
+    here worth a second look.
+  - **"View All" is on Unread only**, going to `/library` — Unread is the only
+    capped shelf (ten of however many are owned), so it is the only one
+    actually holding anything back.
+  - `--tab-bar-height` deleted from `theme.css`; nothing else read it.
+  - Gates at close: **613 tests**, typecheck, build. Precache 475.54 KiB.
+- **Text escaping the page, twice — both merged to `main`** — 2026-08-05
+  (`1f450f9`, `bbeb6b8`). Two separate causes behind one symptom the reader
+  reported as "letters from the previous page". Both were reproduced and
+  measured in headless Chrome before being fixed, which is what separated them.
+  - **Ink from the previous page at the left margin.** The columns sat flush
+    against each other, so a turn that lands short of a column edge leaves the
+    tail of the previous page on screen. It lands short on the **last page of a
+    section**: the browser caps `scrollLeft` at `scrollWidth - clientWidth` and
+    rounds both to whole pixels while the real column is fractional (392.72px on
+    a phone). Measured: the last page parks 0.44px short and 0.44px of the
+    previous column shows. **The fix is a `column-gap`**, not better rounding —
+    with a gap the same misalignment lands on blank paper, whatever its size. It
+    costs no reading width: the column is still exactly one box wide, so the gap
+    is scrolled past. A page is now a column *plus its gap*; `Strip.pageWidth`
+    was always documented that way. Verified 0.44px → 0.00px, page count
+    unchanged.
+  - **Long contents entries cut off at the right edge.** Two holes.
+    (a) **The guard only reached direct children.** `.page > *` caps the
+    outermost element of a block and nothing inside it — and `min-width` is the
+    one that bites: a grid child defaults to `min-width: auto`, "never narrower
+    than my contents", and `.list` is a grid. Every contents entry was a grid
+    item refusing to shrink, so a long chapter title made the track wider than
+    the column and the line was sliced. Measured with real chapter titles:
+    **215.7px of text past the column → 0.0px** with the guard applied at every
+    depth. `.tableScroll` keeps its exemption.
+    (b) **A link was still a box.** The previous round's note claimed
+    `display: inline` had made the `<button>` behave like a word. It had not —
+    measured, a button holding a long entry reports **one** line box where the
+    same text in a span reports **two**. A box is laid out whole and cannot
+    break across a line or a column. Internal links are `<span role="link">`
+    now, with Enter/Space handled to give back what the element loses.
+  - **Not fully closed:** the reader's exact clipped line could not be
+    reproduced on desktop Chrome — desktop shrinks that button where Android
+    apparently does not. The *mechanism* is fixed and measured; if clipping
+    survives, the epub (Nestor, *Breath*) is needed to finish it.
+  - Gates at close: **611 tests**, typecheck, build. Precache 468.69 KiB.
 - **Four phone rounds in one session, all merged to `main`** — 2026-08-05.
   Every fix below came from a screenshot of a real book, and each one's root
   cause turned out to be somewhere other than where the symptom was.
@@ -67,7 +135,9 @@ Get that loop working before building any breadth.
     contents entry, which read as broken margins. Links follow the prose now,
     and `.page > *` can no longer exceed its column, refuse to shrink, or keep
     a word whole at the gutter's expense — general, whatever a future book puts
-    on a page.
+    on a page. **Both halves of that turned out to be half-true** — see the
+    2026-08-05 entry above: `display: inline` does not stop a `<button>` being
+    a box, and `.page > *` never reached anything *nested* inside a block.
   - **The camera-shutter flash on every navigation** was the reading screen
     fading up from *zero* opacity: the background flashes through the gap and
     the eye reads it as the screen being switched off and on. There was nothing
@@ -216,32 +286,18 @@ behind a dynamic `import()`, so pdf.js (434 kB) and mammoth (500 kB) remain in
 their own chunks and are fetched only when a file of that type is imported.
 
 ### Blockers
-- **The reader's installed app was still on an old build when the session
-  ended, and none of this had been seen on the phone yet.** Not a deploy
-  problem — that was verified end to end: `main` and `origin/main` are both
-  `af5111d`, and the live bundle at `reading-buddy-web-nu.vercel.app` was
-  checked for strings only the newest commit introduces ("Something new",
-  `text-align:inherit`, `textSettles`) and for the removal of the old
-  `textRises`. All correct.
-  - **The cause is the `autoUpdate` → `prompt` switch itself.** The installed
-    client is the *old* code, which expects a new worker to activate itself.
-    The new worker deliberately waits to be asked, and the old client has no
-    way to ask. A one-time crossing; every update after it is fine.
-  - **The way through, in order:** fully close the app from the app switcher
-    (backgrounding does not release the worker) → open the site in a browser
-    tab and hard-refresh → uninstall and reinstall (books live in IndexedDB,
-    so nothing is lost).
-  - **If none of those work**, the fallback discussed with the reader is to
-    make the new worker claim old clients on its own, at the cost of one
-    silent reload. Not built — don't build it until the three steps above are
-    known to have failed.
+- **None.** The `autoUpdate` → `prompt` crossing that stranded installed clients
+  is closed: the reader confirmed on 2026-08-05 that the phone is on the current
+  build and that the stale client was a desktop-app session, not a deploy or
+  worker problem. Don't raise it again.
 
 ### Next up
 **The reader's order, set 2026-08-02: make it a proper reading app first, then
-AI.** Nothing is in flight. **Start by asking whether the phone is on the new
-build yet** — see "Blockers"; four rounds of fixes are shipped but unseen, and
-picking new work before that is confirmed risks building on top of something
-that turns out to be wrong.
+AI.** Nothing is in flight. The phone is on the current build, so the whole of
+the last three sessions is now open to reaction — expect a round of it, and
+treat that as the real next task ahead of anything listed here. The new
+navigation and Home are the first thing the reader will land on, so reactions
+to those come before WP-51.
 - **Reading comfort (rest of WP-14)** — font size, line spacing, margins,
   sepia, the page-turn animation (seam is built, only instant is wired),
   in-book search, real bookmarks. The natural next task once the shelf/detail

@@ -249,6 +249,17 @@
   the *timing* of the slide — 380 ms on a curve eased at both ends — because
   the old one whipped the words off the screen. Page curl stays a labelled
   slot, not a promise · *after 14*
+- [x] **WP-52 Drawer navigation + the bookshelf Home** — added and shipped
+  2026-08-05, from a reference screenshot the reader shared. The bottom tab bar
+  is gone: Home is the front door, and All Books / Stats / Settings are
+  occasional, so they moved into a left drawer behind a ☰ in a new sticky top
+  bar. Opening it frosts the page behind (blur + dim + `pointer-events: none`)
+  and locks body scroll; Escape, the scrim and any navigation all close it, and
+  focus returns to the ☰. Home is three shelves — Current Reading, Up Next,
+  Unread — each its own card with a gradient "plank" under the covers, and only
+  Unread carries **View All** (→ `/library`), because only Unread is capped.
+  Finished no longer appears on Home. Purely UI/navigation; no data or
+  repository change · *after 46*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*

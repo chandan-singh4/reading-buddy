@@ -388,3 +388,45 @@
   the page edge. Paired with a general rule that no child of `.page` may exceed
   its column, since there is no gap between columns for anything to spill
   into. — 2026-08-05
+- **The reading columns have a gap, and a page is a column *plus* its gap.**
+  Superseding the line above: flush columns had nothing to absorb a turn that
+  lands short, and one always does — the browser caps `scrollLeft` at
+  `scrollWidth - clientWidth`, rounding both to whole pixels while the real
+  column is fractional, so the last page of a section parks a fraction short and
+  the previous page's ink shows. A gap costs no reading width (the column is
+  still one box wide) and turns any residual misalignment into blank paper,
+  which is why it beats better rounding — it does not depend on the error being
+  small. `Strip.pageWidth` is the pitch; `measure()` reads the gap off the
+  computed style so the stylesheet stays the only place it is set. — 2026-08-05
+- **An internal link is a `<span role="link">`, never a `<button>`.** Also
+  superseding the line above, which was wrong on the point it turned on: a
+  button is a *box* whatever its `display` says. Measured in Chrome — a button
+  holding a long contents entry reports one line box where the same text in a
+  span reports two — and a box is laid out whole, so it cannot break across a
+  line or a column and the column edge cuts off the rest. Enter and Space are
+  handled by hand to give back what the element loses. — 2026-08-05
+- **The no-wider-than-the-column guard applies at every depth, not to direct
+  children.** `.page > *` never reached anything *inside* a block, and the
+  default that bites is `min-width: auto` on grid and flex children — "never
+  narrower than my contents" — which is why the contents list (a grid) could
+  push its own items past the page. `.page *` sets `max-width: 100%` and
+  `min-width: 0`; a table is exempted by element selector because
+  `.tableScroll` means it to be wider. — 2026-08-05
+- **Navigation is a left drawer, not a bottom tab bar.** Home is the front door
+  and All Books / Stats / Settings are occasional — they do not each earn a
+  permanent quarter of the bottom edge, and four tabs on a reading app spend
+  the screen's most valuable strip on things a reader touches rarely. Home is
+  therefore not *in* the drawer either: it is the screen the ☰ is sitting on.
+  — 2026-08-05
+- **The frosted page behind the drawer is blurred on a wrapper that is a
+  *sibling* of the drawer, never its ancestor.** A CSS `filter` makes an element
+  a containing block for fixed-position descendants, so a drawer nested inside
+  the blurred element would be blurred along with the page it is supposed to sit
+  in front of. The same rule already governs `UpdatePrompt`'s blur. The filter is
+  written out at no-op values (`blur(0) saturate(1) brightness(1)`) rather than
+  left as `none`, because a browser interpolates between two filter lists only
+  when they have the same shape — `none → blur()` snaps. — 2026-08-05
+- **Only a shelf that is holding something back gets "View All".** Unread is
+  capped at ten of however many are owned; Current Reading is one book by
+  definition and Up Next is three. A link on all three would promise more where
+  there is no more. — 2026-08-05

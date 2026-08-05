@@ -5,7 +5,7 @@
 // real repository, so there has to be a real database underneath it.
 import 'fake-indexeddb/auto'
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
@@ -31,20 +31,42 @@ describe('app shell', () => {
   it('lands on Home and reports an empty shelf', async () => {
     renderAt('/')
 
-    expect(screen.getByRole('heading', { name: 'Home' })).toBeDefined()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
     // Resolves only once the repository has actually answered.
     expect(await screen.findByText('No books yet')).toBeDefined()
   })
 
-  it('shows all four tabs on shell routes', () => {
+  it('opens the drawer from the hamburger and offers all three destinations', () => {
     renderAt('/')
 
+    const trigger = screen.getByRole('button', { name: 'Open menu' })
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(trigger)
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect(nav).toBeDefined()
-    expect(screen.getByRole('link', { name: 'Home' })).toBeDefined()
-    expect(screen.getByRole('link', { name: 'All Books' })).toBeDefined()
-    expect(screen.getByRole('link', { name: 'Stats' })).toBeDefined()
-    expect(screen.getByRole('link', { name: 'Settings' })).toBeDefined()
+    expect(screen.getByRole('link', { name: /All Books/ })).toBeDefined()
+    expect(screen.getByRole('link', { name: /Stats/ })).toBeDefined()
+    expect(screen.getByRole('link', { name: /Settings/ })).toBeDefined()
+  })
+
+  it('closes the drawer on Escape', () => {
+    renderAt('/')
+
+    const trigger = screen.getByRole('button', { name: 'Open menu' })
+    fireEvent.click(trigger)
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('has no bottom tab bar', () => {
+    renderAt('/')
+
+    // The drawer is the only navigation landmark, and it starts closed.
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
   })
 
   it('renders Settings on its route', () => {
@@ -78,6 +100,6 @@ describe('app shell', () => {
   it('falls back to Home for an unknown route', () => {
     renderAt('/nowhere')
 
-    expect(screen.getByRole('heading', { name: 'Home' })).toBeDefined()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
   })
 })
