@@ -155,6 +155,38 @@
   overflow-wrap: break-word;
 }
 
+/*
+ * The same guard, at every depth — and this is the half that was missing.
+ *
+ * `.page > *` only reaches a block's outermost element. Everything the book
+ * actually puts *inside* one was unprotected, and two of those escape the column
+ * on their own:
+ *
+ * `min-width: 0` — a grid or flex child defaults to `min-width: auto`, which
+ * means "never narrower than my contents". The contents list (`.list` in
+ * `blocks.module.css`) is a grid, so every contents entry was a grid item that
+ * refused to shrink; a long chapter title made the track wider than the column
+ * and `overflow: hidden` sliced the end off it. That is the cut-off words on a
+ * contents page, and it is why it turned up in book after book — every book has
+ * a contents page and some of them have long titles.
+ *
+ * `max-width: 100%` — anything with a box of its own (a picture, a button, a
+ * pre-formatted block) can be sized by its content rather than by its container.
+ * Capping it at the column is the whole of the rule.
+ *
+ * A wide table is the deliberate exception: `.tableScroll` gives it a scroller of
+ * its own, so it is *meant* to be wider than the page. The element selector below
+ * outranks this one and hands the exemption back.
+ */
+.page * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.page table {
+  max-width: none;
+}
+
 /* Reduced motion is honoured in `reader/motion.ts`, where every move now
    originates — a stylesheet rule here would only cover the one that no longer
    exists. */

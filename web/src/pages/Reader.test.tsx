@@ -622,14 +622,14 @@ describe('following a link in the text', () => {
     openReader(LINKED)
     await screen.findByText(/See/)
 
-    expect(screen.getByRole('button', { name: 'the note' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'the note' })).toBeTruthy()
   })
 
   it('goes to the paragraph the link names', async () => {
     openReader(LINKED)
     await screen.findByText(/See/)
 
-    fireEvent.click(screen.getByRole('button', { name: 'the note' }))
+    fireEvent.click(screen.getByRole('link', { name: 'the note' }))
 
     // Chapter 2's section, which was two sections away.
     expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
@@ -640,7 +640,7 @@ describe('following a link in the text', () => {
     // leaves you to find your own way home.
     openReader(LINKED)
     await screen.findByText(/See/)
-    fireEvent.click(screen.getByRole('button', { name: 'the note' }))
+    fireEvent.click(screen.getByRole('link', { name: 'the note' }))
     await screen.findByText('The second chapter begins.')
 
     fireEvent.click(screen.getByRole('button', { name: /^↩ Back to/ }))
@@ -654,7 +654,7 @@ describe('following a link in the text', () => {
     // most of knowing where the jump put you.
     openReader(LINKED)
     await screen.findByText(/See/)
-    fireEvent.click(screen.getByRole('button', { name: 'the note' }))
+    fireEvent.click(screen.getByRole('link', { name: 'the note' }))
     await screen.findByText('The second chapter begins.')
 
     expect(await screen.findByRole('button', { name: /Back to page \d+/ })).toBeTruthy()
