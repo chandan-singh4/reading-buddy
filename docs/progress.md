@@ -253,8 +253,9 @@ that turns out to be wrong.
 - **The page-flip animation** — the reader named it explicitly this session as
   still to come. The seam (`turnPage`) is untouched and still where it plugs
   in; the motion work done this round was timing and curve only.
-- **Merge `deploy-vercel` into `main`** whenever convenient — just the
-  `.env.example` + a doc note, no functional change, low risk.
+- ~~Merge `deploy-vercel` into `main`~~ — **already done**; it went in via
+  `61cc272` and every remote branch is now an ancestor of `main`. Nothing is
+  outstanding to merge.
 - WP-09/10 (summaries, classification) need a model call and can follow.
   WP-02 (Tauri) stays skipped.
 
