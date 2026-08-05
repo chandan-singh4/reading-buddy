@@ -261,6 +261,31 @@
   padding: 0;
   margin: 0;
   cursor: pointer;
+  /*
+   * A `<button>` is not a word, and left to itself it does not behave like one.
+   * Three browser defaults have to be undone, and all three were visible on the
+   * contents page of a real book:
+   *
+   * `display: inline-block` — the default — makes the link one *box*. A box
+   * cannot be broken across a line or, worse, across a column: a long contents
+   * entry at the foot of a page could not split, so it hung past the column
+   * edge and the overhang was clipped by `overflow: hidden`. That is the stray
+   * letter that appeared at the left edge of the following page.
+   *
+   * `text-align: center` — also a default, and only visible once a link wraps —
+   * centred every wrapped contents entry while the unwrapped ones stayed left,
+   * which read as broken indentation rather than as centring.
+   *
+   * `inherit` rather than fixed values throughout, because these must follow
+   * whatever the surrounding prose is doing — including the justification and
+   * the line breaks a book's own `<br>` puts there.
+   */
+  display: inline;
+  text-align: inherit;
+  white-space: inherit;
+  /* A single unbreakable word — a long URL in a note — must break rather than
+     push the column edge outward, which is the other way text escapes a page. */
+  overflow-wrap: break-word;
   text-decoration: underline;
   text-decoration-color: var(--color-accent);
   text-decoration-thickness: 1px;

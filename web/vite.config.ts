@@ -34,7 +34,12 @@ export default defineConfig({
       // one by hand would mean owning cache invalidation, and a reading app
       // that serves a stale build after an update is a bug with no visible
       // cause.
-      registerType: 'autoUpdate',
+      // `prompt`, not `autoUpdate`. Under `autoUpdate` the new worker takes over
+      // and the page reloads on its own — the app simply blinks and the reader
+      // is somewhere slightly different with no idea why. Asking first is both
+      // calmer and honest about what is happening, and it is the only mode that
+      // calls `onNeedRefresh`, which is what the update panel waits on.
+      registerType: 'prompt',
 
       // We register the worker ourselves (`app/updates.ts`). The script this
       // would otherwise inject only checks for updates on the `load` event —

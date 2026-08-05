@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 
 import AppShell from './app/AppShell.tsx'
+import { UpdatePrompt } from './app/UpdatePrompt.tsx'
 import BookInfo from './pages/BookInfo.tsx'
 import Home from './pages/Home.tsx'
 import Library from './pages/Library.tsx'
@@ -33,6 +34,13 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppRoutes />
+      {/*
+       * Outside the routes, not inside `AppShell`: the reading screen is the
+       * one place a reader is most likely to be when a build lands, and it
+       * deliberately renders outside the shell. Mounted here, the panel covers
+       * every screen there is.
+       */}
+      <UpdatePrompt />
     </BrowserRouter>
   )
 }

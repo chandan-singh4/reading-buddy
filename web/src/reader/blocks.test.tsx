@@ -287,3 +287,60 @@ describe('links in the text', () => {
     expect(link.getAttribute('rel')).toContain('noopener')
   })
 })
+
+/**
+ * A link is a `<button>`, and a button is not a word. Three browser defaults
+ * make it behave like a box instead, and all three showed up on the contents
+ * page of a real book: a long entry could not break across a column, so it hung
+ * past the edge and the overhang was clipped — the stray letter that appeared
+ * at the left edge of the next page — and every wrapped entry was centred while
+ * the unwrapped ones stayed left.
+ *
+ * The values live in `blocks.module.css`; what is asserted here is that the
+ * link keeps carrying the class that holds them, on every path that renders one.
+ */
+describe('a link behaves like the words around it', () => {
+  const linked: Partial<Paragraph> = {
+    links: [{ start: 0, end: 3, anchor: '[ch01-s01-p001]' as Anchor }],
+  }
+
+  it('styles an internal link', () => {
+    const { container } = render(<Block block={blockOf('prose', 'See this.', linked)} />)
+    expect(container.querySelector('button')?.className).toContain(styles.link)
+  })
+
+  it('styles an external link', () => {
+    const { container } = render(
+      <Block
+        block={blockOf('prose', 'See this.', {
+          links: [{ start: 0, end: 3, url: 'https://example.com' }],
+        })}
+      />,
+    )
+    expect(container.querySelector('a')?.className).toContain(styles.link)
+  })
+
+  it('styles a link inside a list item — a book’s own contents page', () => {
+    // The exact case that was reported. Contents entries are list items, and
+    // each one is a single long link.
+    const { container } = render(
+      <Block
+        block={blockOf('list', 'Chapter One The Worst Breathers in the Animal Kingdom', {
+          links: [{ start: 0, end: 52, anchor: '[ch01-s01-p001]' as Anchor }],
+        })}
+      />,
+    )
+    expect(container.querySelector('li button')?.className).toContain(styles.link)
+  })
+
+  it('keeps the link’s words even when it spans the whole line', () => {
+    const { container } = render(
+      <Block
+        block={blockOf('list', 'Chapter One The Worst Breathers in the Animal Kingdom', {
+          links: [{ start: 0, end: 52, anchor: '[ch01-s01-p001]' as Anchor }],
+        })}
+      />,
+    )
+    expect(container.textContent).toContain('Chapter One The Worst Breathers in the Animal Kingdom')
+  })
+})

@@ -25,13 +25,26 @@
      through the page number. */
   padding: calc(var(--safe-top) + var(--space-4)) 0
     calc(var(--safe-bottom) + var(--space-4) + var(--status-line));
-  /* Opening a book was a hard cut — the shelf was simply replaced by text,
-     which reads as a glitch rather than as a move. Fade only, and deliberately
-     no `transform` here: the overlay inside is `position: fixed`, and any
-     transform on an ancestor makes "fixed" mean fixed to *this box* instead of
-     to the screen — which would shift the bars for the length of the animation.
-     The rise lives on the text below, where nothing depends on it. */
-  animation: fadeIn 200ms ease-out both;
+  /*
+   * No entry animation on the reading screen itself.
+   *
+   * There used to be one — a fade, added because opening a book was a hard cut.
+   * It became the opposite problem. Fading the *whole screen* up from zero
+   * means every arrival starts on an empty page and the background flashes
+   * through it, which the reader described exactly: like a camera shutter going
+   * off on every navigation. It fired on opening a book, on following a link,
+   * and on coming back, so the app blinked constantly.
+   *
+   * The page beneath is the same colour as the page above it. There is nothing
+   * to cover, and covering it was the artefact. What softens the arrival now is
+   * the text alone (`textSettles` below) — content moving, rather than the screen
+   * being switched off and on again.
+   *
+   * Deliberately no `transform` here either, animation or not: the overlay
+   * inside is `position: fixed`, and a transform on an ancestor makes "fixed"
+   * mean fixed to *this box* instead of to the screen, which would shift the
+   * bars for as long as it ran.
+   */
 }
 
 .back {
@@ -84,11 +97,16 @@
      always did until a reader actually opens that tab. */
   font-size: var(--reading-text-size);
   line-height: var(--reading-leading);
-  /* The text rises into place. 220 ms stays under the ~250 ms where a
-     transition stops feeling like motion and starts feeling like waiting.
-     Both animations are suppressed under `prefers-reduced-motion` by the
-     global rule in `index.css`. */
-  animation: textRises 220ms ease-out both;
+  /*
+   * The text settles into place. This is the only arrival animation left, and
+   * it no longer starts from nothing: rising from full transparency is what
+   * made an arrival read as a flash rather than as a movement. It begins mostly
+   * opaque and travels a shorter distance, so the page appears to *settle*
+   * instead of being switched on.
+   *
+   * Suppressed under `prefers-reduced-motion` by the global rule in `index.css`.
+   */
+  animation: textSettles 240ms ease-out both;
 }
 
 /* Gutters have to live on the children, not on the column box: padding on a
@@ -96,25 +114,35 @@
    in between would run to the screen edge. */
 .page > * {
   padding-inline: var(--space-4);
+  /*
+   * The gutter is only a margin if nothing is allowed to reach past it. There
+   * is no gap between these columns — the page turn's arithmetic is built on a
+   * page being exactly one box wide — so anything wider than its column does
+   * not spill into empty space, it spills onto the *next page* and is sliced
+   * off by `overflow: hidden`. That is how a stray half-letter ends up at the
+   * left edge of the following page.
+   *
+   * These three lines make that impossible in general, whatever the block is
+   * and whatever a future book puts inside it: never wider than the column,
+   * always able to shrink (`min-width: auto` is the default on a grid or flex
+   * child and refuses to go below its longest word), and always able to break a
+   * word that has nowhere else to go.
+   */
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* Reduced motion is honoured in `reader/motion.ts`, where every move now
    originates — a stylesheet rule here would only cover the one that no longer
    exists. */
 
-@keyframes fadeIn {
+@keyframes textSettles {
   from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes textRises {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+    /* Not 0. The gap between "nothing on screen" and "the page" is the flash;
+       starting most of the way there makes it a movement instead. */
+    opacity: 0.6;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;

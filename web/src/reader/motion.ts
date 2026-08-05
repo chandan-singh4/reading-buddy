@@ -23,12 +23,17 @@
 /**
  * How long any move takes.
  *
- * Set to sit where the browser's own smooth scroll sat, because that is the
- * motion a reader meets most — every page turn inside a chapter — and it is
- * therefore the one everything else has to match rather than the other way
+ * Originally set to sit where the browser's own smooth scroll sat, because that
+ * is the motion a reader meets most — every page turn inside a chapter — and it
+ * is therefore the one everything else has to match rather than the other way
  * round.
+ *
+ * Lengthened from 320 ms after the turn was reported as whipping past. Still
+ * comfortably under the ~400–450 ms where a transition stops reading as motion
+ * and starts reading as a wait, which is the ceiling a page turn cannot cross:
+ * a reader turning several pages in a row must never feel they are queueing.
  */
-export const MOVE_MS = 320
+export const MOVE_MS = 380
 
 /**
  * The curve, as its four control points.
@@ -39,10 +44,20 @@ export const MOVE_MS = 320
  * the function itself. Deriving both from one definition is what stops them
  * drifting apart.
  *
- * Quick to leave, slow to settle: the shape of something pushed rather than
- * something switched on.
+ * Eased at both ends, and gently.
+ *
+ * The previous curve was `0.32, 0.72, 0, 1` — almost all of the distance
+ * covered in the first third. On a page of text that reads as the outgoing
+ * words being *snatched* off the screen: the eye is still on a line when the
+ * line leaves at speed. Words are not a UI element being dismissed; they are
+ * the thing being looked at, and the motion has to respect that they are still
+ * being read as it starts.
+ *
+ * So: no sudden departure, and still a soft arrival. Slightly longer than
+ * before to match — the same distance spread over a curve that no longer front-
+ * loads it, which is what "smoother" means here rather than merely "slower".
  */
-const CURVE = [0.32, 0.72, 0, 1] as const
+const CURVE = [0.4, 0.0, 0.2, 1] as const
 
 /** The same curve in the form CSS and the Web Animations API want. */
 export const MOVE_EASING = `cubic-bezier(${CURVE.join(', ')})`
@@ -167,5 +182,10 @@ export function fadeIn(element: HTMLElement | null): void {
   if (!element || prefersReducedMotion()) return
   if (typeof element.animate !== 'function') return
 
-  element.animate([{ opacity: 0 }, { opacity: 1 }], MOVE_TIMING)
+  // From 0.6, not from 0. Taking the page all the way to transparent and back
+  // is what the reader described as a camera shutter firing on every jump: the
+  // background flashes through the gap, and the eye reads that as the screen
+  // being switched off and on rather than as the book moving. Starting most of
+  // the way there keeps the softening and loses the blink.
+  element.animate([{ opacity: 0.6 }, { opacity: 1 }], MOVE_TIMING)
 }
