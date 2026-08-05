@@ -120,7 +120,22 @@ export function holdOutgoing(strip: HTMLElement | null, by: 1 | -1): HeldPage | 
  * Called once the new section is on screen *and* scrolled to the page it should
  * land on — animating before that would slide in a page that then jumps.
  */
-export function playTurn(held: HeldPage | null, strip: HTMLElement | null): void {
+export function playTurn(
+  held: HeldPage | null,
+  strip: HTMLElement | null,
+  /**
+   * How far the two pages travel, in CSS pixels — one column *plus the gap after
+   * it*, which is exactly what a scroll inside a section moves.
+   *
+   * It matters now that the columns have a gap between them (`Reader.module.css`
+   * explains why they do). A screen width and a page's worth of travel used to be
+   * the same number; they are not any more, and a crossing that moved a screen
+   * width while a scroll moved a screen width plus a gutter is the seam showing —
+   * the one thing this module exists to hide. Falls back to the old behaviour
+   * when the caller has nothing to measure.
+   */
+  distance?: number,
+): void {
   if (!held) return
 
   // No strip to cross with, or a platform with no Web Animations API — jsdom is
@@ -134,8 +149,9 @@ export function playTurn(held: HeldPage | null, strip: HTMLElement | null): void
 
   // The one timing, from `motion.ts` — the same length and the same curve as a
   // turn within a section, which is the whole point of it living there.
-  const away = held.by === 1 ? '-100%' : '100%'
-  const from = held.by === 1 ? '100%' : '-100%'
+  const span = distance && distance > 0 ? `${distance}px` : '100%'
+  const away = held.by === 1 ? `-${span}` : span
+  const from = held.by === 1 ? span : `-${span}`
 
   strip.animate(
     [{ transform: `translateX(${from})` }, { transform: 'translateX(0)' }],

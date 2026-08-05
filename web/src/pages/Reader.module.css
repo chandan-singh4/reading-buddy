@@ -76,7 +76,28 @@
   max-width: var(--reading-column-width);
   margin: var(--space-4) auto 0;
   columns: 1;
-  column-gap: 0;
+  /*
+   * The gutter between one page and the next — and it is a *safety margin*, not
+   * decoration. It costs nothing to read: the column is still exactly as wide as
+   * this box, so the gap is scrolled past rather than taken out of the text.
+   *
+   * It exists because a turn cannot always land exactly on a column edge. The
+   * browser caps `scrollLeft` at `scrollWidth - clientWidth`, and it rounds both
+   * of those to whole pixels while the real column width is fractional (392.72px
+   * on a phone). So on the *last* page of a section the strip parks a fraction of
+   * a pixel short of true — and with the columns flush against each other, that
+   * fraction is filled by the right-hand edge of the previous page. That is the
+   * stray letters readers were seeing at the left margin, on many books.
+   *
+   * With a gap, the same misalignment lands on blank paper. It does not depend on
+   * the shortfall being small, which is why it is the fix rather than better
+   * rounding: whatever is left over shows nothing.
+   *
+   * `reader/motion.ts` and `pages/Reader.tsx` read this value back off the
+   * computed style — it is not repeated in JS. Change it here and the page
+   * arithmetic follows.
+   */
+  column-gap: var(--page-gap, 2rem);
   /* Fill each column completely before starting the next — the default balances
      columns against each other, which here would mean half-empty pages. */
   column-fill: auto;
@@ -115,12 +136,13 @@
 .page > * {
   padding-inline: var(--space-4);
   /*
-   * The gutter is only a margin if nothing is allowed to reach past it. There
-   * is no gap between these columns — the page turn's arithmetic is built on a
-   * page being exactly one box wide — so anything wider than its column does
-   * not spill into empty space, it spills onto the *next page* and is sliced
-   * off by `overflow: hidden`. That is how a stray half-letter ends up at the
-   * left edge of the following page.
+   * The gutter is only a margin if nothing is allowed to reach past it. The gap
+   * between columns is a landing margin for the turn, not room for content to
+   * grow into — anything wider than its column still spills onto the *next page*
+   * and is sliced off by `overflow: hidden`, gap or no gap. That is one way a
+   * stray half-letter ends up at the left edge of the following page; the other
+   * was the turn parking short of the column edge, which is what the gap itself
+   * answers (see `column-gap` above).
    *
    * These three lines make that impossible in general, whatever the block is
    * and whatever a future book puts inside it: never wider than the column,
