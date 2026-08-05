@@ -341,3 +341,50 @@
 - **Cost visibility** = detailed per-book / per-session / per-model-tier screen.
 - **Google Drive backup/restore** is opt-in, off by default.
 - **Install path:** mkcert local HTTPS, one-time manual trust per phone.
+
+### Settled 2026-08-05 (four phone rounds: divisions, titles, links, feel)
+- **An epub's spine boundary is a page break, not a section break.** The
+  publisher's own division (cover, copyright, dedication, preface are separate
+  documents) is recorded as `startsPage` on a block and rendered as
+  `break-before: column`. Making it a *section* would have shredded the
+  contents list on books that spread one chapter over several files, and
+  sections are the navigation and the anchor grammar. — 2026-08-05
+- **A run-together subtitle is cut from a shelf title**, on the reader's
+  explicit instruction after being shown the cost. The signal is a
+  *capitalised* article mid-string — title case leaves them lowercase
+  mid-title — guarded by a minimum of words either side, a preceding comma and
+  a preceding preposition. It is a guess and will occasionally be wrong; the
+  manual rename on the detail page is the way back. — 2026-08-05
+- **`TITLE_CLEAN_VERSION` is separate from `PARSER_VERSION` and this is why
+  it earns its keep:** three title rounds shipped this session and every one
+  reached the reader's existing 32 books at next boot, with no re-import and no
+  kept source file. — 2026-08-05
+- **A consumed heading's ids are inherited by the block beneath it.** A heading
+  that opens a chapter becomes that division's title and the block is
+  discarded; headings are the commonest link target in a book, so this was
+  silently killing links that had nothing wrong with them. — 2026-08-05
+- **An unresolvable link falls back to the document it points into** rather
+  than being dropped. The right page beats nowhere, and a marker that renders
+  as plain text looks like a bug in the book. — 2026-08-05
+- **A `<br>` is a real newline in `text`, never a space.** The lines of an
+  imprint, an address or a verse are not one sentence; `white-space: pre-line`
+  honours it, the same newline lists already use. — 2026-08-05
+- **Nothing on the reading screen animates from zero opacity.** Fading a whole
+  screen up from nothing lets the background flash through, which reads as a
+  camera shutter rather than as motion — the reader's own description. The page
+  beneath is the same colour as the page above it, so there was never anything
+  to cover. — 2026-08-05
+- **A page turn is eased at both ends** (`0.4, 0, 0.2, 1` over 380 ms), not
+  front-loaded. Words are the thing being looked at, not a UI element being
+  dismissed: the motion has to respect that a line is still being read as it
+  starts. — 2026-08-05
+- **The app asks before it updates** (`registerType: 'prompt'`), and the book
+  stays visible behind the panel, blurred rather than blacked out, so no place
+  looks lost. Known one-time cost: clients installed under `autoUpdate` cannot
+  ask a waiting worker to activate and need one manual app close. — 2026-08-05
+- **A link is a `<button>`, and a button is not a word.** `display: inline`,
+  `text-align: inherit`, `white-space: inherit` — the browser defaults make it
+  a box that cannot break across a line or a column, which is how text escaped
+  the page edge. Paired with a general rule that no child of `.page` may exceed
+  its column, since there is no gap between columns for anything to spill
+  into. — 2026-08-05

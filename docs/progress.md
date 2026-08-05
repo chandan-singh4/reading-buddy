@@ -14,11 +14,70 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- Nothing. **The walking skeleton now walks on the reading side**: import →
-  store → list → *read*. What remains of the original loop is select → Ask →
-  streamed answer (WP-17 → 18 → 19 → 20).
+- **Nothing in the code.** One thing is unverified on the phone: the reader was
+  still on an old build at the end of the session — see "Blockers".
 
 ### Recently done
+- **Four phone rounds in one session, all merged to `main`** — 2026-08-05.
+  Every fix below came from a screenshot of a real book, and each one's root
+  cause turned out to be somewhere other than where the symptom was.
+  - **An epub's own page divisions were being flattened** (`PARSER_VERSION` 7).
+    A spine is separate XHTML documents — cover, copyright page, dedication,
+    preface — and that is the publisher's own page break. The documents were
+    concatenated into one block stream, correctly, but the *seam* went with
+    them, so the cover plate ran straight into the title beneath it. Recorded
+    now as `startsPage` on the first surviving block of each document (never
+    the first document — that would open the book with a blank page — and
+    never on furniture, which is dropped before anchors are assigned), and
+    honoured as `break-before: column`. Deliberately **not** a section split:
+    sections are the navigation and the anchor grammar, and books that spread
+    one chapter over three files would shred the contents list.
+  - **Titles are titles now** (`TITLE_CLEAN_VERSION` 3). Author names without
+    the citation comma, `null`, years, bindings, university presses, edition
+    and volume brackets, and — on the reader's explicit call, after being shown
+    what it costs — **run-together subtitles**. The signal is a *capitalised*
+    article mid-string: English title case leaves them lowercase mid-title
+    ("the Middle Way", "a Hat"), so a capital "A" or "The" partway through is a
+    second phrase starting. Guarded by a minimum of words either side, by a
+    preceding comma ("The Good, The Bad") and by a preceding preposition. Nine
+    real titles are locked into tests as must-not-cut. An orphaned "(" left by
+    a cut is now removed — that was how round two came back.
+  - **Dead footnote markers: the cause was never the marker, it was the
+    target.** A heading that opens a chapter is consumed by the assembler as
+    that division's *title*, and its ids went into the bin with it — and
+    headings are the commonest link target in a book. Those ids now pass to the
+    first block underneath. Alongside: legacy `<a name="fn1">` is recognised,
+    ids resolve case-insensitively, and a link whose fragment is unknown falls
+    back to the document it points into rather than being dropped.
+  - **`<br>` was invisible to the text walker**, so the words either side were
+    pasted together ("Published byDell Publishinga division of"). It writes a
+    real newline now, not a space — the lines of an imprint or a verse are not
+    one sentence — honoured by `white-space: pre-line`.
+  - **It reads like a book**: justified with hyphenation (useless apart on a
+    phone column), first-line indents on continuing paragraphs with the blank
+    line stepping back, and dedications/epigraphs centred with air above them.
+    That last needed a parser change — `epub:type="dedication"` marks the
+    enclosing *section*, so the type is carried down the walk.
+  - **A letter hanging off the page edge**, and the margins with it. Root
+    cause: **a link is a `<button>`, and a button is not a word.** Its default
+    `display: inline-block` makes it one box, and a box cannot break across a
+    line or a *column* — so a long contents entry hung past the edge and the
+    overhang was clipped, which is the stray letter that appeared at the left
+    of the next page. Its default `text-align: center` centred every wrapped
+    contents entry, which read as broken margins. Links follow the prose now,
+    and `.page > *` can no longer exceed its column, refuse to shrink, or keep
+    a word whole at the gutter's expense — general, whatever a future book puts
+    on a page.
+  - **The camera-shutter flash on every navigation** was the reading screen
+    fading up from *zero* opacity: the background flashes through the gap and
+    the eye reads it as the screen being switched off and on. There was nothing
+    to cover — the page beneath is the same colour. Gone; the two remaining
+    animations start at 0.6.
+  - **The page turn was whipping past.** The curve was `0.32, 0.72, 0, 1` —
+    almost the whole distance in the first third, which on text reads as the
+    words being snatched away mid-line. Now `0.4, 0, 0.2, 1` over 380 ms.
+  - **WP-50 · the update panel** — the app asks before it reloads.
+  - Gates at close: **611 tests**, typecheck, build. Precache 468.27 KiB.
 - **Shelf/detail redesign (WP-46→49) shipped, then fast-followed against the
   reader's live reaction** — 2026-08-03, all merged straight to `main`.
   - **WP-46→49**: bigger cover-forward Home tiles with a raised
@@ -157,14 +216,32 @@ behind a dynamic `import()`, so pdf.js (434 kB) and mammoth (500 kB) remain in
 their own chunks and are fetched only when a file of that type is imported.
 
 ### Blockers
-- None.
+- **The reader's installed app was still on an old build when the session
+  ended, and none of this had been seen on the phone yet.** Not a deploy
+  problem — that was verified end to end: `main` and `origin/main` are both
+  `af5111d`, and the live bundle at `reading-buddy-web-nu.vercel.app` was
+  checked for strings only the newest commit introduces ("Something new",
+  `text-align:inherit`, `textSettles`) and for the removal of the old
+  `textRises`. All correct.
+  - **The cause is the `autoUpdate` → `prompt` switch itself.** The installed
+    client is the *old* code, which expects a new worker to activate itself.
+    The new worker deliberately waits to be asked, and the old client has no
+    way to ask. A one-time crossing; every update after it is fine.
+  - **The way through, in order:** fully close the app from the app switcher
+    (backgrounding does not release the worker) → open the site in a browser
+    tab and hard-refresh → uninstall and reinstall (books live in IndexedDB,
+    so nothing is lost).
+  - **If none of those work**, the fallback discussed with the reader is to
+    make the new worker claim old clients on its own, at the cost of one
+    silent reload. Not built — don't build it until the three steps above are
+    known to have failed.
 
 ### Next up
 **The reader's order, set 2026-08-02: make it a proper reading app first, then
-AI.** Nothing is in flight right now — see `active-task.md`: the shelf/detail
-detour (WP-46→49 plus its same-day fast-follow) just shipped and the reader
-hasn't reacted to this latest round yet. Check that before picking anything
-below.
+AI.** Nothing is in flight. **Start by asking whether the phone is on the new
+build yet** — see "Blockers"; four rounds of fixes are shipped but unseen, and
+picking new work before that is confirmed risks building on top of something
+that turns out to be wrong.
 - **Reading comfort (rest of WP-14)** — font size, line spacing, margins,
   sepia, the page-turn animation (seam is built, only instant is wired),
   in-book search, real bookmarks. The natural next task once the shelf/detail
@@ -173,6 +250,9 @@ below.
 - **WP-17 → 18 → 19 → 20 · the tutor loop** — select text → assemble a prompt →
   call Claude → stream an answer. This is the rest of the walking skeleton and
   the first time the app does anything an ordinary reader can't.
+- **The page-flip animation** — the reader named it explicitly this session as
+  still to come. The seam (`turnPage`) is untouched and still where it plugs
+  in; the motion work done this round was timing and curve only.
 - **Merge `deploy-vercel` into `main`** whenever convenient — just the
   `.env.example` + a doc note, no functional change, low risk.
 - WP-09/10 (summaries, classification) need a model call and can follow.

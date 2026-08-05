@@ -78,6 +78,20 @@ is a heading or one of nine content kinds (`prose`, `quote`, `list`, `code`,
   ToC and running heads must never consume a permanent anchor.
 - **Epub figure `src` values are archive paths**, resolved against the chapter
   that referenced them while that context still exists.
+- **`startsPage` marks where the source book itself divided** — an epub spine
+  document: the cover, the copyright page, the dedication, the preface. A
+  boundary recorded by the parser, rendered as `break-before: column`. It is
+  deliberately *not* a section split; sections are the navigation and the anchor
+  grammar, and a chapter spread over three files would fragment the contents
+  list.
+- **`label` carries the finer distinction a `kind` deliberately doesn't** —
+  `dedication` and `epigraph` (set apart the way print sets them apart), the
+  note types, a figure's real caption. New display treatments belong here rather
+  than in a tenth kind.
+- **A consumed heading's ids are inherited by the block beneath it.** A heading
+  that opens a chapter or section becomes that division's *title* and the block
+  itself is discarded — so without this, every link pointing at a chapter
+  heading resolved to nothing and was dropped.
 - **PDF emits only `heading` and `prose`.** It has no structural markup — tables
   and figures there are geometry, not tags.
 

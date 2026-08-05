@@ -49,9 +49,21 @@
 > neighbouring *section* at either end — the seam, working as intended. Turning
 > back into a section lands on its **last** page.
 >
-> **Still open in WP-14:** font size, line spacing, margins, sepia, in-book
-> search, real bookmarks, and the page-turn *animation* (the seam is built; only
-> instant is wired).
+> **Still open in WP-14:** in-book search and real bookmarks — the two stub tabs
+> in the nav sheet, which are a visible promise. Font size, line spacing,
+> margins and themes shipped 2026-08-03; the page-turn *animation* is carved out
+> as **WP-51**.
+>
+> **Book typography shipped 2026-08-05** and belongs here: justified text with
+> hyphenation (the two are close to useless apart on a phone-width column),
+> first-line indents on paragraphs that continue the flow with the blank line
+> stepping back, and dedications/epigraphs centred with air above them. The
+> reader's own framing was that it "does not feel like I'm reading a book" —
+> the indent is what tells the eye a new paragraph began. One judgement call is
+> **unconfirmed on the phone**: removing the blank line between paragraphs is
+> authentic book setting but denser than what came before, and the reader was
+> offered the choice of keeping both. If it reads as cramped, restore the
+> margin and keep the indent — one line in `blocks.module.css`.
 
 > **Pagination — decided 2026-08-02, after the reader brainstormed four options.**
 >
@@ -219,6 +231,24 @@
   for both removed as clutter, so they're gone: UI, repository methods
   (`setMoods`/`rateBookAxis`) and the `BookMeta` fields/type all pulled
   rather than left dead · *after 47*
+- [x] **WP-50 The update panel** — added and shipped 2026-08-05, asked for by
+  the reader in the same breath as "I want to focus on giving character to my
+  app". The app used to reload underneath whoever was reading with no
+  explanation. `registerType` moves from `autoUpdate` to `prompt`;
+  `app/updates.ts` keeps the plumbing (`onUpdateReady`, `applyUpdate`) and
+  knows nothing about how it looks, `app/UpdatePrompt.tsx` is the other half.
+  The book stays on screen behind it, blurred rather than blacked out, so it is
+  visible that no place has been lost. Every way out — Later, Escape, tapping
+  the blur — means the same thing, and a deferred build stays deferred rather
+  than asking again on every check. **Carries a one-time cost:** clients
+  installed under `autoUpdate` cannot ask a waiting worker to activate, so the
+  crossing needs a manual app close. See `progress.md` Blockers · *after 30*
+- [ ] **WP-51 Page-flip animation** — added 2026-08-05, named by the reader as
+  still outstanding. The seam is already built and unchanged (`turnPage` in
+  `Reader.tsx`, one function every move goes through); this round only changed
+  the *timing* of the slide — 380 ms on a curve eased at both ends — because
+  the old one whipped the words off the screen. Page curl stays a labelled
+  slot, not a promise · *after 14*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*
