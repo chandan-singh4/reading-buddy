@@ -101,8 +101,13 @@ const EDGE_TAP = 0.25
  */
 function measure(element: HTMLElement | null): Strip {
   if (!element) return { scrollWidth: 0, pageWidth: 0, scrollLeft: 0 }
+  const gap = columnGapOf(element)
   return {
-    scrollWidth: element.scrollWidth,
+    // Plus one gap. `columns.ts` works in whole pages, and a page is a column
+    // *and the gap after it* — so the strip has to be reported as though the last
+    // column carried its gap too, or the final page is short of a full pitch and
+    // `pageCountOf` rounds the book one page smaller than it is.
+    scrollWidth: element.scrollWidth + gap,
     // `getBoundingClientRect`, not `clientWidth`. This is the whole of the
     // "page 134 is cut off down the middle" bug, and it is pure arithmetic: a
     // column is exactly as wide as this box, but `clientWidth` is *rounded to a
@@ -111,9 +116,29 @@ function measure(element: HTMLElement | null): Strip {
     // by page 134 the strip is 50px out of true, which everybody can. The
     // fractional width is the real column pitch, so multiples of it land on
     // real column edges however far into the book they are.
-    pageWidth: element.getBoundingClientRect().width,
+    // The *pitch*: one column plus the gap after it, which is how far one page
+    // turn travels. `Strip.pageWidth` has always been documented that way; until
+    // the gap existed the two happened to be the same number.
+    pageWidth: element.getBoundingClientRect().width + gap,
     scrollLeft: element.scrollLeft,
   }
+}
+
+/**
+ * The gap between one column and the next, in CSS pixels.
+ *
+ * Read off the computed style rather than repeated as a constant here, so
+ * `Reader.module.css` stays the single place the page gutter is decided — a gap
+ * in the stylesheet and a different one in the arithmetic would put every turn
+ * slightly out of true, which is the exact failure the gap was added to end.
+ *
+ * Zero where there is no layout to read (jsdom reports `normal`), which is the
+ * same "one page, nothing to turn" fallback the rest of `measure` takes.
+ */
+function columnGapOf(element: HTMLElement): number {
+  if (typeof getComputedStyle !== 'function') return 0
+  const gap = Number.parseFloat(getComputedStyle(element).columnGap)
+  return Number.isFinite(gap) ? gap : 0
 }
 
 /**
@@ -953,7 +978,7 @@ export default function Reader() {
     // the jump's fade at the same duration. Except the very first section of
     // all: opening the book has its own entrance, and two at once is a flicker.
     const arriving = () => {
-      if (turn) playTurn(turn, strip.current)
+      if (turn) playTurn(turn, strip.current, measure(strip.current).pageWidth)
       else if (landedBefore.current) fadeIn(strip.current)
       landedBefore.current = true
     }
