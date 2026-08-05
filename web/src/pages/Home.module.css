@@ -1,4 +1,4 @@
-/* The curated front door — a handful of shelves, not the whole collection.
+/* The curated front door — three shelves, not the whole collection.
    Full-catalogue furniture (search, import, multi-select) lives in
    `page.module.css`, for `/library` only. */
 
@@ -7,31 +7,100 @@
   gap: var(--space-6);
 }
 
-.title {
+.greeting {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.greetingTitle {
   font-size: var(--text-2xl);
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--color-accent);
+}
+
+.greetingSub {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Each shelf is its own panel: a heading, the covers, and the plank they stand
+   on. Grouping them means the gap between shelves is one value, not three that
+   have to be kept in agreement. */
+.shelf {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) 0;
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
+}
+
+.shelfHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .shelfHeading {
-  margin-bottom: var(--space-3);
   font-size: var(--text-sm);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--color-text-muted);
+}
+
+.viewAll {
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  /* Small text is an easy target to miss — the padding buys tap area without
+     changing where the label sits. */
+  padding: var(--space-1) 0 var(--space-1) var(--space-2);
+}
+
+/* The wooden plank the covers stand on. A gradient rather than an image: it
+   costs nothing, scales to any width, and stays crisp on a phone screen.
+   Negative margins let it run the full width of the shelf panel while the
+   covers above it keep their padding. */
+.plank {
+  height: 0.6rem;
+  margin: 0 calc(-1 * var(--space-4));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-accent) 78%, #000) 0%,
+    color-mix(in srgb, var(--color-accent) 92%, #fff) 45%,
+    color-mix(in srgb, var(--color-accent) 60%, #000) 100%
+  );
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.18);
 }
 
 /* Scrolls sideways rather than wrapping — a shelf of covers reads as a shelf
    only if it behaves like one. Wider gap than a plain list: covers are the
    thing being browsed, so each one gets room to read as its own object
-   rather than a row of edge-to-edge thumbnails. */
+   rather than a row of edge-to-edge thumbnails.
+
+   The negative side margins plus matching padding let the row bleed to the
+   panel's edges as it scrolls, so a cover slides off under the corner instead
+   of stopping short of it. */
 .row {
   display: flex;
+  align-items: flex-end;
   gap: var(--space-4);
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 0 var(--space-4) var(--space-2);
   overflow-x: auto;
-  padding-bottom: var(--space-2);
   scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.row::-webkit-scrollbar {
+  display: none;
 }
 
 .tile {
@@ -47,13 +116,11 @@
 /* The one book in progress gets its own panel, not just a wider row item —
    it is the single thing on this screen the reader is most likely to act on. */
 .heroCard {
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-raised);
+  display: flex;
+  padding: var(--space-3) 0 var(--space-4);
 }
 
-/* Currently Reading's single hero tile: cover and text side by side rather
+/* Current Reading's single hero tile: cover and text side by side rather
    than stacked, so it reads as the one thing on the shelf that matters most
    right now, not as one more card in a row. Its cover runs larger than a
    shelf tile's — the one book in progress earns the biggest cover on the
@@ -78,8 +145,24 @@
   width: 10rem;
 }
 
+/* Lifts the cover off the plank a touch and settles it back on press. The
+   shadow does the work — a cover with no shadow looks printed on the shelf
+   rather than standing on it. */
 .tileMedia {
   display: block;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  box-shadow:
+    0 6px 14px rgb(0 0 0 / 0.18),
+    0 1px 2px rgb(0 0 0 / 0.12);
+  transition:
+    transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 220ms ease;
+}
+
+.tile:active .tileMedia {
+  transform: translateY(2px) scale(0.985);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.16);
 }
 
 .infoButton {
@@ -93,6 +176,8 @@
   justify-content: center;
   border-radius: 50%;
   background: rgb(0 0 0 / 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   color: #fff;
   font-size: var(--text-xs);
   line-height: 1;
@@ -147,19 +232,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-.seeAll {
-  justify-self: start;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 .pending {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
 
 .empty {
-  margin-top: var(--space-6);
   padding: var(--space-6) var(--space-4);
   text-align: center;
   border: 1px dashed var(--color-border);
@@ -174,9 +252,18 @@
 }
 
 .error {
-  margin-top: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-accent);
   border-radius: var(--radius-sm);
+}
+
+/* Wider screens: the shelves stop stretching edge to edge and centre on a
+   comfortable column, the way the reading screen already does. */
+@media (min-width: 48rem) {
+  .home {
+    max-width: 46rem;
+    margin-inline: auto;
+    width: 100%;
+  }
 }

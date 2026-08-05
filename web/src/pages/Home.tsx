@@ -13,14 +13,26 @@ type LoadState =
   | { status: 'ready'; shelves: HomeShelves; total: number }
   | { status: 'failed'; message: string }
 
+/** "Good morning" / "Good afternoon" / "Good evening", by the clock. */
+function greetingFor(hour: number): string {
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
 /**
- * The front door: a handful of curated shelves rather than the whole
- * collection — Currently Reading, Up Next, Unread, Finished. The full
- * library — every book, search, import, delete — lives at `/library`
- * (`Library.tsx`, unchanged), one tap away via "See all books".
+ * The front door: three curated shelves — Current Reading, Up Next, Unread —
+ * rather than the whole collection. The full library — every book, search,
+ * import, delete — lives at `/library` (`Library.tsx`, unchanged), one tap
+ * away via the Unread shelf's "View All" or the drawer's "All Books".
+ *
+ * Only Unread carries "View All": it is the shelf that is capped (at ten of
+ * however many you own), so it is the only one where something is actually
+ * being held back.
  */
 export default function Home() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
+  const greeting = useMemo(() => greetingFor(new Date().getHours()), [])
 
   useEffect(() => {
     let cancelled = false
@@ -45,7 +57,10 @@ export default function Home() {
 
   return (
     <div className={styles.home}>
-      <h1 className={styles.title}>Home</h1>
+      <header className={styles.greeting}>
+        <h1 className={styles.greetingTitle}>{greeting}, reader.</h1>
+        <p className={styles.greetingSub}>Pick up where you left off.</p>
+      </header>
 
       {state.status === 'loading' && <p className={styles.pending}>Loading…</p>}
 
@@ -76,7 +91,6 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
       ...(shelves.currentlyReading ? [shelves.currentlyReading.book] : []),
       ...shelves.upNext.map((entry) => entry.book),
       ...shelves.unread,
-      ...shelves.finished,
     ],
     [shelves],
   )
@@ -85,8 +99,7 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
   return (
     <>
       {shelves.currentlyReading && (
-        <section>
-          <h2 className={styles.shelfHeading}>Currently reading</h2>
+        <Shelf title="Current Reading">
           <div className={styles.heroCard}>
             <BookTile
               entry={shelves.currentlyReading}
@@ -94,48 +107,62 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
               large
             />
           </div>
-        </section>
+        </Shelf>
       )}
 
       {shelves.upNext.length > 0 && (
-        <section>
-          <h2 className={styles.shelfHeading}>Up next</h2>
+        <Shelf title="Up Next">
           <div className={styles.row}>
             {shelves.upNext.map((entry) => (
               <BookTile key={entry.book.id} entry={entry} coverSrc={covers.get(entry.book.id)} />
             ))}
           </div>
-        </section>
+        </Shelf>
       )}
 
       {shelves.unread.length > 0 && (
-        <section>
-          <h2 className={styles.shelfHeading}>
-            Unread <span className={styles.pending}>({shelves.unreadTotal})</span>
-          </h2>
+        <Shelf title="Unread" viewAllTo="/library">
           <div className={styles.row}>
             {shelves.unread.map((book) => (
               <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
             ))}
           </div>
-        </section>
+        </Shelf>
       )}
-
-      {shelves.finished.length > 0 && (
-        <section>
-          <h2 className={styles.shelfHeading}>Finished</h2>
-          <div className={styles.row}>
-            {shelves.finished.map((book) => (
-              <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <Link to="/library" className={styles.seeAll}>
-        See all books →
-      </Link>
     </>
+  )
+}
+
+/**
+ * One shelf: a heading, its covers, and the wooden plank they stand on. The
+ * plank is drawn under the row rather than behind it so the covers appear to
+ * rest on it — that edge is what makes the screen read as a bookshelf instead
+ * of a list of cards.
+ */
+function Shelf({
+  title,
+  viewAllTo,
+  children,
+}: {
+  title: string
+  viewAllTo?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className={styles.shelf}>
+      <div className={styles.shelfHead}>
+        <h2 className={styles.shelfHeading}>{title}</h2>
+        {viewAllTo && (
+          <Link to={viewAllTo} className={styles.viewAll}>
+            View All
+          </Link>
+        )}
+      </div>
+
+      {children}
+
+      <div className={styles.plank} aria-hidden="true" />
+    </section>
   )
 }
 

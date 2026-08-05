@@ -11,8 +11,8 @@ import Stats from './pages/Stats.tsx'
 
 /**
  * Route table. Home, Library, Stats and Settings all nest inside `AppShell`
- * so they share the tab bar; Reader and BookInfo (WP-47) sit outside it to
- * render full-bleed.
+ * so they share the top bar and navigation drawer; Reader and BookInfo
+ * (WP-47) sit outside it to render full-bleed.
  */
 export function AppRoutes() {
   return (
