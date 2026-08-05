@@ -255,11 +255,11 @@ describe('links in the text', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'One' }))
+    fireEvent.click(screen.getByRole('link', { name: 'One' }))
     expect(followed).toEqual([target])
     // The entry without a link is still there, just not tappable.
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
-    expect(screen.getAllByRole('button')).toHaveLength(1)
+    expect(screen.getAllByRole('link')).toHaveLength(1)
   })
 
   it('makes a link inside a paragraph tappable', () => {
@@ -273,7 +273,7 @@ describe('links in the text', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'note 4' }))
+    fireEvent.click(screen.getByRole('link', { name: 'note 4' }))
     expect(followed).toEqual([target])
   })
 
@@ -289,12 +289,15 @@ describe('links in the text', () => {
 })
 
 /**
- * A link is a `<button>`, and a button is not a word. Three browser defaults
- * make it behave like a box instead, and all three showed up on the contents
- * page of a real book: a long entry could not break across a column, so it hung
- * past the edge and the overhang was clipped — the stray letter that appeared
- * at the left edge of the next page — and every wrapped entry was centred while
- * the unwrapped ones stayed left.
+ * A link has to behave like a word. It did not, and the contents page of a real
+ * book is where that showed: an internal link was a `<button>`, a button is a
+ * box whatever its `display` says, and a box is laid out whole — so a long entry
+ * could not break across a line or a column. It hung past the column edge and
+ * the overhang was cut off by `overflow: hidden`, which is the missing letters
+ * readers reported. Wrapped entries were centred by the button default too,
+ * while the unwrapped ones stayed left.
+
+ * It is a `<span role="link">` now, which breaks like the text around it.
  *
  * The values live in `blocks.module.css`; what is asserted here is that the
  * link keeps carrying the class that holds them, on every path that renders one.
@@ -306,7 +309,7 @@ describe('a link behaves like the words around it', () => {
 
   it('styles an internal link', () => {
     const { container } = render(<Block block={blockOf('prose', 'See this.', linked)} />)
-    expect(container.querySelector('button')?.className).toContain(styles.link)
+    expect(container.querySelector('[role="link"]')?.className).toContain(styles.link)
   })
 
   it('styles an external link', () => {
@@ -330,7 +333,7 @@ describe('a link behaves like the words around it', () => {
         })}
       />,
     )
-    expect(container.querySelector('li button')?.className).toContain(styles.link)
+    expect(container.querySelector('li [role="link"]')?.className).toContain(styles.link)
   })
 
   it('keeps the link’s words even when it spans the whole line', () => {

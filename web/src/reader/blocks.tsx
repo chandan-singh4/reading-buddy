@@ -51,20 +51,44 @@ function Runs({ runs, onFollow }: { runs: Run[]; onFollow?: FollowLink }) {
 
         if (run.link.anchor) {
           const target = run.link.anchor
+          const follow = () => onFollow?.(target)
           return (
-            <button
+            <span
               key={index}
-              type="button"
               className={styles.link}
+              // A `<span>`, not a `<button>`, and the reason is layout rather
+              // than semantics — `role` and the key handling below give back
+              // everything the element loses.
+              //
+              // A `<button>` is a *box*, and no amount of `display: inline`
+              // changes that: measured in Chrome, a button holding a long
+              // contents entry reports one line box where the same text in a
+              // span reports two. A box cannot be broken across a line or a
+              // column, so it is laid out whole, at whatever width its contents
+              // want, and the column edge cuts off whatever hangs past it. Real
+              // inline text has no such minimum: it breaks wherever the line
+              // runs out, like every other word on the page.
+              role="link"
+              tabIndex={0}
               onClick={(event) => {
                 // The reading page uses taps for turning pages and showing the
                 // overlay. A tap meant for a link is neither.
                 event.stopPropagation()
-                onFollow?.(target)
+                follow()
+              }}
+              onKeyDown={(event) => {
+                // What the browser gave for free with a `<button>`. Both keys,
+                // because the role is a link but the thing under a reader's
+                // thumb is still a control.
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                // Space scrolls the page if it is left alone.
+                event.preventDefault()
+                event.stopPropagation()
+                follow()
               }}
             >
               {run.text}
-            </button>
+            </span>
           )
         }
 

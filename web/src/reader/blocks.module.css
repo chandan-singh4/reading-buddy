@@ -262,18 +262,20 @@
   margin: 0;
   cursor: pointer;
   /*
-   * A `<button>` is not a word, and left to itself it does not behave like one.
-   * Three browser defaults have to be undone, and all three were visible on the
-   * contents page of a real book:
+   * A link has to behave like a word, and the elements it is made of do not, so
+   * their defaults are undone here.
    *
-   * `display: inline-block` — the default — makes the link one *box*. A box
-   * cannot be broken across a line or, worse, across a column: a long contents
-   * entry at the foot of a page could not split, so it hung past the column
-   * edge and the overhang was clipped by `overflow: hidden`. That is the stray
-   * letter that appeared at the left edge of the following page.
+   * `display: inline` was once meant to do the whole job on the `<button>` this
+   * used to be. It cannot: a button is a box whatever its `display` says, and a
+   * box is laid out whole — it cannot break across a line, let alone across a
+   * column, so a long contents entry hung past the column edge and `overflow:
+   * hidden` cut the end off it. That is why the internal link is a `<span role
+   * ="link">` now (`blocks.tsx` has the measurement). The declaration stays
+   * because `<a>` and `<span>` still need to be told, and because it costs
+   * nothing to say what this must be.
    *
-   * `text-align: center` — also a default, and only visible once a link wraps —
-   * centred every wrapped contents entry while the unwrapped ones stayed left,
+   * `text-align: center` — a button default, and only visible once a link wraps
+   * — centred every wrapped contents entry while the unwrapped ones stayed left,
    * which read as broken indentation rather than as centring.
    *
    * `inherit` rather than fixed values throughout, because these must follow
