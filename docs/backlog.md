@@ -264,6 +264,21 @@
   Unread carries **View All** (→ `/library`), because only Unread is capped.
   Finished no longer appears on Home. Purely UI/navigation; no data or
   repository change · *after 46*
+- [x] **WP-53 Library redesign — views, filters, folders, swipe** — added and
+  shipped 2026-08-06, from two reference screenshots (a Kindle-like list and a
+  two-column grid). List and grid views from one component, so the scroll
+  position survives the switch and a badge can't be added to one and forgotten
+  in the other; search across title, author and folder name; filters for
+  reading status, content type and folder, plus eight sort orders; a floating
+  "+" replacing the import panel; long press for selection, replacing the
+  Select button and the per-row shelf picker; and horizontal swipe between
+  Home ↔ Library ↔ Stats ↔ Settings, with Home added to the drawer to match.
+  **The one data change is folders** — a `folders` table (schema v8) and an
+  indexed `folderId` on a book, one folder per book, and deleting a folder
+  unfiles its books rather than deleting them. The rules that can be *wrong*
+  (what shows, in what order, how far through) live in `src/library/` as pure
+  tested functions; the screen is a shell over them. Fast-followed the same day
+  with three phone-reported faults — see `progress.md` · *after 52*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*
@@ -289,14 +304,23 @@
 
 ### Library — finding the next book
 - Rename a book → **NEW** (small; pairs with reading real title/author out of EPUB and docx metadata, since titles are filename-derived today)
-- Search the library → WP-24
-- Filter by status (Unread / Reading / Finished) → WP-24 ("status grouping")
-- Sort: recently read, recently added, title, author → WP-24
-- Cover images → WP-24
+- ~~Search the library~~ → **shipped WP-53.** Title, author and folder name.
+- ~~Filter by status (Unread / Reading / Finished)~~ → **shipped WP-53.**
+- ~~Sort: recently read, recently added, title, author~~ → **shipped WP-53**,
+  plus reading progress and folder. "Last modified" was declined — nothing
+  records it, and a sort that silently duplicates "recently added" lies.
+- ~~Cover images~~ → shipped; on the shelf, the grid and the detail page.
 - Continue Reading → WP-24, needs WP-15
-- Reading progress (% and last location) → WP-24, needs WP-15
+- ~~Reading progress (% and last location)~~ → **shipped WP-53** on the shelf:
+  a bar in list view, a percentage in grid, "Finished" instead of "100%".
 - Import folder / watch a directory → **NEW, low priority.** Folder *import* shipped in WP-11: a one-time scan when you point at a folder. *Watching* means new files landing in that folder appear on the shelf by themselves, and a web page can't do that — it can't look at the disk unprompted and isn't running with the tab closed. Possible via the Tauri shell, or via the File System Access API, which still only notices on next open. The gap it closes is one drag of a folder; revisit only if books start arriving often and to a fixed folder.
-- Favourites / pin important books → **NEW** (small, sits in WP-24)
+- Favourites / pin important books → **NEW** (small). **Cheap now**: a boolean
+  on `BookMeta`, one field on `LibraryPrefs`, one clause in `matchesFilters` and
+  a chip in the filter sheet. WP-53 built the filter chain to take exactly this.
+- Tags → **NEW.** Deliberately *not* what folders became: a book has one folder,
+  a tag is many-to-many and needs a join table. WP-53 left the seam — the
+  search haystack is built in one function specifically so tags become one more
+  line in it.
 - Archive instead of delete → **NEW** (small, sits in WP-24)
 - Recently opened list → **NEW** (small, needs WP-15)
 - Rate a book on finishing, then 5 recommendations: 2 by the same author, 3 on the topic by others → **NEW, and the largest item here.** Needs a book-metadata source we don't have — the shelf only knows what's been imported, so recommendations must come from Claude. Worth its own waypoint, after WP-19.

@@ -99,17 +99,32 @@ is a heading or one of nine content kinds (`prose`, `quote`, `list`, `code`,
 
 ```
 web/src/
-├─ app/       AppShell — tab bar + <Outlet>, wraps Library and Settings
-├─ pages/     Library · Reader · Settings
+├─ app/       AppShell (top bar, drawer, swipe nav) · Cover · Portal · hooks
+├─ pages/     Home · Library · Reader · BookInfo · Stats · Settings
+├─ library/   WP-53 — the library screen's parts and its rules
+├─ reader/    the reading screen's parts (columns, page turn, settings)
 ├─ styles/    theme.css — all design tokens
 ├─ structure/ WP-05 schema
 ├─ parse/     WP-06/07/08/35–38 parsers
 └─ storage/   WP-03 persistence
 ```
 
-- **Routes:** `/` Library · `/settings` · `/book/:bookId` Reader · `*` → Library.
-- **Reader renders outside `AppShell`** so reading is full-bleed; navigation
-  appears on tap instead (WP-13).
+- **Routes:** `/` Home · `/library` · `/stats` · `/settings` · `/book/:bookId`
+  Reader · `/book/:bookId/info` · `*` → Home.
+- **Reader and BookInfo render outside `AppShell`** so reading is full-bleed;
+  navigation appears on tap instead (WP-13).
+- **Navigation is a drawer plus a horizontal swipe**, both moving through
+  Home ↔ Library ↔ Stats ↔ Settings in that order. There is no bottom tab bar
+  and **no page index held anywhere** — the URL is the state.
+- **A screen is a shell; its rules are pure functions beside it.** `library/`
+  is the pattern: the screen holds state and talks to storage, while what is
+  shown, in what order, and how far through each book is are pure and tested
+  (`filter.ts`, `status.ts`, `prefs.ts`). Anything that can be *wrong* rather
+  than merely ugly belongs on that side of the line.
+- **`position: fixed` does not work inside `AppShell`'s frame.** The frame
+  carries a permanent CSS `filter`, which makes it a containing block for fixed
+  descendants — so anything meaning "fixed to the screen" renders through
+  `app/Portal.tsx`, below the drawer's z-index. See `decisions.md`.
 - **No hard-coded colours or spacing in components** — everything reads a token
   from `theme.css`, so the WP-14 day/night toggle is a single `data-theme`
   attribute on `<html>`. Dark currently follows the OS setting.
@@ -118,14 +133,26 @@ web/src/
 ### Storage (WP-03)
 
 `web/src/storage/` is the only code allowed to touch IndexedDB. Dexie database
-`reading-buddy`, schema version 1:
+`reading-buddy`, currently schema version 8:
 
-| Table | Primary key | Holds |
-|---|---|---|
-| `books` | `id` | `BookMeta` — indexed on title, type, importedAt |
-| `manifests` | `bookId` | one `Manifest` per book |
-| `chapters` | `[bookId+chapter]` | one `ChapterIndex` per chapter |
-| `sections` | `[bookId+path]` | **one row per section** — the retrieval atom |
+| Table | Primary key | Holds | Since |
+|---|---|---|---|
+| `books` | `id` | `BookMeta` — indexed on title, type, importedAt, contentHash, textSignature, folderId | v1 |
+| `manifests` | `bookId` | one `Manifest` per book | v1 |
+| `chapters` | `[bookId+chapter]` | one `ChapterIndex` per chapter | v1 |
+| `sections` | `[bookId+path]` | **one row per section** — the retrieval atom | v1 |
+| `positions` | `bookId` | where reading stopped, indexed on `at` | v4 |
+| `sources` | `bookId` | the original file, so a parser fix can be re-applied | v5 |
+| `assets` | `[bookId+path]` | one row per picture, addressed like a section | v6 |
+| `quotes` | `[bookId+id]` | favourite passages | v7 |
+| `folders` | `id` | the reader's own shelves, indexed on name | v8 |
+
+- **Everything per-book is its own table, keyed by `bookId`.** A reading
+  position is written every few seconds while reading, and a picture can be a
+  megabyte — neither belongs on the book row, which would then be rewritten in
+  full on every save and read in full on every shelf paint.
+- **A book is in at most one folder** (`BookMeta.folderId`, absent = loose), and
+  **deleting a folder unfiles its books rather than deleting them.**
 
 - **Import `./storage`, never `./storage/db.ts`.** `repository.ts` is the door;
   the database behind it stays swappable.
@@ -133,8 +160,9 @@ web/src/
   `getChapterIndex` + one `getSection`. Adding a whole-book read would quietly
   undo the token strategy.
 - **Schema changes go in a new `.version(n)` block** — never edit a shipped one,
-  or existing installs lose data. Highlights/notes (WP-25) and reading position
-  (WP-15) land as version 2.
+  or existing installs lose data. Most additions need no migration: an absent
+  field is the state every existing row is already in (`folderId` in v8 is the
+  worked example — a book without one is loose, which all of them were).
 - Import and delete both run in transactions: no half-parsed books, no orphaned
   sections eating the phone's storage quota.
 - **Book metadata set at import:** type (`light-fiction` | `dense/technical`),

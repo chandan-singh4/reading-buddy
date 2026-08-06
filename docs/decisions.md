@@ -465,3 +465,47 @@
   push — Vercel deploys from `main`, so anything left on a branch is invisible to
   the reader. This deliberately overrides `/wrap-session`'s older "do not commit
   or push unless I ask". — 2026-08-06
+- **A book belongs to at most one folder.** A book in several places is a *tag*,
+  which is a different feature with a different shape — a join table, no
+  partition of the library, and nothing for a "sort by folder" to sort by.
+  Building the first as though it were the second gets neither right. The seam
+  for tags is left open: the search haystack is built in one function so tags
+  become one more line in it. — 2026-08-06
+- **Deleting a folder never deletes the books in it.** A folder is a label on a
+  shelf, not a box with a bottom; the books are unfiled in the same transaction.
+  This is the single most destructive misreading the library could make, and
+  there is no undo — the original files were never kept. — 2026-08-06
+- **An empty filter list means "all", never "none".** Unticking the last reading
+  status is a reader asking to stop filtering, not asking for a blank shelf —
+  and a folder filter pointing at a folder since deleted hides nothing, because
+  an empty library behind a name that no longer exists reads as "my books are
+  gone". Whenever a filter is narrowing the shelf, the screen says so and offers
+  one tap to clear it. — 2026-08-06
+- **Sort is one flat list, not a field plus a direction.** Two fields would
+  allow "recently added, A→Z", which is not a thing. Direction only means
+  something for title and author, and a menu offering meaningless combinations
+  is a menu the reader has to think their way past. "Last modified" was declined
+  outright rather than faked: nothing records it. — 2026-08-06
+- **List and grid are one component, not two.** They show the same facts and
+  differ only in layout, so two components would mean adding every future badge
+  twice and finding out from a screenshot that the second was forgotten. It is
+  also what makes the scroll position survive the switch, since the same
+  elements stay in the same order. — 2026-08-06
+- **`position: fixed` does not work inside the app frame — use `app/Portal.tsx`.**
+  `AppShell`'s frame carries a CSS `filter` permanently, at no-op values, so the
+  drawer's blur animates rather than snapping; an element with a filter is a
+  containing block for every fixed descendant. "Fixed to the screen" therefore
+  means "fixed to the whole scrolling document". This cost two rounds — the
+  drawer, then the library's floating "+" and filter sheet — so it is a rule
+  now, not a caution. Portalled things stay below the drawer's z-index. — 2026-08-06
+- **A touch gesture is judged on `pointermove`, not on `pointerup`.** A browser
+  seizes a pan after a few pixels and fires `pointercancel` instead, carrying
+  stale coordinates — so measuring at `pointerup` measures nothing. A screen
+  that owns horizontal gestures must also claim them with `touch-action`
+  (`pan-y pinch-zoom` on the shell, `pan-x` on the reading screen) or it is
+  fighting the browser and losing. — 2026-08-06
+- **Layout and gestures are verified on the phone or not at all.** jsdom has no
+  layout and never cancels a pointer, and headless Chrome renders this app's
+  root empty in every mode tried. Three faults shipped under 656 green tests
+  because of this. A gesture test is only worth writing if it reproduces the
+  real event sequence, cancel and all. — 2026-08-06
