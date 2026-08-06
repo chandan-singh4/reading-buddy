@@ -14,11 +14,64 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing in the code.** The nav/Home redesign below is merged and on Vercel
-  but not yet seen on the phone, and neither is the second of the two text-
-  escaping fixes — see the top two "Recently done" entries.
+- **Nothing in the code.** Three rounds are now merged and on Vercel awaiting
+  the reader's eye: the shelf/page-flip round below, the nav/Home redesign, and
+  the second of the two text-escaping fixes.
 
 ### Recently done
+- **WP-51 · A shelf of real books, and a page that turns** — 2026-08-06, merged
+  to `main` (`f5e4bf7`). Four UI complaints from a phone screenshot, plus the
+  page-flip that had been an open slot since WP-14.
+  - **Covers are books now.** A spine down the left edge, a block of page edges
+    down the right, and the weight of a solid object on the plank — built from
+    a stack of hard `box-shadow`s and two pseudo-elements on `.tileMedia`,
+    **deliberately not a 3D transform**: a rotated element carries its own width
+    with it and would undo the row alignment fixed in the same commit. Scoped to
+    `Home.module.css`, so `Cover.tsx` stays the printed face and Library/BookInfo
+    are untouched.
+  - **The missing cover was a parser gap, not a display bug.** An epub declares
+    its cover two standard ways (`properties="cover-image"`, `<meta
+    name="cover">`) and conversion tools drop both routinely — the book then
+    imports fine and shows a coloured placeholder forever with nothing to say
+    why. Two *guesses* added behind the two declarations: a manifest image
+    plainly called "cover", and the lone picture on the book's own cover page.
+    Both strict — a page with >12 words is a chapter, several pictures is a
+    title page, and a single-document book has no separate cover page at all
+    (that last guard is what stopped the figure tests going red).
+    **`PARSER_VERSION` → 9**, so the shelf offers the rebuild.
+  - **Alignment: `align-items: flex-end` was the bug.** Aligning tiles by their
+    *bottoms* pushes a one-line-title book down — that is why "Breath" sat low.
+    Now `stretch` with `grid-template-rows: auto 1fr`, so every tile shares a top
+    edge and (same width, same 2:3 shape) one baseline under the covers.
+  - **Padding: the bleed cost the thing it decorated.** The row was pulled to the
+    panel edges with negative margins so a cover would slide under the rounded
+    corner; the first book of every shelf ended up flush with the border while
+    its heading kept its inset, which is the "title touching the edge" report.
+    Bleed removed — the row lives inside the shelf's own padding.
+  - **The page turns over instead of sliding.** A slide is what a *scroll* looks
+    like and paper pivots about the binding. Forwards: one copy of the outgoing
+    page rotates over the spine (`rotateY` 0 → −118°, `perspective(1600px)`,
+    origin `0% 50%`) and uncovers the strip beneath. **Backwards is not a mirror
+    image** — the *arriving* page is the one that moves, so it needs two copies:
+    the page being left sitting still, and a copy of the strip flipping onto it,
+    played with `direction: 'reverse'`. Both dropped at the end. A shade overlay
+    fades to `--color-bg` as the sheet goes edge-on, so what shows past halfway
+    is the blank back of the page rather than its own text mirrored.
+  - **`copyOf` now returns a wrapper, not the bare clone.** The strip is a
+    *scrolling* box, so an overlay at `inset: 0` inside a copy of it lands at the
+    copy's scroll origin — thirty-nine screens off to the left on page forty. The
+    shade hangs on a non-scrolling wrapper with the scrolled copy inside; the
+    wrapper is also what gets rotated. `playTurn` is gone, replaced by `playFlip`.
+  - **Now cloning per tap, not per section.** Within-section turns used to be a
+    pure scroll; they take a `cloneNode(true)` of the laid-out section now. The
+    reader was told to watch for stutter on a long chapter — **the named fix is
+    to cache the clone per section and reset its `scrollLeft`, not to rebuild the
+    animation.** Don't guess at it without their device as evidence.
+  - **`CLAUDE.md` gained a ship-at-end-of-thread ritual** at the reader's
+    request: build, commit, merge to `main`, push, so work reaches Vercel rather
+    than sitting on a branch. Note this **contradicts `/wrap-session`'s "do not
+    commit or push unless I ask"** — the ritual is newer and explicit, and won.
+  - Gates at close: **616 tests** (3 new, on the cover rules), typecheck, build.
 - **WP-52 · Drawer navigation and the bookshelf Home** — 2026-08-05, merged to
   `main`. Asked for against a reference screenshot the reader shared; purely
   UI and navigation, no data or repository change.
@@ -294,21 +347,21 @@ their own chunks and are fetched only when a file of that type is imported.
 ### Next up
 **The reader's order, set 2026-08-02: make it a proper reading app first, then
 AI.** Nothing is in flight. The phone is on the current build, so the whole of
-the last three sessions is now open to reaction — expect a round of it, and
-treat that as the real next task ahead of anything listed here. The new
-navigation and Home are the first thing the reader will land on, so reactions
-to those come before WP-51.
-- **Reading comfort (rest of WP-14)** — font size, line spacing, margins,
-  sepia, the page-turn animation (seam is built, only instant is wired),
-  in-book search, real bookmarks. The natural next task once the shelf/detail
-  work is settled.
+the last four sessions is now open to reaction — expect a round of it, and treat
+that as the real next task ahead of anything listed here. The bookshelf and the
+page flip are what they will land on first.
+- **Two things from this round need the reader's eye specifically.** (a) Run the
+  library's **Update** to pull covers forward to `PARSER_VERSION` 9 — the fix
+  does nothing for books already on the shelf until it runs. (b) Does the flip
+  stutter on a long chapter? See the clone-caching note above.
+- **Reading comfort (rest of WP-14)** — in-book search and real bookmarks are
+  what is left; font size, line spacing, margins, sepia and the page turn are
+  all done now.
 - **WP-43 · Re-scan a folder + name what's new.**
 - **WP-17 → 18 → 19 → 20 · the tutor loop** — select text → assemble a prompt →
   call Claude → stream an answer. This is the rest of the walking skeleton and
   the first time the app does anything an ordinary reader can't.
-- **The page-flip animation** — the reader named it explicitly this session as
-  still to come. The seam (`turnPage`) is untouched and still where it plugs
-  in; the motion work done this round was timing and curve only.
+- ~~**The page-flip animation**~~ — **done 2026-08-06**, see WP-51 above.
 - ~~Merge `deploy-vercel` into `main`~~ — **already done**; it went in via
   `61cc272` and every remote branch is now an ancestor of `main`. Nothing is
   outstanding to merge.

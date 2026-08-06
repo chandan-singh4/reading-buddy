@@ -51,8 +51,8 @@
 >
 > **Still open in WP-14:** in-book search and real bookmarks — the two stub tabs
 > in the nav sheet, which are a visible promise. Font size, line spacing,
-> margins and themes shipped 2026-08-03; the page-turn *animation* is carved out
-> as **WP-51**.
+> margins and themes shipped 2026-08-03; the page-turn *animation* was carved
+> out as **WP-51** and shipped 2026-08-06.
 >
 > **Book typography shipped 2026-08-05** and belongs here: justified text with
 > hyphenation (the two are close to useless apart on a phone-width column),
@@ -243,12 +243,16 @@
   than asking again on every check. **Carries a one-time cost:** clients
   installed under `autoUpdate` cannot ask a waiting worker to activate, so the
   crossing needs a manual app close. See `progress.md` Blockers · *after 30*
-- [ ] **WP-51 Page-flip animation** — added 2026-08-05, named by the reader as
-  still outstanding. The seam is already built and unchanged (`turnPage` in
-  `Reader.tsx`, one function every move goes through); this round only changed
-  the *timing* of the slide — 380 ms on a curve eased at both ends — because
-  the old one whipped the words off the screen. Page curl stays a labelled
-  slot, not a promise · *after 14*
+- [x] **WP-51 Page-flip animation** — added 2026-08-05, shipped 2026-08-06. The
+  page now pivots about the spine instead of sliding: `rotateY` 0 → −118° under
+  `perspective(1600px)`, origin at the left edge, with a shade that fades to the
+  page colour as the sheet goes edge-on so what shows past halfway is the blank
+  *back* of the page. Forwards moves one copy (the outgoing page); **backwards
+  moves the arriving one and therefore needs two** — a still page to land on and
+  a copy of the strip flipping onto it. Within-section turns scroll instantly
+  now and take their movement from the flip instead. Same `MOVE_MS` and curve as
+  every other move; reduced motion still gets the instant change. Page *curl*
+  was never promised and is still not built · *after 14*
 - [x] **WP-52 Drawer navigation + the bookshelf Home** — added and shipped
   2026-08-05, from a reference screenshot the reader shared. The bottom tab bar
   is gone: Home is the front door, and All Books / Stats / Settings are
