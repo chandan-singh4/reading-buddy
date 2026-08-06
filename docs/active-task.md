@@ -8,13 +8,67 @@
 
 ---
 
-## Task — react to the bookshelf and the page flip
+## Task — react to the redesigned library
 
-Shipped 2026-08-06 (WP-51, `f5e4bf7`) and on Vercel; **not yet seen on the
-phone.** Nothing is half-built. The next task is whatever the reader says when
-they open it, and there are two questions to put to them before anything else.
+Shipped 2026-08-06 (WP-53) and on Vercel; **not yet seen on the phone.** Nothing
+is half-built. The next task is whatever the reader says when they open it.
 
-### Ask these two first
+### Ask these first
+
+1. **How does it look?** This is the honest gap in the round: jsdom has no
+   layout, and **headless Chrome renders this app's `#root` empty**, so it could
+   not be screenshotted either. Every one of the 656 tests says the library
+   *behaves*; not one of them has seen it. The specific things to look at are
+   the grid card proportions, the progress bar in list view, whether the
+   floating "+" sits clear of the last book, and whether the filter sheet is
+   reachable one-handed.
+2. **Does the long press feel right?** 500 ms with a 10px movement guard. If it
+   fires while scrolling, raise the guard, not the delay; if it feels sluggish,
+   `HOLD_MS` in `library/useLongPress.ts` is the one number.
+3. **Does swiping fight the shelf?** The ratio guard (1.6× more horizontal than
+   vertical) is the same class of fix the reading screen needed. If a diagonal
+   flick still navigates, raise `RATIO` in `app/useSwipeNav.ts`.
+
+### Decisions made this round the reader may want to revisit
+- **A book is in at most one folder.** Many folders is a *tag*, which is a
+  different feature — say so before building it as an extension of this one.
+- **"Sort by Last Modified" was dropped**, not faked. Adding it means recording
+  a `modifiedAt` when a book is renamed, rated, retyped or annotated.
+- **"Change type" offers all three** (Book / Research paper / Document), not the
+  two the brief listed — otherwise a Document could never be set back.
+- **Type and folder badges are shown only when they aren't the obvious answer.**
+  A shelf of novels each labelled "Book" is noise.
+
+### Files in scope
+
+*For a reaction to the library:*
+- `web/src/pages/Library.tsx` + `Library.module.css` — the screen, the search
+  bar, the folder dialog.
+- `web/src/library/BookShelf.tsx` + `.module.css` — the list and the grid. One
+  component; the layout is the only difference.
+- `web/src/library/FilterSheet.tsx`, `SelectionBar.tsx`, `AddButton.tsx` and
+  their stylesheets — the three controls around the shelf.
+- `web/src/library/useLongPress.ts` — the 500 ms / 10 px gesture.
+- `web/src/library/filter.ts` / `prefs.ts` / `status.ts` — the rules. **Add a
+  new filter here first**: a field on `LibraryPrefs`, a validator, one clause in
+  `matchesFilters`, and nothing else in the app changes.
+
+*For a reaction to navigation:*
+- `web/src/app/useSwipeNav.ts` — the order, the distance and the ratio guard.
+- `web/src/app/AppShell.tsx` + `.module.css` — the drawer and the page slide.
+
+*For folders:*
+- `web/src/storage/db.ts` (schema v8) and `repository.ts` (the folder methods).
+
+### Out of scope
+The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half, in-book
+search and real bookmarks (the rest of WP-14).
+
+---
+
+## Still unseen from the round before — the bookshelf and the page flip
+
+Shipped 2026-08-06 (WP-51, `f5e4bf7`). Two questions still open:
 
 1. **Did the covers come back?** They will not have, on their own. The fix is in
    the *parser*, and a parsed book is a snapshot — so it reaches books already on
@@ -72,10 +126,6 @@ they open it, and there are two questions to put to them before anything else.
   `coverPageOf`, `readCoverAsset`.
 - `web/src/parse/version.ts` — the stamp and the log of what each bump changed.
 
-### Out of scope
-The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half, in-book
-search and real bookmarks (the rest of WP-14).
-
 ---
 
 ## Carried forward — things that will bite
@@ -102,6 +152,16 @@ search and real bookmarks (the rest of WP-14).
   `filter` makes an element a containing block for fixed-position descendants.
   Both places that frost the background — `AppShell`'s drawer and `UpdatePrompt`
   — keep the overlay as a sibling. Any future sheet or modal must too.
+- **A book belongs to at most one folder, and deleting a folder must never
+  delete its books.** Both are load-bearing: the first is what keeps folders
+  distinct from the tags that come later, the second is the single most
+  destructive misreading the library screen could make, and there is no undo.
+- **"Empty means all" for every library filter.** Unticking the last status is a
+  request to stop filtering. A new filter that treats an empty list as "match
+  nothing" hands the reader a blank shelf and no way to explain it.
+- **A gesture must decide what it *is* before acting.** Long press cancels on
+  movement; swipe navigation needs the horizontal:vertical ratio. Both are the
+  same lesson the reading screen learned when a curved flick scrolled the page.
 - **Anything laid out as a grid or flex inside a page needs `min-width: 0`.** The
   general rule on `.page *` supplies it; a new component setting its own
   `min-width` re-opens the bug that cut the contents page off.
@@ -133,10 +193,17 @@ search and real bookmarks (the rest of WP-14).
 - **Only a shelf holding something back gets "View All"** — Unread alone.
 
 ## Useful context (already known — don't re-derive)
-- Gates: `npm test` (616), `npm run typecheck`, `npm run build`, from the repo
+- Gates: `npm test` (656), `npm run typecheck`, `npm run build`, from the repo
   root.
 - **There is no bottom tab bar.** Navigation is a ☰ in `AppShell`'s top bar
-  opening a left drawer (All Books / Stats / Settings). Home is not in it.
+  opening a left drawer (Home / Library / Stats / Settings), plus a horizontal
+  swipe through the same four in that order. The URL is the only state — there
+  is no page index held anywhere, and there must not be.
+- **Headless Chrome cannot screenshot this app.** It renders `#root` empty, in
+  both the old and new headless modes, against the dev server and against a
+  statically-served production build. It still works for a *probe page* (see the
+  text-escaping note below); it does not work for the app itself. Don't spend a
+  session rediscovering this — layout goes to the reader's phone.
 - **`@testing-library/user-event` is not installed** — component tests drive
   clicks and keys through `fireEvent`.
 - Retrieval path, and the whole of it: `getManifest(bookId)` →

@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 
+import { PAGE_ORDER, useSwipeNav } from './useSwipeNav.ts'
 import styles from './AppShell.module.css'
 
+/**
+ * The drawer, in the same order a swipe moves through them.
+ *
+ * Home is in the list now. It was deliberately left out when the drawer was
+ * built — the reasoning being that Home is the screen the ☰ is sitting on — but
+ * that stopped being true the moment swiping made Home one page among four. A
+ * reader who swipes to Settings and opens the drawer to go back needs Home to
+ * be *in* it; "swipe right three times" is not a way home.
+ */
 const DRAWER_LINKS: { to: string; label: string; icon: string }[] = [
-  { to: '/library', label: 'All Books', icon: '▤' },
+  { to: '/', label: 'Home', icon: '⌂' },
+  { to: '/library', label: 'Library', icon: '▤' },
   { to: '/stats', label: 'Stats', icon: '◔' },
   { to: '/settings', label: 'Settings', icon: '⚙' },
 ]
@@ -27,6 +38,24 @@ export default function AppShell() {
   const location = useLocation()
   const drawerRef = useRef<HTMLElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+
+  useSwipeNav()
+
+  /**
+   * Which way the last move went, so the arriving screen slides in from the
+   * side it came from.
+   *
+   * Held in a ref rather than state: it is read during render to pick a class
+   * and is never itself a reason to re-render. `previous` starts as the current
+   * path, so the first paint of a session has no direction and doesn't animate
+   * — a screen sliding in when the app opens looks like a glitch, not a
+   * transition.
+   */
+  const previous = useRef(location.pathname)
+  const from = PAGE_ORDER.indexOf(previous.current)
+  const to = PAGE_ORDER.indexOf(location.pathname)
+  const direction = from === -1 || to === -1 || from === to ? 0 : Math.sign(to - from)
+  previous.current = location.pathname
 
   // Navigating is the drawer's whole purpose, so arriving somewhere new is the
   // signal to close it — no link needs to remember to do it itself.
@@ -91,7 +120,23 @@ export default function AppShell() {
         </header>
 
         <main className={styles.content}>
-          <Outlet />
+          {/*
+            Keyed on the path so React rebuilds the subtree on every move,
+            which is what restarts the animation — without the key the same
+            element is reused and the CSS never re-runs. It also means each
+            screen mounts fresh, so the library isn't holding cover blobs open
+            while the reader is on Settings.
+          */}
+          <div
+            key={location.pathname}
+            className={
+              direction === 0
+                ? styles.page
+                : `${styles.page} ${direction > 0 ? styles.pageFromRight : styles.pageFromLeft}`
+            }
+          >
+            <Outlet />
+          </div>
         </main>
       </div>
 
@@ -129,6 +174,9 @@ export default function AppShell() {
             <li key={link.to}>
               <NavLink
                 to={link.to}
+                // Without `end`, "/" matches every route and Home would be
+                // highlighted while the reader is on Settings.
+                end={link.to === '/'}
                 className={({ isActive }) =>
                   isActive ? `${styles.drawerLink} ${styles.drawerLinkActive}` : styles.drawerLink
                 }

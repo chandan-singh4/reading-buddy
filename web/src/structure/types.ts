@@ -75,6 +75,18 @@ export interface BookMeta {
    */
   shelfOverridden?: boolean
   /**
+   * The reader's own folder this book sits in, if any (`StoredFolder.id`).
+   *
+   * Absent means "loose in the library" — the state every book starts in and
+   * most stay in. Deliberately a single id rather than a list: see the note on
+   * `StoredFolder` for why a book in several places is a tag, not a folder.
+   *
+   * A dangling id is survivable by design. Deleting a folder clears it from
+   * every book in one transaction, but if that ever half-fails the book simply
+   * reads as loose rather than disappearing from the library.
+   */
+  folderId?: string
+  /**
    * SHA-256 of the imported file's bytes — the book's fingerprint, used to
    * recognise a re-import. Identity is the *file*, not the title: two editions
    * of the same book are genuinely different books, while the same file

@@ -1,20 +1,148 @@
-/* The "All books" list's own look — a thumbnail-forward row closer to what a
-   library app's book list actually looks like, layered on top of the shared
-   furniture in `page.module.css` (the importer, the empty states, the select
-   bar). Everything below is additive to `.cardRow`/`.cardLink`, never a
-   replacement for them. */
+/* The library screen's own furniture — the search bar, the filter button, the
+   folder dialog. The books themselves are `library/BookShelf.module.css`, and
+   the shared page pieces (headings, empty states, the update banner) are still
+   `page.module.css`. */
 
-.coverMedia {
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  border-radius: 999px;
+  background-color: var(--color-surface-raised);
+}
+
+.searchIcon {
   flex: none;
-  width: 3rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-lg);
+  line-height: 1;
 }
 
-.text {
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.searchInput:focus {
+  outline: none;
+}
+
+/* The bar takes the focus ring on the input's behalf, so the rounded shape is
+   what lights up rather than a rectangle inside it. */
+.searchBar:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.filterButton {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
   display: grid;
-  gap: 0.125rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
 }
 
-.progress {
+.filterButtonOn {
+  background-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+/* Three lines, shortening downward — the standard "filter" mark, drawn rather
+   than set as a glyph so it inherits colour cleanly in every theme. */
+.filterIcon {
+  display: grid;
+  gap: 3px;
+  width: 1rem;
+}
+
+.filterIcon > span {
+  height: 2px;
+  border-radius: 999px;
+  background-color: currentColor;
+}
+
+.filterIcon > span:nth-child(2) {
+  width: 72%;
+  justify-self: center;
+}
+
+.filterIcon > span:nth-child(3) {
+  width: 40%;
+  justify-self: center;
+}
+
+.activeFilters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.clear {
+  border: 0;
+  background: none;
   color: var(--color-accent);
-  font-variant-numeric: tabular-nums;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Dragging files over the page. */
+.dropping {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+/* The "name your folder" prompt. */
+.dialogScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background-color: rgb(0 0 0 / 0.45);
+}
+
+.dialog {
+  width: min(22rem, 100%);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.3);
+}
+
+.dialogLabel {
+  font-weight: 600;
+}
+
+.dialogInput {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg);
+  color: inherit;
+  font: inherit;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }

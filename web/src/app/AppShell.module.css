@@ -97,6 +97,48 @@
   flex: 1;
   padding: var(--space-5) var(--space-4)
     calc(var(--safe-bottom) + var(--space-8));
+  /* The arriving page starts off-screen, and a page mid-slide must not be able
+     to widen the document — otherwise every swipe adds a horizontal scrollbar
+     for the length of the animation. */
+  overflow-x: clip;
+}
+
+/* A page arriving after a swipe or a drawer tap. The class is only applied
+   when there is a direction to show, so the first paint of a session doesn't
+   animate — a screen sliding in at launch reads as a glitch. */
+.page {
+  min-width: 0;
+}
+
+.pageFromRight {
+  animation: fromRight 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pageFromLeft {
+  animation: fromLeft 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Both start at 0.6 opacity, never 0 — see `decisions.md`: fading up from
+   zero flashes the background through and reads as the screen blinking. */
+@keyframes fromRight {
+  from {
+    transform: translateX(6%);
+    opacity: 0.6;
+  }
+}
+
+@keyframes fromLeft {
+  from {
+    transform: translateX(-6%);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pageFromRight,
+  .pageFromLeft {
+    animation: none;
+  }
 }
 
 /* Dims the page behind the drawer and swallows the tap that closes it. Kept

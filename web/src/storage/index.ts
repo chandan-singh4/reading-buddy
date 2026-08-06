@@ -9,6 +9,7 @@ export type {
   ReadingPosition,
   StoredAsset,
   StoredChapterIndex,
+  StoredFolder,
   StoredQuote,
   StoredSection,
   StoredSource,

@@ -14,11 +14,69 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing in the code.** Three rounds are now merged and on Vercel awaiting
-  the reader's eye: the shelf/page-flip round below, the nav/Home redesign, and
-  the second of the two text-escaping fixes.
+- **Nothing in the code.** Four rounds are now merged and on Vercel awaiting the
+  reader's eye: the library redesign below, the shelf/page-flip round, the
+  nav/Home redesign, and the second of the two text-escaping fixes.
 
 ### Recently done
+- **WP-53 · The library, redesigned** — 2026-08-06, merged to `main`. Asked for
+  against two reference screenshots (a Kindle-like list and a two-column grid).
+  Eight parts, shipped together at the reader's call.
+  - **The screen is now a shell over `src/library/`.** `Library.tsx` holds state
+    and talks to storage; everything that can be *wrong* rather than merely ugly
+    is a pure function beside it — `filter.ts` (search → filter → sort),
+    `status.ts` (unread/reading/finished), `prefs.ts` (what is remembered). That
+    split is the whole reason the ordering rules are unit-tested at all; the old
+    850-line screen had no seam to test at.
+  - **List and grid are one component, not two.** `BookShelf` renders the same
+    children in the same order either way and only the CSS differs — which is
+    what makes the scroll position survive the switch, and what stops a future
+    badge being added to one view and forgotten in the other. Grid is
+    `auto-fill minmax(9.5rem, 1fr)`, so two columns on a phone becomes three or
+    four on a tablet with no media query.
+  - **Folders are real now, and they are a *folder*, not a tag.** New `folders`
+    table (schema v8) plus an indexed `folderId` on a book: **at most one
+    folder per book, deliberately.** A book in three places is a tag — different
+    shape (join table), never partitions the library, and would leave "sort by
+    folder" with nothing to sort by. **Deleting a folder never deletes the books
+    in it**; they are unfiled in the same transaction. No migration: a book with
+    no `folderId` is loose, which every book already was.
+  - **"Add a folder" was two different things and both are in the + menu.**
+    Importing every book inside a device folder (what the old button did) and
+    making a folder to file books into (what the feature needs). Named apart:
+    picking the wrong one either imports nothing or waits three minutes.
+  - **Long press replaces the Select button and the per-row controls.** Pointer
+    events, 500 ms, cancelled by >10px of movement — without that guard,
+    flicking down a long shelf selects books at random. The tap the browser
+    fires afterwards is swallowed, or holding a book to select it would also
+    open it.
+  - **"Empty means all" runs through every filter.** Unticking the last status
+    is a request to stop filtering, not a request for an empty shelf — and a
+    folder filter pointing at a deleted folder hides nothing, because an empty
+    library behind a name that no longer exists reads as "my books are gone". A
+    line above the shelf says *Showing 3 of 40* whenever anything is narrowing
+    it, with one tap to clear.
+  - **Sort is one flat list, not a field plus a direction.** Two fields would
+    allow "recently added, A→Z", which is not a thing. **"Last Modified" was
+    dropped on the reader's call** — nothing records it, and a menu item that
+    silently duplicates "recently added" is a menu item that lies.
+  - **Swiping moves between Home ↔ Library ↔ Stats ↔ Settings**, and the ends
+    do not wrap — an edge is how a reader learns where they are. Guarded by the
+    same ratio test the reading screen needed: a finger arcs, and a curved
+    scroll must not navigate. Mouse drags are ignored outright or text could
+    never be selected. **Home is in the drawer now** — it was left out when
+    Home was simply the screen the ☰ sat on, but "swipe right three times" is
+    not a way home.
+  - **Not a scroll-snap carousel**, though that would animate for free: it would
+    mount all four screens at once, and Library builds cover thumbnails while
+    Stats reads every position. One screen mounts; the transition is CSS.
+  - **Dead CSS removed rather than left**: the importer panel, the old select
+    bar, the per-row shelf picker and the old search all went with the screen
+    they belonged to. Bundle CSS 49.7 kB → 47.4 kB.
+  - **Not seen by eye.** jsdom has no layout and headless Chrome renders this
+    app's root empty, so every judgement about how it *looks* is unverified —
+    see the two questions in `active-task.md`.
+  - Gates at close: **656 tests** (40 new), typecheck, build. Precache 500.66 KiB.
 - **WP-51 · A shelf of real books, and a page that turns** — 2026-08-06, merged
   to `main` (`f5e4bf7`). Four UI complaints from a phone screenshot, plus the
   page-flip that had been an open slot since WP-14.

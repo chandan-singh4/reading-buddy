@@ -1,0 +1,101 @@
+/* The floating "+" and its menu. Anchored to the viewport rather than the
+   page, so it stays reachable however far down a long shelf the reader is. */
+
+.wrap {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + var(--safe-bottom));
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.fab {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.plus {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+/* The "+" becomes an "×" by turning, rather than by swapping glyph — the
+   rotation is what says the same button will put the menu back. */
+.fabOpen {
+  transform: rotate(45deg);
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  opacity: 0;
+  transform: translateY(0.5rem) scale(0.96);
+  transform-origin: bottom right;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menuOpen {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+}
+
+.item[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.itemIcon {
+  color: var(--color-text-muted);
+}
+
+/* Visually hidden, not `display: none` — a hidden input can't be opened by
+   its label in some browsers, and it must stay focusable for the keyboard. */
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab,
+  .menu {
+    transition: none;
+  }
+}

@@ -16,6 +16,7 @@ import type {
   Manifest,
   Section,
   SectionPath,
+  Shelf,
 } from '../structure/index.ts'
 import { countWordsIn, sectionPathOf } from '../structure/index.ts'
 import { cleanTitle, TITLE_CLEAN_VERSION } from '../parse/cleanTitle.ts'
@@ -25,6 +26,7 @@ import {
   type ReadingPosition,
   type StoredChapterIndex,
   type StoredAsset,
+  type StoredFolder,
   type StoredQuote,
   type StoredSection,
   type StoredSource,
@@ -646,6 +648,121 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
 
     async deleteQuote(bookId: BookId, id: string): Promise<void> {
       await database.quotes.delete([bookId, id])
+    },
+
+    // --- Folders -----------------------------------------------------------
+
+    /**
+     * Make a folder, or hand back the one that already has this name.
+     *
+     * Returning the existing folder rather than refusing, or making a second
+     * one, is the only behaviour that isn't a small betrayal: a reader typing
+     * "Philosophy" into "new folder" for the second time means the philosophy
+     * folder, and two folders with one name is a library they can no longer
+     * reason about. Matched case-insensitively for the same reason.
+     */
+    async createFolder(name: string): Promise<StoredFolder | undefined> {
+      const trimmed = name.trim()
+      if (!trimmed) return undefined
+
+      const existing = await database.folders
+        .filter((folder) => folder.name.toLowerCase() === trimmed.toLowerCase())
+        .first()
+      if (existing) return existing
+
+      const folder: StoredFolder = {
+        id: crypto.randomUUID(),
+        name: trimmed,
+        createdAt: new Date().toISOString(),
+      }
+      await database.folders.put(folder)
+      return folder
+    },
+
+    /** Alphabetical, which is the only order a folder list is ever wanted in. */
+    async listFolders(): Promise<StoredFolder[]> {
+      const folders = await database.folders.toArray()
+      return folders.sort((a, b) => a.name.localeCompare(b.name))
+    },
+
+    async renameFolder(id: string, name: string): Promise<void> {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      const folder = await database.folders.get(id)
+      if (!folder) return
+      await database.folders.put({ ...folder, name: trimmed })
+    },
+
+    /**
+     * Delete a folder — the folder only, never the books in it.
+     *
+     * A folder is a label on a shelf, not a box with a bottom. Taking the label
+     * away must leave the books standing loose in the library; deleting them
+     * with it would be the single most destructive misreading this screen could
+     * make, and there is no undo. The books are unfiled in the same transaction
+     * so no book is ever left pointing at a folder that has gone.
+     */
+    async deleteFolder(id: string): Promise<void> {
+      await database.transaction('rw', [database.folders, database.books], async () => {
+        const inside = await database.books.where('folderId').equals(id).toArray()
+        if (inside.length > 0) {
+          await database.books.bulkPut(
+            inside.map((book) => {
+              const { folderId: _dropped, ...rest } = book
+              return rest
+            }),
+          )
+        }
+        await database.folders.delete(id)
+      })
+    },
+
+    /**
+     * File books into a folder, or (with `undefined`) turn them loose again.
+     *
+     * Takes a list because that is how the library's selection mode works —
+     * thirty books moved in one transaction rather than thirty round trips that
+     * can fail halfway and leave the reader guessing which moved.
+     */
+    async moveBooksToFolder(
+      bookIds: readonly BookId[],
+      folderId: string | undefined,
+    ): Promise<void> {
+      if (bookIds.length === 0) return
+
+      await database.transaction('rw', database.books, async () => {
+        const books = await database.books.bulkGet([...bookIds])
+        const updated = books.filter((book): book is BookMeta => book !== undefined).map((book) => {
+          if (folderId === undefined) {
+            // Removed rather than set to `undefined`: Dexie indexes the field,
+            // and an explicit `undefined` and an absent key are not the same
+            // thing to `where('folderId')`.
+            const { folderId: _dropped, ...rest } = book
+            return rest
+          }
+          return { ...book, folderId }
+        })
+        if (updated.length > 0) await database.books.bulkPut(updated)
+      })
+    },
+
+    /**
+     * Set the shelf (Book / Research paper / Document) on several books at once.
+     *
+     * Always recorded as an override, exactly as the single-book `move` on the
+     * library screen has always been: nothing later gets to re-guess a shelf
+     * the reader has corrected by hand.
+     */
+    async setShelfFor(bookIds: readonly BookId[], shelf: Shelf): Promise<void> {
+      if (bookIds.length === 0) return
+
+      await database.transaction('rw', database.books, async () => {
+        const books = await database.books.bulkGet([...bookIds])
+        const updated = books
+          .filter((book): book is BookMeta => book !== undefined)
+          .map((book) => ({ ...book, shelf, shelfOverridden: true as const }))
+        if (updated.length > 0) await database.books.bulkPut(updated)
+      })
     },
   }
 }

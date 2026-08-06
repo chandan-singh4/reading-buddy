@@ -119,6 +119,26 @@ export interface StoredQuote {
   addedAt: string
 }
 
+/**
+ * A shelf of the reader's own making — "Philosophy", "For the course", "Lent
+ * out". A book belongs to at most one (`BookMeta.folderId`).
+ *
+ * At most one, deliberately. A book in three folders is a *tag*, and tags are a
+ * different feature with a different shape: they need a join table, they never
+ * partition the library, and a "Folder" sort would have nothing to sort by.
+ * Folders answer "where does this live"; tags will answer "what is this about".
+ * Building the first as if it were the second gets neither right.
+ *
+ * `name` is indexed so the library can sort and search by folder without
+ * loading every book first.
+ */
+export interface StoredFolder {
+  id: string
+  name: string
+  /** ISO 8601 — ties a "recently added" ordering to folders too. */
+  createdAt: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -136,6 +156,7 @@ export type ReadingBuddyDB = Dexie & {
   sources: Table<StoredSource, BookId>
   assets: Table<StoredAsset, [BookId, string]>
   quotes: Table<StoredQuote, [BookId, string]>
+  folders: Table<StoredFolder, string>
 }
 
 /**
@@ -199,6 +220,17 @@ function defineSchema(db: Dexie): void {
   // its quotes without listing them first, same as `assets`.
   db.version(7).stores({
     quotes: '[bookId+id], bookId',
+  })
+
+  // v8 — folders the reader makes themselves, and `folderId` indexed on a book
+  // so "show me this folder" is a lookup rather than a scan of the shelf.
+  //
+  // No migration step: a book with no `folderId` is loose in the library, which
+  // is exactly what every book already is. Nothing has to be rewritten, and a
+  // reader who never makes a folder never sees one.
+  db.version(8).stores({
+    folders: 'id, name, createdAt',
+    books: 'id, title, type, importedAt, contentHash, textSignature, folderId',
   })
 }
 
