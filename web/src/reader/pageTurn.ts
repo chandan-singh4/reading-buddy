@@ -56,12 +56,37 @@ export interface HeldPage {
  * change they asked for.
  */
 export function holdOutgoing(strip: HTMLElement | null, by: 1 | -1): HeldPage | null {
-  if (!strip || prefersReducedMotion()) return null
+  const node = copyOf(strip, 1)
+  return node ? { node, by } : null
+}
+
+/**
+ * A still picture of the strip exactly as it looks now, laid over it.
+ *
+ * Both halves of a flip are made of these: the page being left, and — turning
+ * backwards — the page arriving on top of it. Returns `null` when there is
+ * nothing to copy or the reader has asked for less movement, in which case the
+ * caller gets the instant change they asked for.
+ *
+ * ## Why the copy is wrapped rather than used bare
+ *
+ * The strip is a *scrolling* box — that is what a page turn inside a section
+ * moves — and a copy of it is scrolled too. Anything laid over it with
+ * `inset: 0` therefore lands at the copy's scroll *origin*, which on page forty
+ * of a chapter is thirty-nine screens off to the left. The flip's shading has
+ * to sit still over the page, so it hangs on a wrapper that doesn't scroll,
+ * with the scrolled copy inside it. The wrapper is also the thing that gets
+ * rotated, which keeps the rotation and the scroll from having to share one
+ * element's `transform`.
+ */
+function copyOf(strip: HTMLElement | null, layer: number): HTMLElement | null {
+  if (!strip || prefersReducedMotion() || typeof document === 'undefined') return null
 
   const parent = strip.parentElement
   if (!parent) return null
 
   const node = strip.cloneNode(true) as HTMLElement
+  const wrapper = document.createElement('div')
 
   // Every id, gone. This is the one thing that makes a clone safe: the reading
   // screen looks paragraphs up by id, and a second copy of each would answer
@@ -77,23 +102,33 @@ export function holdOutgoing(strip: HTMLElement | null, by: 1 | -1): HeldPage | 
   node.setAttribute('aria-hidden', 'true')
   node.inert = true
 
-  // Laid exactly over the strip, in the strip's own coordinates. `offsetTop`
-  // and friends are relative to the nearest positioned ancestor, which
-  // `Reader.module.css` guarantees is the parent.
-  node.style.position = 'absolute'
-  node.style.top = `${strip.offsetTop}px`
-  node.style.left = `${strip.offsetLeft}px`
+  // The wrapper is laid exactly over the strip, in the strip's own coordinates.
+  // `offsetTop` and friends are relative to the nearest positioned ancestor,
+  // which `Reader.module.css` guarantees is the parent.
+  wrapper.setAttribute('aria-hidden', 'true')
+  wrapper.style.position = 'absolute'
+  wrapper.style.top = `${strip.offsetTop}px`
+  wrapper.style.left = `${strip.offsetLeft}px`
   // Fractional, from the rect rather than from `offsetWidth`. A copy a whole
   // pixel wider than the original lays its columns out at a different pitch,
   // and the still picture of the page you just left would not quite be it.
   const box = strip.getBoundingClientRect()
-  node.style.width = `${box.width}px`
-  node.style.height = `${box.height}px`
+  wrapper.style.width = `${box.width}px`
+  wrapper.style.height = `${box.height}px`
+  wrapper.style.margin = '0'
+  wrapper.style.pointerEvents = 'none'
+  wrapper.style.zIndex = String(layer)
+  // Opaque, or the page underneath shows through this one while they cross.
+  wrapper.style.background = 'var(--color-bg)'
+  wrapper.style.overflow = 'hidden'
+
+  // The copy fills its wrapper and keeps its own scroll.
+  node.style.position = 'absolute'
+  node.style.inset = '0'
+  node.style.width = '100%'
+  node.style.height = '100%'
   node.style.margin = '0'
-  node.style.pointerEvents = 'none'
-  node.style.zIndex = '1'
-  // Opaque, or the new section shows through the old one while they cross.
-  node.style.background = 'var(--color-bg)'
+  node.style.maxWidth = 'none'
   // The clone inherits whatever entrance animation the strip last played, and
   // would replay it on being inserted.
   node.style.animation = 'none'
@@ -107,67 +142,158 @@ export function holdOutgoing(strip: HTMLElement | null, by: 1 | -1): HeldPage | 
   // visibly raced from page one to that page while the turn was starting.
   node.style.scrollBehavior = 'auto'
 
-  parent.append(node)
+  wrapper.append(node)
+  parent.append(wrapper)
   // After insertion: a node outside the document has no scroll position to set.
   node.scrollLeft = strip.scrollLeft
 
-  return { node, by }
+  return wrapper
 }
 
 /**
- * Cross the two pages: the held copy out, the strip in.
+ * How far over the page leans as it turns.
  *
- * Called once the new section is on screen *and* scrolled to the page it should
- * land on — animating before that would slide in a page that then jumps.
+ * Past ninety degrees on purpose: a page that stops edge-on hasn't turned, it
+ * has folded. Carrying on to a hundred and eighteen takes it visibly *over* the
+ * spine, which is the moment the eye reads as the turn having happened.
  */
-export function playTurn(
-  held: HeldPage | null,
-  strip: HTMLElement | null,
-  /**
-   * How far the two pages travel, in CSS pixels — one column *plus the gap after
-   * it*, which is exactly what a scroll inside a section moves.
-   *
-   * It matters now that the columns have a gap between them (`Reader.module.css`
-   * explains why they do). A screen width and a page's worth of travel used to be
-   * the same number; they are not any more, and a crossing that moved a screen
-   * width while a scroll moved a screen width plus a gutter is the seam showing —
-   * the one thing this module exists to hide. Falls back to the old behaviour
-   * when the caller has nothing to measure.
-   */
-  distance?: number,
-): void {
+const FLIP_DEGREES = 118
+
+/** How far the eye is from the page. Shallower reads as a pop-up book. */
+const FLIP_PERSPECTIVE = 1600
+
+/**
+ * Turn the page over.
+ *
+ * ## Why a rotation and not a slide
+ *
+ * A slide is what a *scroll* looks like, and for a long time that is what this
+ * was — the outgoing page and the incoming one crossing sideways at the same
+ * speed. It is honest about the underlying mechanism and it is the wrong
+ * metaphor: the book on screen has a spine, a cover and page edges, and paper
+ * does not slide sideways. It pivots about the binding.
+ *
+ * ## The two directions are not mirror images
+ *
+ * Turning **forwards**, the page you are leaving lifts and swings left over the
+ * spine, uncovering the next one underneath. One moving page, one still page,
+ * and the still one is the arriving one — which is already on the strip. So a
+ * forward turn is a single copy of the outgoing page, rotating away.
+ *
+ * Turning **back** is the same motion run the other way, and that means the
+ * moving page is the *arriving* one: it swings in from the left and lands on
+ * top of the page you were reading. That page therefore has to stay visible
+ * underneath for the whole turn — but the strip beneath has already been
+ * scrolled to the destination. So a backward turn needs two copies: the page
+ * being left, sitting still, and the page arriving, flipping onto it. Both are
+ * dropped at the end and the real strip — which has shown the destination all
+ * along, behind both of them — is simply revealed.
+ *
+ * Doing it with copies rather than by transforming the strip itself is what
+ * keeps this free of the reading screen: nothing here reorders, re-styles or
+ * re-stacks an element React owns.
+ *
+ * ## The shading
+ *
+ * A rotated `<div>` of text with no shading reads as a flat rectangle being
+ * spun, and worse, shows its own text mirrored once it passes ninety degrees.
+ * A single overlay handles both: it fades to the page colour as the sheet turns
+ * edge-on — so what you see past halfway is the *back* of the page, blank, as
+ * it would be — with a soft gradient across it for the shadow the lifted edge
+ * casts on itself.
+ */
+export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void {
   if (!held) return
 
-  // No strip to cross with, or a platform with no Web Animations API — jsdom is
-  // the one that matters, where there is no layout to animate either. Either
-  // way the honest outcome is the instant change: drop the copy and let the new
-  // page stand.
+  // No strip, or a platform with no Web Animations API — jsdom is the one that
+  // matters, where there is no layout to animate either. The honest outcome is
+  // the instant change: drop the copy and let the new page stand.
   if (!strip || typeof strip.animate !== 'function') {
     held.node.remove()
     return
   }
 
-  // The one timing, from `motion.ts` — the same length and the same curve as a
-  // turn within a section, which is the whole point of it living there.
-  const span = distance && distance > 0 ? `${distance}px` : '100%'
-  const away = held.by === 1 ? `-${span}` : span
-  const from = held.by === 1 ? span : `-${span}`
+  // Forwards, the outgoing copy is the one that moves. Backwards, it stays put
+  // as the page being landed on, and a second copy — the page arriving — does
+  // the moving on top of it.
+  const still = held.by === -1 ? held.node : null
+  const moving = held.by === -1 ? copyOf(strip, 2) : held.node
 
-  strip.animate(
-    [{ transform: `translateX(${from})` }, { transform: 'translateX(0)' }],
-    MOVE_TIMING,
-  )
+  // The second copy couldn't be made (no parent, reduced motion changed under
+  // us). Falling back to the instant change beats a half-played turn.
+  if (!moving) {
+    held.node.remove()
+    return
+  }
 
-  const leaving = held.node.animate(
-    [{ transform: 'translateX(0)' }, { transform: `translateX(${away})` }],
-    MOVE_TIMING,
-  )
+  const shade = shadeOver(moving)
 
-  // Removed on completion, and again on failure — an animation can be cancelled
-  // by the element being taken out from under it, and a copy left behind would
-  // sit over the book blocking nothing but showing the wrong page.
-  const remove = () => held.node.remove()
-  leaving.finished.then(remove, remove)
+  moving.style.transformOrigin = '0% 50%'
+  moving.style.backfaceVisibility = 'hidden'
+  moving.style.willChange = 'transform, opacity'
+
+  const at = (degrees: number) => `perspective(${FLIP_PERSPECTIVE}px) rotateY(${degrees}deg)`
+
+  // Read forwards for a forward turn, backwards for a backward one — the same
+  // motion, which is what makes going back feel like undoing rather than like a
+  // second, different gesture.
+  const sheet: Keyframe[] = [
+    { transform: at(0), opacity: 1, offset: 0 },
+    { transform: at(-FLIP_DEGREES * 0.6), opacity: 1, offset: 0.62 },
+    { transform: at(-FLIP_DEGREES), opacity: 0, offset: 1 },
+  ]
+
+  // Opaque by halfway, which is where the sheet is edge-on: past that point the
+  // reader is looking at the back of the page, and the back of a page has no
+  // text on it.
+  const shading: Keyframe[] = [
+    { opacity: 0, offset: 0 },
+    { opacity: 0.45, offset: 0.32 },
+    { opacity: 1, offset: 0.5 },
+    { opacity: 1, offset: 1 },
+  ]
+
+  const timing: KeyframeAnimationOptions =
+    held.by === 1 ? MOVE_TIMING : { ...MOVE_TIMING, direction: 'reverse' }
+
+  const turning = moving.animate(sheet, timing)
+  shade?.animate(shading, timing)
+
+  // Removed on completion *and* on failure — an animation can be cancelled by
+  // the element being taken out from under it, and a copy left behind would sit
+  // over the book showing the wrong page.
+  const clear = () => {
+    moving.remove()
+    still?.remove()
+  }
+  turning.finished.then(clear, clear)
+}
+
+/**
+ * The blank back of the turning page, and the shadow the lift casts on it.
+ *
+ * Appended to the copy rather than drawn with a filter so it can be faded in on
+ * its own clock: the page has to become paper-coloured exactly as it goes
+ * edge-on, which is a different curve from the rotation itself.
+ */
+function shadeOver(node: HTMLElement): HTMLElement | null {
+  if (typeof document === 'undefined') return null
+
+  const shade = document.createElement('div')
+  shade.setAttribute('aria-hidden', 'true')
+  shade.style.position = 'absolute'
+  shade.style.inset = '0'
+  shade.style.pointerEvents = 'none'
+  shade.style.opacity = '0'
+  shade.style.backgroundColor = 'var(--color-bg)'
+  // Darkest at the spine, where a lifted sheet curves away from the light.
+  shade.style.backgroundImage =
+    'linear-gradient(90deg, rgb(0 0 0 / 0.30) 0%, rgb(0 0 0 / 0.10) 38%, rgb(0 0 0 / 0) 78%)'
+
+  // Onto the wrapper, which is positioned and does not scroll — see `copyOf`.
+  // Appended last, so it lies over the copy rather than under it.
+  node.append(shade)
+  return shade
 }
 
 /**

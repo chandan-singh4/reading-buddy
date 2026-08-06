@@ -533,4 +533,76 @@ describe('parseEpub — cover image', () => {
     const book = await parseEpub(epub, meta())
     expect((book.assets ?? []).some((asset) => asset.path === COVER_ASSET_PATH)).toBe(false)
   })
+
+  // The two rules below are guesses rather than declarations, and they exist
+  // because the two declarations above are the first thing a conversion tool
+  // drops: the book imports fine and simply shows a coloured placeholder on the
+  // shelf forever, with nothing anywhere to say why.
+
+  it('falls back to a manifest image that is plainly called the cover', async () => {
+    const epub = makeEpub({
+      manifest:
+        '<item id="img7" href="images/cover.jpeg" media-type="image/jpeg"/>' +
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      files: { 'OEBPS/ch1.xhtml': chapterDoc('<h1>One</h1><p>Prose.</p>') },
+      binary: { 'OEBPS/images/cover.jpeg': JPEG },
+    })
+
+    const book = await parseEpub(epub, meta())
+    const cover = (book.assets ?? []).find((asset) => asset.path === COVER_ASSET_PATH)
+
+    expect(cover?.data.size).toBe(JPEG.length)
+  })
+
+  it('falls back to the lone picture on the book’s own cover page', async () => {
+    const epub = makeEpub({
+      manifest:
+        '<item id="p0" href="cover-page.xhtml" media-type="application/xhtml+xml"/>' +
+        '<item id="img7" href="images/plate.jpeg" media-type="image/jpeg"/>' +
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+      // `linear="no"`, as a cover page very often is — so it never reaches a
+      // figure block and the picture is reachable no other way.
+      spine: '<itemref idref="p0" linear="no"/><itemref idref="c1"/>',
+      files: {
+        // Wrapped in an SVG viewBox, which is how most cover pages scale a
+        // plate to the screen.
+        'OEBPS/cover-page.xhtml': chapterDoc(
+          '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
+            'viewBox="0 0 600 900">' +
+            '<image width="600" height="900" xlink:href="images/plate.jpeg"/></svg>',
+        ),
+        'OEBPS/ch1.xhtml': chapterDoc('<h1>One</h1><p>Prose.</p>'),
+      },
+      binary: { 'OEBPS/images/plate.jpeg': JPEG },
+    })
+
+    const book = await parseEpub(epub, meta())
+    const cover = (book.assets ?? []).find((asset) => asset.path === COVER_ASSET_PATH)
+
+    expect(cover?.data.size).toBe(JPEG.length)
+  })
+
+  it('does not mistake a figure in the text for a cover', async () => {
+    const epub = makeEpub({
+      manifest:
+        '<item id="img7" href="images/fig1.jpeg" media-type="image/jpeg"/>' +
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>' +
+        '<item id="c2" href="ch2.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/><itemref idref="c2"/>',
+      files: {
+        // One picture, but a page of prose around it — a chapter, not a cover.
+        'OEBPS/ch1.xhtml': chapterDoc(
+          '<h1>One</h1><p>A good deal of opening prose, enough that no one could ' +
+            'mistake this page for a picture of a book jacket.</p>' +
+            '<figure><img src="images/fig1.jpeg"/><figcaption>Figure 1.</figcaption></figure>',
+        ),
+        'OEBPS/ch2.xhtml': chapterDoc('<h1>Two</h1><p>More prose.</p>'),
+      },
+      binary: { 'OEBPS/images/fig1.jpeg': JPEG },
+    })
+
+    const book = await parseEpub(epub, meta())
+    expect((book.assets ?? []).some((asset) => asset.path === COVER_ASSET_PATH)).toBe(false)
+  })
 })

@@ -187,19 +187,28 @@ function readSpine(archive: Archive, packagePath: string): Spine {
   }
 
   const documents: string[] = []
+  /**
+   * The very first document the spine lists, `linear="no"` and all — which is
+   * almost always the cover page. Kept for `findCoverPath`'s last resort: a book
+   * that names no cover in its metadata usually still *has* one, sitting as the
+   * only picture on that page.
+   */
+  let firstDocument: string | undefined
   for (const itemref of byLocalName(doc, 'itemref')) {
     const idref = itemref.getAttribute('idref')
     if (!idref) continue
-
-    // `linear="no"` marks incidental content (ads, colophons) that readers are
-    // free to skip. Skipping it keeps cover pages out of chapter one.
-    if (itemref.getAttribute('linear') === 'no') continue
 
     const path = hrefById.get(idref)
     if (!path) continue
 
     const type = typeById.get(idref) ?? ''
     if (type && !type.includes('html')) continue
+
+    if (firstDocument === undefined) firstDocument = path
+
+    // `linear="no"` marks incidental content (ads, colophons) that readers are
+    // free to skip. Skipping it keeps cover pages out of chapter one.
+    if (itemref.getAttribute('linear') === 'no') continue
 
     documents.push(path)
   }
@@ -214,25 +223,62 @@ function readSpine(archive: Archive, packagePath: string): Spine {
     documents,
     title: cleanTitle(firstByLocalName(metadata, 'title')?.textContent, author),
     author,
-    coverPath: findCoverPath(doc, metadata, packagePath, hrefById, typeById),
+    coverPath: findCoverPath(
+      archive,
+      doc,
+      metadata,
+      packagePath,
+      hrefById,
+      typeById,
+      coverPageOf(documents, firstDocument),
+    ),
   }
 }
 
 /**
- * The cover image's archive path, if the package names one.
+ * The spine's first document, but only when it can be a *cover page* rather
+ * than the book itself.
  *
- * Two ways an epub says "this is the cover", and both are still common: EPUB
- * 3 marks the manifest item itself (`properties="cover-image"`); EPUB 2 says
- * so indirectly, with a `<meta name="cover" content="ID">` pointing at a
- * manifest item id. Tried in that order; whichever resolves to an actual
- * image item wins.
+ * A cover page is always a document of its own — separate from chapter one,
+ * whether it is skipped as `linear="no"` or read as the first page. So the one
+ * case where "the first document" cannot mean "the cover" is a book that is a
+ * single readable document *and* that document is the first thing in the spine:
+ * there is no separate page for a cover to be on, and the picture on it is a
+ * figure in the text.
+ */
+function coverPageOf(documents: readonly string[], firstDocument: string | undefined): string | undefined {
+  if (documents.length === 1 && firstDocument === documents[0]) return undefined
+  return firstDocument
+}
+
+/**
+ * The cover image's archive path, if the book has one we can find.
+ *
+ * Four ways of asking, in descending order of how much the book is actually
+ * *telling* us versus how much we are inferring — the first match wins.
+ *
+ * 1. EPUB 3 marks the manifest item itself: `properties="cover-image"`.
+ * 2. EPUB 2 says so indirectly: `<meta name="cover" content="ID">` points at a
+ *    manifest item id.
+ * 3. A manifest image whose id or filename is literally "cover". Not
+ *    standardised at all, but overwhelmingly the convention — and the two rules
+ *    above are the ones conversion tools most often drop on the way through.
+ * 4. The only picture on the spine's first document. A book's first page is its
+ *    cover page in essentially every epub ever built, and if that page shows
+ *    exactly one image, that image is the cover.
+ *
+ * Rules 3 and 4 exist because rules 1 and 2 miss quietly: the book imports
+ * fine, reads fine, and simply shows a coloured placeholder on the shelf
+ * forever, with nothing anywhere to say why.
  */
 function findCoverPath(
+  archive: Archive,
   doc: Document,
   metadata: Document | Element,
   packagePath: string,
   hrefById: Map<string, string>,
   typeById: Map<string, string>,
+  firstDocument: string | undefined,
 ): string | undefined {
   for (const item of byLocalName(doc, 'item')) {
     const properties = item.getAttribute('properties') ?? ''
@@ -252,7 +298,65 @@ function findCoverPath(
     if (href) return href
   }
 
-  return undefined
+  for (const [id, path] of hrefById) {
+    const type = typeById.get(id) ?? ''
+    const isImage = type ? type.startsWith('image/') : mediaTypeOf(path) !== undefined
+    if (!isImage) continue
+
+    const filename = path.slice(path.lastIndexOf('/') + 1)
+    if (/cover/i.test(id) || /cover/i.test(filename)) return path
+  }
+
+  return coverFromFirstPage(archive, firstDocument)
+}
+
+/**
+ * The lone picture on the book's first page, if that is what the first page is.
+ *
+ * Deliberately strict, in two ways, because the cost of guessing wrong is a
+ * publisher's colophon sitting on the shelf where the cover belongs:
+ *
+ * - **One image, or none of them.** A page carrying several is a title page
+ *   with a logo and an ornament, and there is no way to say which is the cover.
+ * - **Almost no words.** A cover page is a picture; a page with prose on it is
+ *   a page of the book that happens to have a picture on it.
+ */
+const COVER_PAGE_MAX_WORDS = 12
+
+function coverFromFirstPage(archive: Archive, firstDocument: string | undefined): string | undefined {
+  if (!firstDocument) return undefined
+
+  const source = readText(archive, firstDocument)
+  if (!source) return undefined
+
+  let page: Document
+  try {
+    page = parseXml(source, 'the first page')
+  } catch {
+    return undefined
+  }
+
+  const words = (page.documentElement?.textContent ?? '').trim().split(/\s+/).filter(Boolean)
+  if (words.length > COVER_PAGE_MAX_WORDS) return undefined
+
+  // `<img src>` and SVG's `<image xlink:href>` — an epub cover page is very
+  // often the second, wrapped in an SVG viewBox so it scales to the screen.
+  const sources = [
+    ...byLocalName(page, 'img').map((node) => node.getAttribute('src')),
+    ...byLocalName(page, 'image').map(
+      (node) => node.getAttribute('href') ?? node.getAttribute('xlink:href'),
+    ),
+  ].filter((href): href is string => !!href)
+
+  const paths = new Set(sources.map((href) => resolvePath(firstDocument, href)))
+  if (paths.size !== 1) return undefined
+
+  const [path] = [...paths]
+  if (!path || !mediaTypeOf(path)) return undefined
+  // Through `readFile` rather than a direct lookup: an href is URL-encoded and
+  // may differ in case from the stored ZIP entry, and `readCoverAsset` will read
+  // it the same lenient way.
+  return readFile(archive, path) ? path : undefined
 }
 
 // --- Table of contents (titles only) -----------------------------------------

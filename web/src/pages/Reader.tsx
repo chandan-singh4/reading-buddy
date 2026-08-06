@@ -14,7 +14,7 @@ import {
   cancelTurn,
   fadeIn,
   holdOutgoing,
-  playTurn,
+  playFlip,
   scrollStrip,
   type Cancel,
   type HeldPage,
@@ -661,7 +661,18 @@ export default function Reader() {
         by,
       )
       if (next !== null) {
-        showPage(next)
+        // A turn inside a section used to *be* the scroll — the strip slid one
+        // column and that slide was the animation. It isn't any more: the page
+        // turns over instead, so the scroll happens instantly underneath and
+        // the movement is supplied by the sheet rotating on top of it. Same two
+        // pages, same timing; a different metaphor for the same move.
+        //
+        // A second turn before the first has landed drops the first outright —
+        // a fast tapper outruns the animation rather than queueing behind it.
+        cancelTurn(held.current)
+        const sheet = holdOutgoing(strip.current, by)
+        showPage(next, true)
+        playFlip(sheet, strip.current)
         return
       }
 
@@ -978,7 +989,7 @@ export default function Reader() {
     // the jump's fade at the same duration. Except the very first section of
     // all: opening the book has its own entrance, and two at once is a flicker.
     const arriving = () => {
-      if (turn) playTurn(turn, strip.current, measure(strip.current).pageWidth)
+      if (turn) playFlip(turn, strip.current)
       else if (landedBefore.current) fadeIn(strip.current)
       landedBefore.current = true
     }

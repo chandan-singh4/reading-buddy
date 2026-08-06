@@ -69,7 +69,7 @@ export {
 } from './navigation.ts'
 export type { SectionCountLookup, SectionRef } from './navigation.ts'
 
-export { cancelTurn, holdOutgoing, playTurn } from './pageTurn.ts'
+export { cancelTurn, holdOutgoing, playFlip } from './pageTurn.ts'
 export type { HeldPage } from './pageTurn.ts'
 
 export {

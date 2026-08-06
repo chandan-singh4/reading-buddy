@@ -61,6 +61,20 @@ by `decisions.md` or `architecture.md`:
    the existing docs don't answer it.
 3. Read it only after I say yes — and only the specific ticket(s) you named.
 
+## Ship at the end of every thread
+
+Vercel deploys from `main`, so work that only exists on a branch is work I can't
+see on my phone. **At the end of every conversation thread, without being asked:**
+
+1. `npm run build` from `web/` (typecheck + production build) — never ship red.
+2. Commit the work on the feature branch with a plain-language message.
+3. Merge that branch into `main` (`git checkout main && git merge <branch>`).
+4. `git push origin main` — this is what triggers the Vercel deploy.
+5. Tell me the branch, the commit, and that `main` is pushed.
+
+If the build fails, fix it and try again; if it can't be fixed in the thread, say
+so plainly and leave `main` untouched rather than merging something broken.
+
 ## Commands
 
 `/startup` · `/wrap-session` · `/plan-task` — defined in `.claude/skills/`.

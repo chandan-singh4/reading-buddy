@@ -67,5 +67,11 @@
  *   rather than dropped with the heading, and the legacy `<a name="fn1">` form
  *   is recognised. A dedication or an epigraph is labelled as such, so the
  *   reading screen can set it apart the way print does.
+ * - **9** — covers are found in two more ways. A book that names no cover in
+ *   its metadata — which conversion tools drop routinely — now gets one from a
+ *   manifest image called "cover", or from the single picture on the book's own
+ *   first page. Books parsed under 1–8 that missed on the metadata rules have
+ *   no cover asset stored at all and show a coloured placeholder until this
+ *   update runs.
  */
-export const PARSER_VERSION = 8
+export const PARSER_VERSION = 9
