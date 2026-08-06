@@ -8,115 +8,69 @@
 
 ---
 
-## First: how did the new navigation and Home land?
+## Task — react to the bookshelf and the page flip
 
-Shipped 2026-08-05 (WP-52) and merged to `main`, so Vercel has it — but the
-reader had not yet opened it on the phone when the session closed. **Ask before
-building anything else.** It is the first screen they will see and the whole of
-it is new: the ☰ and its drawer, the frosted blur behind it, the three shelves,
-the wooden plank, the greeting.
+Shipped 2026-08-06 (WP-51, `f5e4bf7`) and on Vercel; **not yet seen on the
+phone.** Nothing is half-built. The next task is whatever the reader says when
+they open it, and there are two questions to put to them before anything else.
 
-- **The one deliberate subtraction: Finished is no longer a shelf on Home.** The
-  reader asked for three shelves; the reference screenshot they shared has four.
-  Nothing was deleted — those books are still under All Books — and putting it
-  back is a `<Shelf>` block in `Home.tsx` plus re-adding `shelves.finished` to
-  the cover list. **They were told this; wait for their call rather than
-  pre-empting it.**
-- **Two things could only be checked in jsdom, which has no layout.** The blur
-  and the drawer slide have never been seen on a real phone: `backdrop-filter`
-  and a transitioned `filter` are both known to be uneven on Android, and a
-  blurred wrapper is a repaint on every frame of a 320 ms transition. If it
-  stutters, the cheap answer is to drop `saturate()` and lower the blur radius,
-  not to rebuild the animation.
-- **Files if a reaction comes back:** `web/src/app/AppShell.tsx` +
-  `AppShell.module.css` for anything about the bar, the drawer or the blur;
-  `web/src/pages/Home.tsx` + `Home.module.css` for the shelves, the plank and
-  "View All". Nothing else was touched except one deleted token in
-  `styles/theme.css` and a comment in `App.tsx`.
+### Ask these two first
 
----
+1. **Did the covers come back?** They will not have, on their own. The fix is in
+   the *parser*, and a parsed book is a snapshot — so it reaches books already on
+   the shelf only when **Library → Update** is run (`PARSER_VERSION` 9, rebuilt
+   from the kept source file). If the reader runs it and *Beyond Mindfulness in
+   Plain English* still shows a placeholder, **ask for the epub before
+   diagnosing.** All four cover rules are unit-tested; a fifth guess without the
+   file is not worth the tokens.
+2. **Does the page flip stutter on a long chapter?** A turn *inside* a section
+   used to be a pure scroll and now takes a `cloneNode(true)` of the laid-out
+   section on every tap — dozens of pages of multi-column DOM, re-laid-out. It
+   may be perfectly fine; it is the one place this round could have cost
+   performance, and jsdom cannot tell us. **If it does stutter, the fix is named
+   already: cache the clone per section in a ref and just reset its `scrollLeft`
+   before each flip, rather than rebuilding the animation.** Invalidate on
+   section change, resize, and any reader-settings change.
 
-## Then: did the text stop escaping the page?
-
-Two fixes shipped on 2026-08-05 (`1f450f9`, `bbeb6b8`) against two screenshots
-of the same book. The phone is on the current build — **the old-build blocker is
-closed, don't raise it again.**
-
-- **Round one — ink from the previous page at the left margin.** Fixed by giving
-  the columns a `column-gap`. The reader confirmed this one gone.
-- **Round two — long contents entries cut off at the right edge.** Fixed in two
-  places: the no-wider-than-the-column guard now applies at *every* depth (grid
-  children were refusing to shrink), and an internal link is no longer a
-  `<button>`, because a button is a box that cannot break across a line.
-  **Unconfirmed by eye.**
-
-**If round two's clipping survives, ask for the epub before diagnosing.** The
-book is Nestor, *Breath* — not in the repo. The mechanism was reproduced and
-measured in headless Chrome (215.7px of overhang → 0.0px), but the reader's
-*exact* line could not be: desktop Chrome shrinks that button where Android
-apparently does not, so a reconstruction can only get so close. A second round
-of guessing without the file is not worth the tokens.
-
-**Headless Chrome is the tool that cracked both of these**, and it is worth
-reaching for again before touching layout code. `chrome.exe --headless
---disable-gpu --virtual-time-budget=5000 --dump-dom <file:///…>` runs a probe
-page's JavaScript and prints the DOM, so a measurement written into a `<pre>`
-comes straight back. Both fixes have a measured before/after because of it.
-Chrome is at `C:\Program Files\Google\Chrome\Application\chrome.exe`.
-
-### Also waiting on the reader's eye
-- **The blank line between paragraphs is gone**, replaced by a first-line
-  indent. Authentic book setting and denser than before. Restoring it is one line
-  in `blocks.module.css`.
+### Also unconfirmed by eye, from earlier rounds
+- **The three other Home fixes** — books with spines and page edges, tiles
+  aligned by their tops, and the row's edge-bleed removed so titles stop touching
+  the panel border.
+- **Long contents entries cut off at the right edge** (2026-08-05, `bbeb6b8`).
+  The mechanism was measured in headless Chrome (215.7px overhang → 0.0px) but
+  the reader's exact line could not be reproduced — desktop Chrome shrinks that
+  button where Android apparently does not. The book is Nestor, *Breath*, not in
+  the repo. **Ask for the file rather than guessing again.**
+- **Finished is deliberately not a shelf on Home.** The reader asked for three;
+  their reference screenshot has four. Putting it back is a `<Shelf>` block in
+  `Home.tsx` plus `shelves.finished` in the cover list. They were told — wait for
+  their call.
+- **The blank line between paragraphs is gone**, replaced by a first-line indent.
+  One line in `blocks.module.css` to restore.
 - **Subtitle cutting is a guess** and will occasionally take a real title too
-  far. Worth a scan down the shelf; the manual rename on the detail page is the
-  way back.
-
----
-
-## Task — WP-51: the page-flip animation
-
-Still not started. The reader named it as outstanding three sessions ago, and it
-stays next once the reactions above are in.
-
-The seam has been built since WP-14 and is untouched: **`Reader.tsx` has one
-`goTo` and one `turnPage`, and every move goes through them.** A previous session
-changed only the *timing* of the slide — 380 ms on a curve eased at both ends,
-because the old one whipped the words off the screen. What is still missing is
-the turn looking like a page rather than a viewport sliding.
-
-Page curl stays a labelled slot, not a promise: it is expensive, easy to make
-gaudy, and the reader's stated want is *smooth*, which a well-made slide already
-delivers.
-
-**Note the ground has shifted slightly.** A page is now a column *plus its gap*,
-so the distance a turn travels is `measure(strip).pageWidth`, not the element's
-width. `playTurn` already takes that distance as a pixel argument — anything new
-must use the same number or the between-sections turn will drift out of step
-with the within-section one, which is the one thing that seam exists to prevent.
-
-### Definition of done
-A page turn reads as a page moving rather than a viewport scrolling; it honours
-`prefers-reduced-motion` by staying instant; a fast tapper can still outrun it
-rather than queueing behind it; and turning *between* sections looks the same as
-turning within one.
+  far. The manual rename on the detail page is the way back.
 
 ### Files in scope
-- `web/src/reader/motion.ts` — the single `MOVE_MS` and curve. Every kind of
-  move is driven from here; if one ever feels out of step, the answer is here
-  and only here.
-- `web/src/reader/pageTurn.ts` — the between-sections turn, where the outgoing
-  page is laid over the strip. Now takes the travel distance in pixels.
-- `web/src/pages/Reader.tsx` — `goTo` and `turnPage`, the seam itself, plus
-  `measure()` and the column-gap arithmetic.
-- `web/src/pages/Reader.module.css` — the frame the turn is measured against,
-  the `column-gap` and why it exists, the guard on everything inside a page, and
-  the note on why there is deliberately no `transform` on `.reader`.
-- `web/src/reader/columns.ts` — the page arithmetic the turn must not break.
-- `web/src/reader/blocks.tsx` — **added 2026-08-05**: renders links and every
-  block; where the `<span role="link">` lives.
-- `web/src/reader/blocks.module.css` — **added 2026-08-05**: block typography,
-  including `.list` (a grid) and `.link`.
+
+*For a reaction to the shelf:*
+- `web/src/pages/Home.tsx` + `Home.module.css` — the three shelves, the tiles,
+  and the book shape (spine, page edges, gloss) on `.tileMedia`.
+- `web/src/app/Cover.tsx` + `Cover.module.css` — the printed face only. The book
+  *shell* is in `Home.module.css` on purpose, so Library and BookInfo keep plain
+  covers.
+
+*For a reaction to the flip:*
+- `web/src/reader/pageTurn.ts` — `copyOf`, `holdOutgoing`, `playFlip`. Where the
+  clone-caching fix would go.
+- `web/src/pages/Reader.tsx` — `turnPage` and the arrival effect, the two places
+  `playFlip` is called.
+- `web/src/reader/motion.ts` — the single `MOVE_MS` and curve. If a move ever
+  feels out of step, the answer is here and only here.
+
+*For a reaction to covers:*
+- `web/src/parse/epub.ts` — `findCoverPath` (four rules), `coverFromFirstPage`,
+  `coverPageOf`, `readCoverAsset`.
+- `web/src/parse/version.ts` — the stamp and the log of what each bump changed.
 
 ### Out of scope
 The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half, in-book
@@ -126,55 +80,61 @@ search and real bookmarks (the rest of WP-14).
 
 ## Carried forward — things that will bite
 
+- **Ship at the end of every thread.** Build, commit, merge to `main`, push —
+  Vercel deploys from `main`. This is in `CLAUDE.md` at the reader's request and
+  it **overrides `/wrap-session`'s older "do not commit or push unless I ask".**
 - **Books imported before a parser change keep the old parse, silently.**
-  `PARSER_VERSION` is 8 and the shelf offers the update — but it needs the kept
+  `PARSER_VERSION` is 9 and the shelf offers the update — but it needs the kept
   source file, and a book imported without one can never be brought forward.
 - **A title fix reaches everyone; a parser fix does not.** `TITLE_CLEAN_VERSION`
-  recomputes from what is already stored, at boot, for free. Keep new work on
-  the title side of that line wherever there is a choice.
-- **The subtitle rule is deliberately a guess.** Real titles are locked into
-  `cleanTitle.test.ts` as must-not-cut; add to them rather than loosening the
-  guards when something breaks.
+  recomputes from what is already stored, at boot, for free. Keep new work on the
+  title side of that line wherever there is a choice.
+- **A copy of the strip is a scrolling box.** Anything laid over one at
+  `inset: 0` lands at its scroll origin, not on screen — hang it on the
+  non-scrolling wrapper `copyOf` returns.
 - **A page is a column plus its gap.** Anything that scrolls or measures the
-  strip must use `measure().pageWidth`, never the element's width, and the gap
-  itself is set once in `Reader.module.css` and read back from the computed
-  style. Two sources for it would put every turn out of true.
+  strip must use `measure().pageWidth`, never the element's width, and the gap is
+  set once in `Reader.module.css` and read back from the computed style.
+- **No 3D transform on a shelf tile.** A rotated element takes its own width with
+  it and breaks the row alignment. Spine and page edges are shadows and
+  pseudo-elements for exactly this reason.
 - **A blurred wrapper cannot contain the thing it is blurring *behind*.** A CSS
-  `filter` makes an element a containing block for fixed-position descendants,
-  so an overlay nested inside gets blurred with the page. Both places that frost
-  the background — `AppShell`'s drawer and `UpdatePrompt` — keep the overlay as a
-  sibling. Any future sheet or modal must do the same.
-- **Anything laid out as a grid or flex inside a page needs `min-width: 0`.**
-  The general rule on `.page *` supplies it, but a new component that sets its
-  own `min-width` will re-open exactly the bug that cut the contents page off.
+  `filter` makes an element a containing block for fixed-position descendants.
+  Both places that frost the background — `AppShell`'s drawer and `UpdatePrompt`
+  — keep the overlay as a sibling. Any future sheet or modal must too.
+- **Anything laid out as a grid or flex inside a page needs `min-width: 0`.** The
+  general rule on `.page *` supplies it; a new component setting its own
+  `min-width` re-opens the bug that cut the contents page off.
+- **The subtitle rule is deliberately a guess.** Real titles are locked into
+  `cleanTitle.test.ts` as must-not-cut; add to them rather than loosening guards.
 - **Columns break awkwardly around tall figures, wide tables and long code.**
   Accepted; the named remedy is plain scrolling as a per-section fallback. Not
   built — wait until it is actually hit.
 - **`Reader.test.tsx` and `Library.test.tsx` are timing-sensitive under load.**
-  One `Library` test failed mid-session and passed on a re-run with nothing
-  changed. If it recurs on an idle machine, it is real.
+  If one fails on an idle machine, it is real.
 - **The live Anthropic key is still in `Claude API/API.txt`**, gitignored and
   never committed. WP-19 is when it must move out and be read from an env var.
 
 ## Decisions already made — don't re-derive these
 - **A reading place is an anchor, never a page number** (WP-15).
-- **Pages are counted in words, not screens** (WP-40). 300 words to a page;
-  changing that constant renumbers every book.
+- **Pages are counted in words, not screens** (WP-40). 300 words to a page.
 - **The spine is not a whole-book read.** Manifest plus chapter *indexes* only.
 - **Pagination is CSS columns**, not JavaScript measurement, and **the page turn
   is a seam** — navigation and animation stay separate.
-- **An epub spine boundary is a page break, not a section break** — sections are
-  the navigation and the anchor grammar.
-- **Nothing on the reading screen animates from zero opacity** — that is the
+- **A page turn is a rotation about the spine, not a slide** — and the two
+  directions are not mirror images: forwards the outgoing page moves, backwards
+  the arriving one does, which is why going back needs two copies.
+- **An epub spine boundary is a page break, not a section break.**
+- **Nothing on the reading screen animates from zero opacity** — the
   camera-shutter flash.
 - **Focus Mode hides, never removes.**
-- **A link is a range of a paragraph**, resolved *after* assembly, with epub ids
-  qualified by their source file — and it renders as a `<span role="link">`,
-  never a `<button>`.
+- **A link is a range of a paragraph**, resolved *after* assembly, rendered as a
+  `<span role="link">`, never a `<button>`.
+- **Only a shelf holding something back gets "View All"** — Unread alone.
 
 ## Useful context (already known — don't re-derive)
-- Gates: `npm test` (613), `npm run typecheck`, `npm run build`, from the repo
-  root. Precache 475.54 KiB.
+- Gates: `npm test` (616), `npm run typecheck`, `npm run build`, from the repo
+  root.
 - **There is no bottom tab bar.** Navigation is a ☰ in `AppShell`'s top bar
   opening a left drawer (All Books / Stats / Settings). Home is not in it.
 - **`@testing-library/user-event` is not installed** — component tests drive
@@ -186,15 +146,18 @@ search and real bookmarks (the rest of WP-14).
 - Anchors reach the DOM as ids with the brackets stripped (`ch02-s03-p013`).
 - Vitest defaults to `node`; add `// @vitest-environment jsdom` per file for
   React tests. Testing Library needs an explicit `afterEach(cleanup)`.
-- A state change arriving from outside React — a service-worker event — needs
-  wrapping in `act()` in tests; nothing else will flush it.
 - jsdom has no layout: stub `window.scrollTo` **and**
-  `Element.prototype.scrollIntoView` in any test that mounts Reader. It also
-  reports every width as zero, which `measure()` reads as "one page, nothing to
-  turn" on purpose — **a layout bug cannot be caught here, only in a real
-  browser.** That is why both of this session's fixes were measured in headless
-  Chrome and neither was caught by 611 passing tests.
+  `Element.prototype.scrollIntoView` in any test that mounts Reader. It reports
+  every width as zero, which `measure()` reads as "one page, nothing to turn" on
+  purpose, and it has no Web Animations API — `playFlip` falls through to the
+  instant change there. **A layout or animation bug cannot be caught here, only
+  in a real browser.**
+- **Headless Chrome is the tool that cracked the text-escaping bugs** and is
+  worth reaching for before touching layout code. `chrome.exe --headless
+  --disable-gpu --virtual-time-budget=5000 --dump-dom <file:///…>` runs a probe
+  page's JavaScript and prints the DOM, so a measurement written into a `<pre>`
+  comes straight back. Chrome is at
+  `C:\Program Files\Google\Chrome\Application\chrome.exe`.
 - Real books for manual checks: the Jung epub in `books/`, the Springer PDF in
-  `research-paper/`. Both untracked. **Neither reproduces the reported dead-link
-  bug nor the contents-page clipping** — that book (Nestor's *Breath*) is not in
-  the repo. Ask for the file rather than diagnosing against the Jung again.
+  `research-paper/`. Both untracked. Neither is *Breath* or *Beyond Mindfulness*
+  — ask for those files rather than diagnosing against the Jung again.

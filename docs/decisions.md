@@ -430,3 +430,38 @@
   capped at ten of however many are owned; Current Reading is one book by
   definition and Up Next is three. A link on all three would promise more where
   there is no more. — 2026-08-05
+- **A page turn is a rotation about the spine, not a slide.** A slide is what a
+  *scroll* looks like, and it is the wrong metaphor for a thing with a binding.
+  The two directions are not mirror images: turning forwards, the *outgoing*
+  page moves and the arriving one is already on the strip beneath it, so one
+  copy suffices; turning back, the *arriving* page moves and the page being left
+  has to stay visible underneath for the whole turn, so it takes two copies —
+  one still, one flipping onto it. Done with copies laid over the strip rather
+  than by transforming the strip itself, so nothing here restyles or re-stacks
+  an element React owns. — 2026-08-06
+- **A copy of the strip is wrapped, never used bare.** The strip is a scrolling
+  box, so anything laid over a copy of it at `inset: 0` lands at the copy's
+  scroll *origin* — pages away from what is on screen. The flip's shading hangs
+  on a non-scrolling wrapper with the scrolled copy inside it, and the wrapper is
+  what gets rotated. — 2026-08-06
+- **A book on the shelf is drawn with shadows and pseudo-elements, never a 3D
+  transform.** A rotated element carries its own width with it and pulls the row
+  out of alignment, which is the exact fault the same change was fixing. Spine
+  and page edges — the asymmetry — are what make a rectangle read as a book;
+  shadow alone never does. — 2026-08-06
+- **Covers may be guessed at, but only strictly.** Behind the two standard
+  declarations (`properties="cover-image"`, `<meta name="cover">`), which
+  conversion tools drop routinely, sit two inferences: a manifest image plainly
+  called "cover", and the lone picture on the book's own cover page. The guards
+  matter more than the guesses — a page with more than a dozen words is a
+  chapter, several pictures is a title page, and a book that is a single
+  document has no separate cover page at all. A publisher's colophon on the
+  shelf is worse than a placeholder. — 2026-08-06
+- **Shelf tiles align by their tops, never their bottoms.** Bottom alignment
+  pushes a book with a short title down; every cover is the same width and the
+  same 2:3 shape, so one top edge gives one baseline under the covers for free.
+  — 2026-08-06
+- **Work ships at the end of every thread.** Build, commit, merge to `main`,
+  push — Vercel deploys from `main`, so anything left on a branch is invisible to
+  the reader. This deliberately overrides `/wrap-session`'s older "do not commit
+  or push unless I ask". — 2026-08-06
