@@ -28,5 +28,14 @@ resume. Keep every edit terse.
    persistence — so it only reflects reality if this stays in sync. Don't re-read
    or touch anything else in the file.
 
-Then show me a 3-line summary of what changed and stop. **Do not commit or push
-unless I ask.** If I want spend, remind me to run `/cost`.
+7. **Ship it** — the same ritual as the end of any other thread, and for the
+   same reason: Vercel deploys from `main`, so notes left on a branch are notes
+   the next session won't find. See "Ship at the end of every thread" in
+   `CLAUDE.md`, which is the single definition — don't restate the steps here
+   and let the two drift apart. In short: build, commit, merge to `main`, push.
+   A docs-only wrap still runs the build if any code changed this session; if
+   the code was already shipped earlier in the thread, the notes go up on their
+   own.
+
+Then show me a 3-line summary of what changed, say what was pushed, and stop.
+If I want spend, remind me to run `/cost`.
