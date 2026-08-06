@@ -19,6 +19,35 @@ Get that loop working before building any breadth.
   nav/Home redesign, and the second of the two text-escaping fixes.
 
 ### Recently done
+- **WP-53 fast-follow · three faults from the phone** — 2026-08-06, merged to
+  `main`. Reported within the hour of shipping; two shared one cause.
+  - **The floating "+" was fixed to the document, not the screen**, so it was
+    only visible after scrolling to the end of the shelf — and **the filter
+    sheet rose from below the fold**, so its button appeared to do nothing.
+    Same cause: `AppShell`'s `.frame` carries a `filter` at all times (at no-op
+    values, so the drawer blur animates rather than snapping), and **an element
+    with a filter is a containing block for every `position: fixed`
+    descendant.** The drawer and `UpdatePrompt` already dodge this by being
+    siblings of the frame; there was no way for a component *inside* a page to
+    do the same, so `app/Portal.tsx` now exists and the "+", the sheet and the
+    folder dialog all render into `<body>` through it, below the drawer's
+    z-index. **This is the second round this trap has cost** — it is now a rule
+    in `active-task.md`, not a caution.
+  - **Swiping did nothing at all on a phone.** Two causes, both invisible to
+    jsdom. The distance was measured at `pointerup`, but a browser seizes a pan
+    after a few pixels and fires `pointercancel` instead — so the handler
+    either never ran or ran with stale coordinates. And `touch-action` was left
+    at `auto`, which is what let the browser claim the horizontal drag in the
+    first place. Now: movement tracked on `pointermove` and judged on whichever
+    end arrives, and `touch-action: pan-y pinch-zoom` on `.content` — the
+    mirror image of the `pan-x` the reading screen needed for the same reason.
+    Panels opt out of page swipes with `data-no-swipe`.
+  - **All three shipped under 656 green tests.** jsdom has no layout and never
+    cancels a pointer. The swipe tests now reproduce a real event sequence —
+    down, moves, then a cancel carrying stale coordinates — and fail against
+    the old handler. The standing conclusion is recorded: layout and gestures
+    are verified on the phone or not at all.
+  - Gates at close: **658 tests**, typecheck, build.
 - **WP-53 · The library, redesigned** — 2026-08-06, merged to `main`. Asked for
   against two reference screenshots (a Kindle-like list and a two-column grid).
   Eight parts, shipped together at the reader's call.

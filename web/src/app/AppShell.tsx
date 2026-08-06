@@ -156,6 +156,9 @@ export default function AppShell() {
         // tab into links sitting off-screen.
         inert={!open}
         tabIndex={-1}
+        // A drag inside the drawer belongs to the drawer, not to the page
+        // behind it — see `useSwipeNav`.
+        data-no-swipe=""
       >
         <div className={styles.drawerHead}>
           <span className={styles.drawerTitle}>Reading Buddy</span>

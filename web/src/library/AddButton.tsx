@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { ACCEPTED_EXTENSIONS } from '../import/index.ts'
+import { Portal } from '../app/Portal.tsx'
 import styles from './AddButton.module.css'
 
 export interface AddButtonProps {
@@ -63,7 +64,11 @@ export function AddButton({ busy, onPickFiles, onPickFolder, onNewFolder }: AddB
   }
 
   return (
-    <div className={styles.wrap} ref={wrapRef}>
+    // Outside the app frame, or "fixed to the bottom-right of the screen"
+    // silently means "fixed to the bottom-right of the whole scrolling
+    // document" — see `app/Portal.tsx`.
+    <Portal>
+      <div className={styles.wrap} ref={wrapRef} data-no-swipe="">
       <div className={open ? `${styles.menu} ${styles.menuOpen}` : styles.menu} inert={!open}>
         {/* The label *is* the menu item — a file input can only be opened by a
             real user gesture on its own label or the input itself, so there is
@@ -130,6 +135,7 @@ export function AddButton({ busy, onPickFiles, onPickFolder, onNewFolder }: AddB
           +
         </span>
       </button>
-    </div>
+      </div>
+    </Portal>
   )
 }

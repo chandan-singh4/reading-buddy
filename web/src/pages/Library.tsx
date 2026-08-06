@@ -13,6 +13,7 @@ import {
 } from '../import/index.ts'
 import type { BookId, BookMeta, Shelf } from '../structure/index.ts'
 import { repository, type StoredFolder } from '../storage/index.ts'
+import { Portal } from '../app/Portal.tsx'
 import { useCovers } from '../app/useCovers.ts'
 import { useRowMemory } from '../app/useRowMemory.ts'
 import { AddButton } from '../library/AddButton.tsx'
@@ -565,7 +566,11 @@ function NameFolder({
   const [name, setName] = useState('')
 
   return (
-    <div className={libraryStyles.dialogScrim} role="dialog" aria-label="New folder">
+    // Portalled for the same reason as the sheet and the "+": inside the app
+    // frame, `position: fixed` is fixed to the document, not the screen — so a
+    // dialog opened halfway down a long shelf would appear above the fold.
+    <Portal>
+    <div className={libraryStyles.dialogScrim} role="dialog" aria-label="New folder" data-no-swipe="">
       <form
         className={libraryStyles.dialog}
         onSubmit={(event) => {
@@ -600,6 +605,7 @@ function NameFolder({
         </div>
       </form>
     </div>
+    </Portal>
   )
 }
 

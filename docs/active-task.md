@@ -13,6 +13,26 @@
 Shipped 2026-08-06 (WP-53) and on Vercel; **not yet seen on the phone.** Nothing
 is half-built. The next task is whatever the reader says when they open it.
 
+### First reaction, and what it cost — 2026-08-06
+
+Three faults reported on the phone, all now fixed and shipped. Two shared one
+cause, and it is a cause this project had already written down:
+
+- **The "+" sat at the bottom of the document** and **the filter sheet opened
+  below the fold**, so its button looked dead. Both were `position: fixed`
+  *inside* the app frame, which has an always-on `filter` and is therefore a
+  containing block for fixed descendants. Fixed by `app/Portal.tsx`. See the
+  rule in "things that will bite" — this had already bitten the drawer.
+- **Swiping did nothing.** Distance was measured at `pointerup`, which a
+  browser never fires once it seizes a pan; and `touch-action` was left at
+  `auto`, so the browser claimed horizontal drags. Both fixed.
+
+**The uncomfortable part: all three shipped with 656 green tests.** jsdom has no
+layout and never cancels a pointer, so it could not have caught any of them. The
+gesture tests have been rewritten to reproduce a real event sequence, and both
+lessons are recorded below — but the standing conclusion is that **this app's
+layout and gestures are verified on the reader's phone or not at all.**
+
 ### Ask these first
 
 1. **How does it look?** This is the honest gap in the round: jsdom has no
@@ -148,10 +168,18 @@ Shipped 2026-08-06 (WP-51, `f5e4bf7`). Two questions still open:
 - **No 3D transform on a shelf tile.** A rotated element takes its own width with
   it and breaks the row alignment. Spine and page edges are shadows and
   pseudo-elements for exactly this reason.
-- **A blurred wrapper cannot contain the thing it is blurring *behind*.** A CSS
-  `filter` makes an element a containing block for fixed-position descendants.
-  Both places that frost the background — `AppShell`'s drawer and `UpdatePrompt`
-  — keep the overlay as a sibling. Any future sheet or modal must too.
+- **`position: fixed` does not work anywhere inside the app frame. Use
+  `app/Portal.tsx`.** This has now cost two rounds, so it is stated as a rule
+  rather than a caution. `AppShell`'s `.frame` carries a `filter` **at all
+  times** — at no-op values (`blur(0)`), because `none → blur()` snaps instead
+  of animating — and an element with a filter is a containing block for every
+  fixed descendant. So "fixed to the bottom-right of the screen" silently means
+  "fixed to the bottom-right of the whole scrolling document": the library's
+  floating "+" was reachable only by scrolling to the end of the shelf, and its
+  filter sheet rose from below the fold, which read as the button being dead.
+  The drawer and `UpdatePrompt` escape it by being *siblings* of the frame;
+  anything rendered inside a page must go through the portal. Portalled things
+  stay **below the drawer's z-index 8/9** so opening the menu covers them.
 - **A book belongs to at most one folder, and deleting a folder must never
   delete its books.** Both are load-bearing: the first is what keeps folders
   distinct from the tags that come later, the second is the single most
@@ -162,6 +190,21 @@ Shipped 2026-08-06 (WP-51, `f5e4bf7`). Two questions still open:
 - **A gesture must decide what it *is* before acting.** Long press cancels on
   movement; swipe navigation needs the horizontal:vertical ratio. Both are the
   same lesson the reading screen learned when a curved flick scrolled the page.
+- **A touch gesture ends in `pointercancel`, not `pointerup`, and its
+  coordinates are stale.** A browser seizes a pan after a few pixels and cancels
+  the pointer stream; measuring the distance at `pointerup` measures nothing.
+  **Track the movement on `pointermove` and judge on whichever end arrives.**
+  This is why swipe navigation shipped green and did nothing on a phone.
+- **A screen that owns horizontal gestures must say so with `touch-action`.**
+  `pan-y pinch-zoom` on `AppShell`'s `.content` is what stops the browser
+  claiming a horizontal drag in the first place; the reading screen needs the
+  mirror image (`pan-x`). Without it the handler is fighting the browser and
+  loses.
+- **jsdom cannot catch either of the two above.** Synthesised events are never
+  cancelled and CSS `touch-action` does nothing there, so a gesture test can
+  only be trusted if it *reproduces the real event sequence* — down, moves, then
+  a cancel carrying stale coordinates. The tests were rewritten to do that after
+  the fact; write them that way first next time.
 - **Anything laid out as a grid or flex inside a page needs `min-width: 0`.** The
   general rule on `.page *` supplies it; a new component setting its own
   `min-width` re-opens the bug that cut the contents page off.
@@ -193,7 +236,7 @@ Shipped 2026-08-06 (WP-51, `f5e4bf7`). Two questions still open:
 - **Only a shelf holding something back gets "View All"** — Unread alone.
 
 ## Useful context (already known — don't re-derive)
-- Gates: `npm test` (656), `npm run typecheck`, `npm run build`, from the repo
+- Gates: `npm test` (658), `npm run typecheck`, `npm run build`, from the repo
   root.
 - **There is no bottom tab bar.** Navigation is a ☰ in `AppShell`'s top bar
   opening a left drawer (Home / Library / Stats / Settings), plus a horizontal

@@ -107,11 +107,13 @@
   border-radius: var(--radius-md);
 }
 
-/* The "name your folder" prompt. */
+/* The "name your folder" prompt. Portalled into `<body>` like the sheet and the
+   "+" — see `app/Portal.tsx`. Sits at the sheet's level; the two are never open
+   together, and both stay below the drawer (8/9). */
 .dialogScrim {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 7;
   display: grid;
   place-items: center;
   padding: var(--space-4);

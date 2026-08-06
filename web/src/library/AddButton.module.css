@@ -1,11 +1,18 @@
 /* The floating "+" and its menu. Anchored to the viewport rather than the
    page, so it stays reachable however far down a long shelf the reader is. */
 
+/* Rendered into `<body>`, not into the page — see `app/Portal.tsx`. Inside the
+   app frame `position: fixed` resolves against the frame (which has a filter,
+   making it a containing block) rather than the viewport, which pinned this to
+   the bottom of the whole document.
+
+   z-index sits below the drawer's scrim (8) and panel (9) on purpose: opening
+   the menu should cover the "+", not leave it floating over frosted glass. */
 .wrap {
   position: fixed;
   right: var(--space-4);
   bottom: calc(var(--space-4) + var(--safe-bottom));
-  z-index: 30;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

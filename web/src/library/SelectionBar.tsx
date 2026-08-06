@@ -60,7 +60,9 @@ export function SelectionBar({
   }
 
   return (
-    <div className={styles.bar} role="toolbar" aria-label="Selected books">
+    // Swiping off the screen mid-selection would throw the selection away, so
+    // the bar opts out of page navigation — see `app/useSwipeNav.ts`.
+    <div className={styles.bar} role="toolbar" aria-label="Selected books" data-no-swipe="">
       <div className={styles.top}>
         <button
           type="button"

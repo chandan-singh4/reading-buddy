@@ -101,6 +101,17 @@
      to widen the document — otherwise every swipe adds a horizontal scrollbar
      for the length of the animation. */
   overflow-x: clip;
+  /*
+   * Vertical scrolling and pinch-zoom stay the browser's; horizontal movement
+   * is ours.
+   *
+   * This is what makes `useSwipeNav` work on a phone at all. Under the default
+   * `auto`, a horizontal drag is a pan the *browser* owns, so it seizes the
+   * gesture and fires `pointercancel` after a few pixels — the swipe handler
+   * then never sees a finger travel far enough to count. The reading screen
+   * needed the mirror image of this (`pan-x`) for the same reason.
+   */
+  touch-action: pan-y pinch-zoom;
 }
 
 /* A page arriving after a swipe or a drawer tap. The class is only applied

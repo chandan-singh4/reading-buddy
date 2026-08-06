@@ -57,20 +57,37 @@ describe('app shell', () => {
   })
 
   /**
-   * A swipe, as a pair of pointer events on the document.
+   * A swipe, as the sequence a real finger produces: down, a run of moves, then
+   * an end.
    *
-   * `pointerType: 'touch'` matters — a mouse drag across a page is a text
+   * The moves are not decoration. A browser seizes a pan gesture and fires
+   * `pointercancel` after a few pixels, so `pointerup` often never arrives and
+   * its coordinates are worthless when it does — the hook reads the *last move*
+   * instead. An earlier version of both the hook and this helper measured the
+   * distance at `pointerup` only, which is why the feature passed its tests and
+   * did nothing at all on a phone. Ending on `pointercancel` is therefore the
+   * case worth covering, not an edge case.
+   *
+   * `pointerType: 'touch'` matters too — a mouse drag across a page is a text
    * selection, and hijacking it would make the library impossible to select
    * text on, so the hook ignores the mouse entirely.
    */
-  function swipe(dx: number, dy = 0) {
-    fireEvent.pointerDown(document, { pointerId: 1, pointerType: 'touch', clientX: 200, clientY: 300 })
-    fireEvent.pointerUp(document, {
+  function swipe(dx: number, dy = 0, end: 'up' | 'cancel' = 'up') {
+    const at = (fraction: number) => ({
       pointerId: 1,
-      pointerType: 'touch',
-      clientX: 200 + dx,
-      clientY: 300 + dy,
+      pointerType: 'touch' as const,
+      clientX: 200 + dx * fraction,
+      clientY: 300 + dy * fraction,
     })
+
+    fireEvent.pointerDown(document, at(0))
+    fireEvent.pointerMove(document, at(0.5))
+    fireEvent.pointerMove(document, at(1))
+    // A cancel carries stale coordinates — the browser is reporting where it
+    // seized the gesture, not where the finger got to. Reading the event
+    // itself, rather than the last move, is precisely the bug being guarded.
+    if (end === 'cancel') fireEvent.pointerCancel(document, at(0))
+    else fireEvent.pointerUp(document, at(1))
   }
 
   it('swipes left from Home to the library, and right back again', async () => {
@@ -106,6 +123,31 @@ describe('app shell', () => {
     renderAt('/')
 
     swipe(-20)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+  })
+
+  it('still navigates when the browser cancels the gesture', async () => {
+    // The bug that shipped: a browser takes a pan over and fires
+    // `pointercancel` instead of `pointerup`, so a handler that only measured
+    // at `pointerup` measured nothing. On a phone this meant swiping did
+    // absolutely nothing, while the tests stayed green.
+    renderAt('/')
+
+    swipe(-150, 0, 'cancel')
+    expect(await screen.findByText('All books')).toBeDefined()
+  })
+
+  it('ignores a drag that starts inside the drawer', () => {
+    // The drawer is a panel over the page, not part of it; dragging across its
+    // links must not navigate the page underneath.
+    renderAt('/')
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+
+    const drawer = screen.getByRole('navigation', { name: 'Main' })
+    fireEvent.pointerDown(drawer, { pointerId: 1, pointerType: 'touch', clientX: 200, clientY: 300 })
+    fireEvent.pointerMove(document, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 300 })
+    fireEvent.pointerUp(document, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 300 })
+
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
   })
 

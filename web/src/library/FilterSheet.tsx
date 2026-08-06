@@ -24,6 +24,7 @@ import {
   type ViewMode,
 } from './prefs.ts'
 import type { ReadingStatus } from './status.ts'
+import { Portal } from '../app/Portal.tsx'
 import styles from './FilterSheet.module.css'
 
 export interface FilterSheetProps {
@@ -64,7 +65,12 @@ export function FilterSheet({ open, prefs, folders, onChange, onClose }: FilterS
   }, [open, onClose])
 
   return (
-    <>
+    // Outside the app frame. `AppShell`'s always-on `filter` makes it a
+    // containing block for fixed descendants, so a sheet rendered inside the
+    // page rises from the bottom of the *document* — hundreds of pixels below
+    // the fold on a long shelf, which reads as the button doing nothing.
+    // See `app/Portal.tsx`.
+    <Portal>
       <div
         className={open ? `${styles.scrim} ${styles.scrimOpen}` : styles.scrim}
         onClick={onClose}
@@ -79,6 +85,9 @@ export function FilterSheet({ open, prefs, folders, onChange, onClose }: FilterS
         aria-hidden={!open}
         inert={!open}
         tabIndex={-1}
+        // A swipe inside the sheet is aimed at the sheet, not at the page
+        // behind it — without this, dragging across the chips navigates away.
+        data-no-swipe=""
       >
         <div className={styles.handle} aria-hidden="true" />
 
@@ -191,7 +200,7 @@ export function FilterSheet({ open, prefs, folders, onChange, onClose }: FilterS
           Done
         </button>
       </div>
-    </>
+    </Portal>
   )
 }
 
