@@ -214,12 +214,29 @@ export function pagesAt(spine: Spine, here: SectionRef, position: number): Pages
 
   const pageCount = pagesIn(spine.totalWords)
   const at = clamp(position, 0, spine.totalWords)
+  // `at` counts the words *behind* you, so you're on the next page.
+  const page = Math.min(pageCount, Math.floor(at / WORDS_PER_PAGE) + 1)
 
   return {
-    // `at` counts the words *behind* you, so you're on the next page.
-    page: Math.min(pageCount, Math.floor(at / WORDS_PER_PAGE) + 1),
+    page,
     pageCount,
-    percent: Math.round((at / spine.totalWords) * 100),
+    /*
+     * The last page is 100%, stated rather than divided for.
+     *
+     * `at` is where the paragraph at the top of the screen *starts*, so there
+     * is always some book after it and the division can only approach 100
+     * without arriving — on the final page of a real book it returns 99. That
+     * was invisible as a readout and load-bearing everywhere else: "finished"
+     * is defined as 100% in both `homeShelves.ts` and `library/status.ts`, so
+     * nothing was ever finished, the Home shelf stayed empty, and the
+     * library's Finished filter matched nothing. Reaching the last page is
+     * what finishing a book is; the percentage now says so.
+     *
+     * A book short enough to be one page is finished the moment it is opened.
+     * That is the right answer rather than an edge case to guard: at one page,
+     * the whole text is on the screen.
+     */
+    percent: page >= pageCount ? 100 : Math.round((at / spine.totalWords) * 100),
     // At least 1: standing anywhere in a chapter, there is always this page.
     leftInChapter: Math.max(1, pagesIn(chapterEnd - at)),
   }

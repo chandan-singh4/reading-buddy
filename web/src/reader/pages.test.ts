@@ -266,4 +266,42 @@ describe('moving inside one long section', () => {
     expect(wordsAt(spine, { chapter: 1, section: 1 })).toBe(0)
     expect(pagesOf(spine, { chapter: 1, section: 1 }).page).toBe(1)
   })
+
+  /*
+   * "Finished" is defined as 100% in both `app/homeShelves.ts` and
+   * `library/status.ts`, so what this function returns on the last page is not
+   * a readout — it is the whole definition of having finished a book.
+   */
+  describe('the last page is 100%', () => {
+    const here = { chapter: 1, section: 1 }
+
+    it('reports 100 on the final page', () => {
+      const last = pagesAt(spine, here, spine.totalWords)
+      expect(last.page).toBe(last.pageCount)
+      expect(last.percent).toBe(100)
+    })
+
+    it('reports 100 from anywhere on the final page, not just its last word', () => {
+      // The real case: `at` is where the paragraph at the top of the screen
+      // begins, so it lands somewhere *inside* the last page and never on its
+      // final word. Dividing gave 99 here, which is why nothing was ever
+      // finished.
+      const intoLastPage = (pagesIn(spine.totalWords) - 1) * WORDS_PER_PAGE + 1
+      const last = pagesAt(spine, here, intoLastPage)
+
+      expect(last.page).toBe(last.pageCount)
+      expect(last.percent).toBe(100)
+    })
+
+    it('does not report 100 before the final page', () => {
+      const before = pagesAt(spine, here, (pagesIn(spine.totalWords) - 2) * WORDS_PER_PAGE)
+      expect(before.page).toBeLessThan(before.pageCount)
+      expect(before.percent).toBeLessThan(100)
+    })
+
+    it('counts a one-page book as finished — the whole text is on the screen', () => {
+      const tiny = spineOf([[80]])
+      expect(pagesAt(tiny, here, 0)).toMatchObject({ page: 1, pageCount: 1, percent: 100 })
+    })
+  })
 })
