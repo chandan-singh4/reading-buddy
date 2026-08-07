@@ -28,12 +28,18 @@
  * is therefore the one everything else has to match rather than the other way
  * round.
  *
- * Lengthened from 320 ms after the turn was reported as whipping past. Still
- * comfortably under the ~400–450 ms where a transition stops reading as motion
- * and starts reading as a wait, which is the ceiling a page turn cannot cross:
- * a reader turning several pages in a row must never feel they are queueing.
+ * Lengthened from 320 ms after the turn was reported as whipping past, and
+ * again to 400 after it still read as an abrupt change rather than an eased
+ * one. That is the top of the useful range: past ~400–450 ms a transition stops
+ * reading as motion and starts reading as a wait, and a reader turning several
+ * pages in a row must never feel they are queueing. It does not go further.
+ *
+ * Note that the *perceived* abruptness was only half timing. The other half was
+ * the turn losing its opening frames to laying out the copy of the page — see
+ * the layout flush in `pageTurn.ts`, which is what makes this duration actually
+ * arrive on screen.
  */
-export const MOVE_MS = 380
+export const MOVE_MS = 400
 
 /**
  * The curve, as its four control points.

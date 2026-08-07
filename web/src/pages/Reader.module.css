@@ -126,8 +126,15 @@
    * instead of being switched on.
    *
    * Suppressed under `prefers-reduced-motion` by the global rule in `index.css`.
+   *
+   * Timed to sit just inside `reader/motion.ts`'s `MOVE_MS`, not at some
+   * duration of its own. Opening a book is the one arrival with no outgoing
+   * page to cross with, so the text settling *is* the whole transition — at
+   * 240 ms it was over before the eye had found the page, which is what made
+   * opening a book read as a hard cut. Slightly shorter than a page turn so
+   * that reading can begin before the movement has quite finished.
    */
-  animation: textSettles 240ms ease-out both;
+  animation: textSettles 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 /* Gutters have to live on the children, not on the column box: padding on a

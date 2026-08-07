@@ -232,6 +232,28 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
   moving.style.backfaceVisibility = 'hidden'
   moving.style.willChange = 'transform, opacity'
 
+  /*
+   * Lay the copy out *before* the clock starts.
+   *
+   * This is what was making the turn feel like a jump rather than a movement,
+   * and it is not a timing problem — it is a bookkeeping one. `holdOutgoing`
+   * has just cloned a laid-out section: on a long chapter that is dozens of
+   * pages of multi-column DOM, and none of it has been laid out yet, because
+   * nothing has asked. `Element.animate` records its start time immediately and
+   * then the browser does that layout — so the first frames of the turn are
+   * spent on work, the animation is already 60–100 ms in by the time it paints,
+   * and what the reader sees is the page appearing part-way through its swing.
+   * The eye reads a movement that starts in the middle as no movement at all.
+   *
+   * Reading a geometry property forces the layout to happen here instead, on
+   * the frame the reader's finger left the screen — where they are expecting
+   * the gesture to cost something anyway. The animation then starts at zero and
+   * every frame of the curve reaches the screen. Deliberately kept and not
+   * "optimised away": the return value is unused on purpose, and that is the
+   * whole point of the line.
+   */
+  void moving.getBoundingClientRect().width
+
   const at = (degrees: number) => `perspective(${FLIP_PERSPECTIVE}px) rotateY(${degrees}deg)`
 
   // Read forwards for a forward turn, backwards for a backward one — the same

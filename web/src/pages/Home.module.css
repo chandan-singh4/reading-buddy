@@ -131,6 +131,16 @@
   gap: var(--space-3);
   color: inherit;
   scroll-snap-align: start;
+  /* A tile is one thing to tap, not a passage to select. The global rule in
+     `index.css` kills the tap highlight; this kills the *other* blue — the
+     selection the browser starts on a title or an author when a thumb rests on
+     it a moment too long, which on a shelf is never what was meant. The press
+     state a reader should see is `.tile:active` below: the book settling onto
+     the plank. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 /* The one book in progress gets its own panel, not just a wider row item —

@@ -6,7 +6,7 @@
 import 'fake-indexeddb/auto'
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useNavigate } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
@@ -23,6 +23,33 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <AppRoutes />
+    </MemoryRouter>,
+  )
+}
+
+/**
+ * The device's Back button, as something a test can press.
+ *
+ * There is no way to observe a history *stack* from the outside — `useLocation`
+ * only ever reports the top of it. So the way to ask "did that swipe leave an
+ * entry behind?" is to go back once and see where you land: if the four screens
+ * push, Back undoes the last swipe; if they replace, Back leaves the level
+ * altogether. Rendered as a sibling of the app so it survives every navigation.
+ */
+function Back() {
+  const navigate = useNavigate()
+  return (
+    <button type="button" onClick={() => navigate(-1)}>
+      device back
+    </button>
+  )
+}
+
+function renderFrom(entries: string[]) {
+  return render(
+    <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
+      <AppRoutes />
+      <Back />
     </MemoryRouter>,
   )
 }
@@ -135,6 +162,37 @@ describe('app shell', () => {
 
     swipe(-150, 0, 'cancel')
     expect(await screen.findByText('All books')).toBeDefined()
+  })
+
+  it('leaves no history behind when swiping between the four screens', async () => {
+    // The four screens are one level, not four steps into anything. Back has to
+    // mean "leave this level", once — not "undo the last flick", which is what
+    // it meant while every swipe pushed an entry.
+    renderFrom(['/book/does-not-exist', '/'])
+
+    swipe(-150)
+    expect(await screen.findByText('All books')).toBeDefined()
+    swipe(-150)
+    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+    swipe(-150)
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
+
+    // One press, and out — not three more screens of tab-shuffling first.
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    expect(await screen.findByRole('alert')).toBeDefined()
+  })
+
+  it('leaves no history behind when the drawer moves between the four either', async () => {
+    // The drawer and the swipe are the same move by two routes; if only one of
+    // them replaced, Back would depend on which one the reader had reached for.
+    renderFrom(['/book/does-not-exist', '/'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Settings/ }))
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    expect(await screen.findByRole('alert')).toBeDefined()
   })
 
   it('ignores a drag that starts inside the drawer', () => {

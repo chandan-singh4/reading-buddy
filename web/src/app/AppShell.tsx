@@ -180,6 +180,12 @@ export default function AppShell() {
                 // Without `end`, "/" matches every route and Home would be
                 // highlighted while the reader is on Settings.
                 end={link.to === '/'}
+                // The drawer and the swipe must not disagree about what kind of
+                // move this is: both cross *within* one level, so neither adds
+                // a history entry. See "why a swipe replaces" in
+                // `useSwipeNav.ts` — Back has to mean "leave these four", not
+                // "undo the last one of them I looked at".
+                replace
                 className={({ isActive }) =>
                   isActive ? `${styles.drawerLink} ${styles.drawerLinkActive}` : styles.drawerLink
                 }

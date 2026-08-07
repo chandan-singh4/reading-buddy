@@ -13,6 +13,42 @@ body,
   height: 100%;
 }
 
+/*
+ * No blue flash on tap, anywhere.
+ *
+ * WebKit and Blink paint a translucent highlight over whatever element a touch
+ * lands on — a link, a button, anything with a click handler. On a shelf of
+ * books that meant a blue rectangle flickering over a cover, a title or an
+ * author for the moment between the tap and the book opening, which reads as a
+ * browser artefact rather than as the app responding.
+ *
+ * `-webkit-tap-highlight-color` inherits, so setting it on the root covers the
+ * whole document; the second rule restates it on the interactive elements
+ * because a UA stylesheet can set its own value on them and win on specificity.
+ * What the app draws instead is its own press state — `.tile:active` settling a
+ * book onto the plank, `.drawerLink:active` — which is a *deliberate* response
+ * in the app's own colours.
+ *
+ * This removes only the pointer highlight. Keyboard focus is untouched: the
+ * `:focus-visible` outline below is what a keyboard user navigates by, and
+ * dropping it to make taps quiet would be trading one problem for a worse one.
+ */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+a,
+button,
+[role='button'],
+[role='link'],
+label,
+summary,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
 html,
 body {
   /* Reading is a vertical activity: there is never anything to the left or

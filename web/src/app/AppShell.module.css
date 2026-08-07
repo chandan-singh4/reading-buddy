@@ -7,6 +7,21 @@
   --drawer-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --drawer-duration: 320ms;
 
+  /*
+   * The page slide borrows the drawer's curve and very nearly its duration, on
+   * purpose. A swipe between the four screens and a tap in the drawer are the
+   * *same move* by two routes, so if they were timed differently the app would
+   * feel like two apps depending on which one a reader reached for.
+   *
+   * 300 ms rather than the 260 this used to run at. The old timing was short
+   * enough that the slide read as a cut with a flicker on it — the screen was
+   * already still by the time the eye found it. Long enough to be followed,
+   * short enough that a reader flicking through all four never queues; the same
+   * ceiling `reader/motion.ts` argues for the page turn.
+   */
+  --page-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --page-duration: 300ms;
+
   min-height: 100dvh;
 }
 
@@ -121,27 +136,41 @@
   min-width: 0;
 }
 
+/* `will-change` sits on the two animating classes rather than on `.page`, so a
+   screen that is merely sitting there isn't holding a compositor layer open for
+   a move that may never come. Without it the first frame or two of a swipe go
+   on handing the element to the compositor — which is exactly the part of the
+   movement the eye is watching for, and it reads as the screen jumping and then
+   gliding. */
 .pageFromRight {
-  animation: fromRight 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fromRight var(--page-duration) var(--page-ease) both;
+  will-change: transform, opacity;
 }
 
 .pageFromLeft {
-  animation: fromLeft 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fromLeft var(--page-duration) var(--page-ease) both;
+  will-change: transform, opacity;
 }
 
-/* Both start at 0.6 opacity, never 0 — see `decisions.md`: fading up from
-   zero flashes the background through and reads as the screen blinking. */
+/* Both start at 0.75 opacity, never 0 — see `decisions.md`: fading up from
+   zero flashes the background through and reads as the screen blinking. Raised
+   from 0.6 now the slide runs longer: over 300 ms a dip that deep is visible as
+   a *fade*, and a screen that fades as well as slides is two effects doing one
+   job. The travel does the work; the opacity only takes the hard edge off it.
+
+   8% rather than 6% for the same reason — a longer, gentler curve needs a
+   little more distance to still read as movement rather than as drift. */
 @keyframes fromRight {
   from {
-    transform: translateX(6%);
-    opacity: 0.6;
+    transform: translateX(8%);
+    opacity: 0.75;
   }
 }
 
 @keyframes fromLeft {
   from {
-    transform: translateX(-6%);
-    opacity: 0.6;
+    transform: translateX(-8%);
+    opacity: 0.75;
   }
 }
 
