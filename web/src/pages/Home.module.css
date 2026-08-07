@@ -1,24 +1,10 @@
-/*
- * The front door, drawn as a piece of furniture.
- *
- * One bookcase — sides, a back panel, and boards cut into it — rather than
- * three cards each with a plank painted underneath. That distinction is the
- * whole design: the shadow across the top of a shelf is cast by the board
- * above it, and that only makes sense if the boards belong to the same object.
- *
- * Everything here is gradients. No image is loaded for the wood: a photograph
- * of oak would cost a few hundred kilobytes, go soft on a high-density phone
- * screen, and tile visibly at any width the layout wasn't cut for. Layered
- * `repeating-linear-gradient`s give grain that is crisp at every size and
- * scales to any shelf width for nothing.
- *
- * Full-catalogue furniture (search, import, multi-select) lives in
- * `page.module.css`, for `/library` only.
- */
+/* The curated front door — three shelves, not the whole collection.
+   Full-catalogue furniture (search, import, multi-select) lives in
+   `page.module.css`, for `/library` only. */
 
 .home {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-6);
 }
 
 .greeting {
@@ -39,156 +25,90 @@
   color: var(--color-text-muted);
 }
 
-/*
- * ─── The case ────────────────────────────────────────────────────────────────
- *
- * `--book-base` is the one measurement the whole shelf is cut from: the height
- * of an average book. Every other size here — the depth of a recess, the
- * thickness of a board, the width of a cover — is derived from it, so the
- * bookcase scales as one object instead of a dozen values drifting apart at
- * different breakpoints. `clamp` does the responsiveness on its own: a book is
- * 40% of the viewport's width on a phone (about two and a half books visible,
- * which is what makes a shelf read as continuing past the edge), and stops
- * growing at 12.5rem so a desktop gets *more books* rather than giant ones.
- */
-.bookcase {
-  --book-base: clamp(7.5rem, 36vw, 11.5rem);
-
-  /* Walnut. Warm and fairly dark — the covers are the colour on this screen,
-     and the case has to sit behind them without competing. */
-  --wood-lit: #b07a45;
-  --wood-face: #7d4f2a;
-  --wood-deep: #492c16;
-  --wood-shadow: #2c1a0d;
-  /* The inside back panel, always darker than the frame: it is the surface
-     furthest from the light and never directly lit. */
-  --wood-back: #35210f;
-  /* Warm off-white for anything printed on the wood. */
-  --wood-ink: #f0e2cf;
-
-  display: grid;
-  min-width: 0;
-  padding: var(--space-2);
-  border-radius: var(--radius-lg);
-  background:
-    /* The vertical grain of the frame. */
-    repeating-linear-gradient(
-      90deg,
-      rgb(255 255 255 / 0.03) 0 1px,
-      rgb(0 0 0 / 0.05) 1px 3px,
-      transparent 3px 7px
-    ),
-    linear-gradient(
-      100deg,
-      var(--wood-deep) 0%,
-      var(--wood-face) 18%,
-      var(--wood-lit) 46%,
-      var(--wood-face) 74%,
-      var(--wood-deep) 100%
-    );
-  /* A frame has thickness: a hairline of light along the top edge where it
-     catches the room, and the weight of the whole piece underneath. */
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.22),
-    inset 0 -1px 0 rgb(0 0 0 / 0.4),
-    0 18px 34px -18px rgb(0 0 0 / 0.55),
-    0 2px 6px rgb(0 0 0 / 0.18);
-}
-
-/* On a phone the case runs to the edges of the screen, the way furniture meets
-   the walls of a small room. The top corners stay rounded and the bottom ones
-   square off, so it reads as standing on the floor rather than floating. */
-@media (max-width: 47.999rem) {
-  .bookcase {
-    margin-inline: calc(-1 * var(--space-4));
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  }
-}
-
-/*
- * ─── One shelf ───────────────────────────────────────────────────────────────
- *
- * The recess the books stand in, and the board they stand on. In that order,
- * so the feet of the books land exactly on the board's top edge with nothing
- * in between — which is why the metadata is printed on the covers rather than
- * captioned underneath them.
- */
+/* Each shelf is its own panel: a heading, the covers, and the plank they stand
+   on. Grouping them means the gap between shelves is one value, not three that
+   have to be kept in agreement. */
 .shelf {
   display: grid;
-  grid-template-rows: auto auto;
-  /* A grid item defaults to `min-width: auto` — "never narrower than my
-     contents" — so a shelf holding more books than fit made the *case* wider
-     than the screen instead of letting the row scroll. The books then ran off
-     the right edge of the phone and the right-hand side of the bookcase was
-     never drawn at all. Same trap the contents page hit; it needs saying at
-     every level between the grid and the scroller. */
-  min-width: 0;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) 0;
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
 }
 
-/* The back of the case. Darker than the frame, grained the other way, and lit
-   from above by the gap the boards leave — plus the underside shadow of the
-   board above, which is the single detail that makes the shelves read as cut
-   into one piece rather than stacked. */
-.recess {
-  position: relative;
-  min-width: 0;
-  background:
-    /* Very faint, and on a wide pitch. The back panel is the surface the
-       covers sit against, and grain that reads as *stripes* competes with
-       them — it should only be noticeable if you go looking for it. */
-    repeating-linear-gradient(
-      88deg,
-      rgb(255 255 255 / 0.012) 0 3px,
-      rgb(0 0 0 / 0.022) 3px 7px,
-      transparent 7px 19px
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--wood-back) 84%, #000) 0%,
-      var(--wood-back) 34%,
-      color-mix(in srgb, var(--wood-back) 88%, #000) 100%
-    );
-  box-shadow:
-    inset 0 10px 14px -9px rgb(0 0 0 / 0.85),
-    inset 3px 0 8px -6px rgb(0 0 0 / 0.7),
-    inset -3px 0 8px -6px rgb(0 0 0 / 0.7);
+.shelfHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
-/*
- * The books on one board.
- *
- * `align-items: flex-end` is what lets each book be its own height: they are
- * aligned by their *feet*, not their tops, because that is the line a shelf
- * actually enforces. (This is the opposite of the fix the old card row needed,
- * and for the opposite reason — there, tiles of different *text* lengths were
- * being aligned by their bottoms, which pushed the covers out of line.)
- *
- * Scrolls sideways rather than wrapping. A shelf that reflowed into a second
- * row would need a second board under it, and there isn't one.
- */
+.shelfHeading {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.viewAll {
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  /* Small text is an easy target to miss — the padding buys tap area without
+     changing where the label sits. */
+  padding: var(--space-1) 0 var(--space-1) var(--space-2);
+}
+
+/* The wooden plank the covers stand on. A gradient rather than an image: it
+   costs nothing, scales to any width, and stays crisp on a phone screen.
+   Negative margins let it run the full width of the shelf panel while the
+   covers above it keep their padding. */
+.plank {
+  height: 0.6rem;
+  margin: 0 calc(-1 * var(--space-4));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-accent) 78%, #000) 0%,
+    color-mix(in srgb, var(--color-accent) 92%, #fff) 45%,
+    color-mix(in srgb, var(--color-accent) 60%, #000) 100%
+  );
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.18);
+}
+
+/* Scrolls sideways rather than wrapping — a shelf of covers reads as a shelf
+   only if it behaves like one. Wider gap than a plain list: covers are the
+   thing being browsed, so each one gets room to read as its own object
+   rather than a row of edge-to-edge thumbnails.
+
+   The row used to be pulled out to the panel's edges with negative margins and
+   pushed back in with matching padding, so a cover would slide off under the
+   rounded corner rather than stopping short of it. That is a nice effect and it
+   cost the thing it was decorating: the first book in every shelf ended up
+   flush with the panel border while the heading above it kept its inset, so its
+   title read as touching the edge of the card. The row now simply lives inside
+   the shelf's own padding — one inset for the heading, the books and the
+   titles, which is the alignment a reader actually notices.
+
+   `align-items: stretch`, not `flex-end`. Aligning the *bottoms* of tiles whose
+   titles run to different numbers of lines pushes the short-titled ones down,
+   which is exactly why "Breath" sat lower than the books either side of it.
+   Stretching instead lets every tile share one top edge — and since every cover
+   is the same width and the same 2:3 shape, one top edge means one baseline
+   under the covers too. */
 .row {
   display: flex;
-  min-width: 0;
-  align-items: flex-end;
-  gap: clamp(var(--space-3), 4vw, var(--space-5));
-  /* Air above the tallest book, so nothing touches the board above it — plus
-     8px of headroom for the lift a hover gives it, which would otherwise be
-     sliced off by the clipping below. */
-  padding: calc(var(--book-base) * 0.14 + 8px) var(--space-4) 0;
-  min-height: calc(var(--book-base) * 1.22 + 8px);
+  align-items: stretch;
+  gap: var(--space-4);
+  /* Room under the row for the books' own drop shadows, which would otherwise
+     be sliced off by the shelf panel's `overflow: hidden`. */
+  padding-bottom: var(--space-3);
   overflow-x: auto;
-  /* A horizontal scroller cannot have visible vertical overflow — the pair is
-     clipped either way — so it is stated rather than left to compute, and the
-     book's contact shadow is drawn inside its own box because of it. */
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
-  /* Without this, snapping aligns the first book to the scroller's own edge
-     and quietly eats the row's left inset — so a shelf with more books than
-     fit started with its first book jammed against the side of the case while
-     every shelf that fitted kept its margin. The snap area has to know about
-     the padding. */
-  scroll-padding-inline: var(--space-4);
   scrollbar-width: none;
 }
 
@@ -196,462 +116,256 @@
   display: none;
 }
 
-.slot {
-  position: relative;
-  flex: none;
+/* Cover first, then whatever text there is. `1fr` on the second row is what
+   keeps the covers level: the text takes the space left over rather than the
+   cover being pushed around by how long a title happens to be.
+
+   No `overflow: hidden` here any more — it clipped the page edges and the drop
+   shadow that make the tile read as a book. The two things it was guarding
+   against (a long title, a long author) are clamped where they are set. */
+.tile {
+  flex: 0 0 auto;
+  width: 8.5rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-3);
+  color: inherit;
   scroll-snap-align: start;
 }
 
-/* Current Reading gets the biggest book in the case. It is the one thing on
-   this screen the reader is most likely to act on, and on a bookcase the way
-   to say so is size, not a badge. */
-.slotHero {
-  --book-base: clamp(11rem, 44vw, 14.5rem);
+/* The one book in progress gets its own panel, not just a wider row item —
+   it is the single thing on this screen the reader is most likely to act on. */
+.heroCard {
+  display: flex;
+  padding: var(--space-3) 0 var(--space-4);
+}
+
+/* Current Reading's single hero tile: cover and text side by side rather
+   than stacked, so it reads as the one thing on the shelf that matters most
+   right now, not as one more card in a row. Its cover runs larger than a
+   shelf tile's — the one book in progress earns the biggest cover on the
+   page. */
+.tileLarge {
+  width: 100%;
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+/* Holds the cover link and the info button on top of it — `.tileMedia` is
+   decorative (the tileInfo link below is the real, keyboard-reachable route
+   to the same book), `.infoButton` is the only other interactive thing here. */
+.mediaWrap {
+  position: relative;
+  width: 8.5rem;
+  flex: none;
+}
+
+.tileLarge .mediaWrap {
+  width: 10rem;
 }
 
 /*
- * ─── A book ──────────────────────────────────────────────────────────────────
+ * A book, not a picture of one.
  *
- * Height, lean and page-block depth all arrive as custom properties from
- * `app/shelfLook.ts`, seeded on the book's id. Width follows from the cover's
- * own 2:3 shape, so a taller book is a wider book, exactly as on a real shelf.
+ * Three things do the work, and none of them is a 3D transform — a rotated
+ * element would take its own width with it and pull the row out of alignment,
+ * which is the bug this same commit is fixing elsewhere.
  *
- * The lean is a `transform`, so it takes no width with it and no neighbour
- * moves — and it pivots about the book's bottom edge, so the line the feet
- * stand on is untouched. That is what keeps it inside the standing rule
- * against rotating a shelf tile: the rule exists because rotation used to
- * break row alignment, and this rotation cannot.
+ * 1. **Asymmetry.** A spine down the left, a block of pages down the right.
+ *    A rectangle with the same treatment on all four sides reads as a card
+ *    however much shadow it is given; a rectangle with a spine reads as a book
+ *    almost immediately.
+ * 2. **Thickness**, drawn as a stack of hard box-shadows offset one pixel at a
+ *    time to the right. Each layer is painted behind the one before it, so five
+ *    of them come out as five hairlines of paper stepping out from under the
+ *    cover — the fore edge. It costs no elements and no layout.
+ * 3. **Weight**, from a soft shadow low and tight, the way a solid object sits
+ *    on a shelf rather than floating above it.
+ *
+ * The gloss is deliberately faint. This is a warm, quiet shelf; a glassy
+ * highlight would look like a stock illustration of a book instead of a book.
  */
-.book {
+.tileMedia {
   position: relative;
   display: block;
-  height: calc(var(--book-base) * var(--book-height, 1));
-  /* The width comes from the height, via the cover's 2:3 shape — a taller book
-     is a wider book, exactly as on a real shelf. It has to be stated *here*
-     rather than left to the cover inside: a block-level child with
-     `width: auto` fills its parent instead of deriving its width from its own
-     aspect ratio, so the shape resolved circularly and every book came out
-     roughly square. */
-  aspect-ratio: 2 / 3;
-  transform: rotate(var(--book-lean, 0deg));
-  transform-origin: bottom left;
   /* Barely rounded at the spine, properly rounded at the fore edge — the shape
      a bound book actually has. */
   border-radius: 2px var(--radius-sm) var(--radius-sm) 2px;
-  color: var(--wood-ink);
-  /* Its weight on the board. Low and tight: a solid object sitting on wood,
-     not a card floating over it. The row clips vertically (a horizontal
-     scroller must), so the contact shadow is drawn inside the book's own box
-     rather than beneath it — see `.book::after` for the fore edge, which is
-     the only thing allowed outside. */
   box-shadow:
-    0 8px 14px -9px rgb(0 0 0 / 0.9),
-    0 1px 2px rgb(0 0 0 / 0.4);
+    /* The page block. Warm off-white, alternating slightly so it reads as
+       separate leaves rather than one grey slab. */
+    1px 0 0 0 #fbf6ec,
+    2px 0 0 0 #e9dfcd,
+    3px 0 0 0 #fbf6ec,
+    4px 0 0 0 #e2d6c0,
+    5px 0 0 0 #f6f0e3,
+    6px 0 0 0 #cfc1a7,
+    /* The book's own weight on the plank. */
+    0 10px 16px -8px rgb(0 0 0 / 0.42),
+    0 2px 4px rgb(0 0 0 / 0.16);
   transition:
-    transform 260ms cubic-bezier(0.32, 0.72, 0, 1),
-    box-shadow 260ms ease;
-}
-
-.face {
-  position: relative;
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  overflow: hidden;
+    transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 220ms ease;
 }
 
 /* The cover art is printed *on* the book: it takes the shell's shape and gives
-   up the standalone shadow it carries elsewhere, which inside a book would
-   read as a second object. Height-driven, width automatic — the cover's 2:3
-   ratio is what decides how wide this book is.
-
-   Written as `.book .face > *` rather than `.face > *` on purpose: `Cover`
-   brings its own `width: 100%` from `Cover.module.css`, which is the same
-   specificity as a bare child selector, so which one won would come down to
-   the order the two stylesheets happened to land in the bundle. Here the width
-   is load-bearing — it is what the book's shape is measured from. */
-.book .face > * {
+   up the standalone shadow it carries elsewhere, which inside a book would read
+   as a second object. */
+.tileMedia > * {
   display: block;
-  height: 100%;
   width: 100%;
   border-radius: inherit;
   box-shadow: none;
 }
 
+/* The spine. A dark fold at the very edge easing into a thin highlight where
+   the cover starts to curve away from it. */
+.tileMedia::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 9%;
+  min-width: 5px;
+  max-width: 11px;
+  border-radius: 2px 0 0 2px;
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 0.38) 0%,
+    rgb(0 0 0 / 0.16) 42%,
+    rgb(255 255 255 / 0.14) 76%,
+    rgb(0 0 0 / 0.07) 100%
+  );
+  pointer-events: none;
+}
+
 /* The cover's own curve: light catching the top-left, the fore edge falling
-   away into shade. Deliberately faint — a glassy highlight would look like a
-   stock illustration of a book instead of a book. */
-.face::after {
+   away into shade. */
+.tileMedia::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   background: linear-gradient(
     105deg,
-    rgb(255 255 255 / 0.13) 0%,
-    rgb(255 255 255 / 0) 26%,
-    rgb(0 0 0 / 0) 68%,
-    rgb(0 0 0 / 0.14) 100%
-  );
-  pointer-events: none;
-}
-
-/* The spine: a dark fold at the very edge easing into a thin highlight where
-   the cover starts to curve away from it. A rectangle with the same treatment
-   on all four sides reads as a card however much shadow it is given; a
-   rectangle with a spine reads as a book almost immediately. */
-.book::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 7%;
-  min-width: 5px;
-  max-width: 12px;
-  border-radius: 2px 0 0 2px;
-  background: linear-gradient(
-    90deg,
-    rgb(0 0 0 / 0.45) 0%,
-    rgb(0 0 0 / 0.18) 40%,
-    rgb(255 255 255 / 0.15) 74%,
+    rgb(255 255 255 / 0.1) 0%,
+    rgb(255 255 255 / 0) 30%,
+    rgb(0 0 0 / 0) 72%,
     rgb(0 0 0 / 0.08) 100%
   );
-  z-index: 2;
   pointer-events: none;
 }
 
-/* The fore edge — the block of pages showing past the cover. Its width comes
-   from `--book-thickness`, so books differ in depth as well as height, and the
-   leaves are a repeating gradient rather than a fixed stack of box-shadows,
-   which is what makes a variable count possible at all. */
-.book::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  bottom: 1px;
-  left: 100%;
-  width: calc(var(--book-thickness, 5) * 1px);
-  border-radius: 0 1px 1px 0;
-  background:
-    /* Shaded top and bottom, and falling away from the cover — paper seen
-       edge-on is never the brightest thing on a book. Left flat white it read
-       as a second card standing behind the first. */
-    linear-gradient(180deg, rgb(0 0 0 / 0.4) 0%, rgb(0 0 0 / 0.06) 14% 86%, rgb(0 0 0 / 0.42) 100%),
-    linear-gradient(90deg, rgb(0 0 0 / 0.1) 0%, rgb(0 0 0 / 0.34) 100%),
-    repeating-linear-gradient(90deg, #ede2cd 0 1px, #c8b898 1px 2px);
-  pointer-events: none;
-}
-
-/*
- * ─── What a book tells you ───────────────────────────────────────────────────
- *
- * A plate across the foot of the cover, the way a library sticks its own label
- * there. It has to be on the book: a caption underneath would put something
- * between the book and the board, and the board is the only reason any of this
- * reads as a shelf.
- *
- * Dark and blurred rather than opaque, so it never becomes the brightest thing
- * on a cover — and the cover art still shows through it, which is what keeps
- * the shelf feeling like books rather than a row of labelled boxes.
- */
-.plate {
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: 1;
-  display: grid;
-  gap: 1px;
-  padding: 0.45rem 0.5rem calc(0.45rem + 3px) calc(0.5rem + 7%);
-  border-radius: 0 0 var(--radius-sm) 2px;
-  background: linear-gradient(180deg, rgb(12 8 4 / 0) 0%, rgb(12 8 4 / 0.72) 38%, rgb(12 8 4 / 0.88) 100%);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  color: #fdf8f0;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
-}
-
-.plateTitle {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: 0.005em;
-  /* Two lines, then cut. `max-height` is the backstop: on its own,
-     `-webkit-line-clamp` has been seen to let a third line bleed out of a
-     narrow flex item on some mobile browsers. The full title is on the link's
-     `title` attribute either way. */
-  display: -webkit-box;
-  line-clamp: 2;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  max-height: calc(1.25em * 2);
-  word-break: break-word;
-}
-
-.plateAuthor {
-  font-size: 0.6875rem;
-  line-height: 1.3;
-  color: rgb(253 248 240 / 0.72);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.slotHero .plateTitle {
-  font-size: var(--text-sm);
-}
-
-.slotHero .plateAuthor {
-  font-size: var(--text-xs);
-}
-
-/* Reading progress, as a gilt line along the very foot of the book. A number
-   in a corner is a statistic; a line that grows along the bottom edge is the
-   bookmark's depth, which is the thing a reader actually pictures. The figure
-   itself goes to a screen reader through `.srOnly`. */
-.gauge {
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: 2;
-  height: 3px;
-  border-radius: 0 0 var(--radius-sm) 2px;
-  background: rgb(0 0 0 / 0.45);
-  overflow: hidden;
-}
-
-.gauge::after {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--percent, 0%);
-  background: linear-gradient(90deg, #c08a3e 0%, #e8c07a 60%, #f2d79b 100%);
-  box-shadow: 0 0 6px rgb(232 192 122 / 0.55);
-}
-
-/* Pressed: the book settles onto the board and its shadow tightens under it. */
-.book:active {
-  transform: rotate(var(--book-lean, 0deg)) translateY(2px) scale(0.99);
+/* Pressed: the book settles onto the plank and its shadow tightens under it.
+   The page block stays — a book doesn't lose its pages when you pick it up. */
+.tile:active .tileMedia {
+  transform: translateY(2px) scale(0.985);
   box-shadow:
-    0 3px 6px -4px rgb(0 0 0 / 0.85),
-    0 1px 1px rgb(0 0 0 / 0.35);
-}
-
-/* A pointer that can hover gets the book easing forward off the shelf. Touch
-   devices are excluded outright: a hover state a finger can trigger but not
-   clear is a book that stays lifted after you've moved on. */
-@media (hover: hover) and (pointer: fine) {
-  .book:hover {
-    transform: rotate(var(--book-lean, 0deg)) translateY(-6px);
-    box-shadow:
-      0 16px 24px -12px rgb(0 0 0 / 0.9),
-      0 2px 4px rgb(0 0 0 / 0.4);
-  }
+    1px 0 0 0 #fbf6ec,
+    2px 0 0 0 #e9dfcd,
+    3px 0 0 0 #fbf6ec,
+    4px 0 0 0 #e2d6c0,
+    5px 0 0 0 #f6f0e3,
+    6px 0 0 0 #cfc1a7,
+    0 3px 6px -3px rgb(0 0 0 / 0.34);
 }
 
 .infoButton {
   position: absolute;
   top: var(--space-1);
   right: var(--space-1);
-  z-index: 3;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.5rem;
+  height: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgb(0 0 0 / 0.3);
+  background: rgb(0 0 0 / 0.55);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   color: #fff;
-  /* The icon is sized in `em`, so this is what sets it. */
-  font-size: 0.85rem;
+  font-size: var(--text-xs);
   line-height: 1;
-  /* Faint until wanted. On a shelf of covers, a dozen identical dark circles
-     are the first thing the eye finds and the least important thing on the
-     screen — so they sit just above invisible and come up on touch, hover or
-     focus. Not hidden outright: on a phone there is no hover to reveal them
-     with, and a control you cannot find is worse than a quiet one. */
-  opacity: 0.32;
-  transition: opacity 180ms ease;
+  text-decoration: none;
 }
 
-.infoButton:hover,
-.infoButton:active,
-.infoButton:focus-visible,
-.slot:hover .infoButton {
-  opacity: 1;
-  background: rgb(0 0 0 / 0.55);
-}
-
-/*
- * ─── The board ───────────────────────────────────────────────────────────────
- *
- * A plank seen from very slightly above: a narrow lit top face where the books
- * stand, then the front edge falling away into shade, then the bullnose
- * catching a hairline of light at the bottom.
- *
- * The shelf's name is engraved into that front edge rather than floated above
- * the books as a heading. It is the only surface a label has ever belonged on,
- * and it buys back a whole line of vertical space — on a phone, most of a
- * book's worth.
- */
-.board {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 2.1rem;
-  padding: 0.35rem var(--space-4) 0.2rem;
-  background:
-    repeating-linear-gradient(
-      92deg,
-      rgb(255 255 255 / 0.028) 0 2px,
-      rgb(0 0 0 / 0.04) 2px 4px,
-      transparent 4px 9px
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--wood-lit) 88%, #fff) 0%,
-      var(--wood-lit) 14%,
-      var(--wood-face) 34%,
-      var(--wood-deep) 88%,
-      color-mix(in srgb, var(--wood-lit) 70%, #000) 100%
-    );
-  box-shadow:
-    /* Where the books meet the wood. */
-    inset 0 5px 7px -6px rgb(0 0 0 / 0.75),
-    /* The plank's own edge, and the shade it throws into the shelf below. */
-      inset 0 -1px 0 rgb(255 255 255 / 0.16),
-    0 5px 9px -4px rgb(0 0 0 / 0.5);
-}
-
-/* Engraved, not printed: a dark line with a hairline of light directly under
-   it is what a router cut into wood looks like from the front. */
-.boardLabel {
+/* The text under a book. `align-content: start` so a one-line title sits
+   directly under its cover instead of being centred in the stretched row —
+   the same alignment fix as the covers, one level down. */
+.tileInfo {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
   min-width: 0;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  line-height: 1.4;
-  /* 88%, not the 62% this started at. Engraving reads best when the letters
-     are barely there, and barely there measured 3.5:1 against the plank —
-     under the 4.5:1 that small text needs. The dark line above and the
-     hairline of light below are what carry the cut now, and the ink itself is
-     legible. */
-  color: color-mix(in srgb, var(--wood-ink) 88%, transparent);
-  text-shadow:
-    0 -1px 1px rgb(0 0 0 / 0.8),
-    0 1px 0 rgb(255 255 255 / 0.16);
+  color: inherit;
+  text-decoration: none;
+}
+
+
+.tileTitle {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  line-height: 1.3;
+  /* Two lines, then cut — a long title shouldn't push neighbouring tiles out
+     of alignment. `max-height` is the backstop: on its own,
+     `-webkit-line-clamp` has been seen to let a third line bleed out of a
+     narrow flex/grid tile on some mobile browsers, so the hard height plus
+     `overflow: hidden` clips it regardless of whether the clamp itself takes
+     effect. */
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: calc(1.3em * 2);
+  word-break: break-word;
+}
+
+.tileLarge .tileTitle {
+  font-size: var(--text-lg);
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
+  max-height: calc(1.3em * 3);
+}
+
+/* Title, author and progress are three weights of the same thought, so they are
+   spaced as a group rather than evenly: the author sits close under its title,
+   and the progress — a different fact about the book, not part of its name —
+   gets a little air above it. */
+.tileAuthor {
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Only Unread carries this: it is the shelf that is capped — ten of however
-   many you own — so it is the only one actually holding anything back. */
-.viewAll {
-  flex: none;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #f4dcb0;
-  text-shadow: 0 -1px 1px rgb(0 0 0 / 0.7);
-  /* Small text is an easy target to miss — the padding buys tap area without
-     changing where the label sits. */
-  padding: var(--space-2) 0 var(--space-2) var(--space-3);
-}
-
-/*
- * ─── The empty shelf ─────────────────────────────────────────────────────────
- *
- * The bottom board is kept clear on purpose: it is where the next book goes.
- * Drawn as a gap in the row rather than a button floated over the furniture —
- * everything on this screen is an object on the case, and "somewhere to put
- * the next one" is the most natural thing an empty shelf can hold.
- */
-.addSlot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  /* Book-shaped, and the size of an average book, so it reads as the space one
-     would occupy rather than as a control that happens to be nearby. */
-  height: var(--book-base);
-  aspect-ratio: 2 / 3;
-  border: 1px dashed color-mix(in srgb, var(--wood-ink) 34%, transparent);
-  border-radius: 2px var(--radius-sm) var(--radius-sm) 2px;
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.045) 0%, rgb(0 0 0 / 0.12) 100%);
-  color: color-mix(in srgb, var(--wood-ink) 78%, transparent);
-  text-align: center;
-  transition:
-    border-color 200ms ease,
-    background 200ms ease,
-    color 200ms ease;
-}
-
-.addSlot:hover,
-.addSlot:focus-visible {
-  border-color: color-mix(in srgb, var(--wood-ink) 62%, transparent);
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.1) 0%, rgb(0 0 0 / 0.08) 100%);
-  color: var(--wood-ink);
-}
-
-.addMark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font-size: var(--text-xl);
-  line-height: 1;
-  opacity: 0.85;
-}
-
-.addLabel {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-}
-
-/* A brand-new library: the top shelf explains itself rather than standing
-   empty next to a shelf that is empty on purpose. */
-.emptyShelf {
-  display: grid;
-  gap: var(--space-1);
-  place-content: center;
-  min-height: calc(var(--book-base) * 0.9);
-  padding: var(--space-5) var(--space-4);
-  text-align: center;
-  color: color-mix(in srgb, var(--wood-ink) 72%, transparent);
-}
-
-.emptyTitle {
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--wood-ink);
-}
-
-.emptyLine {
+.tileProgress {
+  margin-top: calc(var(--space-1) / 2);
   font-size: var(--text-sm);
+  line-height: 1.3;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
 }
-
-.emptyLine a {
-  color: #f4dcb0;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-/* ─── The rest ─────────────────────────────────────────────────────────────── */
 
 .pending {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+.empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+}
+
+.emptyTitle {
+  font-size: var(--text-lg);
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 .error {
@@ -661,109 +375,12 @@
   border-radius: var(--radius-sm);
 }
 
-.srOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-/* Wider screens: the case stops stretching edge to edge and stands on a
-   comfortable column, the way the reading screen already does. The books
-   don't grow with it — `--book-base` is capped — so the extra width shows
-   more of the shelf, which is the right answer for a bookcase. */
+/* Wider screens: the shelves stop stretching edge to edge and centre on a
+   comfortable column, the way the reading screen already does. */
 @media (min-width: 48rem) {
   .home {
-    max-width: 52rem;
+    max-width: 46rem;
     margin-inline: auto;
     width: 100%;
-  }
-
-  /* The books grow with the case rather than the case growing around them.
-     Capping `--book-base` at its phone ceiling looked right in the abstract —
-     "a desktop gets more books, not giant ones" — and was plainly wrong once
-     built: four small books on a 900px plank read as a half-empty display
-     case. A bookcase you are standing in front of holds bigger books. */
-  .bookcase {
-    --book-base: clamp(11.5rem, 15vw, 14.5rem);
-  }
-
-  .slotHero {
-    --book-base: clamp(15rem, 21vw, 19rem);
-  }
-
-  .row {
-    padding-inline: var(--space-5);
-    scroll-padding-inline: var(--space-5);
-  }
-
-  .board {
-    padding-inline: var(--space-5);
-    min-height: 2.4rem;
-  }
-}
-
-/*
- * High contrast is the one theme where "tasteful" is the wrong goal, and a
- * dark walnut case with cream text engraved into it is the exact opposite of
- * what it is for. The furniture flattens to plain surfaces and the ink goes
- * back to the theme's own text colour; the layout, the varied heights and the
- * shelf labels all survive.
- */
-:global([data-theme='contrast']) .bookcase {
-  --wood-lit: var(--color-surface-raised);
-  --wood-face: var(--color-surface-raised);
-  --wood-deep: var(--color-surface-raised);
-  --wood-back: var(--color-surface);
-  --wood-ink: var(--color-text);
-
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: none;
-}
-
-:global([data-theme='contrast']) .recess {
-  background: var(--color-surface);
-  box-shadow: none;
-  border-bottom: 1px solid var(--color-border);
-}
-
-:global([data-theme='contrast']) .board {
-  background: var(--color-surface-raised);
-  box-shadow: none;
-  border-bottom: 2px solid var(--color-border);
-}
-
-:global([data-theme='contrast']) .boardLabel,
-:global([data-theme='contrast']) .viewAll,
-:global([data-theme='contrast']) .emptyLine a {
-  color: var(--color-text);
-  text-shadow: none;
-}
-
-:global([data-theme='contrast']) .plate {
-  background: #000;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-/* A book easing forward off the shelf is decoration, and decoration is what
-   this preference asks to be spared. The press state stays — it is feedback,
-   not flourish — but nothing lifts or leans on its own. */
-@media (prefers-reduced-motion: reduce) {
-  .book {
-    transform: none;
-  }
-
-  .book:hover {
-    transform: none;
-  }
-
-  .book:active {
-    transform: none;
   }
 }
