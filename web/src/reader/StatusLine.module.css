@@ -1,0 +1,70 @@
+/*
+ * The page number printed at the foot of the page. See `StatusLine.tsx` for why
+ * this is not part of the overlay.
+ */
+
+/*
+ * `absolute`, inside the sheet — not `fixed` to the screen, which is what it
+ * used to be.
+ *
+ * The change matters: the sheet shrinks and slides when the toolbar comes up,
+ * and a page number fixed to the screen would have stayed behind while the page
+ * it belongs to moved away from it. Pinned to the foot of the sheet, it travels
+ * with the page, which is what a printed page number does.
+ *
+ * `pointer-events: none` on the container so the dead space either side of the
+ * text belongs to the page underneath — the middle tap that raises the overlay
+ * must not be swallowed by an invisible bar. The button itself takes its own
+ * taps back, below.
+ */
+.statusLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline: var(--space-4);
+  font-family: var(--font-ui);
+  pointer-events: none;
+}
+
+/* A button styled as text — it has to read as information rather than as a
+   control, while still being the thing you tap. Padded rather than given a
+   height, so it is a usable target without printing the line halfway up the
+   page; `--status-line` is what the sheet reserves for it, and the two must
+   stay in step. */
+.status {
+  pointer-events: auto;
+  flex: 1;
+  padding: var(--space-2) 0;
+  line-height: var(--leading-ui);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  /* No blue flash when it's tapped. A phone paints a highlight over anything
+     button-shaped, which is right for a button and wrong for this — it reads as
+     information, so lighting it up looks like something happened. The state
+     change is the text itself changing, which is all the feedback it needs.
+     Focus is still shown to a keyboard, below, where nothing else marks it. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.status:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.percent {
+  /* Reserved whether or not it's showing, so the line doesn't shift sideways
+     when the percentage leaves in the bare state. */
+  min-width: 4ch;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

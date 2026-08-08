@@ -23,14 +23,11 @@
   /* The foot leaves room for the status line, which is `fixed` and so takes no
      space of its own — without this the last line of every page would be read
      through the page number. */
-  /* Room at both ends for the overlay's bars, so raising them covers furniture
-     and never prose — see `--reader-bar-top` in `theme.css` for why this is a
-     permanent margin rather than something that appears with the bars. The foot
-     also clears the status line, which is `fixed` and takes no space of its
-     own; without that the last line of every page would be read through the
-     page number. */
-  padding: calc(var(--safe-top) + var(--reader-bar-top)) 0
-    calc(var(--safe-bottom) + var(--reader-bar-bottom) + var(--status-line));
+  /* The page's own margins, and nothing more. Room for the bars is made by the
+     page shrinking when they appear — see `.stage` — not by standing space
+     kept empty for them. */
+  padding: calc(var(--safe-top) + var(--space-4)) 0
+    calc(var(--safe-bottom) + var(--space-4));
   /*
    * No entry animation on the reading screen itself.
    *
@@ -51,6 +48,82 @@
    * mean fixed to *this box* instead of to the screen, which would shift the
    * bars for as long as it ran.
    */
+}
+
+/*
+ * The sheet of paper: the text *and* the page number printed at its foot, as
+ * one thing that can be moved as one thing.
+ *
+ * ## What it is for
+ *
+ * When the toolbar comes up, this shrinks a little and slides down, so the page
+ * sits between the two bars instead of underneath them. Google Books does the
+ * same, and the reason is the same: a bar over a page of prose hides two or
+ * three lines, and lines you can't read are as good as missing.
+ *
+ * ## Why a transform, and why it is safe here in particular
+ *
+ * A transform is the only way to make a box *look* smaller without making it
+ * *be* smaller. That distinction is everything on this screen: the text is laid
+ * out in columns, so a box that genuinely changed size would re-flow, the
+ * browser would re-decide where every page break falls, and the page you were
+ * standing on would change under you the moment you tapped. Scaled, not a
+ * single line moves — the same sheet is simply held further away.
+ *
+ * It costs three things, and each is paid for explicitly:
+ *
+ * 1. Measured rectangles come back scaled. `Reader.tsx` divides them by
+ *    `--page-scale`, which is why that number is set from the one constant in
+ *    the TypeScript rather than written here.
+ * 2. `position: fixed` inside a transformed box means fixed to *this box*. That
+ *    is why the status line is inside it and why it is `absolute` — it is part
+ *    of the page and should travel with it, which it now does.
+ * 3. The page-turn animation lays its copy out from measured offsets, which a
+ *    scale would apply twice. So a turn while the toolbar is up is instant
+ *    rather than animated — see `turnPage` in `Reader.tsx`.
+ *
+ * `scale(1)` is set even at rest, deliberately. It makes this the containing
+ * block for the status line at all times: a box that only sometimes established
+ * one would move the page number every time the toolbar appeared.
+ */
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Room at the foot for the status line, which is out of the flow. Without it
+     the last line of every page is read through the page number. */
+  padding-bottom: var(--status-line);
+  /* Shrinks towards the top: the head of the page stays put and the foot rises,
+     which is what makes the movement read as the page stepping back rather than
+     as the whole screen jumping. */
+  transform-origin: top center;
+  transform: scale(1);
+  transition: transform 200ms ease;
+}
+
+/*
+ * Read right to left: scaled about its top edge, then pushed down clear of the
+ * top bar. The push is applied *after* the scale, so it is a true distance and
+ * not a scaled one — the page lands exactly where the bar ends however small it
+ * has been made.
+ *
+ * The room this frees at the foot is `(1 - scale)` of the page's height, less
+ * whatever the push spent at the head. On a phone held upright that is
+ * comfortably more than the bottom bar needs. On a very short screen — a phone
+ * on its side — it is not, and the slider will overlap the last line. Reading a
+ * book in landscape on a phone is not a case worth distorting the portrait one
+ * for, so it is left as it is rather than guarded against.
+ */
+.stage[data-shrunk='true'] {
+  transform: translateY(var(--reader-bar-top)) scale(var(--page-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage {
+    transition: none;
+  }
 }
 
 .back {

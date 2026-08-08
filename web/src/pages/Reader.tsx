@@ -11,6 +11,7 @@ import {
   inBookOrder,
   labelFor,
   searchBook,
+  StatusLine,
   type BookmarkRow,
   elementIdOf,
   pagesAt,
@@ -96,6 +97,45 @@ const READING_LINE = 80
 const EDGE_TAP = 0.25
 
 /**
+ * How much the page shrinks by when the toolbar comes up.
+ *
+ * Lives here rather than in the stylesheet because the arithmetic below has to
+ * know it exactly — see `scaleOf`. It is handed to the CSS as a custom property
+ * on the stage, so there is one number and not two that have to agree.
+ *
+ * The value is set by what has to fit: the room freed at the foot is
+ * `(1 - PAGE_SCALE)` of the page's height less what the top bar takes, and the
+ * bottom bar has to sit in the rest of it.
+ */
+const PAGE_SCALE = 0.85
+
+/**
+ * The scale the page is currently drawn at.
+ *
+ * Every rectangle read off a scaled element comes back scaled, while
+ * `scrollLeft`, `scrollWidth` and the column gap do not — they are layout
+ * numbers, which a transform never touches. Mixing the two is what would put
+ * every page turn out of true, so each measured rectangle is divided by this on
+ * the way in.
+ *
+ * Read from the DOM rather than passed down from React state, because the
+ * measuring happens inside plain functions that scroll handlers call — and
+ * asked as a *question about the element* rather than computed from
+ * `getBoundingClientRect() / offsetWidth`, which would look tidier and be
+ * wrong: `offsetWidth` is rounded to a whole pixel, so the scale would come out
+ * a fraction of a per cent off, and a fraction of a per cent of a
+ * forty-thousand-pixel strip is a page and a half.
+ *
+ * During the 200ms the shrink is animating, the real scale is somewhere between
+ * the two values and this answers with the destination. Nothing is measured in
+ * that window except by a reader turning a page in the same fifth of a second
+ * as they raised the toolbar, and the next scroll settles it.
+ */
+function scaleOf(element: HTMLElement): number {
+  return element.closest('[data-shrunk="true"]') ? PAGE_SCALE : 1
+}
+
+/**
  * Measure the laid-out strip of pages.
  *
  * Returns zeroes before layout has happened and under jsdom, which has no
@@ -124,7 +164,11 @@ function measure(element: HTMLElement | null): Strip {
     // The *pitch*: one column plus the gap after it, which is how far one page
     // turn travels. `Strip.pageWidth` has always been documented that way; until
     // the gap existed the two happened to be the same number.
-    pageWidth: element.getBoundingClientRect().width + gap,
+    //
+    // Divided by the scale, because the rectangle is what the page *looks*
+    // like and everything else here is what it *is* — see `scaleOf`. The gap is
+    // read off the computed style and so is already unscaled.
+    pageWidth: element.getBoundingClientRect().width / scaleOf(element) + gap,
     scrollLeft: element.scrollLeft,
   }
 }
@@ -158,7 +202,11 @@ function columnOf(node: HTMLElement, strip: HTMLElement | null): number {
   const { pageWidth } = measure(strip)
   if (!strip || pageWidth <= 0) return 1
 
-  const from = node.getBoundingClientRect().left - strip.getBoundingClientRect().left
+  // Both rectangles are drawn at the same scale, so the distance between them
+  // is scaled once — and `scrollLeft`, which it is added to, is not scaled at
+  // all. Dividing puts the two in the same units.
+  const from =
+    (node.getBoundingClientRect().left - strip.getBoundingClientRect().left) / scaleOf(strip)
   // A half-pixel of slack, so a paragraph sitting exactly on a column edge is
   // read as opening that column rather than as ending the one before it.
   return Math.floor((from + strip.scrollLeft + 0.5) / pageWidth) + 1
@@ -701,7 +749,13 @@ export default function Reader() {
         // A second turn before the first has landed drops the first outright —
         // a fast tapper outruns the animation rather than queueing behind it.
         cancelTurn(held.current)
-        const sheet = holdOutgoing(strip.current, by)
+        // No flip while the page is shrunk. The turn lays a copy of the page
+        // out from measured offsets inside the stage, and the stage's own scale
+        // would be applied to those offsets a second time — a sheet turning at
+        // the wrong size, in the wrong place. An instant change is the honest
+        // fallback, and it is the same one a reader who asks for less movement
+        // gets everywhere else.
+        const sheet = chromeShown ? null : holdOutgoing(strip.current, by)
         showPage(next, true)
         playFlip(sheet, strip.current)
         return
@@ -715,10 +769,10 @@ export default function Reader() {
       // A second turn before the first has landed drops the first outright —
       // a fast tapper outruns the animation rather than queueing behind it.
       cancelTurn(held.current)
-      held.current = holdOutgoing(strip.current, by)
+      held.current = chromeShown ? null : holdOutgoing(strip.current, by)
       goTo(target)
     },
-    [neighbours, showPage, goTo],
+    [neighbours, showPage, goTo, chromeShown],
   )
 
   /**
@@ -1501,13 +1555,11 @@ export default function Reader() {
             menuOpen={menuOpen}
             sheetOpen={sheetOpen}
             sheetTab={sheetTab}
-            barState={barState}
             settings={settings}
             onToggleFocus={toggleFocus}
             onToggleMenu={toggleMenu}
             onOpenSheet={openSheet}
             onCloseSheet={closeSheet}
-            onBarStateChange={setBarState}
             onJumpToChapter={(chapter) => goTo({ chapter, section: 1 })}
             onJumpToPage={jumpToPage}
             onSettingsChange={changeSettings}
@@ -1524,6 +1576,21 @@ export default function Reader() {
             onJumpToHit={jumpToHit}
           />
 
+          {/*
+            The sheet of paper: the text and the page number printed at its
+            foot, held in one box so the two can be moved as one thing. It is
+            what shrinks out of the toolbar's way — see `.stage` in
+            `Reader.module.css`, which is where the reasoning lives.
+
+            The scale is handed to the stylesheet rather than written in it, so
+            the number the arithmetic above divides by and the number the page
+            is actually drawn at cannot come apart.
+          */}
+          <div
+            className={styles.stage}
+            data-shrunk={chromeShown}
+            style={{ '--page-scale': PAGE_SCALE } as React.CSSProperties}
+          >
           {/*
             Tapping the text shows or hides the overlay — the Books-style
             gesture. It sits on the article rather than the whole page so the
@@ -1639,6 +1706,18 @@ export default function Reader() {
                 />
               ))}
           </article>
+
+            {/* Printed at the foot of the sheet, inside it, so it travels
+                with the page — both when the page turns and when it steps
+                back for the toolbar. */}
+            <StatusLine
+              manifest={frame.manifest}
+              here={here}
+              pages={pages}
+              barState={barState}
+              onBarStateChange={setBarState}
+            />
+          </div>
 
           {/*
             The bookmark, as a corner of the paper rather than a button in a bar.

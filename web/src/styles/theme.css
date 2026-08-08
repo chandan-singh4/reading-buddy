@@ -92,29 +92,22 @@
   --status-line: 2rem;
 
   /*
-   * The two bars of the reading overlay, named here for the same reason as the
-   * status line above: the page has to leave room for them.
+   * The two bars of the reading overlay.
    *
-   * The reader's complaint was that raising the toolbar hid the top and bottom
-   * of the page — a bar over a page of prose covers two or three lines, and the
-   * two lines you cannot read are as good as missing.
+   * Named here because three things have to agree about them: the bars, which
+   * are exactly this tall (`Chrome.module.css` sets these as `min-height`, so
+   * they cannot drift); the menu, which hangs from where the top bar ends; and
+   * the page, which steps out of their way when they appear.
    *
-   * The fix is a reservation rather than anything clever. Two other approaches
-   * were possible and both are worse: shrinking the text box when the bars
-   * appear re-flows the columns, so the page you are on changes under you; and
-   * scaling the page down needs a transform on the reading screen, which would
-   * redefine what `position: fixed` means for the bars themselves and break the
-   * measured rectangles every page turn is built from (see `pageTurn.ts`).
-   *
-   * So the page keeps a margin at each end, always, whether the bars are up or
-   * not. It costs a line or two of prose per page and buys the rule this whole
-   * screen is built on: showing or hiding the overlay never moves a word.
-   *
-   * These must equal the bars' real heights — `Chrome.module.css` sets them as
-   * `min-height` on the bars themselves, so the two cannot drift apart.
+   * "Steps out of their way" is the second attempt at this. The first was a
+   * permanent margin at each end of the page, which worked and read badly — the
+   * reader saw a book with too much air above and below it, and the gap was
+   * there whether the bars were or not. The page now shrinks instead, which is
+   * the same move Google Books makes: see `.stage` in `pages/Reader.module.css`
+   * for how it is done without disturbing a single measurement.
    */
   --reader-bar-top: 3.5rem;
-  --reader-bar-bottom: 4.5rem;
+  --reader-bar-bottom: 3.5rem;
 
   color-scheme: light;
 }

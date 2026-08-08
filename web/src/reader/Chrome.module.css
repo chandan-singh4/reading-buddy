@@ -29,13 +29,12 @@
 }
 
 /*
- * A bar is exactly as tall as the page reserves for it.
+ * A bar is exactly as tall as the page expects it to be.
  *
- * `--reader-bar-top` and `--reader-bar-bottom` are the margins the reading page
- * keeps clear at each end (see `theme.css`). Setting the same two numbers as
- * `min-height` here is what stops the two from drifting: a bar that grew past
- * its reservation would start covering prose again, silently, and the fault
- * would look like the one this replaced.
+ * `--reader-bar-top` and `--reader-bar-bottom` (see `theme.css`) are what the
+ * page shrinks by to make room. Setting the same two numbers as `min-height`
+ * here is what stops the two from drifting: a bar that grew past what the page
+ * stepped back for would start covering prose again, silently.
  */
 .bar {
   pointer-events: auto;
@@ -59,11 +58,11 @@
   align-items: stretch;
   justify-content: center;
   gap: var(--space-2);
-  /* Room at the foot for the status line, which is not part of this bar and
-     stays on screen after it has gone. */
-  min-height: calc(var(--safe-bottom) + var(--reader-bar-bottom) + var(--status-line));
-  padding: var(--space-1) var(--space-4)
-    calc(var(--safe-bottom) + var(--space-1) + var(--status-line));
+  /* No longer dodges the status line. It used to reserve room at its foot so
+     the page number stayed visible underneath — but the page number is part of
+     the page now, and rises with it when this bar appears. */
+  min-height: calc(var(--safe-bottom) + var(--reader-bar-bottom));
+  padding: var(--space-1) var(--space-4) calc(var(--safe-bottom) + var(--space-1));
   border-bottom: none;
   border-top: 1px solid var(--color-border);
 }
@@ -178,76 +177,6 @@
   font-weight: 600;
 }
 
-/*
- * The one permanent thing on the reading screen: "Page 84 of 350" on the left,
- * "24%" on the right, at the foot of the page.
- *
- * No background, no border, no shadow — that is the point. It used to live in
- * the bottom bar, so seeing where you were meant putting a panel over the book,
- * and the panel brought the library link, the focus toggle, the slider and the
- * contents button with it. Now the number is simply printed on the page and the
- * controls are what you tap for.
- *
- * `fixed`, so it is unaffected by the strip of pages sliding sideways behind
- * it, and `pointer-events: none` on the container so the dead space either side
- * of the text belongs to the page underneath — the middle-tap that raises the
- * overlay must not be swallowed by an invisible bar.
- */
-.statusLine {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  /* Above the overlay, so it stays readable while the bars are up rather than
-     disappearing under them. */
-  z-index: 11;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding-inline: var(--space-4);
-  padding-bottom: var(--safe-bottom);
-  font-family: var(--font-ui);
-  pointer-events: none;
-}
-
-/* A button styled as text — it has to read as information rather than as a
-   control, while still being the thing you tap. Padded rather than given a
-   height, so it is a usable target without printing the line halfway up the
-   page; `--status-line` is what the reading page and the bar above reserve for
-   it, and the two must stay in step. */
-.status {
-  pointer-events: auto;
-  flex: 1;
-  padding: var(--space-2) 0;
-  line-height: var(--leading-ui);
-  font-family: inherit;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  text-align: left;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  /* No blue flash when it's tapped. A phone paints a highlight over anything
-     button-shaped, which is right for a button and wrong for this — it reads as
-     information, so lighting it up looks like something happened. The state
-     change is the text itself changing, which is all the feedback it needs.
-     Focus is still shown to a keyboard, below, where nothing else marks it. */
-  -webkit-tap-highlight-color: transparent;
-}
-
-.status:focus:not(:focus-visible) {
-  outline: none;
-}
-
-.percent {
-  /* Reserved whether or not it's showing, so the line doesn't shift sideways
-     when the percentage leaves in the bare state. */
-  min-width: 4ch;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
 
 /* The tappable gap above the sheet. Dimmed rather than clear so the sheet reads
    as sitting on top of the book — and so it's obvious there is something behind

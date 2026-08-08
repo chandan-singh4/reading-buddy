@@ -314,6 +314,37 @@ describe('the overlay', () => {
     expect(container.querySelector('[data-shown]')?.contains(status)).toBe(false)
   })
 
+  /*
+   * The page steps back rather than being covered. jsdom has no layout, so what
+   * can be held here is the switch and not the geometry — that the page is told
+   * to shrink exactly when the bars are up. Whether 85% is the right amount, and
+   * whether the bars clear it, is a question for a real screen.
+   */
+  it('shrinks the page out of the way while the bars are up', async () => {
+    const { container } = openReader()
+    const text = await screen.findByText('The opening words.')
+
+    const stage = container.querySelector('[data-shrunk]')
+    expect(stage?.getAttribute('data-shrunk')).toBe('false')
+
+    fireEvent.click(text)
+    expect(stage?.getAttribute('data-shrunk')).toBe('true')
+
+    fireEvent.click(text)
+    expect(stage?.getAttribute('data-shrunk')).toBe('false')
+  })
+
+  // The page number is printed on the sheet, so it has to move with it. Before
+  // this it was fixed to the screen and stayed behind while the page stepped
+  // back, which left it floating below the shrunk page.
+  it('keeps the page number on the page it belongs to', async () => {
+    const { container } = openReader()
+    await screen.findByText('The opening words.')
+
+    const status = await screen.findByText(/Page \d+ of \d+/)
+    expect(container.querySelector('[data-shrunk]')?.contains(status)).toBe(true)
+  })
+
   it('says where you are as a page, counted in words', async () => {
     openReader()
     await screen.findByText('The opening words.')

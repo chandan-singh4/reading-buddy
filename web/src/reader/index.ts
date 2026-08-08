@@ -14,6 +14,9 @@ export type { Run } from './linkRuns.ts'
 export { Chrome } from './Chrome.tsx'
 export type { BookmarkRow, ChromeProps, SheetTab } from './Chrome.tsx'
 
+export { StatusLine } from './StatusLine.tsx'
+export type { StatusLineProps } from './StatusLine.tsx'
+
 export { bookmarkOn, inBookOrder, labelFor } from './bookmarks.ts'
 export type { BookmarkLike } from './bookmarks.ts'
 

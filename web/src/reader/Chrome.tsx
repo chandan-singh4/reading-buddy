@@ -27,8 +27,7 @@
 
 import { Link } from 'react-router'
 
-import { advanceBar, barLabel, showsPercent, type BarState } from './bar.ts'
-import { progressLabel, progressOf, type Pages } from './progress.ts'
+import { progressOf, type Pages } from './progress.ts'
 import { MIN_QUERY, type SearchOutcome } from './search.ts'
 import type { SectionRef } from './navigation.ts'
 import type { Anchor, Manifest } from '../structure/index.ts'
@@ -106,7 +105,6 @@ export interface ChromeProps {
   menuOpen: boolean
   sheetOpen: boolean
   sheetTab: SheetTab
-  barState: BarState
   /** The reading-comfort settings: theme, font, text size, spacing, margins. */
   settings: ReaderSettings
   onToggleFocus: () => void
@@ -115,7 +113,6 @@ export interface ChromeProps {
       names the panel it wants, which is what let the tab row go. */
   onOpenSheet: (tab: SheetTab) => void
   onCloseSheet: () => void
-  onBarStateChange: (state: BarState) => void
   /** Go to the first section of a chapter. */
   onJumpToChapter: (chapter: number) => void
   /** Go to a page — which may be inside the section already on screen. */
@@ -190,13 +187,11 @@ export function Chrome({
   menuOpen,
   sheetOpen,
   sheetTab,
-  barState,
   settings,
   onToggleFocus,
   onToggleMenu,
   onOpenSheet,
   onCloseSheet,
-  onBarStateChange,
   onJumpToChapter,
   onJumpToPage,
   onSettingsChange,
@@ -213,7 +208,6 @@ export function Chrome({
   onJumpToHit,
 }: ChromeProps) {
   const { chapter, chapterCount } = progressOf(manifest, here)
-  const label = barLabel(barState, pages, progressLabel(manifest, here))
 
   /**
    * What the ✕ in the search field means, which depends on whether there is
@@ -227,10 +221,9 @@ export function Chrome({
   const clears = query.length > 0
 
   return (
-    <>
-    {/* `inert` rather than unmounted: the overlay keeps its scroll position in
+    /* `inert` rather than unmounted: the overlay keeps its scroll position in
         the contents list, and a hidden control must not be reachable by tab or
-        by a screen reader while it is invisible. */}
+        by a screen reader while it is invisible. */
     <div className={styles.chrome} data-shown={shown} inert={!shown}>
       {/*
         One bar, at the top, and four controls on it. The bottom of the screen
@@ -678,43 +671,5 @@ export function Chrome({
         )}
       </footer>
     </div>
-
-    {/*
-      Where you are — and the only part of the interface that stays on screen.
-
-      Deliberately *outside* the overlay above, and it is the whole point of
-      this arrangement. Everything else here is a panel: it has a background, an
-      edge, and a shadow, and it sits over the book. This has none of those. It
-      is a line of small grey text at the foot of the page, exactly as a page
-      number is printed at the foot of a printed page, and it neither comes nor
-      goes as the overlay does.
-
-      Still the control it always was — tapping it cycles through the page
-      number, the pages left in this chapter, and nothing at all. The third
-      state is escapable because the button stays there, empty, to be tapped.
-    */}
-    {/*
-      `data-page-furniture` marks this as belonging to the *page*, not to the
-      app around it — so a page turn takes it with it. A printed page number
-      turns over with the sheet it is printed on; it does not hover in place
-      while the paper moves out from under it. `reader/pageTurn.ts` reads this
-      attribute and nothing else, so anything else that comes to belong to the
-      page — a running header, a footnote rule — joins the flip by carrying it.
-    */}
-    <div className={styles.statusLine} data-page-furniture="">
-      <button
-        type="button"
-        className={styles.status}
-        onClick={() => onBarStateChange(advanceBar(barState))}
-        aria-label={label ?? 'Show where you are in the book'}
-      >
-        {label}
-      </button>
-
-      <span className={styles.percent}>
-        {showsPercent(barState) && pages ? `${pages.percent}%` : ''}
-      </span>
-    </div>
-    </>
   )
 }
