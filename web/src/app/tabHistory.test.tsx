@@ -145,7 +145,7 @@ describe('Back, against the real history', () => {
 
     // One press: the tab actually visited before this one.
     await pressBack('/library')
-    await onShow('All books')
+    await onShow('Library')
 
     // And the level has collapsed to a single entry, so there is nothing of it
     // left to go back through. In a real browser the next press leaves the app;
@@ -215,7 +215,7 @@ describe('Back, against the real history', () => {
     // Waited for through the *shown* screen, not merely a present one: every
     // visited screen stays mounted now, so "the library is in the document" has
     // stopped meaning "the reader is looking at it".
-    await onShow('All books')
+    await onShow('Library')
 
     // Navigating again is what earns the next one.
     swipe(-150)
@@ -224,7 +224,7 @@ describe('Back, against the real history', () => {
     // So this must retrace, not leave. Before the re-arm it left, because the
     // move had rewritten the top entry instead of claiming a new one.
     await pressBack('/library')
-    await onShow('All books')
+    await onShow('Library')
   })
 
   it('still only spends one retrace when Back is pressed twice', async () => {

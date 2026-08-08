@@ -427,15 +427,19 @@ export default function Library() {
           {/* Looked up in `choices` rather than `folderMap`, so "Unread" and
               "Finished" title the screen the same way a folder the reader made
               does — from their side there is no difference between the two. */}
+          {/* "Library", not "All books" — it is what the drawer calls this
+              screen, and a screen whose tab and heading disagree makes the
+              reader check whether they are where they meant to be. */}
           {prefs.folderId
             ? (choices.find((choice) => choice.id === prefs.folderId)?.name ?? 'Library')
-            : 'All books'}
+            : 'Library'}
         </h1>
       )}
 
-      {/* The search bar and the filter button, as one control. They are the
-          same job — narrowing what is on the shelf — and the reference designs
-          treat them as one object for that reason. */}
+      {/* Just the search now. It carried a filter button until the controls
+          moved out from behind it — with the same icon opening the same sheet
+          two inches below, the one in here was a second door onto a room the
+          reader is already standing in. */}
       <div className={libraryStyles.searchBar}>
         <span className={libraryStyles.searchIcon} aria-hidden="true">
           ⌕
@@ -448,23 +452,6 @@ export default function Library() {
           aria-label="Search your library"
           onChange={(event) => setQuery(event.target.value)}
         />
-        <button
-          type="button"
-          className={
-            isFiltered(prefs)
-              ? `${libraryStyles.filterButton} ${libraryStyles.filterButtonOn}`
-              : libraryStyles.filterButton
-          }
-          aria-label="Filter and sort"
-          aria-expanded={filterOpen}
-          onClick={() => setFilterOpen(true)}
-        >
-          <span className={libraryStyles.filterIcon} aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
-        </button>
       </div>
 
       {/* Sort, folder, reading status and view, on the shelf rather than two

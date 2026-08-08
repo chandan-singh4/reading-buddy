@@ -1,7 +1,7 @@
 /**
  * The filter and sort menu, behind the icon at the right of the search bar.
  *
- * A sheet rising from the bottom rather than a dropdown: it holds five groups
+ * A sheet rising from the bottom rather than a dropdown: it holds six groups
  * of choices, which is more than a menu's worth, and on a phone the bottom of
  * the screen is the half a thumb can reach. Every choice applies **the moment
  * it is tapped** — there is no Apply button, because the shelf is visible
@@ -26,10 +26,13 @@ import { useEffect, useRef } from 'react'
 import type { Shelf } from '../structure/index.ts'
 import type { FolderChoice } from './systemFolders.ts'
 import {
+  PROGRESS_OPTIONS,
   SHELF_OPTIONS,
   SORT_OPTIONS,
+  sortPhrase,
   STATUS_OPTIONS,
   type LibraryPrefs,
+  type ProgressBand,
   type SortKey,
   type ViewMode,
 } from './prefs.ts'
@@ -141,6 +144,27 @@ export function FilterSheet({ open, prefs, folders, onChange, onClose }: FilterS
             </div>
           </Group>
 
+          <Group title="Reading progress">
+            <div className={styles.row}>
+              {/* "All" is the absence of a filter, not a fifth band. */}
+              <Choice
+                label="All"
+                active={prefs.bands.length === 0}
+                onClick={() => onChange({ ...prefs, bands: [] })}
+              />
+              {PROGRESS_OPTIONS.map((option) => (
+                <Choice
+                  key={option.value}
+                  label={option.label}
+                  active={prefs.bands.includes(option.value)}
+                  onClick={() =>
+                    onChange({ ...prefs, bands: toggled<ProgressBand>(prefs.bands, option.value) })
+                  }
+                />
+              ))}
+            </div>
+          </Group>
+
           <Group title="Content type">
             <div className={styles.row}>
               <Choice
@@ -193,11 +217,9 @@ export function FilterSheet({ open, prefs, folders, onChange, onClose }: FilterS
                 <Choice
                   key={option.value}
                   // Grouped labels read as "Title A → Z" in one chip: two
-                  // levels of heading for eight options is more structure than
-                  // eight things need.
-                  label={
-                    option.group === option.label ? option.label : `${option.group} ${option.label}`
-                  }
+                  // levels of heading for six options is more structure than
+                  // six things need.
+                  label={sortPhrase(option)}
                   active={prefs.sort === option.value}
                   onClick={() => onChange({ ...prefs, sort: option.value satisfies SortKey })}
                 />

@@ -498,8 +498,14 @@ describe('the filter controls under the search bar', () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    // No sheet, no slide, no second tap: they are readable where they sit.
+    // No sheet, no slide, no second tap: they are readable where they sit, and
+    // each answers its own question rather than hiding behind one "Sort by".
+    expect(screen.getByRole('button', { name: /Title/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Author/ })).toBeTruthy()
+    // The sort in force says which way it is pointing; the other two say only
+    // their own name.
     expect(screen.getByRole('button', { name: /Recently added/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Reading progress/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Folders/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Reading status/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /List/ })).toBeTruthy()
@@ -509,12 +515,86 @@ describe('the filter controls under the search bar', () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    openControl(/Recently added/)
-    fireEvent.click(await screen.findByRole('button', { name: 'Title Z \u2192 A' }))
+    // Its own chip now, not an item buried in a list of eight.
+    openControl(/Title/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Title Z → A' }))
 
     expect(screen.getAllByRole('link')[0]!.textContent).toContain('Red Book')
-    // The chip is the only thing left showing the answer once the panel closes.
-    expect(screen.getByRole('button', { name: /Title Z/ })).toBeTruthy()
+    // The chip is the only thing left showing the answer once the panel closes,
+    // and it says which way it is pointing rather than just "Title".
+    expect(screen.getByRole('button', { name: /Title Z → A/ })).toBeTruthy()
+  })
+
+  it('has no filter button left inside the search bar', async () => {
+    // It opened the same sheet as the icon two inches below it. One door onto
+    // a room the reader is already standing in is one door too many.
+    openLibrary()
+    await screen.findByText('Aion')
+
+    const search = screen.getByRole('searchbox', { name: 'Search your library' })
+    expect(within(search.parentElement!).queryByRole('button')).toBeNull()
+  })
+
+  it('releases the other sort chips when one of them is chosen', async () => {
+    // Sort is one setting. Three chips that could each be on at once would be
+    // promising an order that cannot exist.
+    openLibrary()
+    await screen.findByText('Aion')
+
+    // Starts on "Recently added", which is the default — and says exactly
+    // that, not "Recently Recently added".
+    expect(screen.getByRole('button', { name: 'Recently added' })).toBeTruthy()
+
+    openControl(/Title/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Title A → Z' }))
+
+    // The Recently chip has gone back to saying only its own name.
+    expect(screen.queryByRole('button', { name: /Recently added/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Recently/ })).toBeTruthy()
+  })
+
+  it('sorts by author from its own chip', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Author/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Author A → Z' }))
+
+    expect(screen.getByRole('button', { name: /Author A → Z/ })).toBeTruthy()
+  })
+
+  it('filters to a band of reading progress', async () => {
+    // 10% and 80%: one in the bottom band, one in the top.
+    await repository.savePosition(
+      'a' as BookId,
+      formatAnchor({ chapter: 1, section: 1, paragraph: 1 }),
+      10,
+    )
+    await repository.savePosition(
+      'bb' as BookId,
+      formatAnchor({ chapter: 1, section: 1, paragraph: 1 }),
+      80,
+    )
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Reading progress/)
+    fireEvent.click(await screen.findByRole('button', { name: '0–25%' }))
+
+    expect(screen.getByText('Aion')).toBeTruthy()
+    expect(screen.queryByText('Answer to Job')).toBeNull()
+    // A book never opened has no percentage, and is in no band.
+    expect(screen.queryByText('Red Book')).toBeNull()
+  })
+
+  it('keeps the reading-progress panel open, so several bands can be ticked', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Reading progress/)
+    fireEvent.click(await screen.findByRole('button', { name: '0–25%' }))
+
+    expect(screen.getByRole('button', { name: '75–100%' })).toBeTruthy()
   })
 
   it('filters by reading status from the row', async () => {
@@ -784,7 +864,7 @@ describe('the view and filter menu', () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter and sort' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Grid' }))
     expect(inSheet().getByRole('button', { name: 'Grid' })).toHaveProperty(
       'ariaPressed',
@@ -794,7 +874,7 @@ describe('the view and filter menu', () => {
     cleanup()
     openLibrary()
     await screen.findByText('Aion')
-    fireEvent.click(screen.getByRole('button', { name: 'Filter and sort' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
 
     expect(inSheet().getByRole('button', { name: 'Grid' })).toHaveProperty(
       'ariaPressed',
@@ -811,7 +891,7 @@ describe('the view and filter menu', () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter and sort' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Currently reading' }))
 
     expect(screen.getByText('Aion')).toBeTruthy()
@@ -824,7 +904,7 @@ describe('the view and filter menu', () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter and sort' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
     // Scoped to the group: "Unread" names a reading status *and* a folder, and
     // the sheet offers both.
     fireEvent.click(
@@ -843,8 +923,13 @@ describe('the view and filter menu', () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter and sort' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Title Z → A' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
+    // Scoped: the row of controls offers this ordering too, on the Title chip.
+    fireEvent.click(
+      await within(inSheet().getByRole('group', { name: 'Sort by' })).findByRole('button', {
+        name: 'Title Z → A',
+      }),
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 
     const titles = screen.getAllByRole('link').map((link) => link.textContent)

@@ -103,7 +103,7 @@ describe('coming back to Home', () => {
     expect(await screen.findByText('The Wind in the Willows')).toBeDefined()
 
     swipe(-150)
-    await arrivedAt('All books')
+    await arrivedAt('Library')
 
     swipe(150)
 
@@ -124,7 +124,7 @@ describe('coming back to Home', () => {
     expect(await screen.findByText('Breath')).toBeDefined()
 
     swipe(-150)
-    await arrivedAt('All books')
+    await arrivedAt('Library')
     swipe(150)
 
     // The re-read does still happen — the shelf is allowed to be a moment stale,
@@ -162,7 +162,7 @@ describe('coming back to Home', () => {
     // Synchronously, on the library's first frame. `findBy` would pass against
     // the old code a moment later, which is exactly the moment being complained
     // about.
-    expect(shown().getByText('All books')).toBeDefined()
+    expect(shown().getByRole('heading', { name: 'Library' })).toBeDefined()
     expect(shown().getByText('The Wind in the Willows')).toBeDefined()
     expect(shown().queryByText('Loading…')).toBeNull()
   })
@@ -191,7 +191,7 @@ describe('coming back to Home', () => {
     const tile = await screen.findByText('The Wind in the Willows')
 
     swipe(-150)
-    await arrivedAt('All books')
+    await arrivedAt('Library')
     swipe(150)
 
     expect(shown().getByText('The Wind in the Willows')).toBe(tile)
@@ -230,7 +230,7 @@ describe('coming back to Home', () => {
     expect(await screen.findByText('Breath')).toBeDefined()
 
     swipe(-150)
-    await arrivedAt('All books')
+    await arrivedAt('Library')
     await repository.deleteBook(BOOKS[1]!.id)
     swipe(150)
 

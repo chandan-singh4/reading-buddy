@@ -18,7 +18,7 @@ import { shelfOf } from '../import/index.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 import type { StoredFolder } from '../storage/index.ts'
 import { foldersOf, folderIdsOf } from './folders.ts'
-import type { LibraryPrefs, SortKey } from './prefs.ts'
+import { inBand, type LibraryPrefs, type SortKey } from './prefs.ts'
 import { progressOf, type BookProgress } from './status.ts'
 import { inSystemFolder, isSystemFolder } from './systemFolders.ts'
 
@@ -85,6 +85,13 @@ function matchesFilters(
 
   if (prefs.shelves.length > 0 && !prefs.shelves.includes(shelfOf(book))) return false
 
+  // Any one of the ticked bands is enough. A book with no recorded percentage
+  // is in none of them, on purpose — see `inBand`.
+  if (prefs.bands.length > 0) {
+    const { percent } = progressOf(book, context.progress)
+    if (!prefs.bands.some((band) => inBand(band, percent))) return false
+  }
+
   if (prefs.folderId !== undefined) {
     // Unread and Finished hold no ids: membership is the reading status,
     // answered fresh here rather than stored anywhere. See `systemFolders.ts`.
@@ -120,17 +127,6 @@ function missingLast(a: string | undefined, b: string | undefined): number | und
   return undefined
 }
 
-/**
- * The folder a book sorts under, or `undefined` for a loose one — see the
- * `'folder'` comparator for why "first alphabetically" is the rule.
- */
-function firstFolderName(book: BookMeta, context: LibraryContext): string | undefined {
-  const names = foldersOf(book, context.folders)
-    .map((folder) => folder.name)
-    .sort(byText)
-  return names[0]
-}
-
 type Comparator = (a: BookMeta, b: BookMeta, context: LibraryContext) => number
 
 const COMPARATORS: Record<SortKey, Comparator> = {
@@ -147,35 +143,6 @@ const COMPARATORS: Record<SortKey, Comparator> = {
   },
 
   'recently-added': (a, b) => b.importedAt.localeCompare(a.importedAt),
-
-  // Furthest through first: "reading progress" as a heading over a list
-  // starting at 0% would be a list of books the reader hasn't started.
-  'progress': (a, b, context) => {
-    const left = progressOf(a, context.progress).percent ?? -1
-    const right = progressOf(b, context.progress).percent ?? -1
-    return right - left
-  },
-
-  // Folders alphabetically, loose books last — they are the library's default
-  // state, so they belong at the end rather than under a blank heading at the
-  // top. Within a folder, by title, because "grouped by folder and then in
-  // import order" is not an order anybody can scan.
-  //
-  // **A book in several folders sorts under the first of them alphabetically.**
-  // This is an approximation and it is the price of many-folder membership: a
-  // book cannot be in two places in one list, and the alternative — listing it
-  // once per folder — would show the reader two copies of a book they own one
-  // of, which the folder model exists to avoid. First-alphabetically at least
-  // makes it a *stable* approximation, so the shelf doesn't reshuffle itself
-  // between visits.
-  'folder': (a, b, context) => {
-    const left = firstFolderName(a, context)
-    const right = firstFolderName(b, context)
-    const missing = missingLast(left, right)
-    if (missing !== undefined && missing !== 0) return missing
-    const byFolder = missing === 0 ? 0 : byText(left!, right!)
-    return byFolder !== 0 ? byFolder : byText(a.title, b.title)
-  },
 }
 
 /**

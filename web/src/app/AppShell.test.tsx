@@ -133,7 +133,7 @@ describe('app shell', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
 
     swipe(-150)
-    expect(await screen.findByText('All books')).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
 
     swipe(150)
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
@@ -172,7 +172,7 @@ describe('app shell', () => {
     renderAt('/')
 
     swipe(-150, 0, 'cancel')
-    expect(await screen.findByText('All books')).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
   })
 
   /** Did the app leave? MemoryRouter has nowhere to go, so it sits still. */
@@ -191,20 +191,20 @@ describe('app shell', () => {
     renderFrom(['/'])
 
     swipe(-150)
-    expect(await screen.findByText('All books')).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
 
     // One: the tab actually visited before this one.
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect(await screen.findByText('All books')).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
 
     // Two: out. Not Home, which is where the reader started but not where they
     // were. MemoryRouter cannot leave, so "out" shows as the app standing still
     // on the screen it was already on.
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
     await Promise.resolve()
-    expect(stillOn('All books')).toBeDefined()
+    expect(stillOn('Library')).toBeDefined()
   })
 
   it('retraces the last move however much swiping came before it', async () => {
@@ -235,7 +235,7 @@ describe('app shell', () => {
     renderFrom(['/book/does-not-exist', '/'])
 
     swipe(-150)
-    expect(await screen.findByText('All books')).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
     expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
@@ -322,7 +322,7 @@ describe('app shell', () => {
   it('renders the full catalogue at /library', async () => {
     renderAt('/library')
 
-    expect(screen.getByRole('heading', { name: 'All books' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Library' })).toBeDefined()
     expect(await screen.findByText('No books yet')).toBeDefined()
   })
 
@@ -401,7 +401,7 @@ describe('each screen keeps its own scroll position', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     fireEvent.click(screen.getByRole('link', { name: /Library/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'All books' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
 
     scrollTo(1200)
 
@@ -416,7 +416,7 @@ describe('each screen keeps its own scroll position', () => {
     // top, and not at Home's position.
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     fireEvent.click(screen.getByRole('link', { name: /Library/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'All books' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
 
     expect(scrolls().at(-1)).toBe(1200)
   })
@@ -430,7 +430,7 @@ describe('each screen keeps its own scroll position', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     fireEvent.click(screen.getByRole('link', { name: /Library/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'All books' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
     scrollTo(1200)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
@@ -509,7 +509,7 @@ describe('crossing between two tabs', () => {
     expect(await screen.findByText('Pick up where you left off.')).toBeDefined()
 
     swipeLeft()
-    await screen.findByText('All books')
+    await screen.findByRole('heading', { name: 'Library' })
 
     // Both screens are on screen at once. That is the whole change: the shelf
     // used to be gone in the frame the library started moving, which reads as a
@@ -545,7 +545,7 @@ describe('crossing between two tabs', () => {
     expect(await screen.findByText('Pick up where you left off.')).toBeDefined()
 
     swipeLeft()
-    await screen.findByText('All books')
+    await screen.findByRole('heading', { name: 'Library' })
     expect(pageFor('/').hidden).toBe(false)
 
     // The animation ending is what hides it again. A screen left visible would

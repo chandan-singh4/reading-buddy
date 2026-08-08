@@ -28,6 +28,7 @@ describe('library preferences', () => {
       view: 'grid',
       statuses: ['reading'],
       shelves: ['paper'],
+      bands: [],
       folderId: 'f1',
       sort: 'title-asc',
     }

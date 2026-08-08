@@ -144,6 +144,62 @@ describe('arrange — filtering', () => {
   })
 })
 
+/**
+ * Reading progress as a filter in quarters, which is what it became when the
+ * single "Sort by" chip was split into one control per question. Ordering the
+ * whole library by percentage never answered "which books am I half way
+ * through"; four bands do.
+ */
+describe('arrange — filtering by reading progress', () => {
+  const shelf = [book('barely'), book('half'), book('nearly'), book('done'), book('never')]
+  const positions = [
+    position('barely', '2026-08-01T00:00:00Z', 10),
+    position('half', '2026-08-01T00:00:00Z', 50),
+    position('nearly', '2026-08-01T00:00:00Z', 80),
+    position('done', '2026-08-01T00:00:00Z', 100),
+  ]
+
+  it('keeps only the books inside a band', () => {
+    const found = arrange(shelf, '', prefs({ bands: ['0-25'] }), context(positions))
+    expect(ids(found)).toEqual(['barely'])
+  })
+
+  it('takes several bands at once', () => {
+    // "The ones I've barely started and the ones I'm nearly done with" is a
+    // real thing to ask for, and the panel stays open so it can be asked.
+    const found = arrange(shelf, '', prefs({ bands: ['0-25', '75-100'] }), context(positions))
+    expect(ids(found).sort()).toEqual(['barely', 'done', 'nearly'])
+  })
+
+  it('puts a book on a boundary in exactly one band', () => {
+    // 50% is in 50-75%, not in both. Overlapping bands would show one book
+    // under two filters and make the counts disagree with the shelf.
+    expect(ids(arrange(shelf, '', prefs({ bands: ['25-50'] }), context(positions)))).toEqual([])
+    expect(ids(arrange(shelf, '', prefs({ bands: ['50-75'] }), context(positions)))).toEqual([
+      'half',
+    ])
+  })
+
+  it('keeps a finished book in the top band rather than falling off the end', () => {
+    const found = arrange(shelf, '', prefs({ bands: ['75-100'] }), context(positions))
+    expect(ids(found).sort()).toEqual(['done', 'nearly'])
+  })
+
+  it('leaves a book with no recorded percentage out of every band', () => {
+    // An unknown percentage is not 0% — the book was never opened. Sweeping it
+    // into "0-25%" would answer "barely started" with books never touched.
+    for (const band of ['0-25', '25-50', '50-75', '75-100'] as const) {
+      expect(ids(arrange(shelf, '', prefs({ bands: [band] }), context(positions)))).not.toContain(
+        'never',
+      )
+    }
+  })
+
+  it('treats no bands as all of them, never as none', () => {
+    expect(arrange(shelf, '', prefs({ bands: [] }), context(positions))).toHaveLength(5)
+  })
+})
+
 describe('arrange — sorting', () => {
   it('sorts by title in both directions, ignoring case', () => {
     const shelf = [book('1', { title: 'beta' }), book('2', { title: 'Alpha' })]
@@ -173,25 +229,6 @@ describe('arrange — sorting', () => {
       book('new', { importedAt: '2026-08-01T00:00:00Z' }),
     ]
     expect(ids(arrange(shelf, '', prefs({ sort: 'recently-added' })))).toEqual(['new', 'old'])
-  })
-
-  it('sorts by progress, furthest through first and unstarted last', () => {
-    const shelf = [book('low'), book('high'), book('none')]
-    const positions = [position('low', '2026-08-01T00:00:00Z', 10), position('high', '2026-08-01T00:00:00Z', 90)]
-    const found = arrange(shelf, '', prefs({ sort: 'progress' }), context(positions))
-    expect(ids(found)).toEqual(['high', 'low', 'none'])
-  })
-
-  it('groups by folder alphabetically, loose books last, by title within', () => {
-    const folders = [folder('f1', 'Zoology'), folder('f2', 'Anthropology')]
-    const shelf = [
-      book('loose', { title: 'Loose' }),
-      book('z', { title: 'Zebras', folderIds: ['f1'] }),
-      book('a2', { title: 'Bones', folderIds: ['f2'] }),
-      book('a1', { title: 'Ancestors', folderIds: ['f2'] }),
-    ]
-    const found = arrange(shelf, '', prefs({ sort: 'folder' }), context([], folders))
-    expect(ids(found)).toEqual(['a1', 'a2', 'z', 'loose'])
   })
 
   it('does not sort the array it was given', () => {
