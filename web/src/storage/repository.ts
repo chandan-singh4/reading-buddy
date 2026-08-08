@@ -441,6 +441,25 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       return database.sections.get([bookId, sectionPathOf(anchor)])
     },
 
+    /**
+     * Every section of a book, in reading order — the whole of its prose.
+     *
+     * The one call in here that deliberately loads a book's entire text, and it
+     * exists for in-book search (WP-14), which cannot answer "where does this
+     * word appear" from anything less. Everything else reads one section at a
+     * time, and should go on doing so: this is the expensive door, and it is
+     * named so that using it is a decision rather than an accident.
+     *
+     * Sorted here rather than left to the index. `[bookId+path]` orders by the
+     * *text* of the path, which is right only while the numbers are zero-padded
+     * to the same width — true today, and a silent reordering the day a book has
+     * more than 99 chapters. Sorting on the numbers cannot drift.
+     */
+    async listSections(bookId: BookId): Promise<StoredSection[]> {
+      const sections = await database.sections.where('bookId').equals(bookId).toArray()
+      return sections.sort((a, b) => a.chapter - b.chapter || a.section - b.section)
+    },
+
     /** Section count, for progress and sanity checks. Doesn't load the rows. */
     async countSections(bookId: BookId): Promise<number> {
       return database.sections.where('bookId').equals(bookId).count()

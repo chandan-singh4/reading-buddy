@@ -17,6 +17,9 @@ export type { BookmarkRow, ChromeProps, SheetTab } from './Chrome.tsx'
 export { bookmarkOn, inBookOrder, labelFor } from './bookmarks.ts'
 export type { BookmarkLike } from './bookmarks.ts'
 
+export { MAX_HITS, MIN_QUERY, searchBook } from './search.ts'
+export type { SearchHit, SearchOutcome } from './search.ts'
+
 export { advanceBar, barLabel, showsPercent } from './bar.ts'
 export type { BarState } from './bar.ts'
 

@@ -22,6 +22,7 @@ import { Link } from 'react-router'
 import { advanceBar, barLabel, showsPercent, type BarState } from './bar.ts'
 import { stepThrough, swipeOf, type Touch } from './swipe.ts'
 import { progressLabel, progressOf, type Pages } from './progress.ts'
+import { MIN_QUERY, type SearchOutcome } from './search.ts'
 import type { SectionRef } from './navigation.ts'
 import type { Anchor, Manifest } from '../structure/index.ts'
 import {
@@ -105,6 +106,33 @@ export interface ChromeProps {
   onJumpToBookmark: (anchor: Anchor) => void
   onRenameBookmark: (id: string, label: string) => void
   onDeleteBookmark: (id: string) => void
+
+  /** Whether the search panel is up. */
+  searchOpen: boolean
+  /** What is in the search field — held by the reading page so it survives. */
+  query: string
+  /**
+   * The answer to `query`, or `null` while the book's text is still being
+   * fetched. `null` is a real state and not merely "no results": the first
+   * search in a book waits for its prose to load, and saying "nothing found"
+   * during that wait would be a wrong answer rather than a slow one.
+   */
+  results: SearchOutcome | null
+  onToggleSearch: () => void
+  onQueryChange: (query: string) => void
+  /** Go to a result. */
+  onJumpToHit: (anchor: Anchor) => void
+}
+
+/**
+ * What to call the chapter a result falls in.
+ *
+ * The manifest is the only thing that knows chapter titles, and a result whose
+ * chapter isn't in it — a broken anchor, or a book re-parsed into fewer chapters
+ * since — still has to say *something*, or the row appears to belong nowhere.
+ */
+function chapterNameOf(manifest: Manifest, chapter: number): string {
+  return manifest.chapters.find((entry) => entry.chapter === chapter)?.title ?? 'Elsewhere'
 }
 
 const TABS: { id: SheetTab; label: string }[] = [
@@ -156,6 +184,12 @@ export function Chrome({
   onJumpToBookmark,
   onRenameBookmark,
   onDeleteBookmark,
+  searchOpen,
+  query,
+  results,
+  onToggleSearch,
+  onQueryChange,
+  onJumpToHit,
 }: ChromeProps) {
   const { chapter, chapterCount } = progressOf(manifest, here)
   const label = barLabel(barState, pages, progressLabel(manifest, here))
@@ -223,12 +257,97 @@ export function Chrome({
         <button
           type="button"
           className={styles.control}
+          aria-expanded={searchOpen}
+          aria-label="Search this book"
+          onClick={onToggleSearch}
+        >
+          <span aria-hidden="true">🔍</span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.control}
           aria-pressed={focusMode}
           onClick={onToggleFocus}
         >
           {focusMode ? 'Focus on' : 'Focus off'}
         </button>
       </header>
+
+      {/*
+        Search, in a panel of its own rather than as a fifth tab in the sheet.
+        The reader's call, and it has one consequence worth naming: the results
+        are a jump-to list exactly like the contents and the bookmarks, but it
+        does not live beside them, so it has to carry its own way out (the ✕).
+      */}
+      {searchOpen && (
+        <div className={styles.searchPanel} role="dialog" aria-label="Search this book">
+          <div className={styles.searchField}>
+            <span aria-hidden="true">🔍</span>
+            <input
+              className={styles.searchInput}
+              type="search"
+              value={query}
+              // The panel is opened on purpose and there is exactly one thing to
+              // do in it, so it takes the keyboard rather than waiting to be
+              // tapped a second time.
+              autoFocus
+              placeholder="Search this book"
+              aria-label="Search this book"
+              onChange={(event) => onQueryChange(event.target.value)}
+            />
+            <button
+              type="button"
+              className={styles.searchClose}
+              aria-label="Close search"
+              onClick={onToggleSearch}
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          </div>
+
+          {/*
+            Four states, and each one is a different sentence. Collapsing any of
+            them into "no results" is what makes a search box feel broken: a
+            reader who has typed one letter has not failed to find anything, and
+            a reader waiting for a long book to load has not either.
+          */}
+          <p className={styles.searchStatus} role="status">
+            {query.trim().length < MIN_QUERY
+              ? 'Type at least two letters.'
+              : results === null
+                ? 'Looking…'
+                : results.total === 0
+                  ? 'Nothing found.'
+                  : results.capped
+                    ? `${results.total} results — showing the first ${results.hits.length}.`
+                    : `${results.total} result${results.total === 1 ? '' : 's'}.`}
+          </p>
+
+          {results !== null && results.hits.length > 0 && (
+            <ul className={styles.searchResults}>
+              {results.hits.map((hit) => (
+                <li key={hit.key}>
+                  <button
+                    type="button"
+                    className={styles.searchHit}
+                    onClick={() => onJumpToHit(hit.anchor)}
+                  >
+                    <span className={styles.searchWhere}>
+                      {chapterNameOf(manifest, hit.chapter)}
+                    </span>
+                    <span className={styles.searchSnippet}>
+                      {hit.before}
+                      <mark className={styles.searchMark}>{hit.match}</mark>
+                      {hit.after}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/*
         The space above the sheet, which closes it. Without this the sheet

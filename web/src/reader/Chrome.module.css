@@ -274,6 +274,123 @@
 }
 
 /*
+ * Search (WP-14), in a panel of its own under the top bar.
+ *
+ * Full-bleed between the two bars rather than a sheet rising from the bottom:
+ * the field is at the top, next to the button that opened it, and a list of
+ * results is read downwards from there. A bottom sheet would put the field under
+ * the reader's thumb and the first result off the top of it.
+ *
+ * `position: absolute` inside the overlay, not `fixed` — the overlay is already
+ * the layer that covers the page, and a fixed child of it would escape the
+ * fade the whole overlay does when it is dismissed.
+ */
+.searchPanel {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--safe-top) + 3.5rem) var(--space-4) var(--space-4);
+  background: var(--color-bg);
+}
+
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  /* iOS zooms the whole page in on a focused field below 16px. */
+  font-size: max(16px, var(--text-base));
+}
+
+.searchInput:focus {
+  outline: none;
+}
+
+.searchClose {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.searchStatus {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.searchResults {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  /* The list is the only thing that scrolls here, so it keeps its own momentum
+     rather than handing it to the page underneath. */
+  overscroll-behavior: contain;
+}
+
+.searchHit {
+  width: 100%;
+  display: block;
+  padding: var(--space-3) 0;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.searchWhere {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.searchSnippet {
+  display: block;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/*
+ * The match itself. A browser's default `mark` is a hard yellow that fights
+ * every one of this app's themes, including sepia — so it is redrawn in the
+ * accent at low opacity, which reads as a highlight in all of them.
+ */
+.searchMark {
+  background: color-mix(in srgb, var(--color-accent) 28%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+/*
  * The Bookmarks tab (WP-14).
  *
  * A row is a wide target that jumps, with two small ones after it that don't —

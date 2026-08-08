@@ -545,6 +545,97 @@ describe('bookmarks', () => {
   })
 })
 
+/**
+ * In-book search (WP-14), through the panel behind the magnifier.
+ *
+ * The engine has its own tests in `reader/search.test.ts` and they cover the
+ * hard part — counting, snippets, punctuation. What is checked here is only
+ * what the panel adds: that the book's text is fetched when it is needed and
+ * not before, that each of the four status sentences appears at the right
+ * moment, that a result moves the book, and that the query survives being put
+ * away. All of it debounced, so every wait here is a real one.
+ */
+describe('searching inside a book', () => {
+  const openSearch = () => fireEvent.click(screen.getByRole('button', { name: 'Search this book' }))
+  const typeQuery = (text: string) =>
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: text } })
+
+  it('finds a phrase and says how many there are', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    typeQuery('opening')
+
+    expect(await screen.findByText('1 result.')).toBeTruthy()
+    // The chapter a result falls in, so a reader knows where they would land.
+    expect(screen.getByRole('button', { name: /The Beginning/ })).toBeTruthy()
+  })
+
+  it('counts in the plural, and finds across chapters', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    // In 'The opening words.', 'Later in the first chapter.' and 'The second
+    // chapter begins.' — three sections, two chapters.
+    typeQuery('the')
+
+    expect(await screen.findByText(/^\d+ results\.$/)).toBeTruthy()
+  })
+
+  it('asks for more letters rather than reporting nothing', async () => {
+    // A reader who has typed one letter has not failed to find anything.
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    typeQuery('t')
+
+    expect(await screen.findByText('Type at least two letters.')).toBeTruthy()
+  })
+
+  it('says plainly when a word is not in the book', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    typeQuery('rhinoceros')
+
+    expect(await screen.findByText('Nothing found.')).toBeTruthy()
+  })
+
+  it('goes to the result, and closes on the way', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    typeQuery('second chapter begins')
+    const hit = await screen.findByRole('button', { name: /The Middle/ })
+    fireEvent.click(hit)
+
+    expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
+    // The panel is gone: the reader asked to be taken somewhere, not to keep
+    // looking at a list over the top of it.
+    expect(screen.queryByRole('searchbox')).toBeNull()
+  })
+
+  it('still has the last search in it when it is opened again', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    typeQuery('opening')
+    await screen.findByText('1 result.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close search' }))
+    expect(screen.queryByRole('searchbox')).toBeNull()
+
+    openSearch()
+    expect(screen.getByRole('searchbox')).toHaveProperty('value', 'opening')
+  })
+})
+
 describe('the slider', () => {
   it('moves one page at a time', async () => {
     openReader()

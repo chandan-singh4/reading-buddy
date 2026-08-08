@@ -10,6 +10,7 @@ import {
   chapterTitle,
   inBookOrder,
   labelFor,
+  searchBook,
   type BookmarkRow,
   elementIdOf,
   pagesAt,
@@ -171,6 +172,15 @@ function columnOf(node: HTMLElement, strip: HTMLElement | null): number {
  * enough that closing the tab almost never beats it.
  */
 const SAVE_AFTER_MS = 800
+
+/**
+ * How long typing has to pause before the book is searched (WP-14).
+ *
+ * Shorter than `SAVE_AFTER_MS`, because this one is in front of the reader: they
+ * are watching for the answer, where a saved position is invisible. Long enough
+ * that typing "breath" scans once rather than six times, once per prefix.
+ */
+const SEARCH_AFTER_MS = 200
 
 /** One array, so "no section yet" is the same value every render — see
     `useFigureImages`, which re-fetches when its input changes identity. */
@@ -1302,6 +1312,108 @@ export default function Reader() {
     })
   }, [bookmarks, frame])
 
+  /*
+   * ## In-book search (WP-14)
+   *
+   * Three moving parts, and the reason they are separate is that they change at
+   * three different rates: what the reader has typed (every keystroke), the
+   * book's text (once, and expensively), and the answer (a moment after typing
+   * stops).
+   */
+
+  /**
+   * The whole book's prose, fetched the first time search is opened and kept for
+   * the life of the screen.
+   *
+   * A ref rather than state: nothing renders it, and putting a book's entire
+   * text in state would re-render the reading screen when it arrived. `null`
+   * means "not fetched yet", which the panel shows as *Looking…* rather than as
+   * *Nothing found* — the difference between a slow answer and a wrong one.
+   *
+   * Not fetched on open, deliberately. A reader who never searches never pays
+   * for it, and the cost is the one call in the repository that loads every
+   * section of a book at once.
+   */
+  const bookText = useRef<Section[] | null>(null)
+  const [textLoaded, setTextLoaded] = useState(false)
+
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  /**
+   * The query the results below actually answer.
+   *
+   * Held apart from `query` so the field stays responsive while the scan is
+   * debounced — typing "breath" would otherwise scan the book six times, five of
+   * them for prefixes nobody asked about.
+   */
+  const [settledQuery, setSettledQuery] = useState('')
+
+  useEffect(() => {
+    if (!searchOpen || !id || bookText.current !== null) return
+    let cancelled = false
+
+    void repository
+      .listSections(id)
+      .then((sections) => {
+        if (cancelled) return
+        bookText.current = sections
+        // Only to wake the render that reads the ref — the text itself is not
+        // state, but "it has arrived" has to be.
+        setTextLoaded(true)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          bookText.current = []
+          setTextLoaded(true)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [searchOpen, id])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettledQuery(query), SEARCH_AFTER_MS)
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [query])
+
+  /**
+   * The answer, or `null` while the book's text is still on its way.
+   *
+   * Recomputed only when the settled query or the loaded text changes — not on
+   * every keystroke, and not on every page turn, which is why it is a memo and
+   * not a plain call in the render body.
+   */
+  const results = useMemo(() => {
+    if (!searchOpen) return null
+    // `textLoaded` is read so this recomputes when the prose lands; the text
+    // itself lives in a ref and would not trigger anything on its own.
+    if (!textLoaded || bookText.current === null) return null
+    return searchBook(bookText.current, settledQuery)
+  }, [searchOpen, textLoaded, settledQuery])
+
+  /**
+   * Closing search keeps the query, which is what "remember the last search"
+   * means in practice: come back to the panel and the word is still there, ready
+   * to be run again or edited. Cleared only when the book is left, because the
+   * screen goes with it.
+   */
+  const toggleSearch = useCallback(() => {
+    setSearchOpen((open) => !open)
+  }, [])
+
+  /** Going to a result closes the panel — the reader asked to be taken there. */
+  const jumpToHit = useCallback(
+    (anchor: Anchor) => {
+      setSearchOpen(false)
+      jumpToAnchor(anchor)
+    },
+    [jumpToAnchor],
+  )
+
   const title =
     frame.status === 'ready' ? chapterTitle(frame.manifest, here.chapter) : undefined
 
@@ -1355,6 +1467,12 @@ export default function Reader() {
             onJumpToBookmark={jumpToAnchor}
             onRenameBookmark={renameBookmark}
             onDeleteBookmark={deleteBookmark}
+            searchOpen={searchOpen}
+            query={query}
+            results={results}
+            onToggleSearch={toggleSearch}
+            onQueryChange={setQuery}
+            onJumpToHit={jumpToHit}
           />
 
           {/*
