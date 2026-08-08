@@ -35,6 +35,7 @@ export {
   TEXT_STEPS,
   applyStoredTheme,
   leadingOf,
+  gutterOf,
   measureOf,
   readReaderSettings,
   textSizeOf,

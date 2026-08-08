@@ -37,6 +37,7 @@ import {
   previousSection,
   readFocusMode,
   applyStoredTheme,
+  gutterOf,
   leadingOf,
   measureOf,
   readReaderSettings,
@@ -921,9 +922,54 @@ export default function Reader() {
         '--reading-text-size': textSizeOf(settings.textStep),
         '--reading-leading': leadingOf(settings.spacing),
         '--reading-column-width': measureOf(settings.margins),
+        '--reading-gutter': gutterOf(settings.margins),
       }) as unknown as React.CSSProperties,
     [settings.textStep, settings.spacing, settings.margins],
   )
+
+  /**
+   * Everything about the Aa tab that changes where the words fall.
+   *
+   * Theme is deliberately not in it: a colour changes nothing about the layout,
+   * and re-landing the page on a colour change would be a visible jolt for
+   * nothing.
+   */
+  const layoutKey = `${settings.textStep}|${settings.spacing}|${settings.margins}|${settings.font}`
+
+  /** The layout the strip was last scrolled for. */
+  const laidOutFor = useRef(layoutKey)
+
+  /**
+   * Stay on the same words when the text re-flows.
+   *
+   * This is the whole of a bug the reader hit by changing the margins: every
+   * setting in the Aa tab re-flows the book, so the browser re-decides where
+   * each page break falls — but the strip stays scrolled exactly where it was,
+   * at a number of pixels that no longer lands on a column edge. What you get is
+   * the tail of one page down the left of the screen and the next page running
+   * off the right, which is precisely what the reader photographed.
+   *
+   * Re-landing on the paragraph they were reading fixes it, and does something
+   * better than merely fixing it: making the text bigger now keeps you on the
+   * same sentence rather than on the same page number, which is the only
+   * behaviour that makes sense once the number of pages has changed underneath.
+   *
+   * `settleOn` re-checks itself over the next two frames, which is what covers
+   * the re-flow still being in progress when this runs.
+   *
+   * Guarded on the key rather than on the dependency list, because `anchorHere`
+   * is in that list and changes on every scroll — this must run when the
+   * *layout* changed, not when reading moved.
+   */
+  useEffect(() => {
+    if (laidOutFor.current === layoutKey) return
+    laidOutFor.current = layoutKey
+    if (page.status !== 'ready') return
+
+    const anchor = anchorHere ?? page.section.paragraphs[0]?.anchor
+    const node = anchor ? document.getElementById(elementIdOf(anchor)) : null
+    if (node) settleOn(node)
+  }, [layoutKey, page, anchorHere, settleOn])
 
   // The frame: book + manifest, once per book.
   useEffect(() => {

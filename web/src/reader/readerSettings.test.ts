@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_SETTINGS,
+  gutterOf,
   leadingOf,
   measureOf,
   readReaderSettings,
@@ -71,6 +72,38 @@ describe('leadingOf', () => {
 describe('measureOf', () => {
   it('matches the reading page default for normal margins', () => {
     expect(measureOf('normal')).toBe('34rem')
+  })
+
+  // Narrow margins mean a wider column. The names describe the white space, not
+  // the text, so the numbers run the other way — worth pinning, because getting
+  // it backwards would read as the control simply doing the wrong thing.
+  it('gives the widest column to the narrowest margins', () => {
+    expect(Number.parseFloat(measureOf('narrow'))).toBeGreaterThan(
+      Number.parseFloat(measureOf('wide')),
+    )
+  })
+})
+
+describe('gutterOf', () => {
+  /*
+   * The cap `measureOf` returns is wider than a phone screen at every setting,
+   * so on a phone it never bites and all three margins looked identical. The
+   * gutter is what makes the control do something there.
+   */
+  it('runs the same way round as the column width', () => {
+    expect(Number.parseFloat(gutterOf('narrow'))).toBeLessThan(
+      Number.parseFloat(gutterOf('wide')),
+    )
+  })
+
+  it('offers three visibly different amounts of white space', () => {
+    const gutters = (['narrow', 'normal', 'wide'] as const).map((margins) =>
+      Number.parseFloat(gutterOf(margins)),
+    )
+    // Half a rem apart at least. Two settings a reader cannot tell apart are
+    // two settings that make the tab look broken.
+    expect(gutters[1]! - gutters[0]!).toBeGreaterThanOrEqual(0.5)
+    expect(gutters[2]! - gutters[1]!).toBeGreaterThanOrEqual(0.5)
   })
 })
 

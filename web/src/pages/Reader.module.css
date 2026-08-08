@@ -229,7 +229,11 @@
    multi-column element indents the first and last columns only, so every page
    in between would run to the screen edge. */
 .page > * {
-  padding-inline: var(--space-4);
+  /* The Aa tab's margins setting, overridden inline on `.reader`. Here rather
+     than on `.page` itself: `.page` is one column of a horizontal strip, and
+     narrowing it would change how far a page turn travels. This moves the words
+     and leaves the pitch alone. */
+  padding-inline: var(--reading-gutter, var(--space-4));
   /*
    * The gutter is only a margin if nothing is allowed to reach past it. The gap
    * between columns is a landing margin for the turn, not room for content to

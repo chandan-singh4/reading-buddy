@@ -96,10 +96,34 @@ const SPACING_VALUES: Record<Spacing, string> = {
   relaxed: '2',
 }
 
+/**
+ * The widest the text column is allowed to get. Narrow margins mean a wider
+ * column, which is why the numbers run the other way from the names.
+ *
+ * This is a *cap*, and on a phone it never bites: the narrowest of the three is
+ * still wider than a phone screen, so all three looked identical there. That is
+ * what `GUTTER_VALUES` below is for — the cap shapes a wide window, the gutter
+ * shapes a phone, and between them the setting does something everywhere.
+ */
 const MARGIN_VALUES: Record<Margins, string> = {
   narrow: '40rem',
   normal: '34rem',
   wide: '28rem',
+}
+
+/**
+ * The space either side of the text, inside the page.
+ *
+ * The real margins control on a phone, where the cap above is irrelevant. Set
+ * as padding on the blocks rather than on the page itself, deliberately: the
+ * page is a column in a horizontal strip, and narrowing the *column* would
+ * change how far one page turn travels. Padding leaves the pitch of the strip
+ * exactly where it was and moves only the words inside it.
+ */
+const GUTTER_VALUES: Record<Margins, string> = {
+  narrow: '1rem',
+  normal: '1.75rem',
+  wide: '2.75rem',
 }
 
 /** The line-height for a given spacing choice, as a CSS value. */
@@ -110,6 +134,11 @@ export function leadingOf(spacing: Spacing): string {
 /** The comfortable column width for a given margins choice, as a CSS value. */
 export function measureOf(margins: Margins): string {
   return MARGIN_VALUES[margins]
+}
+
+/** The space either side of the text for a given margins choice. */
+export function gutterOf(margins: Margins): string {
+  return GUTTER_VALUES[margins]
 }
 
 /** The font size for a given step, clamped to the range that exists. */
