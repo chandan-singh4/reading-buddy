@@ -208,9 +208,9 @@ function Table({ block, onFollow }: { block: Paragraph; onFollow?: FollowLink })
   const [head, ...body] = block.rows
 
   return (
-    // Wrapped because a wide table must scroll inside itself — a page that
-    // scrolls sideways is unusable on a phone, and tables are the one block
-    // that reliably causes it.
+    // The wrapper carries the spacing above the table. It used to make the
+    // table scroll sideways too, which is what stopped a long one from being
+    // split over two pages — see `.tableScroll` in the stylesheet.
     <div className={styles.tableScroll}>
       <table className={styles.table}>
         <thead>

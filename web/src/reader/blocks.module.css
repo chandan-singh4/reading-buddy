@@ -139,6 +139,20 @@
   /* Code is the one thing that must not be re-wrapped to fit — a broken line
      changes what it means. It scrolls sideways inside its own box instead. */
   overflow-x: auto;
+  /*
+   * And so it has the same fault a table had: a scroll container cannot be
+   * broken across a page, so one longer than the screen would run off the
+   * bottom and lose everything past the fold.
+   *
+   * A table could give up its scroller and wrap. This cannot — wrapping is
+   * exactly what must not happen here — so it is capped instead. Held under a
+   * page, it always fits in a column, and the listing scrolls within itself in
+   * both directions. Every line stays reachable, which is the whole
+   * requirement; being reachable by scrolling rather than by turning is a fair
+   * price for the one block that has to keep its line breaks.
+   */
+  max-height: 60dvh;
+  overflow-y: auto;
 }
 
 .formula {
@@ -216,18 +230,52 @@
   break-before: auto;
 }
 
-/* A wide table scrolls within itself. Without this the whole page scrolls
-   sideways, which on a phone breaks reading everything else too. */
+/*
+ * A table, and the bug that used to be hiding in this one rule.
+ *
+ * This was `overflow-x: auto`, so that a wide table scrolled inside itself
+ * rather than making the whole page scroll sideways. It solved that, and it
+ * quietly created something worse.
+ *
+ * A page here is a CSS column. Anything with `overflow` set to something other
+ * than `visible` becomes **monolithic** — the browser will not break it across
+ * a column boundary, because a scroll container has no seam to cut. A table
+ * longer than the screen therefore could not be split over two pages: it ran
+ * straight off the bottom of the column and `overflow: hidden` on the page cut
+ * it off. Everything past the fold was simply gone, and there was no gesture
+ * that would reveal it. A twenty-row table showed fourteen rows and lost six.
+ *
+ * So the scroller goes and the table wraps instead. A table that is too wide
+ * now folds its cell text onto more lines rather than running off the side,
+ * which on a phone is the better answer regardless: sideways scrolling inside a
+ * page you turn sideways is two conflicting gestures in the same place. The
+ * cost is a genuinely wide table — six columns of figures — reading cramped.
+ * That is a real loss and it is the right way round: cramped text can be read,
+ * and text below the fold cannot be reached at all.
+ */
 .tableScroll {
   margin-top: var(--space-4);
-  overflow-x: auto;
 }
 
 .table {
+  /* Fills the column and never exceeds it, so there is nothing to scroll. */
+  width: 100%;
   border-collapse: collapse;
   font-family: var(--font-ui);
   font-size: var(--text-sm);
   line-height: var(--leading-ui);
+}
+
+/*
+ * Break between rows, never through one.
+ *
+ * Now that the table can be split over a page boundary at all, it has to be
+ * told where: a row cut in half horizontally would show its top half on one
+ * page and nothing on the next, since the column clips rather than continuing.
+ * Rows are short, so avoiding a break inside one always leaves somewhere to cut.
+ */
+.table tr {
+  break-inside: avoid;
 }
 
 .table th,
@@ -236,6 +284,9 @@
   border: 1px solid var(--color-border);
   text-align: left;
   vertical-align: top;
+  /* A long unbroken word in a narrow cell — a URL, a chemical name — would
+     otherwise force the column wider than the page all by itself. */
+  overflow-wrap: break-word;
 }
 
 .table th {

@@ -269,17 +269,15 @@
  * pre-formatted block) can be sized by its content rather than by its container.
  * Capping it at the column is the whole of the rule.
  *
- * A wide table is the deliberate exception: `.tableScroll` gives it a scroller of
- * its own, so it is *meant* to be wider than the page. The element selector below
- * outranks this one and hands the exemption back.
+ * Tables used to be exempted from this, because they had a scroller of their own
+ * and were *meant* to be wider than the page. That scroller is gone — it made
+ * them unbreakable, so a long one ran off the bottom of the page and lost every
+ * row past the fold (see `.tableScroll` in `blocks.module.css`). They are held
+ * to the column like everything else now, and the exemption has gone with it.
  */
 .page * {
   max-width: 100%;
   min-width: 0;
-}
-
-.page table {
-  max-width: none;
 }
 
 /* Reduced motion is honoured in `reader/motion.ts`, where every move now
