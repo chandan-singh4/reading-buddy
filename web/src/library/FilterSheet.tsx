@@ -1,11 +1,21 @@
 /**
  * The filter and sort menu, behind the icon at the right of the search bar.
  *
- * A sheet rising from the bottom rather than a dropdown: it holds four groups
+ * A sheet rising from the bottom rather than a dropdown: it holds five groups
  * of choices, which is more than a menu's worth, and on a phone the bottom of
  * the screen is the half a thumb can reach. Every choice applies **the moment
  * it is tapped** — there is no Apply button, because the shelf is visible
  * behind the sheet and the result of a filter is the only honest preview of it.
+ *
+ * ## It is no longer the only way to reach these
+ *
+ * `FilterBar` now puts sort, folder, reading status and view on the shelf
+ * itself, and that is where the reader will change them. This is deliberately
+ * kept as the *complete* set behind one icon — it is the only place content type
+ * appears, and it is the one view that answers "what is currently narrowing my
+ * library" in a single glance rather than four chips. The overlap is the point:
+ * a quick path and a full path to the same settings, both reading and writing
+ * the same `LibraryPrefs`, so they can never disagree.
  *
  * Adding a group later is a `<Group>` block and one field on `LibraryPrefs`;
  * nothing here knows what the filters mean.
@@ -14,7 +24,7 @@
 import { useEffect, useRef } from 'react'
 
 import type { Shelf } from '../structure/index.ts'
-import type { StoredFolder } from '../storage/index.ts'
+import type { FolderChoice } from './systemFolders.ts'
 import {
   SHELF_OPTIONS,
   SORT_OPTIONS,
@@ -30,7 +40,8 @@ import styles from './FilterSheet.module.css'
 export interface FilterSheetProps {
   open: boolean
   prefs: LibraryPrefs
-  folders: readonly StoredFolder[]
+  /** The two computed folders and the reader's own, in one list. */
+  folders: readonly FolderChoice[]
   onChange: (prefs: LibraryPrefs) => void
   onClose: () => void
 }
@@ -150,32 +161,31 @@ export function FilterSheet({ open, prefs, folders, onChange, onClose }: FilterS
             </div>
           </Group>
 
-          {/* Only once there is a folder to choose. An empty "Folder" heading
-              on a library nobody has organised is furniture. */}
-          {folders.length > 0 && (
-            <Group title="Folder">
-              <div className={styles.row}>
+          {/* Always shown now, where it used to appear only once the reader had
+              made a folder: Unread and Finished are always there, because they
+              are worked out from reading progress rather than created. */}
+          <Group title="Folder">
+            <div className={styles.row}>
+              <Choice
+                label="All"
+                active={prefs.folderId === undefined}
+                onClick={() => onChange({ ...prefs, folderId: undefined })}
+              />
+              {folders.map((folder) => (
                 <Choice
-                  label="All"
-                  active={prefs.folderId === undefined}
-                  onClick={() => onChange({ ...prefs, folderId: undefined })}
+                  key={folder.id}
+                  label={folder.name}
+                  active={prefs.folderId === folder.id}
+                  onClick={() =>
+                    onChange({
+                      ...prefs,
+                      folderId: prefs.folderId === folder.id ? undefined : folder.id,
+                    })
+                  }
                 />
-                {folders.map((folder) => (
-                  <Choice
-                    key={folder.id}
-                    label={folder.name}
-                    active={prefs.folderId === folder.id}
-                    onClick={() =>
-                      onChange({
-                        ...prefs,
-                        folderId: prefs.folderId === folder.id ? undefined : folder.id,
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </Group>
-          )}
+              ))}
+            </div>
+          </Group>
 
           <Group title="Sort by">
             <div className={styles.row}>
@@ -204,9 +214,19 @@ export function FilterSheet({ open, prefs, folders, onChange, onClose }: FilterS
   )
 }
 
+/**
+ * One headed block of chips.
+ *
+ * `role="group"` with the heading's own text as its name, which it did not need
+ * until Unread and Finished became folders: the sheet now offers "Unread" twice,
+ * once as a reading status and once as a folder, and they do genuinely different
+ * things. Sighted readers have the headings to tell them apart. Without a name
+ * on the group, a screen reader hears two identical buttons and has no way to
+ * find out which is which.
+ */
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className={styles.group}>
+    <section className={styles.group} role="group" aria-label={title}>
       <h2 className={styles.groupTitle}>{title}</h2>
       {children}
     </section>

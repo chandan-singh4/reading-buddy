@@ -21,6 +21,7 @@ import type { BookId, BookMeta } from '../structure/index.ts'
 import type { StoredFolder } from '../storage/index.ts'
 import { Cover } from '../app/Cover.tsx'
 import { rowId } from '../app/useRowMemory.ts'
+import { foldersOf } from './folders.ts'
 import { SHELF_OPTIONS, type ViewMode } from './prefs.ts'
 import { progressOf, type BookProgress } from './status.ts'
 import { useLongPress } from './useLongPress.ts'
@@ -60,7 +61,10 @@ export function BookShelf({
           book={book}
           view={view}
           progress={progressOf(book, progress)}
-          folder={book.folderId ? folders.get(book.folderId) : undefined}
+          // Every folder it is in, not just one — a book filed under both
+          // Philosophy and For the course is still a single row on the shelf,
+          // and the badges are where that shows.
+          bookFolders={foldersOf(book, folders)}
           cover={covers.get(book.id)}
           selecting={selected !== null}
           ticked={selected?.has(book.id) ?? false}
@@ -77,7 +81,7 @@ interface BookCardProps {
   book: BookMeta
   view: ViewMode
   progress: BookProgress
-  folder: StoredFolder | undefined
+  bookFolders: readonly StoredFolder[]
   cover: string | undefined
   selecting: boolean
   ticked: boolean
@@ -90,7 +94,7 @@ function BookCard({
   book,
   view,
   progress,
-  folder,
+  bookFolders,
   cover,
   selecting,
   ticked,
@@ -104,7 +108,7 @@ function BookCard({
     <div className={styles.text}>
       <span className={styles.cardTitle}>{book.title}</span>
       {book.author && <span className={styles.author}>{book.author}</span>}
-      <Badges book={book} progress={progress} folder={folder} view={view} />
+      <Badges book={book} progress={progress} bookFolders={bookFolders} view={view} />
     </div>
   )
 
@@ -170,12 +174,12 @@ function BookCard({
 function Badges({
   book,
   progress,
-  folder,
+  bookFolders,
   view,
 }: {
   book: BookMeta
   progress: BookProgress
-  folder: StoredFolder | undefined
+  bookFolders: readonly StoredFolder[]
   view: ViewMode
 }) {
   const shelf = shelfOf(book)
@@ -207,7 +211,11 @@ function Badges({
           exceptions. */}
       {shelf !== 'book' && <span className={styles.badge}>{shelfLabel}</span>}
 
-      {folder && <span className={styles.badge}>{folder.name}</span>}
+      {bookFolders.map((folder) => (
+        <span key={folder.id} className={styles.badge}>
+          {folder.name}
+        </span>
+      ))}
 
       {/* So the "N books can be improved" banner's number has faces. */}
       {isOutOfDate(book) && <span className={styles.badgeMuted}>can be improved</span>}

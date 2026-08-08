@@ -86,6 +86,9 @@
 }
 
 .menuItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: 999px;
@@ -94,6 +97,30 @@
   font: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
+}
+
+/* A fixed-width slot for the tick, so the folder names line up whether or not
+   the books are in them — a list that shuffles sideways as you tap through it
+   is a list you have to re-aim at after every tap. Present and empty on the
+   rows that are not checkable, for the same reason. */
+.menuMark {
+  display: inline-block;
+  width: 0.75em;
+  flex: none;
+  text-align: center;
+  color: var(--color-accent);
+}
+
+/* "3 of 12" — the fact that says what the next tap will do. Muted because it is
+   describing the row rather than labelling it. */
+.menuNote {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.menuItem[aria-checked='true'] {
+  border-color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 .menuItemStrong {

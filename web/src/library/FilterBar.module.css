@@ -1,0 +1,170 @@
+/* The row of filter controls under the search bar, and the panel one of them
+   opens. Chips share `FilterSheet`'s shape deliberately — they are the same
+   choices in a second place, and two shapes for one idea is how an app starts
+   to look assembled rather than designed. */
+
+.wrap {
+  margin-bottom: var(--space-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  /* More controls than fit across a phone, so the row scrolls rather than
+     wrapping onto a second line: wrapping would push the shelf down by a whole
+     row's height the moment a folder with a long name is chosen, and the shelf
+     moving because a *label* got longer reads as a glitch. */
+  overflow-x: auto;
+  /* The last chip should be able to reach the middle of the screen rather than
+     stopping under the edge, and the row's own scrollbar is furniture on a
+     touch screen. */
+  scrollbar-width: none;
+  /* Sideways here belongs to the row, not to `useSwipeNav` — the row also
+     carries `data-no-swipe`, and this is the browser-level half of the same
+     statement. */
+  touch-action: pan-x;
+  /* Chips have a focus ring and a shadow-free border; without this the ring is
+     shaved off by the scroll box on the first and last of them. */
+  padding: 2px;
+  margin-inline: -2px;
+}
+
+.row::-webkit-scrollbar {
+  display: none;
+}
+
+.control,
+.iconButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.iconButton {
+  width: 2.75rem;
+  padding: 0;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+/* Only the controls that are actually hiding books. Sort and view always have a
+   value and never hide anything, so lighting them up would make an unfiltered
+   library look filtered — see `Control`'s `on` prop. */
+.controlOn {
+  border-color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+}
+
+/* A long folder name truncates rather than stretching the chip past the width
+   of the screen. */
+.controlLabel {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leading {
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.controlOn .leading {
+  color: inherit;
+}
+
+.caret {
+  font-size: 0.7em;
+  line-height: 1;
+  color: var(--color-text-muted);
+  transition: transform 160ms ease;
+}
+
+.controlOn .caret {
+  color: inherit;
+}
+
+/* Points at the panel it opened. */
+.caretUp {
+  transform: rotate(180deg);
+}
+
+/* Four horizontal lines shortening downward — the "tune" mark from the
+   reference, drawn rather than set as a glyph so it inherits colour in every
+   theme, exactly as the search bar's filter icon is. */
+.tuneIcon {
+  display: grid;
+  gap: 3px;
+  width: 1.1rem;
+}
+
+.tuneIcon > span {
+  height: 2px;
+  border-radius: 999px;
+  background-color: currentColor;
+}
+
+.tuneIcon > span:nth-child(2) {
+  width: 70%;
+  justify-self: center;
+}
+
+.tuneIcon > span:nth-child(3) {
+  width: 40%;
+  justify-self: center;
+}
+
+/* In the flow beneath the row, not floated over it: the shelf moves down to
+   make room rather than being covered, which keeps the result of a filter
+   visible at the moment it is chosen. That is the whole reason these controls
+   came out of the sheet. */
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+}
+
+.choice {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.choiceActive {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control,
+  .iconButton,
+  .caret,
+  .choice {
+    transition: none;
+  }
+}

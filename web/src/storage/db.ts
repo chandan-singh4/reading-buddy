@@ -121,13 +121,22 @@ export interface StoredQuote {
 
 /**
  * A shelf of the reader's own making — "Philosophy", "For the course", "Lent
- * out". A book belongs to at most one (`BookMeta.folderId`).
+ * out". A book can belong to any number of them (`BookMeta.folderIds`).
  *
- * At most one, deliberately. A book in three folders is a *tag*, and tags are a
- * different feature with a different shape: they need a join table, they never
- * partition the library, and a "Folder" sort would have nothing to sort by.
- * Folders answer "where does this live"; tags will answer "what is this about".
- * Building the first as if it were the second gets neither right.
+ * This shipped as "at most one", on the reasoning that a book in three folders
+ * is a *tag* and tags are a different feature. The reader asked for many, so
+ * many it is — and the one property that keeps it a folder rather than a tag is
+ * kept deliberately: **the shelf shows each book once**, however many folders it
+ * is in. The folder list narrows the library; it never duplicates it.
+ *
+ * The cost, paid knowingly: "sort by folder" no longer has a single answer per
+ * book, so it sorts on the first of a book's folders alphabetically. That is a
+ * real approximation and it is written down in `filter.ts` where it happens.
+ *
+ * Reading status ("Unread", "Finished") is deliberately **not** stored here.
+ * Those two behave like folders on screen but are worked out from progress every
+ * time they are asked for — see `library/systemFolders.ts` for why a computed
+ * answer is the only one that cannot go stale.
  *
  * `name` is indexed so the library can sort and search by folder without
  * loading every book first.
@@ -232,6 +241,33 @@ function defineSchema(db: Dexie): void {
     folders: 'id, name, createdAt',
     books: 'id, title, type, importedAt, contentHash, textSignature, folderId',
   })
+
+  // v9 — a book may be in several folders. `*folderIds` is a *multiEntry* index:
+  // one index entry per id in the array, so `where('folderIds').equals(id)` is
+  // still a direct lookup rather than a scan, exactly as the single `folderId`
+  // was. The old index is dropped in the same breath — leaving both would mean
+  // two answers to "which folder is this in" and no rule about which wins.
+  //
+  // This one *does* need a migration, where v8 didn't: a book filed under v8
+  // carries `folderId` and nothing else, so without the upgrade below every
+  // folder the reader had made would read as empty. `upgrade` runs once, inside
+  // the version change transaction, over the books table only.
+  db.version(9)
+    .stores({
+      books: 'id, title, type, importedAt, contentHash, textSignature, *folderIds',
+    })
+    .upgrade((tx) =>
+      tx
+        .table<BookMeta & { folderId?: string }>('books')
+        .toCollection()
+        .modify((book) => {
+          if (book.folderId === undefined) return
+          // Written before the old field is removed, and never merged with an
+          // existing `folderIds` — under v8 there cannot be one.
+          book.folderIds = [book.folderId]
+          delete book.folderId
+        }),
+    )
 }
 
 export function createDb(name: string = DB_NAME): ReadingBuddyDB {

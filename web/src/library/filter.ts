@@ -17,8 +17,10 @@
 import { shelfOf } from '../import/index.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 import type { StoredFolder } from '../storage/index.ts'
+import { foldersOf, folderIdsOf } from './folders.ts'
 import type { LibraryPrefs, SortKey } from './prefs.ts'
 import { progressOf, type BookProgress } from './status.ts'
+import { inSystemFolder, isSystemFolder } from './systemFolders.ts'
 
 /** Everything the pipeline needs beyond the books and the reader's choices. */
 export interface LibraryContext {
@@ -35,13 +37,13 @@ export const EMPTY_CONTEXT: LibraryContext = {
 /**
  * Everything about a book that a search should look through.
  *
- * Title, author and folder name today; **tags are listed here the day they
- * exist** and nowhere else — that is the whole point of building the haystack
- * in one place rather than inlining it into the filter.
+ * Title, author and **every** folder name it is in — searching "philosophy"
+ * finds a book filed under Philosophy and For the course alike, which is the
+ * point of letting it be in both.
  */
 function haystack(book: BookMeta, context: LibraryContext): string {
-  const folder = book.folderId ? context.folders.get(book.folderId) : undefined
-  return [book.title, book.author ?? '', folder?.name ?? ''].join(' ').toLowerCase()
+  const names = foldersOf(book, context.folders).map((folder) => folder.name)
+  return [book.title, book.author ?? '', ...names].join(' ').toLowerCase()
 }
 
 /**
@@ -83,10 +85,19 @@ function matchesFilters(
 
   if (prefs.shelves.length > 0 && !prefs.shelves.includes(shelfOf(book))) return false
 
-  // A folder the reader has since deleted filters nothing, rather than hiding
-  // the whole library behind a name that no longer exists.
-  if (prefs.folderId !== undefined && context.folders.has(prefs.folderId)) {
-    if (book.folderId !== prefs.folderId) return false
+  if (prefs.folderId !== undefined) {
+    // Unread and Finished hold no ids: membership is the reading status,
+    // answered fresh here rather than stored anywhere. See `systemFolders.ts`.
+    if (isSystemFolder(prefs.folderId)) {
+      const { status } = progressOf(book, context.progress)
+      if (!inSystemFolder(prefs.folderId, status)) return false
+    } else if (context.folders.has(prefs.folderId)) {
+      // In *any* of its folders is enough. A book in Philosophy and For the
+      // course belongs on both shelves, and appears once on each of them.
+      if (!folderIdsOf(book).includes(prefs.folderId)) return false
+    }
+    // A folder the reader has since deleted filters nothing, rather than hiding
+    // the whole library behind a name that no longer exists.
   }
 
   return true
@@ -107,6 +118,17 @@ function missingLast(a: string | undefined, b: string | undefined): number | und
   if (a === undefined) return 1
   if (b === undefined) return -1
   return undefined
+}
+
+/**
+ * The folder a book sorts under, or `undefined` for a loose one — see the
+ * `'folder'` comparator for why "first alphabetically" is the rule.
+ */
+function firstFolderName(book: BookMeta, context: LibraryContext): string | undefined {
+  const names = foldersOf(book, context.folders)
+    .map((folder) => folder.name)
+    .sort(byText)
+  return names[0]
 }
 
 type Comparator = (a: BookMeta, b: BookMeta, context: LibraryContext) => number
@@ -138,9 +160,17 @@ const COMPARATORS: Record<SortKey, Comparator> = {
   // state, so they belong at the end rather than under a blank heading at the
   // top. Within a folder, by title, because "grouped by folder and then in
   // import order" is not an order anybody can scan.
+  //
+  // **A book in several folders sorts under the first of them alphabetically.**
+  // This is an approximation and it is the price of many-folder membership: a
+  // book cannot be in two places in one list, and the alternative — listing it
+  // once per folder — would show the reader two copies of a book they own one
+  // of, which the folder model exists to avoid. First-alphabetically at least
+  // makes it a *stable* approximation, so the shelf doesn't reshuffle itself
+  // between visits.
   'folder': (a, b, context) => {
-    const left = a.folderId ? context.folders.get(a.folderId)?.name : undefined
-    const right = b.folderId ? context.folders.get(b.folderId)?.name : undefined
+    const left = firstFolderName(a, context)
+    const right = firstFolderName(b, context)
     const missing = missingLast(left, right)
     if (missing !== undefined && missing !== 0) return missing
     const byFolder = missing === 0 ? 0 : byText(left!, right!)

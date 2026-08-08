@@ -4,6 +4,7 @@ import { NavLink, useOutlet } from 'react-router'
 import { prefersReducedMotion } from '../reader/motion.ts'
 import { useViewLocation } from './routeTransition.tsx'
 import { ScreenActiveProvider } from './screenActive.tsx'
+import { recallScroll, rememberScroll } from './scrollMemory.ts'
 import { useTabHistory } from './tabHistory.ts'
 import { PAGE_ORDER, useSwipeNav } from './useSwipeNav.ts'
 import styles from './AppShell.module.css'
@@ -137,6 +138,54 @@ export default function AppShell() {
   const contentRef = useRef<HTMLElement>(null)
 
   /*
+   * ## Each screen keeps its own place in the document
+   *
+   * The four screens share one scroller — the document — because a hidden screen
+   * is `display: none` and so the document is only ever as tall as the screen on
+   * show. Move from a long Library to a short Home and the browser has no choice
+   * but to clamp `scrollY` to Home's last pixel, which is the "Home opens at the
+   * bottom and looks like it refreshed" report; Library then comes back to
+   * whatever Home left behind, because there was only ever one number.
+   *
+   * So the number is kept per screen. The full reasoning, and why a pixel offset
+   * is the right answer here where `useRowMemory` decided it was the wrong one
+   * for coming back from a book, is in `scrollMemory.ts`.
+   */
+
+  /**
+   * The screen the scroll position currently belongs to.
+   *
+   * `null` until the first arrival, so a fresh mount restores rather than
+   * skipping — `AppShell` unmounts while a book is open, and coming back out of
+   * one is an arrival like any other.
+   */
+  const scrolled = useRef<string | null>(null)
+
+  useEffect(() => {
+    // Saved continuously rather than read at the moment of departure: by the
+    // time any effect runs the swap has already happened and the browser has
+    // already clamped, so the honest value is the last one seen *before* it.
+    const onScroll = () => {
+      if (scrolled.current !== null) rememberScroll(scrolled.current, window.scrollY)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    if (scrolled.current === location.pathname) return
+    scrolled.current = location.pathname
+
+    // A layout effect, and therefore before the browser paints: the arriving
+    // screen is already laid out at its full height by now, so this scroll is
+    // never clamped, and the reader never sees the frame in between. In an
+    // ordinary effect the wrong position paints first, which is the jump.
+    window.scrollTo(0, recallScroll(location.pathname))
+  }, [location.pathname])
+
+  /*
    * ## Both screens move, and only the one leaving fades
    *
    * The arriving screen used to slide in alone, which reads as a cut with a
@@ -171,6 +220,23 @@ export default function AppShell() {
   const [leaving, setLeaving] = useState<string | null>(null)
   const direction = useRef(0)
 
+  /**
+   * How far to slide the outgoing screen so it fades out showing the part of
+   * itself the reader was actually looking at.
+   *
+   * Needed only because the two screens now keep separate scroll positions. The
+   * leaving screen is taken out of the flow and pinned to the top of the content
+   * box, which was harmless while both screens shared one offset — the document
+   * did not move, so "the top of the content box" *was* where the reader was.
+   * With Library at 1200px and Home at 0 it stops being harmless: Library would
+   * spend its 300 ms fade showing its first row rather than the row that was
+   * under the reader's thumb, which reads as the shelf jumping just as it goes.
+   *
+   * Arriving offset minus leaving offset puts the leaving screen's old viewport
+   * line back under the new one.
+   */
+  const leavingShift = useRef(0)
+
   useLayoutEffect(() => {
     const from = PAGE_ORDER.indexOf(previous.current)
     const to = PAGE_ORDER.indexOf(location.pathname)
@@ -187,6 +253,10 @@ export default function AppShell() {
     if (typeof Element.prototype.animate !== 'function') return
 
     direction.current = to > from ? 1 : -1
+    // Both still hold: the arriving screen's position was restored by the effect
+    // above, and the leaving screen's was saved by the scroll listener before
+    // the swap could clamp it.
+    leavingShift.current = recallScroll(location.pathname) - recallScroll(was)
     // A layout effect, so this extra render lands before the browser paints and
     // the two screens are on screen together from the very first frame of the
     // move. In an ordinary effect the new screen paints alone first, which is
@@ -327,6 +397,10 @@ export default function AppShell() {
                 // therefore cannot be found by what is written on it.
                 data-path={path}
                 className={going ? `${styles.page} ${styles.pageLeaving}` : styles.page}
+                // Only ever set on the screen on its way out, and only because
+                // the two screens no longer share a scroll position — see
+                // `leavingShift`.
+                style={going ? { top: `calc(var(--space-5) + ${leavingShift.current}px)` } : undefined}
                 hidden={!active && !going}
                 data-active={active}
                 data-leaving={going || undefined}

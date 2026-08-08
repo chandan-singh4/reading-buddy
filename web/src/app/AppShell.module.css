@@ -179,6 +179,10 @@
  * is clipped by `.content`'s `overflow-x: clip` only sideways, which is all the
  * clipping a horizontal drift needs.
  */
+/* `top` is overwritten inline by `AppShell.tsx` for the length of the move, by
+   the difference between the two screens' scroll positions — the value here is
+   the base it is measured from, and the only value when the two agree. See
+   `leavingShift`. */
 .pageLeaving {
   position: absolute;
   top: var(--space-5);

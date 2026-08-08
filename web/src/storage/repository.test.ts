@@ -2,6 +2,7 @@
 // these tests exercise the actual database rather than a mock of one.
 import 'fake-indexeddb/auto'
 
+import Dexie from 'dexie'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { AnchorError, formatAnchor, sectionPath } from '../structure/index.ts'
@@ -725,5 +726,76 @@ describe('healing titles already on the shelf', () => {
 
     expect(await repo.healTitles()).toBe(1)
     expect(await repo.healTitles()).toBe(0)
+  })
+})
+
+/**
+ * The v8 → v9 upgrade: one folder per book becomes many.
+ *
+ * This is the only migration in the app's history that *has* to do work — every
+ * earlier version could leave old rows alone, because an absent field meant the
+ * same thing as the default. Not here: a book filed under v8 carries `folderId`
+ * and nothing else, so without the upgrade every folder the reader had made
+ * would open empty. There is no undo for that and no way for them to tell it had
+ * happened beyond their library looking unorganised.
+ *
+ * So it is tested against a database genuinely written at v8 and reopened at v9,
+ * rather than against the migration function in isolation — the failure this is
+ * guarding against is "the upgrade did not run", which a direct call cannot see.
+ */
+describe('the v8 to v9 upgrade', () => {
+  /** A database at exactly the shape v8 left behind, opened and closed again. */
+  async function writeAtV8(name: string, rows: Record<string, unknown>[]): Promise<void> {
+    const old = new Dexie(name)
+    old.version(8).stores({
+      books: 'id, title, type, importedAt, contentHash, textSignature, folderId',
+      folders: 'id, name, createdAt',
+    })
+    await old.open()
+    await old.table('books').bulkPut(rows)
+    old.close()
+  }
+
+  it('moves a filed book into the list, and drops the old field', async () => {
+    const name = `reading-buddy-upgrade-${(dbCounter += 1)}`
+    await writeAtV8(name, [
+      { ...makeBook('filed'), folderId: 'f1' },
+      { ...makeBook('loose') },
+    ])
+
+    const upgraded = createDb(name)
+    try {
+      const filed = await upgraded.books.get(bookId('filed'))
+      const loose = await upgraded.books.get(bookId('loose'))
+
+      expect(filed?.folderIds).toEqual(['f1'])
+      // Removed, not merely ignored: two fields answering "which folder" is two
+      // answers with no rule about which wins.
+      expect((filed as unknown as Record<string, unknown>).folderId).toBeUndefined()
+      // A book that was never filed stays absent rather than gaining an empty
+      // array — see `unfiled` for why that distinction matters to the index.
+      expect(loose?.folderIds).toBeUndefined()
+    } finally {
+      await upgraded.delete()
+    }
+  })
+
+  it('still finds the book by its folder afterwards, through the new index', async () => {
+    // The whole point of the migration: the reader's folder still opens onto
+    // the books that were in it.
+    const name = `reading-buddy-upgrade-${(dbCounter += 1)}`
+    await writeAtV8(name, [
+      { ...makeBook('a'), folderId: 'f1' },
+      { ...makeBook('b'), folderId: 'f1' },
+      { ...makeBook('c'), folderId: 'f2' },
+    ])
+
+    const upgraded = createDb(name)
+    try {
+      const inside = await upgraded.books.where('folderIds').equals('f1').toArray()
+      expect(inside.map((book) => book.id).sort()).toEqual(['a', 'b'])
+    } finally {
+      await upgraded.delete()
+    }
   })
 })

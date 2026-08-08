@@ -27,11 +27,30 @@ export interface SelectionBarProps {
   count: number
   /** True once every book currently on screen is ticked. */
   allShown: boolean
+  /**
+   * The reader's own folders only. Unread and Finished are deliberately absent:
+   * they are worked out from reading progress, so "put these books in Finished"
+   * would either be a lie or a request to have read them — see
+   * `library/systemFolders.ts`.
+   */
   folders: readonly StoredFolder[]
+  /**
+   * How many of the ticked books are in each folder.
+   *
+   * Needed because membership is no longer one-or-nothing. With thirty books
+   * ticked and eleven of them already in Philosophy, a plain "Philosophy" button
+   * has no honest label — the reader cannot tell whether tapping it will file
+   * the other nineteen or unfile the eleven. The count turns that into three
+   * states the row can actually show: none, some, all.
+   */
+  folderCounts: ReadonlyMap<string, number>
   onSelectAll: () => void
   onSelectNone: () => void
   onChangeType: (shelf: Shelf) => void
-  onMoveToFolder: (folderId: string | undefined) => void
+  /** Add the ticked books to a folder, or take them out of it. */
+  onToggleFolder: (folderId: string, add: boolean) => void
+  /** Take the ticked books out of every folder they are in. */
+  onClearFolders: () => void
   onNewFolder: () => void
   onDelete: () => void
   onCancel: () => void
@@ -44,10 +63,12 @@ export function SelectionBar({
   count,
   allShown,
   folders,
+  folderCounts,
   onSelectAll,
   onSelectNone,
   onChangeType,
-  onMoveToFolder,
+  onToggleFolder,
+  onClearFolders,
   onNewFolder,
   onDelete,
   onCancel,
@@ -107,7 +128,11 @@ export function SelectionBar({
           aria-expanded={menu === 'folder'}
           onClick={() => choose('folder')}
         >
-          Move to folder
+          {/* Not just "Folders": the filter bar above has a control by that
+              name, and two buttons with one label on screen at the same time
+              doing entirely different jobs — one narrowing the shelf, one
+              rewriting what is on it — is a mis-tap waiting to happen. */}
+          Change folders
         </button>
 
         <button
@@ -141,19 +166,42 @@ export function SelectionBar({
 
       {menu === 'folder' && (
         <div className={styles.menu}>
-          {folders.map((folder) => (
-            <button
-              key={folder.id}
-              type="button"
-              className={styles.menuItem}
-              onClick={() => {
-                setMenu(null)
-                onMoveToFolder(folder.id)
-              }}
-            >
-              {folder.name}
-            </button>
-          ))}
+          {/*
+            The menu stays open as folders are tapped, unlike "Change type"
+            above. That one is a single choice and closing is the confirmation;
+            this one is a set, and filing thirty books under three folders would
+            otherwise mean re-opening the menu and re-finding your place twice.
+          */}
+          {folders.map((folder) => {
+            const inside = folderCounts.get(folder.id) ?? 0
+            const all = inside === count
+            return (
+              <button
+                key={folder.id}
+                type="button"
+                className={styles.menuItem}
+                // A checkbox in all but name: it has an on state, an off state
+                // and a partly-on state, and `aria-checked="mixed"` is the one
+                // way to say the third out loud.
+                role="menuitemcheckbox"
+                aria-checked={all ? true : inside > 0 ? 'mixed' : false}
+                onClick={() => onToggleFolder(folder.id, !all)}
+              >
+                <span className={styles.menuMark} aria-hidden="true">
+                  {all ? '✓' : inside > 0 ? '–' : ''}
+                </span>
+                {folder.name}
+                {/* Only when it would otherwise be ambiguous. "3 of 12" on a
+                    folder the reader is about to fill is the fact that decides
+                    what the next tap means. */}
+                {inside > 0 && !all && (
+                  <span className={styles.menuNote}>
+                    {inside} of {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
 
           {/* The way back out. Without this a book can be filed and never
               unfiled, which is a one-way door on an organising feature. */}
@@ -162,10 +210,11 @@ export function SelectionBar({
             className={styles.menuItem}
             onClick={() => {
               setMenu(null)
-              onMoveToFolder(undefined)
+              onClearFolders()
             }}
           >
-            No folder
+            <span className={styles.menuMark} aria-hidden="true" />
+            Remove from all folders
           </button>
 
           <button
@@ -176,7 +225,7 @@ export function SelectionBar({
               onNewFolder()
             }}
           >
-            + New folder…
+            <span className={styles.menuMark} aria-hidden="true" />+ New folder…
           </button>
         </div>
       )}

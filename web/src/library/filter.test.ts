@@ -5,6 +5,7 @@ import type { ReadingPosition, StoredFolder } from '../storage/index.ts'
 import { arrange, matchesSearch, type LibraryContext } from './filter.ts'
 import { DEFAULT_PREFS, type LibraryPrefs } from './prefs.ts'
 import { progressMap } from './status.ts'
+import { FINISHED_FOLDER_ID, UNREAD_FOLDER_ID } from './systemFolders.ts'
 
 function book(id: string, extra: Partial<BookMeta> = {}): BookMeta {
   return {
@@ -55,7 +56,7 @@ describe('matchesSearch', () => {
 
   it('matches a folder name', () => {
     const philosophy = folder('f1', 'Philosophy')
-    const kuhn = book('1', { title: 'Structure', author: 'Kuhn', folderId: 'f1' })
+    const kuhn = book('1', { title: 'Structure', author: 'Kuhn', folderIds: ['f1'] })
 
     expect(matchesSearch(kuhn, 'philosophy', context([], [philosophy]))).toBe(true)
     // The words may come from different fields — that is the point of splitting.
@@ -99,10 +100,40 @@ describe('arrange — filtering', () => {
 
   it('filters to one folder', () => {
     const philosophy = folder('f1', 'Philosophy')
-    const shelf = [book('in', { folderId: 'f1' }), book('out')]
+    const shelf = [book('in', { folderIds: ['f1'] }), book('out')]
 
     const found = arrange(shelf, '', prefs({ folderId: 'f1' }), context([], [philosophy]))
     expect(ids(found)).toEqual(['in'])
+  })
+
+  it('finds a book in any of its folders, and shows it only once', () => {
+    const folders = [folder('f1', 'Philosophy'), folder('f2', 'For the course')]
+    // The book the whole many-folder change exists for.
+    const both = book('both', { folderIds: ['f1', 'f2'] })
+    const shelf = [both, book('out')]
+
+    expect(ids(arrange(shelf, '', prefs({ folderId: 'f1' }), context([], folders)))).toEqual([
+      'both',
+    ])
+    expect(ids(arrange(shelf, '', prefs({ folderId: 'f2' }), context([], folders)))).toEqual([
+      'both',
+    ])
+    // The property that keeps this a folder rather than a tag: two folders
+    // narrow the library, they never multiply it.
+    expect(ids(arrange(shelf, '', prefs(), context([], folders)))).toEqual(['both', 'out'])
+  })
+
+  it('searches every folder name a book is filed under', () => {
+    const folders = [folder('f1', 'Philosophy'), folder('f2', 'For the course')]
+    const both = book('both', { folderIds: ['f1', 'f2'] })
+    expect(matchesSearch(both, 'philosophy', context([], folders))).toBe(true)
+    expect(matchesSearch(both, 'course', context([], folders))).toBe(true)
+  })
+
+  it('drops a folder id whose folder has been deleted, without hiding the book', () => {
+    const shelf = [book('a', { folderIds: ['gone'] })]
+    // The badge disappears; the book does not.
+    expect(ids(arrange(shelf, '', prefs(), context()))).toEqual(['a'])
   })
 
   it('ignores a folder filter pointing at a folder that has been deleted', () => {
@@ -155,9 +186,9 @@ describe('arrange — sorting', () => {
     const folders = [folder('f1', 'Zoology'), folder('f2', 'Anthropology')]
     const shelf = [
       book('loose', { title: 'Loose' }),
-      book('z', { title: 'Zebras', folderId: 'f1' }),
-      book('a2', { title: 'Bones', folderId: 'f2' }),
-      book('a1', { title: 'Ancestors', folderId: 'f2' }),
+      book('z', { title: 'Zebras', folderIds: ['f1'] }),
+      book('a2', { title: 'Bones', folderIds: ['f2'] }),
+      book('a1', { title: 'Ancestors', folderIds: ['f2'] }),
     ]
     const found = arrange(shelf, '', prefs({ sort: 'folder' }), context([], folders))
     expect(ids(found)).toEqual(['a1', 'a2', 'z', 'loose'])
@@ -167,5 +198,67 @@ describe('arrange — sorting', () => {
     const shelf = [book('b', { title: 'b' }), book('a', { title: 'a' })]
     arrange(shelf, '', prefs({ sort: 'title-asc' }))
     expect(ids(shelf)).toEqual(['b', 'a'])
+  })
+})
+
+/**
+ * Unread and Finished are not rows anywhere — membership is worked out from the
+ * reading positions every time the shelf is drawn. These tests are the guard on
+ * that: a book "moves" between them because the answer changed, and nothing was
+ * written down to be moved.
+ */
+describe('the Unread and Finished folders', () => {
+  const shelf = [book('never'), book('midway'), book('done')]
+  const started = [position('midway', '2026-02-01T00:00:00Z', 40)]
+  const completed = [position('done', '2026-02-02T00:00:00Z', 100)]
+
+  it('holds every book that has never been opened, under Unread', () => {
+    const found = arrange(
+      shelf,
+      '',
+      prefs({ folderId: UNREAD_FOLDER_ID }),
+      context([...started, ...completed]),
+    )
+    expect(ids(found)).toEqual(['never'])
+  })
+
+  it('holds the finished books, and not the one halfway through', () => {
+    const found = arrange(
+      shelf,
+      '',
+      prefs({ folderId: FINISHED_FOLDER_ID }),
+      context([...started, ...completed]),
+    )
+    expect(ids(found)).toEqual(['done'])
+  })
+
+  it('moves a book from Unread to Finished when it is finished, with nothing written', () => {
+    const unread = prefs({ folderId: UNREAD_FOLDER_ID })
+    const finished = prefs({ folderId: FINISHED_FOLDER_ID })
+    const one = [book('b')]
+
+    expect(ids(arrange(one, '', unread, context()))).toEqual(['b'])
+    expect(ids(arrange(one, '', finished, context()))).toEqual([])
+
+    // The *only* thing that changes is the reading position. The book itself is
+    // the same object it was on the line above.
+    const after = context([position('b', '2026-03-01T00:00:00Z', 100)])
+    expect(ids(arrange(one, '', unread, after))).toEqual([])
+    expect(ids(arrange(one, '', finished, after))).toEqual(['b'])
+  })
+
+  it('puts a book back in Unread when its place is reset', () => {
+    const one = [book('b')]
+    const reset = context()
+    expect(ids(arrange(one, '', prefs({ folderId: UNREAD_FOLDER_ID }), reset))).toEqual(['b'])
+    expect(ids(arrange(one, '', prefs({ folderId: FINISHED_FOLDER_ID }), reset))).toEqual([])
+  })
+
+  it('does not treat a system folder as one the reader can be filed into', () => {
+    // A book carrying the id anyway — which nothing in the app can produce, and
+    // which must not be honoured if it ever appeared.
+    const forged = [book('forged', { folderIds: [FINISHED_FOLDER_ID] })]
+    const found = arrange(forged, '', prefs({ folderId: FINISHED_FOLDER_ID }), context())
+    expect(ids(found)).toEqual([])
   })
 })

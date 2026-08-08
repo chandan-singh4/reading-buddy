@@ -8,15 +8,40 @@
 // them up and that the destructive controls behave.
 import 'fake-indexeddb/auto'
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { FINISHED_FOLDER_ID } from '../library/systemFolders.ts'
 import { repository, type ParsedBook } from '../storage/index.ts'
 import { chapterPath, formatAnchor, sectionPath, type BookId } from '../structure/index.ts'
 import Library from './Library.tsx'
 
 afterEach(cleanup)
+
+/**
+ * The filter sheet, as a scope to query inside.
+ *
+ * Needed since the shelf grew its own row of filter controls: sort, folder,
+ * reading status and view are now reachable in two places at once, on purpose
+ * (see `library/FilterBar.tsx`), so a bare `getByRole('button', { name: 'Grid' })`
+ * is genuinely ambiguous rather than merely brittle.
+ */
+function sheet(): HTMLElement {
+  return screen.getByRole('dialog', { name: 'Filter and sort' })
+}
+
+function inSheet() {
+  return within(sheet())
+}
 
 function bookOf(id: string, title: string): ParsedBook {
   const bookId = id as BookId
@@ -156,7 +181,10 @@ describe('the shelf', () => {
     )
     openLibrary()
 
-    expect(await screen.findByText(/Finished/)).toBeTruthy()
+    // Asked for by its exact badge text. "Finished" on its own is no longer
+    // unique on this screen: it is a reading status *and* a folder, which is
+    // what the reader asked for and is the sheet's own wording twice over.
+    expect(await screen.findByText('✓ Finished')).toBeTruthy()
   })
 
   it('says nothing about progress for a book with no position yet', async () => {
@@ -311,7 +339,7 @@ describe('removing what is selected', () => {
 
     expect(screen.getByRole('button', { name: 'Delete' })).toHaveProperty('disabled', true)
     expect(screen.getByRole('button', { name: 'Change type' })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('button', { name: 'Move to folder' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Change folders' })).toHaveProperty('disabled', true)
   })
 })
 
@@ -333,10 +361,19 @@ describe('changing what a book is', () => {
 })
 
 describe('folders', () => {
-  it('makes a folder and moves the ticked books into it', async () => {
+  /** The folders a book is in, by name — the fact every test here is about. */
+  async function foldersOnBook(id: string): Promise<string[]> {
+    const book = await repository.getBook(id as BookId)
+    const all = await repository.listFolders()
+    return (book?.folderIds ?? []).map(
+      (folderId) => all.find((entry) => entry.id === folderId)?.name ?? folderId,
+    )
+  }
+
+  it('makes a folder and puts the ticked books into it', async () => {
     await startSelecting()
-    fireEvent.click(screen.getByRole('button', { name: 'Move to folder' }))
-    fireEvent.click(await screen.findByRole('button', { name: '+ New folder…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change folders' }))
+    fireEvent.click(await screen.findByRole('button', { name: /New folder/ }))
 
     fireEvent.change(await screen.findByLabelText('Folder name'), {
       target: { value: 'Philosophy' },
@@ -348,32 +385,273 @@ describe('folders', () => {
     })
     const [folder] = await repository.listFolders()
     const books = await repository.listBooks()
-    expect(books.filter((book) => book.folderId === folder!.id)).toHaveLength(1)
+    expect(books.filter((book) => (book.folderIds ?? []).includes(folder!.id))).toHaveLength(1)
+  })
+
+  it('puts a book in a second folder without taking it out of the first', async () => {
+    // The whole reason membership became a list. Filing must add, never move.
+    const philosophy = await repository.createFolder('Philosophy')
+    const course = await repository.createFolder('For the course')
+    await repository.addBooksToFolder(['a' as BookId], philosophy!.id)
+    await repository.addBooksToFolder(['a' as BookId], course!.id)
+
+    expect((await foldersOnBook('a')).sort()).toEqual(['For the course', 'Philosophy'])
+  })
+
+  it('shows a book in several folders only once on the shelf', async () => {
+    // A folder narrows the library; it never multiplies it. Two folders must
+    // not mean two copies of one book.
+    const philosophy = await repository.createFolder('Philosophy')
+    const course = await repository.createFolder('For the course')
+    await repository.addBooksToFolder(['s0' as BookId], philosophy!.id)
+    await repository.addBooksToFolder(['s0' as BookId], course!.id)
+
+    openLibrary()
+
+    expect(await screen.findAllByRole('link', { name: /Red Book/ })).toHaveLength(1)
+  })
+
+  it('takes books out of one folder, leaving the others alone', async () => {
+    const philosophy = await repository.createFolder('Philosophy')
+    const course = await repository.createFolder('For the course')
+    await repository.addBooksToFolder(['a' as BookId], philosophy!.id)
+    await repository.addBooksToFolder(['a' as BookId], course!.id)
+
+    await repository.removeBooksFromFolder(['a' as BookId], philosophy!.id)
+
+    expect(await foldersOnBook('a')).toEqual(['For the course'])
   })
 
   it('turns a filed book loose again', async () => {
     const folder = await repository.createFolder('Philosophy')
-    await repository.moveBooksToFolder(['a' as BookId], folder!.id)
+    await repository.addBooksToFolder(['a' as BookId], folder!.id)
 
     await startSelecting()
-    fireEvent.click(screen.getByRole('button', { name: 'Move to folder' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'No folder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change folders' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove from all folders' }))
 
     await waitFor(async () => {
-      const book = await repository.getBook('a' as BookId)
-      expect(book?.folderId).toBeUndefined()
+      expect(await foldersOnBook('a')).toEqual([])
     })
+  })
+
+  it('unfiles a book by tapping the folder it is already in', async () => {
+    const folder = await repository.createFolder('Philosophy')
+    await repository.addBooksToFolder(['a' as BookId], folder!.id)
+
+    await startSelecting()
+    fireEvent.click(screen.getByRole('button', { name: 'Change folders' }))
+    // Ticked, because every selected book is in it.
+    const row = await screen.findByRole('menuitemcheckbox', { name: /Philosophy/ })
+    expect(row.getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.click(row)
+
+    await waitFor(async () => {
+      expect(await foldersOnBook('a')).toEqual([])
+    })
+  })
+
+  it('refuses to file a book into Unread or Finished', async () => {
+    // Those two are worked out from reading progress. An id written onto a book
+    // would be a second answer to a question that already has one.
+    await repository.addBooksToFolder(['a' as BookId], FINISHED_FOLDER_ID)
+
+    expect((await repository.getBook('a' as BookId))?.folderIds).toBeUndefined()
   })
 
   it('deleting a folder keeps the books that were in it', async () => {
     // A folder is a label on a shelf, not a box with a bottom.
     const folder = await repository.createFolder('Philosophy')
-    await repository.moveBooksToFolder(['a' as BookId, 'bb' as BookId], folder!.id)
+    await repository.addBooksToFolder(['a' as BookId, 'bb' as BookId], folder!.id)
 
     await repository.deleteFolder(folder!.id)
 
     expect(await repository.listBooks()).toHaveLength(3)
-    expect((await repository.getBook('a' as BookId))?.folderId).toBeUndefined()
+    expect(await foldersOnBook('a')).toEqual([])
+  })
+
+  it('deleting one folder leaves a book in the others it was in', async () => {
+    const philosophy = await repository.createFolder('Philosophy')
+    const course = await repository.createFolder('For the course')
+    await repository.addBooksToFolder(['a' as BookId], philosophy!.id)
+    await repository.addBooksToFolder(['a' as BookId], course!.id)
+
+    await repository.deleteFolder(philosophy!.id)
+
+    expect(await foldersOnBook('a')).toEqual(['For the course'])
+  })
+})
+
+/**
+ * The controls that used to live behind the filter icon and now sit on the
+ * shelf itself. The sheet is still there and still holds everything — these are
+ * about the quick path, and about the two reading them from the same place.
+ */
+describe('the filter controls under the search bar', () => {
+  /** Open one of the chips in the row and return its panel's options. */
+  function openControl(name: string | RegExp) {
+    fireEvent.click(screen.getByRole('button', { name, expanded: false }))
+  }
+
+  it('offers sort, folders, reading status and view without opening anything', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    // No sheet, no slide, no second tap: they are readable where they sit.
+    expect(screen.getByRole('button', { name: /Recently added/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Folders/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Reading status/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /List/ })).toBeTruthy()
+  })
+
+  it('sorts from the row, and says on the chip what it sorted by', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Recently added/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Title Z \u2192 A' }))
+
+    expect(screen.getAllByRole('link')[0]!.textContent).toContain('Red Book')
+    // The chip is the only thing left showing the answer once the panel closes.
+    expect(screen.getByRole('button', { name: /Title Z/ })).toBeTruthy()
+  })
+
+  it('filters by reading status from the row', async () => {
+    await repository.savePosition(
+      'a' as BookId,
+      formatAnchor({ chapter: 1, section: 1, paragraph: 1 }),
+      42,
+    )
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Reading status/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Currently reading' }))
+
+    expect(screen.getByText('Aion')).toBeTruthy()
+    expect(screen.queryByText('Red Book')).toBeNull()
+  })
+
+  it('keeps the status panel open, because several statuses can be on at once', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Reading status/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Unread' }))
+
+    expect(screen.getByRole('button', { name: 'Currently reading' })).toBeTruthy()
+  })
+
+  it('switches view from the row', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/List/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Grid' }))
+
+    // Chosen, panel closed, and the chip now reads back what it is set to.
+    expect(screen.getByRole('button', { name: /Grid/, expanded: false })).toBeTruthy()
+  })
+
+  it('still opens the full sheet, which is the only place content type lives', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
+
+    expect(inSheet().getByRole('group', { name: 'Content type' })).toBeTruthy()
+  })
+
+  it('shows the same setting in the bar and the sheet, because there is one', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/List/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Grid' }))
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
+
+    expect(
+      within(inSheet().getByRole('group', { name: 'View' })).getByRole('button', { name: 'Grid' }),
+    ).toHaveProperty('ariaPressed', 'true')
+  })
+})
+
+describe('the Unread and Finished folders', () => {
+  /** Choose a folder from the row of controls. */
+  async function chooseFolder(name: string) {
+    openLibrary()
+    await screen.findByText('Aion')
+    fireEvent.click(screen.getByRole('button', { name: /Folders/, expanded: false }))
+    fireEvent.click(await screen.findByRole('button', { name }))
+  }
+
+  it('offers them even though the reader has made no folders', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+    fireEvent.click(screen.getByRole('button', { name: /Folders/ }))
+
+    expect(await screen.findByRole('button', { name: 'Unread' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Finished' })).toBeTruthy()
+  })
+
+  it('holds the books that have never been opened', async () => {
+    await repository.savePosition(
+      'a' as BookId,
+      formatAnchor({ chapter: 1, section: 1, paragraph: 1 }),
+      100,
+    )
+
+    await chooseFolder('Unread')
+
+    expect(screen.queryByText('Aion')).toBeNull()
+    expect(screen.getByText('Red Book')).toBeTruthy()
+  })
+
+  it('holds a book the moment it is finished, with nothing filed anywhere', async () => {
+    await repository.savePosition(
+      'a' as BookId,
+      formatAnchor({ chapter: 1, section: 1, paragraph: 1 }),
+      100,
+    )
+
+    await chooseFolder('Finished')
+
+    expect(screen.getByText('Aion')).toBeTruthy()
+    expect(screen.queryByText('Red Book')).toBeNull()
+    // The point of the whole design: membership was never written down.
+    expect((await repository.getBook('a' as BookId))?.folderIds).toBeUndefined()
+  })
+
+  it('puts a book back into Unread when its place is cleared', async () => {
+    await repository.savePosition(
+      'a' as BookId,
+      formatAnchor({ chapter: 1, section: 1, paragraph: 1 }),
+      100,
+    )
+    await repository.forgetPosition('a' as BookId)
+
+    await chooseFolder('Unread')
+
+    expect(screen.getByText('Aion')).toBeTruthy()
+  })
+
+  it('titles the screen with the folder, exactly as a real one does', async () => {
+    await chooseFolder('Finished')
+
+    expect(screen.getByRole('heading', { name: 'Finished' })).toBeTruthy()
+  })
+
+  it('opens a book from one of them', async () => {
+    await repository.savePosition(
+      'a' as BookId,
+      formatAnchor({ chapter: 1, section: 1, paragraph: 1 }),
+      100,
+    )
+
+    await chooseFolder('Finished')
+
+    expect(screen.getByRole('link', { name: /Aion/ }).getAttribute('href')).toBe('/book/a')
   })
 })
 
@@ -468,7 +746,7 @@ describe('searching the library', () => {
 
   it('searches folder names', async () => {
     const folder = await repository.createFolder('Analytical psychology')
-    await repository.moveBooksToFolder(['s0' as BookId], folder!.id)
+    await repository.addBooksToFolder(['s0' as BookId], folder!.id)
 
     await search('analytical')
 
@@ -508,14 +786,20 @@ describe('the view and filter menu', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Filter and sort' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Grid' }))
-    expect(screen.getByRole('button', { name: 'Grid' })).toHaveProperty('ariaPressed', 'true')
+    expect(inSheet().getByRole('button', { name: 'Grid' })).toHaveProperty(
+      'ariaPressed',
+      'true',
+    )
 
     cleanup()
     openLibrary()
     await screen.findByText('Aion')
     fireEvent.click(screen.getByRole('button', { name: 'Filter and sort' }))
 
-    expect(screen.getByRole('button', { name: 'Grid' })).toHaveProperty('ariaPressed', 'true')
+    expect(inSheet().getByRole('button', { name: 'Grid' })).toHaveProperty(
+      'ariaPressed',
+      'true',
+    )
   })
 
   it('filters to one reading status', async () => {
@@ -541,7 +825,13 @@ describe('the view and filter menu', () => {
     await screen.findByText('Aion')
 
     fireEvent.click(screen.getByRole('button', { name: 'Filter and sort' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Unread' }))
+    // Scoped to the group: "Unread" names a reading status *and* a folder, and
+    // the sheet offers both.
+    fireEvent.click(
+      await within(inSheet().getByRole('group', { name: 'Reading status' })).findByRole('button', {
+        name: 'Unread',
+      }),
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 
     expect(screen.getByText('Showing 3 of 3')).toBeTruthy()

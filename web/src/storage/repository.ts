@@ -20,6 +20,7 @@ import type {
 } from '../structure/index.ts'
 import { countWordsIn, sectionPathOf } from '../structure/index.ts'
 import { cleanTitle, TITLE_CLEAN_VERSION } from '../parse/cleanTitle.ts'
+import { isSystemFolder } from '../library/systemFolders.ts'
 import {
   db as defaultDb,
   type ReadingBuddyDB,
@@ -63,6 +64,26 @@ export interface ParsedBook {
    * at all (plain text).
    */
   assets?: BookAsset[]
+}
+
+/**
+ * A book with no folders at all.
+ *
+ * The key is **removed** rather than set to an empty array. `folderIds` is a
+ * multiEntry index, and Dexie's own rule is that an absent key and a present-but-
+ * empty one are not the same thing to a `where('folderIds')` query — the same
+ * trap the single `folderId` had, in its multi-valued form. An empty array also
+ * costs a row of storage on every book in the library to say nothing.
+ */
+function unfiled(book: BookMeta): BookMeta {
+  const { folderIds: _dropped, ...rest } = book
+  return rest
+}
+
+/** The same book, out of one folder — and out of *all* folders if it was its last. */
+function withoutFolder(book: BookMeta, folderId: string): BookMeta {
+  const kept = (book.folderIds ?? []).filter((id) => id !== folderId)
+  return kept.length === 0 ? unfiled(book) : { ...book, folderIds: kept }
 }
 
 export function createRepository(database: ReadingBuddyDB = defaultDb) {
@@ -703,45 +724,73 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
      * so no book is ever left pointing at a folder that has gone.
      */
     async deleteFolder(id: string): Promise<void> {
+      if (isSystemFolder(id)) return
+
       await database.transaction('rw', [database.folders, database.books], async () => {
-        const inside = await database.books.where('folderId').equals(id).toArray()
+        const inside = await database.books.where('folderIds').equals(id).toArray()
         if (inside.length > 0) {
-          await database.books.bulkPut(
-            inside.map((book) => {
-              const { folderId: _dropped, ...rest } = book
-              return rest
-            }),
-          )
+          await database.books.bulkPut(inside.map((book) => withoutFolder(book, id)))
         }
         await database.folders.delete(id)
       })
     },
 
     /**
-     * File books into a folder, or (with `undefined`) turn them loose again.
+     * Put books into a folder, leaving whatever other folders they are in alone.
+     *
+     * "Add", not "move", and that is the whole change from the version that
+     * shipped: a book can be in Philosophy *and* For the course, so filing it
+     * somewhere must not silently unfile it from where it already was. The way
+     * back out is `removeBooksFromFolder`, and the way all the way out is
+     * `clearFoldersFor` — both offered on the same menu, because a one-way door
+     * on an organising feature is how a library stops being trusted.
      *
      * Takes a list because that is how the library's selection mode works —
-     * thirty books moved in one transaction rather than thirty round trips that
+     * thirty books filed in one transaction rather than thirty round trips that
      * can fail halfway and leave the reader guessing which moved.
+     *
+     * A system folder is refused outright rather than quietly ignored at the
+     * last moment: Unread and Finished are worked out from reading progress, and
+     * an id written into a book would be a second, disagreeing answer to a
+     * question that already has one. See `library/systemFolders.ts`.
      */
-    async moveBooksToFolder(
-      bookIds: readonly BookId[],
-      folderId: string | undefined,
-    ): Promise<void> {
+    async addBooksToFolder(bookIds: readonly BookId[], folderId: string): Promise<void> {
+      if (bookIds.length === 0 || isSystemFolder(folderId)) return
+
+      await database.transaction('rw', database.books, async () => {
+        const books = await database.books.bulkGet([...bookIds])
+        const updated = books
+          .filter((book): book is BookMeta => book !== undefined)
+          .filter((book) => !(book.folderIds ?? []).includes(folderId))
+          .map((book) => ({ ...book, folderIds: [...(book.folderIds ?? []), folderId] }))
+        if (updated.length > 0) await database.books.bulkPut(updated)
+      })
+    },
+
+    /** Take books out of one folder, leaving the others they are in untouched. */
+    async removeBooksFromFolder(bookIds: readonly BookId[], folderId: string): Promise<void> {
+      if (bookIds.length === 0 || isSystemFolder(folderId)) return
+
+      await database.transaction('rw', database.books, async () => {
+        const books = await database.books.bulkGet([...bookIds])
+        const updated = books
+          .filter((book): book is BookMeta => book !== undefined)
+          .filter((book) => (book.folderIds ?? []).includes(folderId))
+          .map((book) => withoutFolder(book, folderId))
+        if (updated.length > 0) await database.books.bulkPut(updated)
+      })
+    },
+
+    /** Turn books loose again — out of every folder at once. */
+    async clearFoldersFor(bookIds: readonly BookId[]): Promise<void> {
       if (bookIds.length === 0) return
 
       await database.transaction('rw', database.books, async () => {
         const books = await database.books.bulkGet([...bookIds])
-        const updated = books.filter((book): book is BookMeta => book !== undefined).map((book) => {
-          if (folderId === undefined) {
-            // Removed rather than set to `undefined`: Dexie indexes the field,
-            // and an explicit `undefined` and an absent key are not the same
-            // thing to `where('folderId')`.
-            const { folderId: _dropped, ...rest } = book
-            return rest
-          }
-          return { ...book, folderId }
-        })
+        const updated = books
+          .filter((book): book is BookMeta => book !== undefined)
+          .filter((book) => (book.folderIds ?? []).length > 0)
+          .map((book) => unfiled(book))
         if (updated.length > 0) await database.books.bulkPut(updated)
       })
     },

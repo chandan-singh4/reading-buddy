@@ -75,17 +75,26 @@ export interface BookMeta {
    */
   shelfOverridden?: boolean
   /**
-   * The reader's own folder this book sits in, if any (`StoredFolder.id`).
+   * The reader's own folders this book sits in (`StoredFolder.id`), if any.
    *
-   * Absent means "loose in the library" — the state every book starts in and
-   * most stay in. Deliberately a single id rather than a list: see the note on
-   * `StoredFolder` for why a book in several places is a tag, not a folder.
+   * Absent or empty means "loose in the library" — the state every book starts
+   * in and most stay in.
    *
-   * A dangling id is survivable by design. Deleting a folder clears it from
+   * **A list, and it did not used to be.** This was a single `folderId` on the
+   * settled reasoning that a book in several places is a *tag* and tags are a
+   * different feature. The reader overruled it: they want one book filed under
+   * "Philosophy" and "For the course" at once, without a second copy of it. So
+   * membership is many, and the thing that makes it still a folder rather than a
+   * tag is that the library shows a book **once** however many folders it is in —
+   * the folder list narrows the shelf, it does not multiply it.
+   *
+   * Indexed `*folderIds` (multiEntry), so "show me this folder" stays a lookup.
+   *
+   * A dangling id is survivable by design. Deleting a folder strips it from
    * every book in one transaction, but if that ever half-fails the book simply
-   * reads as loose rather than disappearing from the library.
+   * reads as loose rather than disappearing from the library — see `foldersOf`.
    */
-  folderId?: string
+  folderIds?: string[]
   /**
    * SHA-256 of the imported file's bytes — the book's fingerprint, used to
    * recognise a re-import. Identity is the *file*, not the title: two editions

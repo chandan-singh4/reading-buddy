@@ -10,6 +10,7 @@ import { MemoryRouter, useNavigate } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
+import { forgetScrollMemory } from './scrollMemory.ts'
 import { forgetTabHistory } from './tabHistory.ts'
 
 afterEach(cleanup)
@@ -17,6 +18,11 @@ afterEach(cleanup)
 // Module-level by design — see `tabHistory.ts`; cleared so one case's history
 // memory cannot answer the next case's assertions.
 beforeEach(forgetTabHistory)
+
+// Also module-level, and for the same reason: it has to outlive `AppShell`,
+// which unmounts whenever a book is open. One case's remembered position must
+// not decide the next one's.
+beforeEach(forgetScrollMemory)
 
 // The Reader scrolls to the top of each new section. jsdom has no layout, so
 // its `scrollTo` exists only to complain — stubbed rather than left to warn.
@@ -355,6 +361,99 @@ describe('app shell', () => {
  * none of which needs a real animation, and all of which has been got wrong here
  * before.
  */
+/**
+ * Each screen keeping its own place in the document.
+ *
+ * ## What jsdom can and cannot say about this
+ *
+ * It has no layout, so it cannot reproduce the actual fault — nothing here is
+ * ever tall enough for a browser to clamp `scrollY` against, which is the
+ * mechanism (`scrollMemory.ts` sets it out). What it *can* pin down is the rule
+ * that fixes it, and that rule is a bookkeeping one: **the offset restored on
+ * arrival is the one that screen was left at, and never the other screen's.**
+ * That is the part a future change would break by accident, and it is exactly
+ * the part the shipped bug got wrong — two pages sharing one number.
+ *
+ * The layout half of it is verified on the reader's phone or not at all, which
+ * is this project's standing conclusion about anything to do with scrolling.
+ */
+describe('each screen keeps its own scroll position', () => {
+  /** Where the shell has asked the window to go, oldest first. */
+  function scrolls(): number[] {
+    const calls = vi.mocked(window.scrollTo).mock.calls
+    return calls.map((call) => (typeof call[1] === 'number' ? call[1] : 0))
+  }
+
+  /** Scroll the window as a finger would, and let the shell notice. */
+  function scrollTo(offset: number) {
+    Object.defineProperty(window, 'scrollY', { value: offset, configurable: true })
+    fireEvent.scroll(window)
+  }
+
+  beforeEach(() => {
+    vi.mocked(window.scrollTo).mockClear()
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
+  })
+
+  it('brings Library back to where it was left', async () => {
+    renderAt('/')
+    await screen.findByText('No books yet')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'All books' })).toBeTruthy())
+
+    scrollTo(1200)
+
+    // Back to Home, which was at the top and must arrive at the top.
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Home/ }))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /))
+
+    expect(scrolls().at(-1)).toBe(0)
+
+    // And back to Library, which must arrive where it was left — not at the
+    // top, and not at Home's position.
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'All books' })).toBeTruthy())
+
+    expect(scrolls().at(-1)).toBe(1200)
+  })
+
+  it('does not let one screen inherit the other screen\u2019s position', async () => {
+    // The shipped bug, stated as a rule. Both screens scrolled, to different
+    // places; each must get its own number back.
+    renderAt('/')
+    await screen.findByText('No books yet')
+    scrollTo(300)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'All books' })).toBeTruthy())
+    scrollTo(1200)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Home/ }))
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /))
+
+    expect(scrolls().at(-1)).toBe(300)
+  })
+
+  it('starts a screen it has never been to at the top', async () => {
+    renderAt('/')
+    await screen.findByText('No books yet')
+    scrollTo(500)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Settings/ }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy())
+
+    // Not 500. Arriving somewhere new part-way down is the fault, not the fix.
+    expect(scrolls().at(-1)).toBe(0)
+  })
+})
+
 describe('crossing between two tabs', () => {
   interface Played {
     node: HTMLElement

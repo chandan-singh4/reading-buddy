@@ -26,9 +26,11 @@ import { forgetCovers, useCovers } from '../app/useCovers.ts'
 import { useRowMemory } from '../app/useRowMemory.ts'
 import { AddButton } from '../library/AddButton.tsx'
 import { BookShelf } from '../library/BookShelf.tsx'
+import { FilterBar } from '../library/FilterBar.tsx'
 import { FilterSheet } from '../library/FilterSheet.tsx'
 import { SelectionBar } from '../library/SelectionBar.tsx'
 import { arrange, type LibraryContext } from '../library/filter.ts'
+import { folderChoices, folderIdsOf } from '../library/folders.ts'
 import {
   isFiltered,
   readLibraryPrefs,
@@ -135,6 +137,13 @@ export default function Library() {
     () => new Map(folders.map((folder) => [folder.id, folder])),
     [folders],
   )
+
+  /**
+   * Every folder the reader can pick from — Unread and Finished first, then
+   * their own. Built here and handed to both the bar and the sheet, so the two
+   * can never offer different lists.
+   */
+  const choices = useMemo(() => folderChoices(folders), [folders])
   const context = useMemo<LibraryContext>(
     () => ({ progress, folders: folderMap }),
     [progress, folderMap],
@@ -290,11 +299,43 @@ export default function Library() {
 
   const chosen = useMemo(() => [...(selected ?? [])], [selected])
 
-  async function applyToSelected(work: (ids: BookId[]) => Promise<void>, prefix: string) {
+  /**
+   * How many of the ticked books are in each folder.
+   *
+   * Counted rather than answered yes/no because membership stopped being
+   * one-or-nothing: with eleven of thirty ticked books already in Philosophy,
+   * the bar has to be able to say so, or a tap on that row is a coin toss
+   * between filing nineteen and unfiling eleven. See `SelectionBar`.
+   */
+  const folderCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    if (!selected) return counts
+    for (const book of books) {
+      if (!selected.has(book.id)) continue
+      for (const id of folderIdsOf(book)) counts.set(id, (counts.get(id) ?? 0) + 1)
+    }
+    return counts
+  }, [books, selected])
+
+  /**
+   * Run one bulk action over the ticked books, then re-read the shelf.
+   *
+   * `keepSelection` exists for the folder rows and nothing else. Every other
+   * action here is terminal — books deleted, types changed — and dropping the
+   * ticks afterwards is the confirmation that it happened. Filing is not
+   * terminal: a book can go into several folders, so the reader is usually only
+   * half done, and re-ticking thirty books to finish the job is the kind of
+   * thing that makes a feature not get used.
+   */
+  async function applyToSelected(
+    work: (ids: BookId[]) => Promise<void>,
+    prefix: string,
+    keepSelection = false,
+  ) {
     if (chosen.length === 0) return
     try {
       await work(chosen)
-      setSelected(null)
+      if (!keepSelection) setSelected(null)
       await reload(true)
     } catch (error: unknown) {
       failed(error, prefix)
@@ -307,12 +348,15 @@ export default function Library() {
    * creates one *and moves the ticked books into it* — which is the only
    * reason to be making a folder at that moment.
    */
-  async function createFolder(name: string, moveSelected: boolean) {
+  async function createFolder(name: string, addSelected: boolean) {
     setNaming(null)
     try {
       const folder = await repository.createFolder(name)
-      if (folder && moveSelected && chosen.length > 0) {
-        await repository.moveBooksToFolder(chosen, folder.id)
+      if (folder && addSelected && chosen.length > 0) {
+        // Added, not moved: the ticked books keep whatever folders they were
+        // already in. A book can be in several now, so making a new folder out
+        // of a selection must not quietly empty the ones it came from.
+        await repository.addBooksToFolder(chosen, folder.id)
         setSelected(null)
       }
       await reload()
@@ -349,10 +393,25 @@ export default function Library() {
               'Couldn’t change the type.',
             )
           }}
-          onMoveToFolder={(folderId) => {
+          folderCounts={folderCounts}
+          onToggleFolder={(folderId, add) => {
             void applyToSelected(
-              (ids) => repository.moveBooksToFolder(ids, folderId),
-              'Couldn’t move those books.',
+              (ids) =>
+                add
+                  ? repository.addBooksToFolder(ids, folderId)
+                  : repository.removeBooksFromFolder(ids, folderId),
+              'Couldn’t change those folders.',
+              // The selection survives, unlike every other action on this bar.
+              // Filing books under two folders is one job done twice, and
+              // clearing the ticks after the first half would mean finding all
+              // thirty books again to finish it.
+              true,
+            )
+          }}
+          onClearFolders={() => {
+            void applyToSelected(
+              (ids) => repository.clearFoldersFor(ids),
+              'Couldn’t change those folders.',
             )
           }}
           onNewFolder={() => setNaming({ forSelected: true })}
@@ -365,7 +424,12 @@ export default function Library() {
         />
       ) : (
         <h1 className={styles.title}>
-          {prefs.folderId ? (folderMap.get(prefs.folderId)?.name ?? 'Library') : 'All books'}
+          {/* Looked up in `choices` rather than `folderMap`, so "Unread" and
+              "Finished" title the screen the same way a folder the reader made
+              does — from their side there is no difference between the two. */}
+          {prefs.folderId
+            ? (choices.find((choice) => choice.id === prefs.folderId)?.name ?? 'Library')
+            : 'All books'}
         </h1>
       )}
 
@@ -402,6 +466,16 @@ export default function Library() {
           </span>
         </button>
       </div>
+
+      {/* Sort, folder, reading status and view, on the shelf rather than two
+          taps and a slide away behind the icon above — which still opens the
+          full set. See `FilterBar` for why they came out of the sheet. */}
+      <FilterBar
+        prefs={prefs}
+        folders={choices}
+        onChange={savePrefs}
+        onOpenAll={() => setFilterOpen(true)}
+      />
 
       {/* Says what is being hidden, and offers the one tap that stops hiding
           it. A filter left on from a previous session is otherwise
@@ -568,7 +642,7 @@ export default function Library() {
       <FilterSheet
         open={filterOpen}
         prefs={prefs}
-        folders={folders}
+        folders={choices}
         onChange={savePrefs}
         onClose={() => setFilterOpen(false)}
       />
