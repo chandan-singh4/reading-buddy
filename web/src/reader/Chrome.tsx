@@ -23,7 +23,7 @@ import { advanceBar, barLabel, showsPercent, type BarState } from './bar.ts'
 import { stepThrough, swipeOf, type Touch } from './swipe.ts'
 import { progressLabel, progressOf, type Pages } from './progress.ts'
 import type { SectionRef } from './navigation.ts'
-import type { Manifest } from '../structure/index.ts'
+import type { Anchor, Manifest } from '../structure/index.ts'
 import {
   MAX_TEXT_STEP,
   MIN_TEXT_STEP,
@@ -35,8 +35,26 @@ import {
 } from './readerSettings.ts'
 import styles from './Chrome.module.css'
 
-/** The sheet's four tabs. Two are stubs until WP-25; Aa is WP-14's own. */
+/** The sheet's four tabs. Notes is a stub until WP-25; the rest are WP-14's. */
 export type SheetTab = 'contents' | 'bookmarks' | 'notes' | 'aa'
+
+/**
+ * A bookmark as this component needs it — an id, where it points, what it is
+ * called, and which chapter it falls in so the list can group by chapter without
+ * re-parsing anchors here.
+ *
+ * Structural rather than importing `StoredBookmark`: Chrome is presentational
+ * and has no business knowing what the database keeps. `chapter` is worked out
+ * by the reading page, which already has the manifest open.
+ */
+export interface BookmarkRow {
+  id: string
+  anchor: Anchor
+  label: string
+  chapter: number
+  /** The chapter's own title, for the heading above a run of marks. */
+  chapterTitle: string
+}
 
 export interface ChromeProps {
   bookTitle: string
@@ -70,6 +88,23 @@ export interface ChromeProps {
   onJumpToPage: (page: number) => void
   /** Change one or more reading-comfort settings at once. */
   onSettingsChange: (patch: Partial<ReaderSettings>) => void
+
+  /** Every mark in this book, already in the book's own order. */
+  bookmarks: readonly BookmarkRow[]
+  /**
+   * Whether the paragraph at the top of the page is marked.
+   *
+   * A boolean rather than the bookmark itself, because the ribbon only ever
+   * needs to know which of two things to draw and which of two callbacks to
+   * fire. Which bookmark would be removed is the reading page's business.
+   */
+  bookmarkedHere: boolean
+  /** Mark the current page, or unmark it if it is already marked. */
+  onToggleBookmark: () => void
+  /** Go to a mark. */
+  onJumpToBookmark: (anchor: Anchor) => void
+  onRenameBookmark: (id: string, label: string) => void
+  onDeleteBookmark: (id: string) => void
 }
 
 const TABS: { id: SheetTab; label: string }[] = [
@@ -115,6 +150,12 @@ export function Chrome({
   onJumpToChapter,
   onJumpToPage,
   onSettingsChange,
+  bookmarks,
+  bookmarkedHere,
+  onToggleBookmark,
+  onJumpToBookmark,
+  onRenameBookmark,
+  onDeleteBookmark,
 }: ChromeProps) {
   const { chapter, chapterCount } = progressOf(manifest, here)
   const label = barLabel(barState, pages, progressLabel(manifest, here))
@@ -157,6 +198,27 @@ export function Chrome({
         </Link>
 
         <span className={styles.bookTitle}>{bookTitle}</span>
+
+        {/*
+          A toggle, not an "add" button — see `bookmarkOn` in `bookmarks.ts`.
+          Tapping it on a page that is already marked takes the mark off, which
+          is the only behaviour that makes a ribbon mean anything: a control that
+          only ever added would leave a reader with no way to undo a mistap
+          except to go hunting in the sheet for the thing they just made.
+
+          `aria-pressed` carries the state properly; the filled and hollow
+          glyphs are the sighted half of the same fact, and the label changes
+          with it so a screen reader hears the *action*, not the state twice.
+        */}
+        <button
+          type="button"
+          className={styles.control}
+          aria-pressed={bookmarkedHere}
+          aria-label={bookmarkedHere ? 'Remove bookmark' : 'Bookmark this page'}
+          onClick={onToggleBookmark}
+        >
+          <span aria-hidden="true">{bookmarkedHere ? '🔖' : '🏳'}</span>
+        </button>
 
         <button
           type="button"
@@ -235,9 +297,14 @@ export function Chrome({
           )}
 
           {/*
-            Deliberately built as three tabs with two empty, rather than as a
-            contents list to be widened later. The empty state names the
-            waypoint so it reads as "not yet" rather than "broken".
+            The marks, under the chapter each one falls in.
+
+            Grouped rather than a flat list because the chapter is the thing a
+            reader remembers ("it was somewhere in the breathing chapter"), and
+            because a run of six marks in one chapter with the chapter repeated
+            six times is six lines of noise. The heading is printed when the
+            chapter changes, which — since `inBookOrder` has already sorted them
+            — is exactly once per chapter.
           */}
           {sheetTab === 'bookmarks' && (
             <div
@@ -246,10 +313,64 @@ export function Chrome({
               aria-labelledby="sheet-tab-bookmarks"
               className={styles.sheetPanel}
             >
-              <p className={styles.empty}>
-                Bookmarks arrive with the reading controls — you’ll be able to mark a
-                place and name it.
-              </p>
+              {bookmarks.length === 0 ? (
+                <p className={styles.empty}>
+                  No bookmarks yet. Tap the ribbon at the top of the screen to mark the
+                  page you’re on.
+                </p>
+              ) : (
+                <ul>
+                  {bookmarks.map((bookmark, index) => (
+                    <li key={bookmark.id}>
+                      {bookmark.chapter !== bookmarks[index - 1]?.chapter && (
+                        <p className={styles.bookmarkChapter}>{bookmark.chapterTitle}</p>
+                      )}
+
+                      <div className={styles.bookmarkRow}>
+                        <button
+                          type="button"
+                          className={styles.bookmarkItem}
+                          onClick={() => onJumpToBookmark(bookmark.anchor)}
+                        >
+                          {bookmark.label}
+                        </button>
+
+                        {/*
+                          Rename through the browser's own prompt, deliberately.
+                          An inline editing field inside a sheet that closes on
+                          every navigation is a lot of state to get wrong for a
+                          thing done rarely, and `prompt` is the one dialog that
+                          is already keyboard-accessible, already dismissible,
+                          and already familiar. A cancelled prompt returns null,
+                          which must not be mistaken for "clear the name" — an
+                          empty string is handled by the reading page, which
+                          falls back to the paragraph's opening words.
+                        */}
+                        <button
+                          type="button"
+                          className={styles.bookmarkAction}
+                          aria-label={`Rename ${bookmark.label}`}
+                          onClick={() => {
+                            const named = window.prompt('Name this bookmark', bookmark.label)
+                            if (named !== null) onRenameBookmark(bookmark.id, named)
+                          }}
+                        >
+                          <span aria-hidden="true">✎</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className={styles.bookmarkAction}
+                          aria-label={`Remove ${bookmark.label}`}
+                          onClick={() => onDeleteBookmark(bookmark.id)}
+                        >
+                          <span aria-hidden="true">✕</span>
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 

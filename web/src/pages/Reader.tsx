@@ -5,8 +5,12 @@ import {
   Block,
   Chrome,
   anchorAtPage,
+  bookmarkOn,
   buildSpine,
   chapterTitle,
+  inBookOrder,
+  labelFor,
+  type BookmarkRow,
   elementIdOf,
   pagesAt,
   refAtPage,
@@ -48,7 +52,7 @@ import {
   type Strip,
   type Touch,
 } from '../reader/index.ts'
-import { repository } from '../storage/index.ts'
+import { repository, type StoredBookmark } from '../storage/index.ts'
 import { tryParseAnchor } from '../structure/index.ts'
 import type {
   Anchor,
@@ -276,6 +280,17 @@ export default function Reader() {
    * start of a section and only jump when you left it.
    */
   const [anchorHere, setAnchorHere] = useState<Anchor | undefined>(undefined)
+
+  /**
+   * Every place the reader has marked in this book (WP-14).
+   *
+   * Held in state and edited in place after each write rather than re-read from
+   * the database: the list is short, the writes all happen here, and a re-read
+   * would make the ribbon flicker between its two glyphs while the round trip
+   * finished. The database is still the record — this is a copy of it that is
+   * only ever changed at the same moment the database is.
+   */
+  const [bookmarks, setBookmarks] = useState<StoredBookmark[]>([])
 
   // There was an `ends` state here — whether this section had pages left either
   // way — and it existed solely to grey out the Previous and Next buttons. With
@@ -1143,6 +1158,150 @@ export default function Reader() {
     }
   }, [id, restored, anchorHere, pages?.percent])
 
+  /*
+   * ## Bookmarks (WP-14)
+   *
+   * Loaded once per book, then kept in step by hand as the reader adds and
+   * removes them. The list belongs to the book, not to the section on screen —
+   * marks in chapter 12 have to be listed while chapter 2 is open, which is the
+   * whole point of a bookmark list.
+   */
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+
+    void repository
+      .listBookmarks(id)
+      .then((rows) => {
+        // A different book may have been opened while this was in flight.
+        if (!cancelled) setBookmarks(rows)
+      })
+      .catch(() => {
+        // An empty list is the honest fallback: the sheet then says there are
+        // no bookmarks, and marking a page still works.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  /**
+   * The paragraph a bookmark would be put on.
+   *
+   * `anchorHere` is only set once a paint has settled and the top of the page
+   * has been worked out. Until then it is `undefined` — and a reader who opens a
+   * book and immediately taps the ribbon is exactly the case that hits, because
+   * they have not scrolled yet. Without the fallback the ribbon silently does
+   * nothing on the page a reader is most likely to want to mark: the one they
+   * just opened to.
+   *
+   * The first paragraph of the loaded section is the honest answer there, and
+   * it is the same fallback `jumpToAnchor` uses for the same reason.
+   *
+   * `anchorHere` is also **discarded when it belongs to a different section**,
+   * which is a narrow window with a real cost. Moving to a new section loads it
+   * and paints it before the settle that works out what is now at the top, so
+   * for those few frames `anchorHere` still names a paragraph in the section
+   * just left. Marking then would file the bookmark in the wrong chapter — and
+   * the ribbon, recomputing a moment later, would flip back to unmarked as if
+   * the tap had been ignored. Checking that the anchor is in the section on
+   * screen costs one parse and closes the window entirely.
+   */
+  const anchorToMark = useMemo(() => {
+    if (page.status !== 'ready') return undefined
+    const first = page.section.paragraphs[0]?.anchor
+    if (!anchorHere) return first
+
+    const parts = tryParseAnchor(anchorHere)
+    const belongsHere = parts?.chapter === here.chapter && parts.section === here.section
+    return belongsHere ? anchorHere : first
+  }, [anchorHere, page, here])
+
+  /** The mark on the paragraph at the top of the screen, if there is one. */
+  const bookmarkHere = bookmarkOn(bookmarks, anchorToMark)
+
+  /**
+   * Mark this page, or unmark it.
+   *
+   * The label comes from the paragraph being marked, which is why this needs the
+   * loaded section rather than just the anchor — see `labelFor`. A reader can
+   * rename it afterwards from the sheet; naming it up front would put a dialog
+   * between them and a one-tap action they will mostly use without thinking.
+   */
+  const toggleBookmark = useCallback(() => {
+    if (!id || !anchorToMark) return
+
+    if (bookmarkHere) {
+      const removed = bookmarkHere.id
+      setBookmarks((rows) => rows.filter((row) => row.id !== removed))
+      void repository.deleteBookmark(id, removed).catch(() => {
+        // It will come back on the next open. Better than an error over a book.
+      })
+      return
+    }
+
+    const text =
+      page.status === 'ready'
+        ? (page.section.paragraphs.find((paragraph) => paragraph.anchor === anchorToMark)?.text ??
+          '')
+        : ''
+
+    void repository
+      .addBookmark(id, anchorToMark, labelFor(text))
+      .then((made) => setBookmarks((rows) => [...rows, made]))
+      .catch(() => {})
+  }, [id, anchorToMark, bookmarkHere, page])
+
+  const renameBookmark = useCallback(
+    (bookmarkId: string, label: string) => {
+      if (!id) return
+      // An empty name is not a name. A reader who clears the field is asking for
+      // the default back, not for a blank row — and the paragraph's opening
+      // words are what the default has always been.
+      const existing = bookmarks.find((row) => row.id === bookmarkId)
+      if (!existing) return
+      const named = label.trim() === '' ? labelFor(existing.label) : label.trim()
+
+      setBookmarks((rows) =>
+        rows.map((row) => (row.id === bookmarkId ? { ...row, label: named } : row)),
+      )
+      void repository.renameBookmark(id, bookmarkId, named).catch(() => {})
+    },
+    [id, bookmarks],
+  )
+
+  const deleteBookmark = useCallback(
+    (bookmarkId: string) => {
+      if (!id) return
+      setBookmarks((rows) => rows.filter((row) => row.id !== bookmarkId))
+      void repository.deleteBookmark(id, bookmarkId).catch(() => {})
+    },
+    [id],
+  )
+
+  /**
+   * The marks as the sheet wants them: in the book's order, each carrying the
+   * chapter it falls in so the list can put a heading above each run.
+   *
+   * A mark whose anchor no longer parses keeps the chapter it is filed under at
+   * 0 and the book's title as its heading — it is still the reader's mark, and
+   * `inBookOrder` has already put it at the end where it can't interleave.
+   */
+  const bookmarkRows: BookmarkRow[] = useMemo(() => {
+    if (frame.status !== 'ready') return []
+    return inBookOrder(bookmarks).map((row) => {
+      const chapter = tryParseAnchor(row.anchor)?.chapter ?? 0
+      return {
+        id: row.id,
+        anchor: row.anchor,
+        label: row.label,
+        chapter,
+        chapterTitle: chapterTitle(frame.manifest, chapter) ?? 'Elsewhere',
+      }
+    })
+  }, [bookmarks, frame])
+
   const title =
     frame.status === 'ready' ? chapterTitle(frame.manifest, here.chapter) : undefined
 
@@ -1190,6 +1349,12 @@ export default function Reader() {
             onJumpToChapter={(chapter) => goTo({ chapter, section: 1 })}
             onJumpToPage={jumpToPage}
             onSettingsChange={changeSettings}
+            bookmarks={bookmarkRows}
+            bookmarkedHere={bookmarkHere !== undefined}
+            onToggleBookmark={toggleBookmark}
+            onJumpToBookmark={jumpToAnchor}
+            onRenameBookmark={renameBookmark}
+            onDeleteBookmark={deleteBookmark}
           />
 
           {/*

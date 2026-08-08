@@ -8,6 +8,7 @@ export type {
   ReadingBuddyDB,
   ReadingPosition,
   StoredAsset,
+  StoredBookmark,
   StoredChapterIndex,
   StoredFolder,
   StoredQuote,

@@ -12,7 +12,10 @@ export type { LoadAssets } from './figures.ts'
 export { runsOf, lineRunsOf } from './linkRuns.ts'
 export type { Run } from './linkRuns.ts'
 export { Chrome } from './Chrome.tsx'
-export type { ChromeProps, SheetTab } from './Chrome.tsx'
+export type { BookmarkRow, ChromeProps, SheetTab } from './Chrome.tsx'
+
+export { bookmarkOn, inBookOrder, labelFor } from './bookmarks.ts'
+export type { BookmarkLike } from './bookmarks.ts'
 
 export { advanceBar, barLabel, showsPercent } from './bar.ts'
 export type { BarState } from './bar.ts'

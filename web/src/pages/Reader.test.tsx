@@ -5,7 +5,7 @@
 // must load first — Reader goes through the app-wide repository.
 import 'fake-indexeddb/auto'
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -392,14 +392,16 @@ describe('the navigation sheet', () => {
     expect(await screen.findByText('The opening words.')).toBeTruthy()
   })
 
-  it('offers Bookmarks and Notes as tabs, saying they are not here yet', async () => {
+  it('says Notes is not here yet, and points at the ribbon for bookmarks', async () => {
     openReader()
     await screen.findByText('The opening words.')
 
     fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
 
+    // Bookmarks is real now (WP-14); with none made, the empty state has to say
+    // how to make one rather than naming a waypoint.
     fireEvent.click(screen.getByRole('tab', { name: 'Bookmarks' }))
-    expect(screen.getByText(/Bookmarks arrive/)).toBeTruthy()
+    expect(screen.getByText(/No bookmarks yet/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
     expect(screen.getByText(/Notes and highlights arrive/)).toBeTruthy()
@@ -407,6 +409,139 @@ describe('the navigation sheet', () => {
     // The chapter list must still be there to come back to.
     fireEvent.click(screen.getByRole('tab', { name: 'Contents' }))
     expect(screen.getByRole('button', { name: /The Middle/ })).toBeTruthy()
+  })
+})
+
+/**
+ * Bookmarks, end to end through a real database (WP-14).
+ *
+ * jsdom cannot lay a page out, so "the paragraph at the top of the screen" is
+ * whatever the reader has settled on — which here is the first paragraph of the
+ * section. That is enough for everything worth checking: the ribbon is a toggle,
+ * the mark survives being written and read back, it is named from the paragraph
+ * it points at, and tapping it moves the book.
+ */
+describe('bookmarks', () => {
+  const MARK = 'Bookmark this page'
+  const UNMARK = 'Remove bookmark'
+
+  const openSheetAt = (tab: string) => {
+    fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
+    fireEvent.click(screen.getByRole('tab', { name: tab }))
+  }
+
+  it('marks the page, names it from the paragraph, and lists it under its chapter', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    fireEvent.click(screen.getByRole('button', { name: MARK }))
+
+    // The ribbon is a toggle: once marked, it offers to unmark.
+    expect(await screen.findByRole('button', { name: UNMARK })).toBeTruthy()
+
+    openSheetAt('Bookmarks')
+    // Scoped to the panel: the chapter title is also printed elsewhere on the
+    // reading screen, and an unscoped match would pass without the list.
+    const panel = within(screen.getByRole('tabpanel'))
+    expect(panel.getByRole('button', { name: 'The opening words.' })).toBeTruthy()
+    // Filed under the chapter it falls in, not listed loose.
+    expect(panel.getByText('The Beginning')).toBeTruthy()
+  })
+
+  it('takes the mark off again when the ribbon is tapped twice', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    fireEvent.click(screen.getByRole('button', { name: MARK }))
+    fireEvent.click(await screen.findByRole('button', { name: UNMARK }))
+
+    expect(await screen.findByRole('button', { name: MARK })).toBeTruthy()
+
+    openSheetAt('Bookmarks')
+    expect(screen.getByText(/No bookmarks yet/)).toBeTruthy()
+  })
+
+  it('survives closing and reopening the book', async () => {
+    // The point of storing them at all. Written on one mount, read on the next.
+    const first = openReader()
+    await screen.findByText('The opening words.')
+    fireEvent.click(screen.getByRole('button', { name: MARK }))
+    await screen.findByRole('button', { name: UNMARK })
+    first.unmount()
+
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSheetAt('Bookmarks')
+    expect(await screen.findByRole('button', { name: 'The opening words.' })).toBeTruthy()
+  })
+
+  it('goes to the marked place when the mark is tapped', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    // Mark chapter 2, then come back to chapter 1 and jump forward by the mark.
+    openSheetAt('Contents')
+    fireEvent.click(screen.getByRole('button', { name: /The Middle/ }))
+    await screen.findByText('The second chapter begins.')
+    fireEvent.click(screen.getByRole('button', { name: MARK }))
+    await screen.findByRole('button', { name: UNMARK })
+
+    openSheetAt('Contents')
+    fireEvent.click(screen.getByRole('button', { name: /The Beginning/ }))
+    await screen.findByText('The opening words.')
+
+    openSheetAt('Bookmarks')
+    fireEvent.click(screen.getByRole('button', { name: 'The second chapter begins.' }))
+
+    expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
+  })
+
+  it('renames a mark, and treats a cleared name as a request for the default', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+    fireEvent.click(screen.getByRole('button', { name: MARK }))
+    await screen.findByRole('button', { name: UNMARK })
+
+    openSheetAt('Bookmarks')
+
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Where I stopped')
+    fireEvent.click(screen.getByRole('button', { name: /^Rename/ }))
+    expect(await screen.findByRole('button', { name: 'Where I stopped' })).toBeTruthy()
+
+    // Cleared, not cancelled: the reader wants the default back, not a blank row.
+    prompt.mockReturnValue('   ')
+    fireEvent.click(screen.getByRole('button', { name: /^Rename/ }))
+    expect(await screen.findByRole('button', { name: 'Where I stopped' })).toBeTruthy()
+
+    // Cancelled: nothing changes at all.
+    prompt.mockReturnValue(null)
+    fireEvent.click(screen.getByRole('button', { name: /^Rename/ }))
+    expect(screen.getByRole('button', { name: 'Where I stopped' })).toBeTruthy()
+    prompt.mockRestore()
+  })
+
+  it('removes a mark from the list', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+    fireEvent.click(screen.getByRole('button', { name: MARK }))
+    await screen.findByRole('button', { name: UNMARK })
+
+    openSheetAt('Bookmarks')
+    fireEvent.click(screen.getByRole('button', { name: /^Remove The opening words\./ }))
+
+    expect(await screen.findByText(/No bookmarks yet/)).toBeTruthy()
+  })
+
+  it('forgets a book’s bookmarks when the book is deleted', async () => {
+    // The cascade. An orphaned bookmark is invisible and unreachable, and would
+    // reattach itself to a book re-imported under the same id.
+    openReader().unmount()
+    await repository.addBookmark(BOOK_ID, formatAnchor({ chapter: 1, section: 1, paragraph: 1 }), 'A mark')
+    expect(await repository.listBookmarks(BOOK_ID)).toHaveLength(1)
+
+    await repository.deleteBook(BOOK_ID)
+    expect(await repository.listBookmarks(BOOK_ID)).toHaveLength(0)
   })
 })
 

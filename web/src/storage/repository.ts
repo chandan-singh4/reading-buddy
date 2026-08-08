@@ -27,6 +27,7 @@ import {
   type ReadingPosition,
   type StoredChapterIndex,
   type StoredAsset,
+  type StoredBookmark,
   type StoredFolder,
   type StoredQuote,
   type StoredSection,
@@ -601,6 +602,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.sources,
           database.assets,
           database.quotes,
+          database.bookmarks,
         ],
         async () => {
           for (const bookId of bookIds) {
@@ -611,6 +613,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
             await database.sources.delete(bookId)
             await database.assets.where('bookId').equals(bookId).delete()
             await database.quotes.where('bookId').equals(bookId).delete()
+            await database.bookmarks.where('bookId').equals(bookId).delete()
             await database.books.delete(bookId)
           }
         },
@@ -635,6 +638,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.sources,
           database.assets,
           database.quotes,
+          database.bookmarks,
         ],
         async () => {
           await database.sections.where('bookId').equals(bookId).delete()
@@ -644,6 +648,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           await database.sources.delete(bookId)
           await database.assets.where('bookId').equals(bookId).delete()
           await database.quotes.where('bookId').equals(bookId).delete()
+          await database.bookmarks.where('bookId').equals(bookId).delete()
           await database.books.delete(bookId)
         },
       )
@@ -669,6 +674,57 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
 
     async deleteQuote(bookId: BookId, id: string): Promise<void> {
       await database.quotes.delete([bookId, id])
+    },
+
+    // --- Bookmarks ---------------------------------------------------------
+
+    /**
+     * Mark a place (WP-14). Returns the row, so the caller can show it without
+     * a second read.
+     *
+     * Deliberately not de-duplicated here. Two bookmarks on one paragraph is a
+     * question about what the *ribbon* does, and the ribbon answers it by
+     * removing rather than adding when the page is already marked — see
+     * `bookmarks.ts`. A repository that silently refused a write would make
+     * that rule invisible from the place it is actually decided.
+     */
+    async addBookmark(bookId: BookId, anchor: Anchor, label: string): Promise<StoredBookmark> {
+      const bookmark: StoredBookmark = {
+        bookId,
+        id: crypto.randomUUID(),
+        anchor,
+        label,
+        addedAt: new Date().toISOString(),
+      }
+      await database.bookmarks.put(bookmark)
+      return bookmark
+    },
+
+    /**
+     * Every bookmark in a book, unordered.
+     *
+     * Ordering is the caller's, and it is not `addedAt`: a bookmark list is a
+     * way of moving around a book, so it reads in the book's own order. That
+     * needs the anchor parsed, which is `reader/bookmarks.ts`'s job — see
+     * `inBookOrder`.
+     */
+    async listBookmarks(bookId: BookId): Promise<StoredBookmark[]> {
+      return database.bookmarks.where('bookId').equals(bookId).toArray()
+    },
+
+    async deleteBookmark(bookId: BookId, id: string): Promise<void> {
+      await database.bookmarks.delete([bookId, id])
+    },
+
+    /**
+     * Give a bookmark a different name.
+     *
+     * A no-op on a bookmark that has since been deleted, rather than recreating
+     * it: renaming a row that is gone is a rename that lost a race, and putting
+     * it back would resurrect something the reader removed.
+     */
+    async renameBookmark(bookId: BookId, id: string, label: string): Promise<void> {
+      await database.bookmarks.update([bookId, id], { label })
     },
 
     // --- Folders -----------------------------------------------------------

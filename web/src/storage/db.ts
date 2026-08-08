@@ -148,6 +148,40 @@ export interface StoredFolder {
   createdAt: string
 }
 
+/**
+ * A place the reader marked on purpose (WP-14).
+ *
+ * Deliberately *not* the same thing as `ReadingPosition`, though both are an
+ * anchor in a book. A position is written for you, constantly, and there is one;
+ * a bookmark is written by you, rarely, and there are as many as you like. The
+ * one that matters: a position is always being overwritten, so storing a
+ * bookmark alongside it would put something the reader chose to keep in a row
+ * designed to be clobbered every few seconds.
+ *
+ * `anchor` is the paragraph at the top of the page when the ribbon was tapped,
+ * which is what makes a bookmark survive a font change — a stored page *number*
+ * would not, since the pages are re-laid-out whenever the type does. The same
+ * reasoning as `position.ts`, and the reason there is no `page` field here.
+ *
+ * The chapter and section are not stored either: they are already inside the
+ * anchor (`ch02-s03-p013`), and `reader/bookmarks.ts` reads them back out. A
+ * denormalised copy is a second answer to the same question, free to drift.
+ *
+ * `label` is always a real string — the reader's own words if they gave any, and
+ * the opening of the marked paragraph if they didn't. Never empty, because an
+ * unnamed row in a list is a row you cannot tell from its neighbours.
+ */
+export interface StoredBookmark {
+  bookId: BookId
+  id: string
+  /** The paragraph the marked page began on. */
+  anchor: Anchor
+  /** The reader's name for it, or the paragraph's opening words. */
+  label: string
+  /** ISO 8601. Kept for "when did I mark this", not for ordering — see below. */
+  addedAt: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -166,6 +200,7 @@ export type ReadingBuddyDB = Dexie & {
   assets: Table<StoredAsset, [BookId, string]>
   quotes: Table<StoredQuote, [BookId, string]>
   folders: Table<StoredFolder, string>
+  bookmarks: Table<StoredBookmark, [BookId, string]>
 }
 
 /**
@@ -268,6 +303,17 @@ function defineSchema(db: Dexie): void {
           delete book.folderId
         }),
     )
+
+  // v10 — bookmarks (WP-14). `[bookId+id]` and a plain `bookId`, the same shape
+  // as `quotes` and `assets`, for the same two reasons: the compound key is the
+  // exact address, and the loose index is what lets `deleteBook` drop a book's
+  // bookmarks without listing them first.
+  //
+  // No migration and nothing to backfill. A book with no bookmark rows has no
+  // bookmarks, which is true of every book there has ever been.
+  db.version(10).stores({
+    bookmarks: '[bookId+id], bookId',
+  })
 }
 
 export function createDb(name: string = DB_NAME): ReadingBuddyDB {

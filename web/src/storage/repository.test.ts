@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { AnchorError, formatAnchor, sectionPath } from '../structure/index.ts'
 import type {
+  Anchor,
   BookId,
   BookMeta,
   ChapterIndex,
@@ -794,6 +795,56 @@ describe('the v8 to v9 upgrade', () => {
     try {
       const inside = await upgraded.books.where('folderIds').equals('f1').toArray()
       expect(inside.map((book) => book.id).sort()).toEqual(['a', 'b'])
+    } finally {
+      await upgraded.delete()
+    }
+  })
+})
+
+/**
+ * The v9 → v10 upgrade: bookmarks (WP-14).
+ *
+ * Nothing has to be rewritten this time — a new table, no new fields on an old
+ * one — so the risk is not that data is transformed wrongly. It is that the
+ * upgrade **fails to open at all**, which on a phone with a real library is not
+ * a missing feature but a book app that will not start. That failure only
+ * happens against a database that already exists at the previous version, so
+ * that is what this opens.
+ */
+describe('the v9 to v10 upgrade', () => {
+  /** A database at exactly the shape v9 left behind, with a book in it. */
+  async function writeAtV9(name: string): Promise<void> {
+    const old = new Dexie(name)
+    old.version(9).stores({
+      books: 'id, title, type, importedAt, contentHash, textSignature, *folderIds',
+      manifests: 'bookId',
+      chapters: '[bookId+chapter], bookId',
+      sections: '[bookId+path], bookId, chapter',
+      positions: 'bookId, at',
+      sources: 'bookId',
+      assets: '[bookId+path], bookId',
+      quotes: '[bookId+id], bookId',
+      folders: 'id, name, createdAt',
+    })
+    await old.open()
+    await old.table('books').put(makeBook('kept'))
+    old.close()
+  }
+
+  it('opens a v9 database, keeps its books, and can take a bookmark', async () => {
+    const name = `reading-buddy-upgrade-${(dbCounter += 1)}`
+    await writeAtV9(name)
+
+    const upgraded = createDb(name)
+    try {
+      // The library survived the upgrade.
+      expect(await upgraded.books.get(bookId('kept'))).toBeTruthy()
+
+      // And the new table is genuinely usable, not merely declared.
+      const repo = createRepository(upgraded)
+      await repo.addBookmark(bookId('kept'), '[ch01-s01-p001]' as Anchor, 'A mark')
+      const marks = await repo.listBookmarks(bookId('kept'))
+      expect(marks.map((mark) => mark.label)).toEqual(['A mark'])
     } finally {
       await upgraded.delete()
     }
