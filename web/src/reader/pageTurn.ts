@@ -46,18 +46,41 @@ export interface HeldPage {
   node: HTMLElement
   /** Which way the turn was going: 1 forwards, -1 back. */
   by: 1 | -1
+  /** How small the text was drawn when the turn began — see `holdOutgoing`. */
+  scale: number
 }
+
+/**
+ * The box a copy is laid inside: the reading screen itself.
+ *
+ * Found by attribute rather than by walking up to `strip.parentElement`, which
+ * is what this did until the text gained a wrapper of its own that *scales*
+ * (`.stage`). Hanging the copy inside a scaled box would have scaled every
+ * measured offset a second time. Marked on the element instead, so the frame
+ * stays the unscaled screen however the boxes between are rearranged.
+ */
+const FRAME = '[data-page-frame]'
 
 /**
  * Take a copy of the page being left and lay it over the strip.
  *
- * Returns `null` when there is nothing to do — no strip, no parent to hang the
+ * `scale` is how small the *text* is currently drawn — 1 while reading, less
+ * while the toolbar is up and the page has stepped back for it. It cannot be
+ * measured here to the precision this needs (`offsetWidth` is a whole number,
+ * and a fraction of a per cent of a page's width is a visible misalignment), so
+ * the reading page, which owns the number, hands it over.
+ *
+ * Returns `null` when there is nothing to do — no strip, no frame to hang the
  * copy on, or a reader who has asked for less movement, who gets the instant
  * change they asked for.
  */
-export function holdOutgoing(strip: HTMLElement | null, by: 1 | -1): HeldPage | null {
-  const node = copyOf(strip, 1)
-  return node ? { node, by } : null
+export function holdOutgoing(
+  strip: HTMLElement | null,
+  by: 1 | -1,
+  scale = 1,
+): HeldPage | null {
+  const node = copyOf(strip, 1, scale)
+  return node ? { node, by, scale } : null
 }
 
 /**
@@ -96,8 +119,26 @@ function makeInert(node: HTMLElement): void {
  * rect rather than `offsetWidth`: a copy a whole pixel wider than the original
  * lays its columns out at a different pitch, and the still picture of the page
  * you just left would not quite be it.
+ *
+ * ## Size and scale are two different questions
+ *
+ * A measured rectangle is what the source *looks* like. When the page has
+ * stepped back for the toolbar, that is smaller than what it *is* — and the two
+ * cannot be conflated here, because a copy given the smaller size would lay its
+ * columns out to fit it and quietly show different text. A still picture of the
+ * page you just left has to be the same words in the same places.
+ *
+ * So the copy is built at the source's real size, `box.width / scale`, and then
+ * drawn at `scale`. Laid out identically, painted identically, and the two
+ * facts kept apart. `scale` is 1 for anything outside the box that shrinks —
+ * the status line is placed with 1 whatever the text is doing.
  */
-function place(source: HTMLElement, frame: DOMRect, wrapper: HTMLElement): HTMLElement {
+function place(
+  source: HTMLElement,
+  frame: DOMRect,
+  wrapper: HTMLElement,
+  scale: number,
+): HTMLElement {
   const clone = source.cloneNode(true) as HTMLElement
   const box = source.getBoundingClientRect()
 
@@ -106,8 +147,14 @@ function place(source: HTMLElement, frame: DOMRect, wrapper: HTMLElement): HTMLE
   clone.style.position = 'absolute'
   clone.style.top = `${box.top - frame.top}px`
   clone.style.left = `${box.left - frame.left}px`
-  clone.style.width = `${box.width}px`
-  clone.style.height = `${box.height}px`
+  clone.style.width = `${box.width / scale}px`
+  clone.style.height = `${box.height / scale}px`
+  if (scale !== 1) {
+    // From the top left, which is the corner the position above pins. Any other
+    // origin would move the copy away from the rectangle it was measured at.
+    clone.style.transformOrigin = 'top left'
+    clone.style.transform = `scale(${scale})`
+  }
   clone.style.margin = '0'
   clone.style.maxWidth = 'none'
   clone.style.zIndex = 'auto'
@@ -196,15 +243,17 @@ function revealFurniture(): void {
  * rotated, which keeps the rotation and the scroll from having to share one
  * element's `transform`.
  */
-function copyOf(strip: HTMLElement | null, layer: number): HTMLElement | null {
+function copyOf(strip: HTMLElement | null, layer: number, scale: number): HTMLElement | null {
   if (!strip || prefersReducedMotion() || typeof document === 'undefined') return null
 
-  const parent = strip.parentElement
+  // The reading screen's own box, which is the sheet's size — and deliberately
+  // not the scaled wrapper the text sits in, so every offset below is measured
+  // against something that never moves. `Reader.module.css` guarantees this
+  // element is positioned and untransformed, so a child at `top: 0; left: 0`
+  // lands on its top-left corner.
+  const parent = strip.closest<HTMLElement>(FRAME) ?? strip.parentElement
   if (!parent) return null
 
-  // The reading screen's own box, which is the sheet's size. `Reader.module.css`
-  // guarantees this element is positioned, so a child at `top: 0; left: 0` lands
-  // on its top-left corner and every measured offset below is relative to it.
   const frame = parent.getBoundingClientRect()
 
   const wrapper = document.createElement('div')
@@ -221,9 +270,11 @@ function copyOf(strip: HTMLElement | null, layer: number): HTMLElement | null {
   wrapper.style.background = 'var(--color-bg)'
   wrapper.style.overflow = 'hidden'
 
-  const text = place(strip, frame, wrapper)
+  const text = place(strip, frame, wrapper, scale)
+  // The furniture is outside the box that shrinks — it holds its size while the
+  // text steps back — so its copy is placed at 1, not at the text's scale.
   for (const item of Array.from(parent.querySelectorAll<HTMLElement>(FURNITURE))) {
-    place(item, frame, wrapper)
+    place(item, frame, wrapper, 1)
   }
 
   parent.append(wrapper)
@@ -303,7 +354,7 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
   // as the page being landed on, and a second copy — the page arriving — does
   // the moving on top of it.
   const still = held.by === -1 ? held.node : null
-  const moving = held.by === -1 ? copyOf(strip, 2) : held.node
+  const moving = held.by === -1 ? copyOf(strip, 2, held.scale) : held.node
 
   // The second copy couldn't be made (no parent, reduced motion changed under
   // us). Falling back to the instant change beats a half-played turn.

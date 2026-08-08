@@ -4,13 +4,20 @@
  */
 
 /*
- * `absolute`, inside the sheet — not `fixed` to the screen, which is what it
- * used to be.
+ * `fixed` to the screen, and outside the sheet that shrinks.
  *
- * The change matters: the sheet shrinks and slides when the toolbar comes up,
- * and a page number fixed to the screen would have stayed behind while the page
- * it belongs to moved away from it. Pinned to the foot of the sheet, it travels
- * with the page, which is what a printed page number does.
+ * This was briefly pinned inside the sheet, on the reasoning that a page number
+ * is printed on the page and should travel with it. It turned out to read
+ * badly: when the toolbar came up the whole sheet scaled down, and the page
+ * number scaled with it — a line of text that shrinks is a line of text that
+ * suddenly looks wrong, and the reader said so at once.
+ *
+ * So it holds still and holds its size. It still *turns* with the page, which
+ * is the other half of belonging to it — that is `data-page-furniture` and the
+ * copy `pageTurn.ts` makes, not this element's position.
+ *
+ * `z-index` above the overlay so it stays readable while the bars are up; the
+ * bottom bar keeps room at its foot for exactly this.
  *
  * `pointer-events: none` on the container so the dead space either side of the
  * text belongs to the page underneath — the middle tap that raises the overlay
@@ -18,10 +25,12 @@
  * taps back, below.
  */
 .statusLine {
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 11;
+  padding-bottom: var(--safe-bottom);
   display: flex;
   align-items: center;
   gap: var(--space-3);

@@ -75,16 +75,19 @@
  * 1. Measured rectangles come back scaled. `Reader.tsx` divides them by
  *    `--page-scale`, which is why that number is set from the one constant in
  *    the TypeScript rather than written here.
- * 2. `position: fixed` inside a transformed box means fixed to *this box*. That
- *    is why the status line is inside it and why it is `absolute` — it is part
- *    of the page and should travel with it, which it now does.
- * 3. The page-turn animation lays its copy out from measured offsets, which a
- *    scale would apply twice. So a turn while the toolbar is up is instant
- *    rather than animated — see `turnPage` in `Reader.tsx`.
+ * 2. `position: fixed` inside a transformed box means fixed to *this box*, so
+ *    anything that must stay put on the screen has to stay *out* of here. The
+ *    status line is out — it was briefly inside, and shrinking a line of small
+ *    grey text looked wrong the moment it was seen on a phone.
+ * 3. The page-turn animation lays its copy out from measured offsets, and a
+ *    measured rectangle is what a box *looks* like rather than what it *is*.
+ *    `pageTurn.ts` is handed the scale and keeps the two apart: the copy is
+ *    built at full size, so its columns fall where the original's did, and then
+ *    drawn small.
  *
- * `scale(1)` is set even at rest, deliberately. It makes this the containing
- * block for the status line at all times: a box that only sometimes established
- * one would move the page number every time the toolbar appeared.
+ * Only the text is in here. Everything else on the reading screen — the page
+ * number, the bookmark corner, the way-back button — sits outside and holds
+ * still.
  */
 .stage {
   position: relative;
@@ -109,15 +112,21 @@
  * not a scaled one — the page lands exactly where the bar ends however small it
  * has been made.
  *
+ * The push is the bar's height *less the margin the page already has*. Pushing
+ * by the whole bar height would be paying twice for the same gap, and every
+ * pixel spent here is a pixel not available at the foot — where the bottom bar
+ * has more to fit, because the page number sits below it.
+ *
  * The room this frees at the foot is `(1 - scale)` of the page's height, less
  * whatever the push spent at the head. On a phone held upright that is
- * comfortably more than the bottom bar needs. On a very short screen — a phone
- * on its side — it is not, and the slider will overlap the last line. Reading a
- * book in landscape on a phone is not a case worth distorting the portrait one
- * for, so it is left as it is rather than guarded against.
+ * comfortably more than the bottom bar and the page number need together. On a
+ * very short screen — a phone on its side — it is not, and the slider will
+ * overlap the last line. Reading a book in landscape on a phone is not a case
+ * worth distorting the portrait one for, so it is left rather than guarded.
  */
 .stage[data-shrunk='true'] {
-  transform: translateY(var(--reader-bar-top)) scale(var(--page-scale));
+  transform: translateY(calc(var(--reader-bar-top) - var(--space-4)))
+    scale(var(--page-scale));
 }
 
 @media (prefers-reduced-motion: reduce) {

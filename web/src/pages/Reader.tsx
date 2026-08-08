@@ -320,6 +320,17 @@ export default function Reader() {
    * Google Books trains.
    */
   const [chromeShown, setChromeShown] = useState(false)
+
+  /**
+   * How small the text is drawn right now — full size while reading, stepped
+   * back while the toolbar is up.
+   *
+   * Named once here and used in the two places that both have to agree about
+   * it: the stylesheet, which does the shrinking, and the page turn, which
+   * copies the page and has to draw the copy at the size the reader is
+   * actually looking at.
+   */
+  const drawnAt = chromeShown ? PAGE_SCALE : 1
   /** The three-dot menu on the top bar. */
   const [menuOpen, setMenuOpen] = useState(false)
   /** Whether the search panel is up. Declared here with the other two layers
@@ -749,13 +760,7 @@ export default function Reader() {
         // A second turn before the first has landed drops the first outright —
         // a fast tapper outruns the animation rather than queueing behind it.
         cancelTurn(held.current)
-        // No flip while the page is shrunk. The turn lays a copy of the page
-        // out from measured offsets inside the stage, and the stage's own scale
-        // would be applied to those offsets a second time — a sheet turning at
-        // the wrong size, in the wrong place. An instant change is the honest
-        // fallback, and it is the same one a reader who asks for less movement
-        // gets everywhere else.
-        const sheet = chromeShown ? null : holdOutgoing(strip.current, by)
+        const sheet = holdOutgoing(strip.current, by, drawnAt)
         showPage(next, true)
         playFlip(sheet, strip.current)
         return
@@ -769,10 +774,10 @@ export default function Reader() {
       // A second turn before the first has landed drops the first outright —
       // a fast tapper outruns the animation rather than queueing behind it.
       cancelTurn(held.current)
-      held.current = chromeShown ? null : holdOutgoing(strip.current, by)
+      held.current = holdOutgoing(strip.current, by, drawnAt)
       goTo(target)
     },
-    [neighbours, showPage, goTo, chromeShown],
+    [neighbours, showPage, goTo, drawnAt],
   )
 
   /**
@@ -1520,7 +1525,9 @@ export default function Reader() {
     frame.status === 'ready' ? chapterTitle(frame.manifest, here.chapter) : undefined
 
   return (
-    <div className={styles.reader} style={readingVars}>
+    /* `data-page-frame` marks the unscaled box a page turn measures itself
+       against — see `FRAME` in `reader/pageTurn.ts`. */
+    <div className={styles.reader} style={readingVars} data-page-frame="">
       {/* Only while there's no book to hang the overlay on — once there is,
           the overlay owns the way back. */}
       {frame.status !== 'ready' && (
@@ -1707,17 +1714,22 @@ export default function Reader() {
               ))}
           </article>
 
-            {/* Printed at the foot of the sheet, inside it, so it travels
-                with the page — both when the page turns and when it steps
-                back for the toolbar. */}
-            <StatusLine
-              manifest={frame.manifest}
-              here={here}
-              pages={pages}
-              barState={barState}
-              onBarStateChange={setBarState}
-            />
           </div>
+
+          {/*
+            The page number, at the foot of the screen and outside the sheet
+            that shrinks — so it holds its size and its place when the toolbar
+            comes up. It still turns with the page: that is
+            `data-page-furniture` and the copy `pageTurn.ts` makes of it, not
+            where it sits.
+          */}
+          <StatusLine
+            manifest={frame.manifest}
+            here={here}
+            pages={pages}
+            barState={barState}
+            onBarStateChange={setBarState}
+          />
 
           {/*
             The bookmark, as a corner of the paper rather than a button in a bar.

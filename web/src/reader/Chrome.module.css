@@ -58,11 +58,12 @@
   align-items: stretch;
   justify-content: center;
   gap: var(--space-2);
-  /* No longer dodges the status line. It used to reserve room at its foot so
-     the page number stayed visible underneath — but the page number is part of
-     the page now, and rises with it when this bar appears. */
-  min-height: calc(var(--safe-bottom) + var(--reader-bar-bottom));
-  padding: var(--space-1) var(--space-4) calc(var(--safe-bottom) + var(--space-1));
+  /* Room at the foot for the status line, which is not part of this bar and
+     holds its place at the bottom of the screen whether the bar is there or
+     not. Covering it would take away the one thing that is always readable. */
+  min-height: calc(var(--safe-bottom) + var(--reader-bar-bottom) + var(--status-line));
+  padding: var(--space-1) var(--space-4)
+    calc(var(--safe-bottom) + var(--space-1) + var(--status-line));
   border-bottom: none;
   border-top: 1px solid var(--color-border);
 }

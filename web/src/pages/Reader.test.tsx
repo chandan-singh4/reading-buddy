@@ -334,15 +334,18 @@ describe('the overlay', () => {
     expect(stage?.getAttribute('data-shrunk')).toBe('false')
   })
 
-  // The page number is printed on the sheet, so it has to move with it. Before
-  // this it was fixed to the screen and stayed behind while the page stepped
-  // back, which left it floating below the shrunk page.
-  it('keeps the page number on the page it belongs to', async () => {
+  // The page number holds its size and its place. It was briefly inside the
+  // sheet, on the reasoning that a page number is printed on the page — and
+  // then it shrank along with the page, which read as a fault the moment it was
+  // seen. It still *turns* with the page; that is `data-page-furniture`, not
+  // where it sits.
+  it('leaves the page number out of the shrink', async () => {
     const { container } = openReader()
     await screen.findByText('The opening words.')
 
     const status = await screen.findByText(/Page \d+ of \d+/)
-    expect(container.querySelector('[data-shrunk]')?.contains(status)).toBe(true)
+    expect(container.querySelector('[data-shrunk]')?.contains(status)).toBe(false)
+    expect(status.closest('[data-page-furniture]')).toBeTruthy()
   })
 
   it('says where you are as a page, counted in words', async () => {
