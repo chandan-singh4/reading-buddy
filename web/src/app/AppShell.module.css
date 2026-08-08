@@ -7,20 +7,8 @@
   --drawer-ease: cubic-bezier(0.32, 0.72, 0, 1);
   --drawer-duration: 320ms;
 
-  /*
-   * The page slide borrows the drawer's curve and very nearly its duration, on
-   * purpose. A swipe between the four screens and a tap in the drawer are the
-   * *same move* by two routes, so if they were timed differently the app would
-   * feel like two apps depending on which one a reader reached for.
-   *
-   * 300 ms rather than the 260 this used to run at. The old timing was short
-   * enough that the slide read as a cut with a flicker on it — the screen was
-   * already still by the time the eye found it. Long enough to be followed,
-   * short enough that a reader flicking through all four never queues; the same
-   * ceiling `reader/motion.ts` argues for the page turn.
-   */
-  --page-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  --page-duration: 300ms;
+  /* The page slide is timed to match these, and is declared in `AppShell.tsx`
+     rather than here — see the note on `.page` for why it had to move. */
 
   min-height: 100dvh;
 }
@@ -129,67 +117,44 @@
   touch-action: pan-y pinch-zoom;
 }
 
-/* A page arriving after a swipe or a drawer tap. The class is only applied
-   when there is a direction to show, so the first paint of a session doesn't
-   animate — a screen sliding in at launch reads as a glitch. */
+/*
+ * One of these per screen the reader has visited; all but the current one carry
+ * `hidden`. See `AppShell.tsx` for why they are kept rather than rebuilt.
+ *
+ * ## Why the slide isn't declared here any more
+ *
+ * It used to be two CSS classes and two keyframes, applied to a page that was
+ * created fresh on every move — which is what made the animation run at all. Now
+ * that screens are revealed rather than created, there is no new element for CSS
+ * to start an animation on, so the slide is run with `animate()` from the shell
+ * instead. Same distance, same curve, same duration; the timing tokens above are
+ * still the source of truth for the drawer, and the shell matches them.
+ *
+ * ## What the slide must not do, which is worth keeping written down
+ *
+ * **Movement only. No opacity.** The two screens are stacked but only one is
+ * rendered — `hidden` removes the other from layout entirely — so the arriving
+ * screen still has nothing behind it but the page background, and it is itself
+ * transparent. Fading it up does not blend two screens together, which is what a
+ * cross-fade is for; it dips the only screen there is and lets the background
+ * show straight through. Every swipe flashed. That is the camera-shutter fault
+ * `decisions.md` already records twice, and it will come back the moment anyone
+ * adds an opacity keyframe here.
+ *
+ * The slide alone reads as movement and cannot flash: what shows in the strip
+ * the page has not yet covered is `--color-bg`, the colour the page sits on
+ * anyway. 5% keeps that strip narrow enough that the top bar's blur has nothing
+ * to shimmer against as it passes.
+ *
+ * No `will-change` either. It promoted the page to its own compositor layer
+ * underneath `.frame`'s always-on `filter` and the top bar's `backdrop-filter`,
+ * and that combination makes Android Chrome re-raster the blurred region as the
+ * layer appears and disappears — a second flash on top of the first. A
+ * transform-only animation earns its layer on its own merits, for exactly as
+ * long as it is running.
+ */
 .page {
   min-width: 0;
-}
-
-.pageFromRight {
-  animation: fromRight var(--page-duration) var(--page-ease) both;
-}
-
-.pageFromLeft {
-  animation: fromLeft var(--page-duration) var(--page-ease) both;
-}
-
-/*
- * Movement only. No opacity, and this is the whole of the shutter.
- *
- * There is exactly one screen mounted at a time — `.page` is keyed on the path,
- * so the screen being left is gone before the arriving one paints. That means
- * the arriving screen has *nothing behind it but the page background*, and it
- * is itself transparent. Fading it up therefore does not blend two screens
- * together, which is what a cross-fade is for; it dips the only screen there is
- * and lets the background show straight through it. Every swipe flashed.
- *
- * This is the camera-shutter fault `decisions.md` already records twice — once
- * on the reading screen's entrance, once on the jump fade — and it reappeared
- * here for exactly the reason recorded there. Starting at 0.75 instead of 0
- * only made it a shorter flash, and stretching the move to 300 ms made it a
- * longer one. **A fade needs something opaque behind it. On this screen there
- * is nothing, so there is no fade.**
- *
- * The slide alone reads as movement, and it cannot flash: what shows in the
- * strip the page has not yet covered is `--color-bg`, which is the colour the
- * page is sitting on anyway. 5% rather than 8% keeps that strip narrow enough
- * that the top bar's blur has nothing to shimmer against as it passes.
- *
- * `will-change` came out with the opacity. It promoted the page to its own
- * compositor layer underneath `.frame`'s always-on `filter` and the top bar's
- * `backdrop-filter` — a combination that makes Android Chrome re-raster the
- * blurred region as the layer appears and disappears, which is a second flash
- * on top of the first one. The animation is transform-only now and gets a
- * compositor layer on its own merits, without being told.
- */
-@keyframes fromRight {
-  from {
-    transform: translateX(5%);
-  }
-}
-
-@keyframes fromLeft {
-  from {
-    transform: translateX(-5%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pageFromRight,
-  .pageFromLeft {
-    animation: none;
-  }
 }
 
 /* Dims the page behind the drawer and swallows the tap that closes it. Kept
