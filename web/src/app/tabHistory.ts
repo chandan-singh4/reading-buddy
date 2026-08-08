@@ -84,67 +84,137 @@ export function isTabEntry(state: unknown): boolean {
  * swipe and the drawer — they are one move by two routes, and if only one went
  * through here Back would depend on which the reader had reached for.
  */
+/**
+ * Where the reader was, and how far into the history they are — kept at module
+ * level, not in a ref.
+ *
+ * This is a correctness requirement, not tidiness. A ref belongs to a mounted
+ * component, and the whole job of this memory is to be there at a moment nobody
+ * can promise `AppShell` has stayed mounted through — a remount would silently
+ * empty it, and an empty memory looks exactly like "there was nothing to
+ * retrace", which is Back landing on Home. A module-level value survives every
+ * remount and dies on a reload, which is precisely the lifetime wanted: a
+ * reloaded session genuinely has no "just before" to go back to.
+ */
+let previousTab: string | null = null
+
+/** How deep in the history the last render was, or `null` before the first. */
+let lastIndex: number | null = null
+
+/** Fallback pop detection where there is no history index. See `wentBack`. */
+const seenKeys = new Set<string>()
+
+/** Clears the module memory. For tests, which must not leak one case into the next. */
+export function forgetTabHistory(): void {
+  previousTab = null
+  lastIndex = null
+  seenKeys.clear()
+}
+
+/**
+ * How far into the history we are, as React Router records it.
+ *
+ * The router keeps `{ usr, key, idx }` on every entry it creates, and `idx` is
+ * the honest answer to "did that go backwards": it decreases on Back and on
+ * nothing else. `null` where there is no such state to read — a memory router
+ * under test, or the very first entry of a session before the router has
+ * written to it — and the key-based fallback covers those.
+ */
+function historyIndex(): number | null {
+  if (typeof window === 'undefined') return null
+  const state = window.history.state as { idx?: unknown } | null
+  return typeof state?.idx === 'number' ? state.idx : null
+}
+
+/**
+ * The path actually in the address bar.
+ *
+ * Read from the browser rather than from the router's `location`, and the
+ * difference is the bug this is built around. `move` needs to record *the tab
+ * being left*, and a captured React value is only as fresh as the render that
+ * captured it — one stale render and the tab recorded is the one before last.
+ * That failure is invisible at the time, because the navigation itself is
+ * computed elsewhere and still goes to the right place; it only shows up later,
+ * as Back retracing to the wrong screen. Which is exactly the report: swiping
+ * worked, and Back went to Home instead of the library.
+ *
+ * `window.location` cannot be stale — it is what the browser is showing.
+ */
+function pathNow(fallback: string): string {
+  if (typeof window === 'undefined') return fallback
+  // Only where the browser history is the router's. Under a memory router the
+  // address bar belongs to somebody else entirely — it is whatever page the
+  // test file happens to be on — and reading it would be reading a stranger's
+  // URL with total confidence. The router's own location is the truth there.
+  if (historyIndex() === null) return fallback
+  return window.location.pathname || fallback
+}
+
+/**
+ * Move between the four screens, and retrace exactly one of those moves on Back.
+ *
+ * Called once, by `AppShell`, and the function it returns is used by both the
+ * swipe and the drawer — they are one move by two routes, and if only one went
+ * through here Back would depend on which the reader had reached for.
+ */
 export function useTabHistory(isTabPath: (pathname: string) => boolean): (to: string) => void {
   const navigate = useNavigate()
   const location = useLocation()
 
   /**
-   * Every history entry this session has stood on, by key.
-   *
-   * This is how a Back press is recognised, and it is worth saying why it isn't
-   * `useNavigationType()`, which exists to answer exactly this question: under a
-   * declarative router — `BrowserRouter`, which is what this app uses — it
-   * reports `POP` for every navigation including pushes. Trusting it made the
-   * handler below fire on every swipe and bounce the reader straight back to the
-   * tab they had just left, which looked precisely like swiping being broken.
-   *
-   * A key, on the other hand, cannot lie. The router mints a fresh one for every
-   * navigation *forward*, push or replace; going back re-visits an entry whose
-   * key already exists. So a key that has been seen before means the reader
-   * moved backwards through the history, and nothing else does.
+   * The live router location, for the two things `window.location` cannot
+   * answer: the entry's `state`, and the path under a memory router in tests.
+   * Written on every render so a callback can read the latest without being
+   * rebuilt — which is what keeps `move` below stable.
    */
-  const seen = useRef(new Set<string>())
+  const here = useRef(location)
+  here.current = location
 
-  /**
-   * The tab visited immediately before the one on screen, or `null` if there
-   * isn't one yet.
-   *
-   * A ref and not history state, which is the point of the whole design: the
-   * entry that would carry it is the one Back is about to throw away. It is
-   * lost on a reload, which is correct — a restored session has no "just before"
-   * to retrace, and inventing one would send the reader somewhere they have not
-   * been this visit.
+  const isTab = useRef(isTabPath)
+  isTab.current = isTabPath
+
+  /*
+   * Stable for the life of the shell: no dependency on `location`, so it is
+   * never rebuilt and `useSwipeNav` never re-subscribes its listeners for a
+   * navigation. Everything changeable is read through a ref at call time, which
+   * is also what makes it impossible for this to act on a stale path.
    */
-  const previous = useRef<string | null>(null)
+  const move = useCallback((to: string) => {
+    const from = pathNow(here.current.pathname)
+    if (to === from) return
 
-  const move = useCallback(
-    (to: string) => {
-      const from = location.pathname
-      if (to === from) return
+    // Only a tab is worth retracing to. Arriving from a book, the level has
+    // nothing behind it yet and Back should simply return there.
+    previousTab = isTab.current(from) ? from : null
 
-      // Only a tab is worth retracing to. Arriving from a book, the level has
-      // nothing behind it yet and Back should simply return there.
-      previous.current = isTabPath(from) ? from : null
-
-      // Claim an entry on the way in; rewrite it from then on. Two entries is
-      // what the retrace above spends, and it never grows past them however
-      // long the reader swipes around.
-      navigate(to, { replace: isTabEntry(location.state), state: TAB_ENTRY })
-    },
-    [navigate, location, isTabPath],
-  )
+    // Claim an entry on the way in; rewrite it from then on. Two entries is
+    // what the retrace spends, and it never grows past them however long the
+    // reader swipes around.
+    navigate(to, { replace: isTabEntry(here.current.state), state: TAB_ENTRY })
+  }, [navigate])
 
   useEffect(() => {
-    const wentBack = seen.current.has(location.key)
-    seen.current.add(location.key)
-    // Moved forward — a swipe, a drawer tap, a link, or the rewrite below,
-    // which mints a key of its own and so cannot retrace its own retrace.
+    const index = historyIndex()
+    let wentBack: boolean
+
+    if (index !== null) {
+      // The reliable reading. A replace leaves the index alone, so the retrace
+      // below cannot be mistaken for another Back.
+      wentBack = lastIndex !== null && index < lastIndex
+      lastIndex = index
+    } else {
+      // No index to read. A key that has been seen before means an entry that
+      // has been stood on before, which is the same conclusion by a longer road.
+      wentBack = seenKeys.has(location.key)
+      seenKeys.add(location.key)
+    }
+
     if (!wentBack) return
 
-    const back = previous.current
+    const back = previousTab
     // Consumed whether or not it is used: one Back retraces one move, and a
     // second press must find nothing left to retrace.
-    previous.current = null
+    previousTab = null
 
     if (!back) return
     // Back has left the four screens altogether — for a book, most likely. That

@@ -20,10 +20,14 @@ import { BrowserRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
+import { forgetTabHistory } from './tabHistory.ts'
 
 afterEach(cleanup)
 
 beforeEach(() => {
+  // Module-level by design — see `tabHistory.ts`. That makes clearing it
+  // between cases the test's job.
+  forgetTabHistory()
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   // Each test starts from a clean stack — jsdom keeps one history per test file.
   window.history.replaceState(null, '', '/')
@@ -95,6 +99,28 @@ describe('Back, against the real history', () => {
 
     await pressBack('/stats')
     expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+  })
+
+  it('records the tab being left from the address bar, not from a captured render', async () => {
+    // The failure this guards against is invisible when it happens and only
+    // shows up later, which is what made it hard to find: the *navigation* is
+    // worked out elsewhere and still goes to the right place, so swiping looks
+    // perfect. Only the tab written down for Back is wrong — one behind — and
+    // the reader meets it a gesture later as "Back took me to Home".
+    //
+    // Asserted through the address bar rather than by reaching into the module:
+    // if `move` reads a stale path, the retrace below goes to Home instead of
+    // the library, which is precisely the report.
+    renderApp()
+    await screen.findByRole('heading', { level: 1 })
+
+    swipe(-150)
+    await waitFor(() => expect(window.location.pathname).toBe('/library'))
+    swipe(-150)
+    await waitFor(() => expect(window.location.pathname).toBe('/stats'))
+
+    await pressBack('/library')
+    expect(window.location.pathname).not.toBe('/')
   })
 
   it('retraces a swipe backwards too', async () => {

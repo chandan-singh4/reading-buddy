@@ -7,11 +7,16 @@ import 'fake-indexeddb/auto'
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
+import { forgetTabHistory } from './tabHistory.ts'
 
 afterEach(cleanup)
+
+// Module-level by design — see `tabHistory.ts`; cleared so one case's history
+// memory cannot answer the next case's assertions.
+beforeEach(forgetTabHistory)
 
 // The Reader scrolls to the top of each new section. jsdom has no layout, so
 // its `scrollTo` exists only to complain — stubbed rather than left to warn.

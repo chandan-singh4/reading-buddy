@@ -21,6 +21,27 @@
   object-fit: cover;
 }
 
+/*
+ * The real cover, as a block.
+ *
+ * This is a layout shift, not a style preference. An `<img>` is `display:
+ * inline` by default, which means it sits on a *text baseline* — and a baseline
+ * reserves room underneath it for descenders, four or five pixels of it. The
+ * placeholder is a flex container and has no such gap.
+ *
+ * So every tile got shorter at the exact moment its real cover arrived, and
+ * everything below the cover — the title, the author, the progress — jumped up
+ * to meet it. On a shelf of covers all resolving at slightly different moments,
+ * that is the text visibly moving as the screen settles, which is what the
+ * reader reported noticing on the way into the library.
+ *
+ * An element selector so it applies to the `<img>` branch of `Cover` only; the
+ * placeholder keeps the `flex` above, which is what centres its letter.
+ */
+img.cover {
+  display: block;
+}
+
 .initial {
   font-family: var(--font-reading);
   font-size: var(--text-2xl);

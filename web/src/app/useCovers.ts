@@ -124,6 +124,70 @@ export function forgetCovers(bookIds?: readonly BookId[]): void {
   }
 }
 
+/**
+ * Fetch covers nobody has asked for yet, so the screen that will ask is already
+ * answered when it opens.
+ *
+ * ## Why the cache alone wasn't enough
+ *
+ * Caching removed the flash from every visit *after* the first. The first visit
+ * to the library still showed a shelf of placeholders resolving into artwork,
+ * because that was the first time anything had asked for those particular
+ * covers — Home only shows a curated handful, and the library shows everything.
+ * So the reader met the flash exactly once per screen per session, which is
+ * still every session.
+ *
+ * Home already reads the whole book list to work out its shelves, so by the time
+ * it has rendered, the ids of every book the library will show are known — a
+ * screen or two before the reader can possibly get there. That is the moment to
+ * do the reading, and it costs nothing visible because there is nothing on
+ * screen waiting for it.
+ *
+ * Deliberately fire-and-forget: it resolves into the shared cache and tells
+ * nobody. A screen that mounts mid-warm finds whatever is ready and fetches the
+ * rest itself, which is the behaviour it had anyway.
+ */
+export function warmCovers(bookIds: readonly BookId[]): void {
+  // Never more than the cache can hold: warming past the limit would evict the
+  // covers warmed a moment earlier and finish having achieved nothing.
+  const wanted = bookIds
+    .filter((bookId) => !covers.has(bookId) && !uncovered.has(bookId))
+    .slice(0, LIMIT)
+  if (wanted.length === 0) return
+
+  const run = () => {
+    void Promise.all(
+      wanted.map(async (bookId) => {
+        // Re-checked: a screen may have fetched this one while we waited for
+        // an idle moment, and a second object URL for the same blob is both a
+        // leak and — if it reached an `<img>` — a flash of its own.
+        if (covers.has(bookId) || uncovered.has(bookId)) return
+        try {
+          const assets = await repository.getAssets(bookId, [COVER_ASSET_PATH])
+          const blob = assets.get(COVER_ASSET_PATH)
+          if (!blob) {
+            uncovered.add(bookId)
+            return
+          }
+          if (covers.has(bookId)) return
+          remember(bookId, URL.createObjectURL(blob))
+        } catch {
+          // A cover that can't be read is a placeholder, which is a complete
+          // and working outcome. Nothing here is worth surfacing.
+        }
+      }),
+    )
+  }
+
+  // After the screen that triggered this has finished painting. `requestIdleCallback`
+  // where it exists (not in Safari, not in jsdom), a timeout otherwise — the
+  // point is only "not in the frame the reader is waiting on".
+  const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => void })
+    .requestIdleCallback
+  if (typeof idle === 'function') idle(run)
+  else window.setTimeout(run, 200)
+}
+
 /** What the cache can answer for these books right now, without any reading. */
 function known(bookIds: readonly BookId[]): ReadonlyMap<BookId, string> {
   const found = new Map<BookId, string>()

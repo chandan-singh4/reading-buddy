@@ -7,6 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { AppRoutes } from '../App.tsx'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
+import { forgetTabHistory } from '../app/tabHistory.ts'
 import { forgetCovers } from '../app/useCovers.ts'
 import { repository } from '../storage/index.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
@@ -38,6 +39,10 @@ beforeEach(async () => {
   // would satisfy the next case's assertions without the code doing anything.
   forgetShelfMemory()
   forgetCovers()
+  // The history memory is module-level for the same reason and with the same
+  // hazard — left over, it reads a fresh render as a Back press and retraces a
+  // move the previous test made.
+  forgetTabHistory()
   for (const book of BOOKS) await repository.saveBook(book)
 })
 

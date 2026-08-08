@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { Cover } from '../app/Cover.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
-import { useCovers } from '../app/useCovers.ts'
+import { useCovers, warmCovers } from '../app/useCovers.ts'
 import type { BookMeta } from '../structure/index.ts'
 import { repository } from '../storage/index.ts'
 import styles from './Home.module.css'
@@ -56,6 +56,13 @@ export default function Home() {
         const shelves = shelvesOf(books, positions)
         writeShelfMemory({ shelves, total: books.length })
         setState({ status: 'ready', shelves, total: books.length })
+
+        // Every book, not just the ones on these three shelves. Home is the only
+        // screen that reads the whole list, so this is the one place that knows
+        // what the library will need before the reader asks for it — and it is a
+        // screen or two ahead of them, which is exactly the head start needed for
+        // the library to open with its covers already on it. See `warmCovers`.
+        warmCovers(books.map((book) => book.id))
       })
       .catch((error: unknown) => {
         if (cancelled) return
