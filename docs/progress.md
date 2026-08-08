@@ -14,12 +14,41 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing in the code.** The library redesign and its three-fault fast-follow
-  are merged and on Vercel. The reader has seen the library once — that is what
-  produced the fast-follow — but **has not seen it since the fixes landed**, and
-  has not reacted to how any of it *looks*, only to what was broken.
+- **Nothing in the code.** WP-54 is merged and on Vercel across five commits,
+  the last four of them the reader's own corrections made live in the same
+  thread. They have seen and steered the filter row itself; **they have not yet
+  seen the scroll fix, the folders, or the reading-progress bands on the phone.**
 
 ### Recently done
+- **WP-54 · Scroll positions, the filter row, and folders that hold a book
+  twice** — 2026-08-08, merged to `main` (`378b43f` → `d304ef1`). Four asks,
+  and then four rounds of the reader correcting the controls by eye.
+  - **Home opened at the bottom, looking like a refresh.** Root cause, and it
+    was neither the covers nor the animation: **there is one scroller and it is
+    the document**, so a hidden screen has no height and the document is only
+    ever as tall as the screen on show. Leaving a long Library for a short Home
+    shrinks it and the browser *clamps* `scrollY` to Home's last pixel — the
+    jolt against the document edge is what read as pull-to-refresh. Library then
+    came back to the clamped number, because the two screens shared one. Now
+    `app/scrollMemory.ts` keeps one offset per path, saved on scroll and
+    restored in a layout effect. The outgoing screen is also shifted by the
+    difference between the two, or it would spend its 300 ms fade showing its
+    own top.
+  - **The filter controls came out of the sheet** onto the shelf
+    (`library/FilterBar.tsx`), and the search bar's duplicate filter button went.
+    Then four corrections, each shipped on its own: **two options is a switch**
+    (Title, Author, Recently and List/Grid change on the tap, no panel);
+    **reading progress became a filter in bands** (0–25%, …) rather than a sort;
+    **the accent follows the tap** — exactly one chip lit, the last one touched;
+    and **any open panel closes** when the reader moves to a control without one.
+  - **Unread and Finished are computed folders.** No rows, no syncing: they are
+    a question asked of the progress map when the shelf is drawn, so "moving
+    between them" is what the answer changing looks like.
+  - **A book can be in several folders** — schema **v9**, `*folderIds`
+    multiEntry, with the first migration in this project's history that has to
+    do real work. Tested against a database genuinely written at v8 and reopened.
+  - Gates at close: **742 tests**, typecheck, build. Every fix was checked to
+    fail without it, including the reported ones.
 - **WP-53 fast-follow · three faults from the phone** — 2026-08-06, merged to
   `main`. Reported within the hour of shipping; two shared one cause.
   - **The floating "+" was fixed to the document, not the screen**, so it was

@@ -538,3 +538,42 @@
   because the History API can append an entry or rewrite the top one and nothing
   else, so "the entry below me should be the tab I was just on" can only be
   arranged after a Back has landed. — 2026-08-07
+- **Every tab screen keeps its own scroll position, because they share one
+  scroller.** The four screens are kept mounted and the inactive ones are
+  `hidden`, which means zero height — so the document is only ever as tall as
+  the screen on show, and a tab change *changes the document's height*. The
+  browser then clamps `scrollY` to the new screen's maximum, which is why a
+  short Home arrived at its own bottom with a jolt that read as pull-to-refresh,
+  and why Library came back wherever Home had left the one number they shared.
+  Caching, animation and pull-to-refresh were all innocent. Corollary: the
+  outgoing screen is offset by the difference between the two positions for the
+  length of the slide, or it fades out showing its own top. — 2026-08-08
+- **Unread and Finished are computed, not stored.** Two real folder rows plus
+  code that moves books between them would make membership a *copy* of the
+  reading position, and every copy needs every writer to remember it. Miss one
+  path and a book shows "✓ Finished" on its cover while sitting in Unread, with
+  no way for the reader to tell which is lying. Asked of the progress map at
+  render time it cannot drift, and "moving between folders" is not an operation
+  the app performs — it is what the answer changing looks like. — 2026-08-08
+- **A book may be in several folders, reversing WP-53.** The reader asked for
+  it directly. What keeps it a folder rather than a tag is one property, kept
+  deliberately: **the shelf shows each book once**, however many folders it is
+  in — the folder list narrows the library, it never multiplies it. The price,
+  paid knowingly, is that "sort by folder" had no single answer per book and was
+  dropped. — 2026-08-08
+- **Two options is a switch, not a menu.** A panel earns its extra tap by having
+  something to decide; offering a choice of two asks a question the reader
+  answered by reaching for the control. Title, Author, Recently and List/Grid
+  change on the tap. Tapping a sort chip that isn't the current sort gives its
+  *first* option, not the direction it was left in last time — a control whose
+  first tap gives you something you didn't ask for takes two taps to trust.
+  — 2026-08-08
+- **The accent marks the one chip the reader is working on — the last one
+  tapped — and never anything permanent.** It first meant "this control is doing
+  something", which lit a filter only once it was already hiding books and lit
+  *nothing* when a panel opened: the screen answered a tap by highlighting a
+  different control. And with sort always set, it lived on a sort chip forever.
+  A mark that cannot move says nothing. What it stopped carrying is carried
+  better elsewhere — an active filter says so in its own label ("Unread", not
+  "Reading status") and the line beneath says "Showing 3 of 12" next to the tap
+  that clears it. — 2026-08-08

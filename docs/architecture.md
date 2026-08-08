@@ -133,11 +133,11 @@ web/src/
 ### Storage (WP-03)
 
 `web/src/storage/` is the only code allowed to touch IndexedDB. Dexie database
-`reading-buddy`, currently schema version 8:
+`reading-buddy`, currently schema version 9:
 
 | Table | Primary key | Holds | Since |
 |---|---|---|---|
-| `books` | `id` | `BookMeta` — indexed on title, type, importedAt, contentHash, textSignature, folderId | v1 |
+| `books` | `id` | `BookMeta` — indexed on title, type, importedAt, contentHash, textSignature, and `*folderIds` (multiEntry, v9) | v1 |
 | `manifests` | `bookId` | one `Manifest` per book | v1 |
 | `chapters` | `[bookId+chapter]` | one `ChapterIndex` per chapter | v1 |
 | `sections` | `[bookId+path]` | **one row per section** — the retrieval atom | v1 |
@@ -151,8 +151,16 @@ web/src/
   position is written every few seconds while reading, and a picture can be a
   megabyte — neither belongs on the book row, which would then be rewritten in
   full on every save and read in full on every shelf paint.
-- **A book is in at most one folder** (`BookMeta.folderId`, absent = loose), and
-  **deleting a folder unfiles its books rather than deleting them.**
+- **A book may be in any number of folders** (`BookMeta.folderIds`, absent =
+  loose), and **deleting a folder unfiles its books rather than deleting them.**
+  It shipped as one-folder-per-book in v8 and became many in v9 at the reader's
+  request. The property that keeps it a *folder* rather than a *tag* is that the
+  shelf shows each book **once**, however many folders it is in.
+- **"Unread" and "Finished" are folders with no rows.** They are worked out from
+  the `positions` table each time the shelf is drawn, so membership cannot drift
+  from the book's own progress. Their ids are namespaced `system:` and the
+  repository refuses to write them onto a book — see
+  `library/systemFolders.ts`.
 
 - **Import `./storage`, never `./storage/db.ts`.** `repository.ts` is the door;
   the database behind it stays swappable.
@@ -161,8 +169,14 @@ web/src/
   undo the token strategy.
 - **Schema changes go in a new `.version(n)` block** — never edit a shipped one,
   or existing installs lose data. Most additions need no migration: an absent
-  field is the state every existing row is already in (`folderId` in v8 is the
+  field is the state every existing row is already in (`folderId` in v8 was the
   worked example — a book without one is loose, which all of them were).
+  **v9 is the exception and the one to copy when a migration is genuinely
+  needed**: `folderId` → `folderIds` had to rewrite every filed book, because an
+  absent list does *not* mean the same thing as the old single field, and
+  skipping it would have opened every folder the reader made as empty. It is
+  tested against a database written at v8 and reopened at v9 — a direct call to
+  the upgrade function cannot catch "the upgrade never ran".
 - Import and delete both run in transactions: no half-parsed books, no orphaned
   sections eating the phone's storage quota.
 - **Book metadata set at import:** type (`light-fiction` | `dense/technical`),

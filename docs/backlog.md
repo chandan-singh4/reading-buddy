@@ -279,6 +279,21 @@
   (what shows, in what order, how far through) live in `src/library/` as pure
   tested functions; the screen is a shell over them. Fast-followed the same day
   with three phone-reported faults — see `progress.md` · *after 52*
+- [x] **WP-54 Library navigation, filter row, and folders** — added and shipped
+  2026-08-08, from a phone report plus a reference screenshot. Four parts. **The
+  scroll bug**: every tab screen now keeps its own position, because the four
+  share one scroller (the document) and a hidden screen has no height, so the
+  browser clamped the offset on every tab change and the two screens overwrote
+  each other. **The filter row**: sort, reading progress, folders, reading
+  status and view moved out of the sheet onto the shelf; controls with exactly
+  two settings switch on the tap; reading progress became a filter in quarters
+  rather than a sort, and sorting by folder was dropped since folders have their
+  own control. **Unread and Finished** are folders computed from reading
+  progress — no rows, so nothing can drift out of step with a book's own
+  progress bar. **A book can be in several folders** (schema v9, `*folderIds`
+  multiEntry, migrated from v8's single `folderId`), which overturns WP-53's
+  "one folder per book" — the shelf still shows each book once, which is what
+  keeps it a folder and not a tag · *after 53*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*
@@ -306,9 +321,12 @@
 - Rename a book → **NEW** (small; pairs with reading real title/author out of EPUB and docx metadata, since titles are filename-derived today)
 - ~~Search the library~~ → **shipped WP-53.** Title, author and folder name.
 - ~~Filter by status (Unread / Reading / Finished)~~ → **shipped WP-53.**
-- ~~Sort: recently read, recently added, title, author~~ → **shipped WP-53**,
-  plus reading progress and folder. "Last modified" was declined — nothing
-  records it, and a sort that silently duplicates "recently added" lies.
+- ~~Sort: recently read, recently added, title, author~~ → **shipped WP-53**;
+  reworked in **WP-54** into one control per question, each switching on the tap.
+  Sorting by *reading progress* became a filter in quarters and sorting by
+  *folder* was dropped, both because they had become a different control on the
+  same row. "Last modified" was declined — nothing records it, and a sort that
+  silently duplicates "recently added" lies.
 - ~~Cover images~~ → shipped; on the shelf, the grid and the detail page.
 - Continue Reading → WP-24, needs WP-15
 - ~~Reading progress (% and last location)~~ → **shipped WP-53** on the shelf:
@@ -316,11 +334,17 @@
 - Import folder / watch a directory → **NEW, low priority.** Folder *import* shipped in WP-11: a one-time scan when you point at a folder. *Watching* means new files landing in that folder appear on the shelf by themselves, and a web page can't do that — it can't look at the disk unprompted and isn't running with the tab closed. Possible via the Tauri shell, or via the File System Access API, which still only notices on next open. The gap it closes is one drag of a folder; revisit only if books start arriving often and to a fixed folder.
 - Favourites / pin important books → **NEW** (small). **Cheap now**: a boolean
   on `BookMeta`, one field on `LibraryPrefs`, one clause in `matchesFilters` and
-  a chip in the filter sheet. WP-53 built the filter chain to take exactly this.
-- Tags → **NEW.** Deliberately *not* what folders became: a book has one folder,
-  a tag is many-to-many and needs a join table. WP-53 left the seam — the
-  search haystack is built in one function specifically so tags become one more
-  line in it.
+  a chip in the filter sheet. WP-53 built the filter chain to take exactly this,
+  and WP-54's reading-progress bands are the worked example of adding one.
+- Tags → **NEW, and now much closer than it was.** This used to read "folders
+  are one-per-book, tags are many-to-many and need a join table" — but **WP-54
+  made folder membership many** at the reader's request (`BookMeta.folderIds`,
+  multiEntry index). The storage shape a tag needs already exists. What is still
+  genuinely different is the *meaning*: a folder answers "where does this live"
+  and shows one at a time; a tag answers "what is this about" and is asked in
+  combination. Build it as a second field beside `folderIds`, not as a rename of
+  it — the search haystack is still built in one function so tags are one more
+  line there.
 - Archive instead of delete → **NEW** (small, sits in WP-24)
 - Recently opened list → **NEW** (small, needs WP-15)
 - Rate a book on finishing, then 5 recommendations: 2 by the same author, 3 on the topic by others → **NEW, and the largest item here.** Needs a book-metadata source we don't have — the shelf only knows what's been imported, so recommendations must come from Claude. Worth its own waypoint, after WP-19.
