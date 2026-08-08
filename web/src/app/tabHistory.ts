@@ -1,42 +1,65 @@
 /**
- * One history entry for the whole tab level — not none, and not one per swipe.
+ * Back retraces one tab move, and then leaves. Never more, never less.
  *
- * ## The two wrong answers, and why the right one is neither
+ * ## What was asked for, exactly
  *
- * Home, Library, Stats and Settings are laid out side by side. They are *one
- * level*, the same relationship a tab bar has, drawn as a swipe instead of a row
- * of buttons. The question is what the device's Back gesture should do while a
- * reader is on that level, and there are two obvious answers, both wrong:
+ * Home → Library → Stats. Back goes to **Library**. Back again leaves the app.
+ * Not Home in between; not Stats then Library then Home.
  *
- * **Push every move.** This is what the app did first, and it makes Back mean
- * "undo the last flick". A reader who browsed Home → Library → Stats → Settings
- * then had to press Back four times to leave, stepping backwards through screens
- * they had already dismissed. Back stopped meaning "out of here" and started
- * meaning "rewind me".
+ * That is two requirements at once, and they are the reason the first two
+ * attempts at this both failed:
  *
- * **Replace every move.** The obvious correction, and it overshoots: with no
- * entry at all for the tab level, Back from Library — reached by swiping from
- * Home a second ago — leaves the app entirely. The reader had somewhere to go
- * back *to* and was thrown out of the front door instead.
+ * - **Back must show the tab you were just on.** Pushing a history entry per
+ *   move gets this right and nothing else: after ten swipes it is ten presses
+ *   to leave, stepping through screens already dismissed.
+ * - **The second Back must leave.** Replacing on every move gets *this* right
+ *   and nothing else: with no entry for the level at all, the first Back throws
+ *   the reader out of a front door they were nowhere near.
  *
- * ## What this does
+ * Spending one entry on the whole level — the second attempt — satisfies the
+ * second requirement and quietly abandons the first: Back always landed on
+ * whatever the level was entered on, which from a cold start is Home, from
+ * wherever the reader actually was.
  *
- * Exactly one entry for the level, however much moving happens inside it. The
- * *first* move onto the tab level pushes; every move made while already on it
- * replaces. So Back always goes back one step — to whatever the reader was doing
- * before they started swiping — and never more than one.
+ * ## Why it needs a pop handler and not just a cleverer push/replace rule
  *
- * The marker rides on the history entry itself (`state.tab`) rather than in a
- * ref or a module variable, which is the only place that survives what has to
- * survive: a reload, a restored session, and the reader pressing Back and then
- * Forward again. A ref would say "we already pushed" about an entry that is no
- * longer the one being looked at.
+ * There isn't a cleverer rule. The History API can append an entry and it can
+ * rewrite the *top* one, and that is all — nothing reaches an entry underneath.
+ * So "the entry below me should be the tab I was just on" is not something a
+ * navigation can arrange, because by the time there is a tab to remember, the
+ * entry that would have to hold it is already buried.
+ *
+ * What *is* reachable is the top entry after a Back has landed on it. So:
+ *
+ * 1. The level keeps **two** entries: one claimed on the way in, and the one it
+ *    keeps rewriting as the reader swipes around.
+ * 2. The tab being left is remembered as we go — in a ref, because it has to
+ *    outlive the entry that would otherwise hold it.
+ * 3. When Back lands on the lower entry, that entry is **rewritten in place** to
+ *    the remembered tab. The reader sees the page they were just on, and because
+ *    a rewrite adds nothing, the level is now down to one entry.
+ * 4. So the next Back leaves. There is nothing left of the level to go back to.
+ *
+ * Step 3 is the whole idea: the retrace and the collapse are the same act.
+ *
+ * ## The case this deliberately does not cover
+ *
+ * Reaching the tabs *forwards* out of a book — following a link into the
+ * library rather than pressing Back into it — and then swiping between tabs.
+ * The first Back there returns to the book rather than retracing a tab.
+ *
+ * It is not an oversight, it is the lesser of the two available wrongs. To
+ * retrace instead, the handler would have to either rewrite the book's entry
+ * (losing the book, so the reader could never get back to it) or push a new one
+ * on top of it (which means landing in the book first, mounting the Reader and
+ * starting a fetch for a book nobody asked to open, for one frame). Returning
+ * to the book is at least a place the reader has actually been.
  */
 
-import { useCallback } from 'react'
-import { useLocation, useNavigate, type Location } from 'react-router'
+import { useCallback, useEffect, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 
-/** What a history entry created by a move between the four screens carries. */
+/** What a history entry belonging to the tab level carries. */
 export interface TabEntryState {
   tab: true
 }
@@ -44,38 +67,96 @@ export interface TabEntryState {
 export const TAB_ENTRY: TabEntryState = { tab: true }
 
 /**
- * Whether this history entry is already the tab level's one entry.
+ * Whether this history entry belongs to the tab level.
  *
  * Deliberately tolerant about the shape: `state` is `unknown` as far as the
  * router is concerned, and it can be anything a previous version of the app —
- * or the browser's session restore — happened to put there.
+ * or the browser's session restore — happened to leave there.
  */
 export function isTabEntry(state: unknown): boolean {
   return typeof state === 'object' && state !== null && (state as { tab?: unknown }).tab === true
 }
 
-/** How to move to a screen on the tab level from wherever we are now. */
-export function tabMoveFrom(location: Location): { replace: boolean; state: TabEntryState } {
-  // Already standing on the level's entry: reuse it. Arriving from anywhere
-  // else — a book, its details page, a cold start — claim one.
-  return { replace: isTabEntry(location.state), state: TAB_ENTRY }
-}
-
 /**
- * Move to one of the four screens, keeping the level to a single history entry.
+ * Move between the four screens, and retrace exactly one of those moves on Back.
  *
- * Used by the swipe and by the drawer alike. They are the same move by two
- * routes, and if only one of them went through here Back would depend on which
- * one the reader happened to reach for.
+ * Called once, by `AppShell`, and the function it returns is used by both the
+ * swipe and the drawer — they are one move by two routes, and if only one went
+ * through here Back would depend on which the reader had reached for.
  */
-export function useTabNavigate(): (to: string) => void {
+export function useTabHistory(isTabPath: (pathname: string) => boolean): (to: string) => void {
   const navigate = useNavigate()
   const location = useLocation()
 
-  return useCallback(
+  /**
+   * Every history entry this session has stood on, by key.
+   *
+   * This is how a Back press is recognised, and it is worth saying why it isn't
+   * `useNavigationType()`, which exists to answer exactly this question: under a
+   * declarative router — `BrowserRouter`, which is what this app uses — it
+   * reports `POP` for every navigation including pushes. Trusting it made the
+   * handler below fire on every swipe and bounce the reader straight back to the
+   * tab they had just left, which looked precisely like swiping being broken.
+   *
+   * A key, on the other hand, cannot lie. The router mints a fresh one for every
+   * navigation *forward*, push or replace; going back re-visits an entry whose
+   * key already exists. So a key that has been seen before means the reader
+   * moved backwards through the history, and nothing else does.
+   */
+  const seen = useRef(new Set<string>())
+
+  /**
+   * The tab visited immediately before the one on screen, or `null` if there
+   * isn't one yet.
+   *
+   * A ref and not history state, which is the point of the whole design: the
+   * entry that would carry it is the one Back is about to throw away. It is
+   * lost on a reload, which is correct — a restored session has no "just before"
+   * to retrace, and inventing one would send the reader somewhere they have not
+   * been this visit.
+   */
+  const previous = useRef<string | null>(null)
+
+  const move = useCallback(
     (to: string) => {
-      navigate(to, tabMoveFrom(location))
+      const from = location.pathname
+      if (to === from) return
+
+      // Only a tab is worth retracing to. Arriving from a book, the level has
+      // nothing behind it yet and Back should simply return there.
+      previous.current = isTabPath(from) ? from : null
+
+      // Claim an entry on the way in; rewrite it from then on. Two entries is
+      // what the retrace above spends, and it never grows past them however
+      // long the reader swipes around.
+      navigate(to, { replace: isTabEntry(location.state), state: TAB_ENTRY })
     },
-    [navigate, location],
+    [navigate, location, isTabPath],
   )
+
+  useEffect(() => {
+    const wentBack = seen.current.has(location.key)
+    seen.current.add(location.key)
+    // Moved forward — a swipe, a drawer tap, a link, or the rewrite below,
+    // which mints a key of its own and so cannot retrace its own retrace.
+    if (!wentBack) return
+
+    const back = previous.current
+    // Consumed whether or not it is used: one Back retraces one move, and a
+    // second press must find nothing left to retrace.
+    previous.current = null
+
+    if (!back) return
+    // Back has left the four screens altogether — for a book, most likely. That
+    // is a real destination and it is where the reader asked to go.
+    if (!isTabPath(location.pathname)) return
+    // Already showing it. The entry Back landed on happened to be the right one.
+    if (back === location.pathname) return
+
+    // Rewritten, not pushed. This is what collapses the level to a single entry
+    // so the *next* Back leaves the app rather than finding another tab.
+    navigate(back, { replace: true, state: TAB_ENTRY })
+  }, [location, navigate, isTabPath])
+
+  return move
 }

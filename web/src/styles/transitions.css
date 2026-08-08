@@ -28,15 +28,28 @@
   mix-blend-mode: normal;
 }
 
-/* The arriving screen is on top and the outgoing one simply waits underneath.
-   Nothing is ever transparent over transparency, so the background never shows
-   through the seam. */
+/*
+ * The outgoing screen sits *on top* and fades off; the arriving one waits
+ * underneath at full opacity.
+ *
+ * This ordering is the whole trick, and the obvious one is wrong. Putting the
+ * arriving screen on top and fading it *up* means that during the crossing both
+ * layers are partly transparent at once — and two transparent layers composite
+ * onto the page background, which shows through the seam. That is the
+ * camera-shutter flash this project has now met three times (`decisions.md`
+ * records the first two), and it does not care whether the fade starts at 0 or
+ * at 0.7; it only cares that nothing opaque is underneath.
+ *
+ * With the fade on the layer that is leaving, the arriving screen is opaque for
+ * every frame of the transition. There is never a moment when the background is
+ * reachable, so there is nothing to flash.
+ */
 ::view-transition-old(root) {
-  z-index: 0;
+  z-index: 1;
 }
 
 ::view-transition-new(root) {
-  z-index: 1;
+  z-index: 0;
 }
 
 /*
@@ -51,71 +64,69 @@
  * differently from the page turns that follow it is the seam this whole app has
  * spent its motion work removing.
  */
-:root[data-route-move='in']::view-transition-new(root) {
-  animation: bookOpens 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+:root[data-route-move='in']::view-transition-old(root) {
+  animation: shelfLeaves 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-:root[data-route-move='in']::view-transition-old(root) {
-  animation: shelfRecedes 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+:root[data-route-move='in']::view-transition-new(root) {
+  animation: bookArrives 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 /*
- * Closing it. The same motion run backwards — the book falls back into the
- * shelf, the shelf comes forward to meet it. Going back has to *look* like
- * undoing, or the reader learns two gestures where there is one.
+ * Closing it. The same motion run backwards — the book pulls back and the shelf
+ * is revealed settling underneath. Going back has to *look* like undoing, or
+ * the reader learns two gestures where there is one.
  */
-:root[data-route-move='out']::view-transition-new(root) {
-  animation: shelfReturns 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
-}
-
 :root[data-route-move='out']::view-transition-old(root) {
-  animation: bookCloses 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: bookLeaves 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-/* Never from zero opacity, in either direction — the settled rule from
-   `decisions.md`. 0.7 and a small scale is a movement; 0 and a scale is a
-   flash with a movement inside it. */
-@keyframes bookOpens {
-  from {
-    opacity: 0.7;
-    transform: scale(1.03);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+:root[data-route-move='out']::view-transition-new(root) {
+  animation: shelfArrives 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
-@keyframes shelfRecedes {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 1;
-    transform: scale(0.97);
-  }
-}
-
-@keyframes shelfReturns {
-  from {
-    opacity: 0.7;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes bookCloses {
+/*
+ * Only the layer on top ever changes opacity, and it is always the one leaving.
+ * The arriving layer moves and stays solid — see the z-index note above for why
+ * that is not a stylistic choice.
+ */
+@keyframes shelfLeaves {
   from {
     opacity: 1;
     transform: scale(1);
   }
   to {
     opacity: 0;
-    transform: scale(1.03);
+    transform: scale(0.97);
+  }
+}
+
+@keyframes bookArrives {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes bookLeaves {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes shelfArrives {
+  from {
+    transform: scale(0.97);
+  }
+  to {
+    transform: scale(1);
   }
 }
 

@@ -136,41 +136,52 @@
   min-width: 0;
 }
 
-/* `will-change` sits on the two animating classes rather than on `.page`, so a
-   screen that is merely sitting there isn't holding a compositor layer open for
-   a move that may never come. Without it the first frame or two of a swipe go
-   on handing the element to the compositor — which is exactly the part of the
-   movement the eye is watching for, and it reads as the screen jumping and then
-   gliding. */
 .pageFromRight {
   animation: fromRight var(--page-duration) var(--page-ease) both;
-  will-change: transform, opacity;
 }
 
 .pageFromLeft {
   animation: fromLeft var(--page-duration) var(--page-ease) both;
-  will-change: transform, opacity;
 }
 
-/* Both start at 0.75 opacity, never 0 — see `decisions.md`: fading up from
-   zero flashes the background through and reads as the screen blinking. Raised
-   from 0.6 now the slide runs longer: over 300 ms a dip that deep is visible as
-   a *fade*, and a screen that fades as well as slides is two effects doing one
-   job. The travel does the work; the opacity only takes the hard edge off it.
-
-   8% rather than 6% for the same reason — a longer, gentler curve needs a
-   little more distance to still read as movement rather than as drift. */
+/*
+ * Movement only. No opacity, and this is the whole of the shutter.
+ *
+ * There is exactly one screen mounted at a time — `.page` is keyed on the path,
+ * so the screen being left is gone before the arriving one paints. That means
+ * the arriving screen has *nothing behind it but the page background*, and it
+ * is itself transparent. Fading it up therefore does not blend two screens
+ * together, which is what a cross-fade is for; it dips the only screen there is
+ * and lets the background show straight through it. Every swipe flashed.
+ *
+ * This is the camera-shutter fault `decisions.md` already records twice — once
+ * on the reading screen's entrance, once on the jump fade — and it reappeared
+ * here for exactly the reason recorded there. Starting at 0.75 instead of 0
+ * only made it a shorter flash, and stretching the move to 300 ms made it a
+ * longer one. **A fade needs something opaque behind it. On this screen there
+ * is nothing, so there is no fade.**
+ *
+ * The slide alone reads as movement, and it cannot flash: what shows in the
+ * strip the page has not yet covered is `--color-bg`, which is the colour the
+ * page is sitting on anyway. 5% rather than 8% keeps that strip narrow enough
+ * that the top bar's blur has nothing to shimmer against as it passes.
+ *
+ * `will-change` came out with the opacity. It promoted the page to its own
+ * compositor layer underneath `.frame`'s always-on `filter` and the top bar's
+ * `backdrop-filter` — a combination that makes Android Chrome re-raster the
+ * blurred region as the layer appears and disappears, which is a second flash
+ * on top of the first one. The animation is transform-only now and gets a
+ * compositor layer on its own merits, without being told.
+ */
 @keyframes fromRight {
   from {
-    transform: translateX(8%);
-    opacity: 0.75;
+    transform: translateX(5%);
   }
 }
 
 @keyframes fromLeft {
   from {
-    transform: translateX(-8%);
-    opacity: 0.75;
+    transform: translateX(-5%);
   }
 }
 

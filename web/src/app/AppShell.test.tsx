@@ -164,49 +164,78 @@ describe('app shell', () => {
     expect(await screen.findByText('All books')).toBeDefined()
   })
 
-  it('spends one history entry on the whole tab level, however much swiping happens', async () => {
-    // Back has to mean "back one step", once. Not "undo the last flick", which
-    // is what it meant while every swipe pushed an entry — three swipes then
-    // cost three presses to escape. And not "leave the app", which is what it
-    // meant when every swipe replaced instead: the reader on Home from a cold
-    // start swiped to Library, pressed Back, and was thrown out of the front
-    // door even though Home was right there behind them.
+  /** Did the app leave? MemoryRouter has nowhere to go, so it sits still. */
+  const stillOn = (name: RegExp | string) =>
+    typeof name === 'string'
+      ? screen.getByRole('heading', { name })
+      : screen.getByRole('heading', { level: 1 })
+
+  it('retraces exactly one tab move on Back, then leaves', async () => {
+    // Stated by the reader in as many words: "Home - Library - Stats. Then
+    // swiping back should take me to Library, and then another swipe out of
+    // the app." Both halves matter, and the two earlier attempts each got one
+    // of them: pushing every move retraced correctly but took a press per swipe
+    // to escape; replacing every move left immediately but retraced to whatever
+    // the level was entered on — Home, from wherever the reader actually was.
     renderFrom(['/'])
 
     swipe(-150)
     expect(await screen.findByText('All books')).toBeDefined()
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
-    swipe(-150)
-    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
 
-    // Three screens deep, and one press lands on the screen the reader was
-    // actually on before any swiping — not Stats, and not out of the app.
+    // One: the tab actually visited before this one.
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('All books')).toBeDefined()
+
+    // Two: out. Not Home, which is where the reader started but not where they
+    // were. MemoryRouter cannot leave, so "out" shows as the app standing still
+    // on the screen it was already on.
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    await Promise.resolve()
+    expect(stillOn('All books')).toBeDefined()
   })
 
-  it('claims its one entry again after leaving the level and coming back', async () => {
-    // The marker lives on the history entry, not in a ref, precisely so this
-    // works: pressing Back returns to an entry that was never a tab entry, and
-    // the next swipe has to push a fresh one rather than believe it already has
-    // one and replace the reader's way back.
+  it('retraces the last move however much swiping came before it', async () => {
+    // The retrace is one *move*, not one entry out of a growing pile — the pile
+    // is what made Back feel like rewinding. Four moves in, Back still means
+    // "the screen I was just looking at".
     renderFrom(['/'])
 
     swipe(-150)
-    expect(await screen.findByText('All books')).toBeDefined()
+    swipe(-150)
+    swipe(-150)
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
+    swipe(150)
+    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    await Promise.resolve()
+    expect(stillOn('Settings')).toBeDefined()
+  })
+
+  it('leaves the four screens for whatever was there before them', async () => {
+    // Retracing one tab move must not cost the reader the way out. Here Home
+    // was reached from a book, so Back retraces the swipe to Home and the press
+    // after it returns to the book — never a loop around the four screens.
+    renderFrom(['/book/does-not-exist', '/'])
 
     swipe(-150)
     expect(await screen.findByText('All books')).toBeDefined()
+
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
     expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    expect(await screen.findByRole('alert')).toBeDefined()
   })
 
-  it('moves the drawer through the same history as the swipe', async () => {
-    // The drawer and the swipe are one move by two routes; if they disagreed,
-    // Back would depend on which one the reader had happened to reach for.
+  it('moves the drawer through exactly the same history as a swipe', async () => {
+    // One move by two routes. If they disagreed, Back would depend on which the
+    // reader had happened to reach for.
     renderFrom(['/'])
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
@@ -217,9 +246,27 @@ describe('app shell', () => {
     fireEvent.click(screen.getByRole('link', { name: /Stats/ }))
     expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
 
-    // Two drawer moves, one entry between them: back to Home, not to Settings.
+    // Back to Settings — the screen before this one — not to Home.
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    await Promise.resolve()
+    expect(stillOn('Settings')).toBeDefined()
+  })
+
+  it('retraces a swipe made after a drawer tap, and the other way round', async () => {
+    renderFrom(['/'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Stats/ }))
+    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+
+    swipe(-150)
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
   })
 
 

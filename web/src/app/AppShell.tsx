@@ -2,9 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 
 import { useViewLocation } from './routeTransition.tsx'
-import { tabMoveFrom } from './tabHistory.ts'
+import { useTabHistory } from './tabHistory.ts'
 import { PAGE_ORDER, useSwipeNav } from './useSwipeNav.ts'
 import styles from './AppShell.module.css'
+
+/** Whether a path is one of the four screens this shell holds. */
+function isTabPath(pathname: string): boolean {
+  return PAGE_ORDER.includes(pathname)
+}
 
 /**
  * The drawer, in the same order a swipe moves through them.
@@ -49,11 +54,16 @@ export default function AppShell() {
   const drawerRef = useRef<HTMLElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
-  // Push or replace, so the four screens cost one history entry between them.
-  // Derived here rather than inside the loop: every link makes the same move.
-  const tabMove = tabMoveFrom(location)
+  /**
+   * The one way to move between the four screens.
+   *
+   * Held here, at the single place both routes to it can reach: the swipe below
+   * and the drawer links further down. It also owns the Back handling, which is
+   * why it is a hook called once rather than a function called twice.
+   */
+  const moveToTab = useTabHistory(isTabPath)
 
-  useSwipeNav()
+  useSwipeNav(moveToTab)
 
   /**
    * Which way the last move went, so the arriving screen slides in from the
@@ -194,11 +204,18 @@ export default function AppShell() {
                 // Without `end`, "/" matches every route and Home would be
                 // highlighted while the reader is on Settings.
                 end={link.to === '/'}
-                // The drawer and the swipe must not disagree about what kind of
-                // move this is — they are one move by two routes. Both go
-                // through `tabHistory`, which spends one history entry on the
-                // whole level: the first move onto it pushes, the rest replace.
-                {...tabMove}
+                // Still a real link — it keeps its `href`, so it is announced,
+                // focused and activated as one. The click is taken over so the
+                // move goes through the same `moveToTab` a swipe does: the
+                // drawer and the swipe are one move by two routes, and Back must
+                // not depend on which the reader reached for.
+                onClick={(event) => {
+                  // A modified click is a request to open it somewhere else,
+                  // and that belongs to the browser.
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                  event.preventDefault()
+                  moveToTab(link.to)
+                }}
                 className={({ isActive }) =>
                   isActive ? `${styles.drawerLink} ${styles.drawerLinkActive}` : styles.drawerLink
                 }

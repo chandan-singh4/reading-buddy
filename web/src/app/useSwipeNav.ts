@@ -12,10 +12,11 @@
  *
  * ## What a swipe does to the history
  *
- * One entry for the whole level: the first move onto it pushes, every move made
- * while already on it replaces. So Back goes back exactly one step, always. The
- * reasoning — and the two obvious answers that are both wrong — is in
- * `tabHistory.ts`, which the drawer goes through too.
+ * Nothing of its own: it is handed a `move` by `AppShell` and calls it. Back
+ * retraces exactly one swipe and then leaves the app, which takes a pop handler
+ * rather than a push-or-replace rule — the reasoning, and the two simpler
+ * answers that both failed, are in `tabHistory.ts`. The drawer calls the same
+ * `move`, so the two can't disagree.
  *
  * ## The two things that stop this working on a real phone
  *
@@ -46,8 +47,6 @@
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
 
-import { useTabNavigate } from './tabHistory.ts'
-
 /** The order a swipe moves through. Left goes down this list, right goes up. */
 export const PAGE_ORDER: readonly string[] = ['/', '/library', '/stats', '/settings']
 
@@ -73,8 +72,7 @@ interface Gesture {
   lastY: number
 }
 
-export function useSwipeNav(): void {
-  const navigate = useTabNavigate()
+export function useSwipeNav(move: (to: string) => void): void {
   const location = useLocation()
   const gesture = useRef<Gesture | undefined>(undefined)
 
@@ -131,9 +129,7 @@ export function useSwipeNav(): void {
       const target = index + (dx < 0 ? 1 : -1)
       if (target < 0 || target >= PAGE_ORDER.length) return
 
-      // Through `tabHistory`, which decides push-or-replace so that the whole
-      // level costs one history entry rather than one per swipe — or none.
-      navigate(PAGE_ORDER[target]!)
+      move(PAGE_ORDER[target]!)
     }
 
     document.addEventListener('pointerdown', onPointerDown)
@@ -147,5 +143,5 @@ export function useSwipeNav(): void {
       document.removeEventListener('pointerup', onPointerEnd)
       document.removeEventListener('pointercancel', onPointerEnd)
     }
-  }, [location.pathname, navigate])
+  }, [location.pathname, move])
 }
