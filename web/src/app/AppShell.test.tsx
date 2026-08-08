@@ -164,11 +164,14 @@ describe('app shell', () => {
     expect(await screen.findByText('All books')).toBeDefined()
   })
 
-  it('leaves no history behind when swiping between the four screens', async () => {
-    // The four screens are one level, not four steps into anything. Back has to
-    // mean "leave this level", once — not "undo the last flick", which is what
-    // it meant while every swipe pushed an entry.
-    renderFrom(['/book/does-not-exist', '/'])
+  it('spends one history entry on the whole tab level, however much swiping happens', async () => {
+    // Back has to mean "back one step", once. Not "undo the last flick", which
+    // is what it meant while every swipe pushed an entry — three swipes then
+    // cost three presses to escape. And not "leave the app", which is what it
+    // meant when every swipe replaced instead: the reader on Home from a cold
+    // start swiped to Library, pressed Back, and was thrown out of the front
+    // door even though Home was right there behind them.
+    renderFrom(['/'])
 
     swipe(-150)
     expect(await screen.findByText('All books')).toBeDefined()
@@ -177,23 +180,48 @@ describe('app shell', () => {
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
 
-    // One press, and out — not three more screens of tab-shuffling first.
+    // Three screens deep, and one press lands on the screen the reader was
+    // actually on before any swiping — not Stats, and not out of the app.
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect(await screen.findByRole('alert')).toBeDefined()
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
   })
 
-  it('leaves no history behind when the drawer moves between the four either', async () => {
-    // The drawer and the swipe are the same move by two routes; if only one of
-    // them replaced, Back would depend on which one the reader had reached for.
-    renderFrom(['/book/does-not-exist', '/'])
+  it('claims its one entry again after leaving the level and coming back', async () => {
+    // The marker lives on the history entry, not in a ref, precisely so this
+    // works: pressing Back returns to an entry that was never a tab entry, and
+    // the next swipe has to push a fresh one rather than believe it already has
+    // one and replace the reader's way back.
+    renderFrom(['/'])
+
+    swipe(-150)
+    expect(await screen.findByText('All books')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+
+    swipe(-150)
+    expect(await screen.findByText('All books')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'device back' }))
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+  })
+
+  it('moves the drawer through the same history as the swipe', async () => {
+    // The drawer and the swipe are one move by two routes; if they disagreed,
+    // Back would depend on which one the reader had happened to reach for.
+    renderFrom(['/'])
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     fireEvent.click(screen.getByRole('link', { name: /Settings/ }))
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(screen.getByRole('link', { name: /Stats/ }))
+    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+
+    // Two drawer moves, one entry between them: back to Home, not to Settings.
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect(await screen.findByRole('alert')).toBeDefined()
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
   })
+
 
   it('ignores a drag that starts inside the drawer', () => {
     // The drawer is a panel over the page, not part of it; dragging across its

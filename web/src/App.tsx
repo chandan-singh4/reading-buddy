@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 
 import AppShell from './app/AppShell.tsx'
+import { RouteTransition, useViewLocation } from './app/routeTransition.tsx'
 import { UpdatePrompt } from './app/UpdatePrompt.tsx'
 import BookInfo from './pages/BookInfo.tsx'
 import Home from './pages/Home.tsx'
@@ -15,8 +16,14 @@ import Stats from './pages/Stats.tsx'
  * (WP-47) sit outside it to render full-bleed.
  */
 export function AppRoutes() {
+  // The location the routes match against is the *rendered* one, which during a
+  // crossing between the shelf and a book is held one step behind the browser's
+  // while the outgoing screen is photographed. Identical to `useLocation()` at
+  // every other moment — see `routeTransition.tsx`.
+  const location = useViewLocation()
+
   return (
-    <Routes>
+    <Routes location={location}>
       <Route element={<AppShell />}>
         <Route index element={<Home />} />
         <Route path="library" element={<Library />} />
@@ -33,7 +40,14 @@ export function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      {/*
+       * Wraps the routes only — not `UpdatePrompt`, which is a panel over
+       * whatever is on screen rather than a place, and has no business being
+       * held a step behind while a book opens.
+       */}
+      <RouteTransition>
+        <AppRoutes />
+      </RouteTransition>
       {/*
        * Outside the routes, not inside `AppShell`: the reading screen is the
        * one place a reader is most likely to be when a build lands, and it

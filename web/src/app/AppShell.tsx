@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { NavLink, Outlet } from 'react-router'
 
+import { useViewLocation } from './routeTransition.tsx'
+import { tabMoveFrom } from './tabHistory.ts'
 import { PAGE_ORDER, useSwipeNav } from './useSwipeNav.ts'
 import styles from './AppShell.module.css'
 
@@ -35,9 +37,21 @@ const DRAWER_LINKS: { to: string; label: string; icon: string }[] = [
  */
 export default function AppShell() {
   const [open, setOpen] = useState(false)
-  const location = useLocation()
+  /**
+   * The location this shell *renders* from.
+   *
+   * Lagged while a book is opening or closing, so the shelf isn't torn down and
+   * rebuilt in the one frame it is being photographed in — see
+   * `routeTransition.tsx`. Identical to `useLocation()` the rest of the time,
+   * which is all of the time a reader is on these four screens.
+   */
+  const location = useViewLocation()
   const drawerRef = useRef<HTMLElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+
+  // Push or replace, so the four screens cost one history entry between them.
+  // Derived here rather than inside the loop: every link makes the same move.
+  const tabMove = tabMoveFrom(location)
 
   useSwipeNav()
 
@@ -181,11 +195,10 @@ export default function AppShell() {
                 // highlighted while the reader is on Settings.
                 end={link.to === '/'}
                 // The drawer and the swipe must not disagree about what kind of
-                // move this is: both cross *within* one level, so neither adds
-                // a history entry. See "why a swipe replaces" in
-                // `useSwipeNav.ts` — Back has to mean "leave these four", not
-                // "undo the last one of them I looked at".
-                replace
+                // move this is — they are one move by two routes. Both go
+                // through `tabHistory`, which spends one history entry on the
+                // whole level: the first move onto it pushes, the rest replace.
+                {...tabMove}
                 className={({ isActive }) =>
                   isActive ? `${styles.drawerLink} ${styles.drawerLinkActive}` : styles.drawerLink
                 }

@@ -1,0 +1,133 @@
+/*
+ * Opening a book, and closing it again.
+ *
+ * These rules style the browser's own View Transition layer — the picture of the
+ * screen being left (`::view-transition-old`) crossing with the screen arriving
+ * (`::view-transition-new`). `app/routeTransition.tsx` decides *when* one runs
+ * and writes the direction onto `<html>` as `data-route-move`; this file is
+ * only ever about what it looks like.
+ *
+ * The transition covers crossings between the app's major locations — the shelf,
+ * a book, a book's details. It deliberately does not cover a swipe between two
+ * tabs, which has its own slide in `AppShell.module.css`.
+ */
+
+/*
+ * The default cross-fade, off.
+ *
+ * The browser supplies one, and on this app it is wrong twice over: it fades the
+ * outgoing screen all the way out, so the page colour flashes through the gap
+ * between the two — the "camera shutter" this project has already ruled out once
+ * on the reading screen — and it blends the two layers, which makes text
+ * momentarily double-struck while they overlap. Replaced below with a pair of
+ * animations that keep something opaque on screen the whole way through.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* The arriving screen is on top and the outgoing one simply waits underneath.
+   Nothing is ever transparent over transparency, so the background never shows
+   through the seam. */
+::view-transition-old(root) {
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
+}
+
+/*
+ * Opening a book. The book comes *forward*: it arrives slightly enlarged and
+ * settles, which is the movement of something being picked up rather than
+ * something sliding in from the side. The shelf underneath sinks a little as it
+ * goes, so the two read as one object moving in depth instead of two pictures
+ * swapping.
+ *
+ * The timing matches the reading screen's own — `reader/motion.ts` owns the
+ * number that everything in a book is measured against, and an arrival timed
+ * differently from the page turns that follow it is the seam this whole app has
+ * spent its motion work removing.
+ */
+:root[data-route-move='in']::view-transition-new(root) {
+  animation: bookOpens 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+:root[data-route-move='in']::view-transition-old(root) {
+  animation: shelfRecedes 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/*
+ * Closing it. The same motion run backwards — the book falls back into the
+ * shelf, the shelf comes forward to meet it. Going back has to *look* like
+ * undoing, or the reader learns two gestures where there is one.
+ */
+:root[data-route-move='out']::view-transition-new(root) {
+  animation: shelfReturns 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+:root[data-route-move='out']::view-transition-old(root) {
+  animation: bookCloses 380ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* Never from zero opacity, in either direction — the settled rule from
+   `decisions.md`. 0.7 and a small scale is a movement; 0 and a scale is a
+   flash with a movement inside it. */
+@keyframes bookOpens {
+  from {
+    opacity: 0.7;
+    transform: scale(1.03);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shelfRecedes {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 1;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes shelfReturns {
+  from {
+    opacity: 0.7;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bookCloses {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+}
+
+/*
+ * `routeTransition.tsx` already declines to start a transition under this
+ * preference, so these rules should never be reached. They are here as the
+ * backstop for the one case it cannot see: the preference being changed *while*
+ * a transition is in flight.
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}

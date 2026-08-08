@@ -10,21 +10,12 @@
  * same thing, which is navigate. There is no page index held anywhere; the URL
  * is the state, and this hook only ever reads it and calls `navigate`.
  *
- * ## Why a swipe replaces rather than pushes
+ * ## What a swipe does to the history
  *
- * The four screens are *one level*, not four steps into anything — the same
- * relationship a tab bar has, drawn as a swipe instead of a row of buttons.
- * Pushing a history entry per swipe made Back mean "undo the last flick", so a
- * reader who arrived from a book, browsed Home → Library → Stats → Settings and
- * pressed Back got three more screens of tab-shuffling before they got out.
- * That is the browser's model of a stack of pages leaking into something that
- * is not a stack.
- *
- * `replace` gives the right shape instead: moving between the four never grows
- * the history, so Back always means "leave this level and go back to wherever I
- * came from" — the book, the info page — exactly once. Anything that really is
- * a step *into* somewhere (opening a book, a book's details) still pushes,
- * because there Back genuinely does have somewhere to return to.
+ * One entry for the whole level: the first move onto it pushes, every move made
+ * while already on it replaces. So Back goes back exactly one step, always. The
+ * reasoning — and the two obvious answers that are both wrong — is in
+ * `tabHistory.ts`, which the drawer goes through too.
  *
  * ## The two things that stop this working on a real phone
  *
@@ -53,7 +44,9 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { useLocation } from 'react-router'
+
+import { useTabNavigate } from './tabHistory.ts'
 
 /** The order a swipe moves through. Left goes down this list, right goes up. */
 export const PAGE_ORDER: readonly string[] = ['/', '/library', '/stats', '/settings']
@@ -81,7 +74,7 @@ interface Gesture {
 }
 
 export function useSwipeNav(): void {
-  const navigate = useNavigate()
+  const navigate = useTabNavigate()
   const location = useLocation()
   const gesture = useRef<Gesture | undefined>(undefined)
 
@@ -138,9 +131,9 @@ export function useSwipeNav(): void {
       const target = index + (dx < 0 ? 1 : -1)
       if (target < 0 || target >= PAGE_ORDER.length) return
 
-      // Replaces rather than pushes — see "why a swipe replaces" above. One
-      // level of navigation must not leave a trail of history behind it.
-      navigate(PAGE_ORDER[target]!, { replace: true })
+      // Through `tabHistory`, which decides push-or-replace so that the whole
+      // level costs one history entry rather than one per swipe — or none.
+      navigate(PAGE_ORDER[target]!)
     }
 
     document.addEventListener('pointerdown', onPointerDown)
