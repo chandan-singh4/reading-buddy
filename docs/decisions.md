@@ -509,3 +509,32 @@
   root empty in every mode tried. Three faults shipped under 656 green tests
   because of this. A gesture test is only worth writing if it reproduces the
   real event sequence, cancel and all. — 2026-08-06
+- **Tab screens are kept mounted, never rebuilt.** The shell used to key its
+  content on the path, so every tab change destroyed the screen and built a new
+  one — and a new `<img>` must be decoded again before it can paint, which is
+  asynchronous. That is one frame of empty boxes where the covers were, on every
+  single return, and it is what the reader called "the page refreshing". It cost
+  five rounds because caching answers one layer at a time (covers, then Home's
+  shelf, then the library's data) improves it at every step without ever
+  reaching it: the data was never the problem, the teardown was. Three things
+  follow and are not optional — arriving replaces mounting as the trigger to
+  re-read (`useOnVisit`), the page slide moves to `animate()` because CSS
+  animations need an element to be *created*, and `Portal` renders nothing from
+  a hidden screen or its content follows the reader off its own page. — 2026-08-07
+- **Inside the shell, `useLocation` is the lagged location, not the live one.**
+  `<Routes location={…}>` overrides the location context for everything beneath
+  it, and the shell is deliberately held one step behind while a book opens. So
+  at the moment the reader leaves for a book, code in the shell sees the *tab's*
+  path alongside the *book's* history index. Anything asking "where is the
+  reader actually" must read `window.location`; `useLocation` answers "what is
+  being rendered". Getting this wrong produced a Back that retraced a tab move
+  when closing a book, and a first fix that looked right and changed nothing.
+  — 2026-08-07
+- **Back retraces one tab move per stretch of navigation, then re-arms.** Not
+  once per session: pressing Back and then navigating again earns another one,
+  and two presses in a row still leave the app. Spending it forever, or never
+  spending it, are the two failures that shipped before this. The mechanism is
+  one flag — whether the level is holding its second, rewritable history entry —
+  because the History API can append an entry or rewrite the top one and nothing
+  else, so "the entry below me should be the tab I was just on" can only be
+  arranged after a Back has landed. — 2026-08-07

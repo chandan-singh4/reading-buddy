@@ -8,12 +8,47 @@
 
 ---
 
-## Task — react to the redesigned library
+## Task — confirm the flash is gone, on the phone
 
-Shipped 2026-08-06 (WP-53) and on Vercel; **not yet seen on the phone.** Nothing
-is half-built. The next task is whatever the reader says when they open it.
+Shipped 2026-08-07 (`6904396`) and on Vercel. Nothing is half-built. The next
+task is whatever the reader says when they open it.
 
-### First reaction, and what it cost — 2026-08-06
+### What this round was, and the one lesson worth keeping — 2026-08-07
+
+Five rounds on one report: "the book covers flash, it looks like the Home page
+is refreshing". Four of those rounds fixed real faults and none of them fixed
+*that*, because **the cause was never the data and never the animation — the
+shell was destroying the screen and building a new one on every tab change.**
+A newly-created `<img>` has to be decoded before it can paint and that decode is
+asynchronous, so there was always a frame of empty boxes where the covers were.
+
+Caching answers one layer at a time (covers → Home's shelf → the library's data)
+improved it at every step and could never reach it. **When something "looks like
+a reload", check whether it *is* one before caching anything.**
+
+Screens are now kept mounted and hidden (`AppShell.tsx`, `screenActive.tsx`).
+Three consequences are load-bearing and easy to undo by accident — arriving
+replaces mounting as the trigger to re-read, the page slide had to move to
+`animate()`, and `Portal` must render nothing from a hidden screen. All three
+are covered by tests in `Home.test.tsx`; the DOM-identity one is the real guard.
+
+### Ask these first
+
+1. **Is the flash actually gone?** Home → All Books → back, and All Books on the
+   *first* visit of a session. If any refresh remains, it is no longer a rebuild
+   — get a description of *what* moves (covers only? the whole page? the text
+   under the covers?) before touching anything.
+2. **Does the slide still feel right?** It is now run by `animate()` in
+   `AppShell.tsx` (300 ms, `SLIDE_FROM` 5%), not by CSS. Same numbers as before,
+   different mechanism, so a change in feel is a bug and not a preference.
+3. **Does anything look stale?** Screens no longer remount, so a shelf that
+   fails to notice a deleted or renamed book means a missing `useOnVisit` or a
+   missing `forget*Memory()` call — not a caching subtlety.
+4. **Back, one more time.** The rule is now: retrace one tab move per *stretch*
+   of navigation, re-armed by navigating again; two presses in a row leave the
+   app; closing a book returns to where it was opened from.
+
+### Previous round — react to the redesigned library — 2026-08-06
 
 Three faults reported on the phone, all now fixed and shipped. Two shared one
 cause, and it is a cause this project had already written down:
@@ -73,9 +108,18 @@ layout and gestures are verified on the reader's phone or not at all.**
   new filter here first**: a field on `LibraryPrefs`, a validator, one clause in
   `matchesFilters`, and nothing else in the app changes.
 
-*For a reaction to navigation:*
+*For a reaction to navigation, the flash, or Back:*
+- `web/src/app/AppShell.tsx` + `.module.css` — the drawer, the kept-alive
+  screens, and the page slide. **Start here for anything that looks like a
+  reload.**
+- `web/src/app/screenActive.tsx` — `useOnVisit`, the replacement for "on mount".
+- `web/src/app/tabHistory.ts` — the whole of the Back rule, with the reasoning.
+- `web/src/app/routeTransition.tsx` — why the shell is held a step behind, and
+  therefore why `useLocation` inside it is not the live location.
 - `web/src/app/useSwipeNav.ts` — the order, the distance and the ratio guard.
-- `web/src/app/AppShell.tsx` + `.module.css` — the drawer and the page slide.
+- `web/src/app/useCovers.ts`, `shelfMemory.ts`, `libraryMemory.ts` — the three
+  caches. **Anything that adds, removes or re-parses a book must clear all
+  three.**
 
 *For folders:*
 - `web/src/storage/db.ts` (schema v8) and `repository.ts` (the folder methods).
@@ -205,6 +249,23 @@ Shipped 2026-08-06 (WP-51, `f5e4bf7`). Two questions still open:
   only be trusted if it *reproduces the real event sequence* — down, moves, then
   a cancel carrying stale coordinates. The tests were rewritten to do that after
   the fact; write them that way first next time.
+- **Tab screens stay mounted. Never key the shell's content on the path again.**
+  That is what caused five rounds of "the page looks like it's refreshing": a
+  rebuilt screen means rebuilt `<img>` elements, and a new image must be decoded
+  before it paints. Three things depend on screens staying alive — `useOnVisit`
+  instead of a mount effect, `animate()` instead of a CSS class for the slide,
+  and `Portal` returning null when its screen is hidden. Remove any one and a
+  regression appears somewhere unrelated: a stale shelf, a slide that never
+  runs, or the library's "+" floating over Home.
+- **Inside `AppShell`, `useLocation()` is the *rendered* location, not the live
+  one.** `<Routes location={…}>` overrides the context beneath it and the shell
+  is deliberately lagged while a book opens — so it briefly sees the tab's path
+  with the book's history index. Use `window.location` for "where is the reader
+  actually". This produced a Back bug *and* a first fix that changed nothing.
+- **A test that renders `AppRoutes` without `RouteTransition` cannot reproduce
+  anything about opening or closing a book.** Without the wrapper the shell
+  unmounts instantly and never sees the book at all. `tabHistory.test.tsx` wraps
+  it and stubs `startViewTransition` for exactly this reason.
 - **Anything laid out as a grid or flex inside a page needs `min-width: 0`.** The
   general rule on `.page *` supplies it; a new component setting its own
   `min-width` re-opens the bug that cut the contents page off.
@@ -236,8 +297,15 @@ Shipped 2026-08-06 (WP-51, `f5e4bf7`). Two questions still open:
 - **Only a shelf holding something back gets "View All"** — Unread alone.
 
 ## Useful context (already known — don't re-derive)
-- Gates: `npm test` (658), `npm run typecheck`, `npm run build`, from the repo
+- Gates: `npm test` (686), `npm run typecheck`, `npm run build`, from the repo
   root.
+- **The installed PWA does not auto-update** (`registerType: 'prompt'`). The
+  reader must accept the update panel or pull to refresh, so "the fix isn't
+  applied" may mean an older build. Say so before re-diagnosing. Deliberate, and
+  the reader's own choice — don't change it without asking.
+- **Never write these files with PowerShell `Set-Content`.** It reads UTF-8 as
+  ANSI and writes mojibake over every em dash and curly quote in the file. Use
+  the editing tools. This cost two file restores in one session.
 - **There is no bottom tab bar.** Navigation is a ☰ in `AppShell`'s top bar
   opening a left drawer (Home / Library / Stats / Settings), plus a horizontal
   swipe through the same four in that order. The URL is the only state — there
