@@ -12,19 +12,28 @@
  * is hidden at the moment you choose it. Out here the shelf reorders underneath
  * your thumb as you tap.
  *
- * ## One control per question, not one control called "Sort by"
+ * ## Two options is a switch, not a menu
  *
- * This started as a single sort chip holding all eight orderings, and that was
- * a menu wearing a chip's clothes: the reader had to open it to find out what it
- * was set to, and the thing they were looking for ("by author") was buried among
- * seven things they were not. Now each question gets its own control and answers
- * itself from the outside — **Title**, **Author** and **Recently** each say
- * which way they are pointing, and the two that aren't in force say only their
- * own name.
+ * Title, Author, Recently and List/Grid each have exactly two settings, so they
+ * **change on the tap** rather than opening a panel to offer a choice of two.
+ * A menu earns its extra tap by having something to decide; with two options the
+ * panel was asking "which of these two?" when the reader had already answered by
+ * reaching for the control at all. Tap Title for A → Z, tap it again for Z → A.
  *
- * Sort is still *one* setting underneath, so choosing from one of the three
- * releases the other two. That is what sorting is, and three chips that could
- * each be on at once would be promising an order that cannot exist.
+ * The three that hold more than two — reading progress, folders, reading status
+ * — still open a panel, because there the choice is real.
+ *
+ * ## What the yellow means, and why it is never permanent
+ *
+ * The accent marks **the thing you are working on**, and it has to be able to
+ * move or it says nothing. Exactly one of Title / Author / Recently carries it,
+ * because sort is one setting: tap Title and it leaves Recently. The filter
+ * chips carry it when they are hiding books.
+ *
+ * **List/Grid deliberately never carries it.** It always has a value, so a lit
+ * View chip would be lit on every screen the reader ever sees — which is the
+ * "permanent yellow" that made the mark meaningless in the first place. Its
+ * label already says which of the two it is set to, which is the whole story.
  *
  * ## Why the open menu is a panel below the row, not a dropdown under the chip
  *
@@ -52,7 +61,6 @@ import {
   type LibraryPrefs,
   type ProgressBand,
   type SortKey,
-  type ViewMode,
 } from './prefs.ts'
 import type { ReadingStatus } from './status.ts'
 import styles from './FilterBar.module.css'
@@ -66,8 +74,11 @@ export interface FilterBarProps {
   onOpenAll: () => void
 }
 
-/** Which control is expanded, if any. Only ever one at a time. */
-type OpenControl = 'title' | 'author' | 'recently' | 'progress' | 'folder' | 'status' | 'view' | null
+/**
+ * Which panel is open, if any. Only the controls with more than two options
+ * have one.
+ */
+type OpenControl = 'progress' | 'folder' | 'status' | null
 
 /** Add or remove one value from a filter list — the "empty means all" rule. */
 function toggled<T>(list: readonly T[], value: T): T[] {
@@ -85,12 +96,30 @@ function sortsIn(group: string) {
 }
 
 /**
+ * What tapping a sort chip should do.
+ *
+ * Two different jobs behind one gesture, and getting the first one wrong is what
+ * makes a toggle feel unpredictable:
+ *
+ * - **Not the current sort** → its *first* ordering. The reader tapping "Author"
+ *   while the shelf is by title is asking for authors A → Z, not for whichever
+ *   direction the author chip happened to be left in a week ago.
+ * - **Already the current sort** → the next one along, wrapping. That is the
+ *   reversal the reader is reaching for on the second tap.
+ */
+function nextSort(group: string, sort: SortKey): SortKey {
+  const options = sortsIn(group)
+  const at = options.findIndex((option) => option.value === sort)
+  if (at === -1) return options[0]!.value
+  return options[(at + 1) % options.length]!.value
+}
+
+/**
  * What a sort chip says: its current setting if the shelf is sorted by it, and
  * otherwise just its name.
  *
- * The label is the whole point of splitting the chips up. "Title" means "you
- * could sort by this"; "Title Z → A" means "this is the order you are looking
- * at" — and the reader can tell which without opening anything.
+ * "Title" means "you could sort by this"; "Title Z → A" means "this is the order
+ * you are looking at" — and the reader can tell which without tapping anything.
  */
 function sortChipLabel(group: string, sort: SortKey): string {
   const active = sortsIn(group).find((option) => option.value === sort)
@@ -129,38 +158,19 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
   }
 
   /** One of the three sort chips, which differ only in which group they hold. */
-  function sortControl(group: string, control: OpenControl) {
+  function sortChip(group: string) {
     const sorted = sortsIn(group).some((option) => option.value === prefs.sort)
     return (
-      <Control
+      <Switch
         label={sortChipLabel(group, prefs.sort)}
         leading="⇅"
-        open={open === control}
-        sorted={sorted}
-        onClick={() => toggle(control)}
+        on={sorted}
+        // Announced as a pressed toggle: "Title Z → A, pressed" is the whole
+        // state of this control said out loud, which is what the accent says
+        // to everyone else.
+        pressed={sorted}
+        onClick={() => onChange({ ...prefs, sort: nextSort(group, prefs.sort) })}
       />
-    )
-  }
-
-  /** The options inside a sort chip. Choosing one closes the panel. */
-  function sortPanel(group: string) {
-    return (
-      <Panel>
-        {sortsIn(group).map((option) => (
-          <Choice
-            key={option.value}
-            label={sortPhrase(option)}
-            active={prefs.sort === option.value}
-            // A single choice, so the panel closes on it: the chip above now
-            // shows the answer, and leaving the list open would be a menu with
-            // nothing left to decide.
-            onClick={() => {
-              onChange({ ...prefs, sort: option.value satisfies SortKey })
-              setOpen(null)
-            }}
-          />
-        ))}
-      </Panel>
     )
   }
 
@@ -170,9 +180,9 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
     <div className={styles.wrap} data-no-swipe="">
       <div className={styles.row}>
         {/* Everything, including the one filter that isn't out here (content
-            type). This is now the *only* way to the sheet — the matching button
-            that used to sit inside the search bar has gone, since it opened the
-            same thing from two inches away. */}
+            type). This is the only way to the sheet — the matching button that
+            used to sit inside the search bar has gone, since it opened the same
+            thing from two inches away. */}
         <button
           type="button"
           className={styles.iconButton}
@@ -186,9 +196,9 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
           </span>
         </button>
 
-        {sortControl('Title', 'title')}
-        {sortControl('Author', 'author')}
-        {sortControl('Recently', 'recently')}
+        {sortChip('Title')}
+        {sortChip('Author')}
+        {sortChip('Recently')}
 
         <Control
           label={progressLabel(prefs.bands)}
@@ -211,16 +221,14 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
           onClick={() => toggle('status')}
         />
 
-        <Control
+        {/* Two options, so it switches on the tap — and never lights up, for
+            the reason in this file's opening note. */}
+        <Switch
           label={prefs.view === 'grid' ? 'Grid' : 'List'}
-          open={open === 'view'}
-          onClick={() => toggle('view')}
+          leading={prefs.view === 'grid' ? '▦' : '☰'}
+          onClick={() => onChange({ ...prefs, view: prefs.view === 'grid' ? 'list' : 'grid' })}
         />
       </div>
-
-      {open === 'title' && sortPanel('Title')}
-      {open === 'author' && sortPanel('Author')}
-      {open === 'recently' && sortPanel('Recently')}
 
       {open === 'progress' && (
         <Panel>
@@ -297,67 +305,36 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
           ))}
         </Panel>
       )}
-
-      {open === 'view' && (
-        <Panel>
-          {(['list', 'grid'] as ViewMode[]).map((view) => (
-            <Choice
-              key={view}
-              label={view === 'list' ? 'List' : 'Grid'}
-              active={prefs.view === view}
-              onClick={() => {
-                onChange({ ...prefs, view })
-                setOpen(null)
-              }}
-            />
-          ))}
-        </Panel>
-      )}
     </div>
   )
 }
 
 /**
- * One chip in the row: what it is currently set to, and a caret saying it opens.
+ * A chip that changes on the tap, for the controls with exactly two settings.
  *
- * ## Two lit states, because there are two different things to say
- *
- * `on` means **this control is hiding books** and fills the chip with the accent
- * colour, which is the loud signal — a reader who can't find a book needs to spot
- * it from across the screen.
- *
- * `sorted` means **this is the order the shelf is in**, and only outlines the
- * chip. Ordering hides nothing, so painting it as loudly as a filter would make
- * an unfiltered library look filtered — the mistake the single "Sort by" chip
- * avoided by never lighting up at all. That was the right call while one chip
- * held every ordering; with three, exactly one of them is in force at a time and
- * *which* one is worth showing. A quieter state says it without crying wolf.
- *
- * View passes neither. It always has a value, it hides nothing, and there is
- * nothing to choose between — the label already reads "List" or "Grid".
+ * No caret: a caret promises something will open, and nothing does. The label is
+ * the state, so the chip reads as a switch you can see the position of rather
+ * than a button whose effect you have to remember.
  */
-function Control({
+function Switch({
   label,
   leading,
-  open,
   on = false,
-  sorted = false,
+  pressed,
   onClick,
 }: {
   label: string
   leading?: string
-  open: boolean
+  /** Carries the accent — "this is the one you are working on". */
   on?: boolean
-  sorted?: boolean
+  pressed?: boolean
   onClick: () => void
 }) {
   return (
     <button
       type="button"
-      className={[styles.control, on ? styles.controlOn : '', sorted ? styles.controlSorted : '']
-        .filter(Boolean)
-        .join(' ')}
-      aria-expanded={open}
+      className={on ? `${styles.control} ${styles.controlOn}` : styles.control}
+      aria-pressed={pressed}
       onClick={onClick}
     >
       {leading && (
@@ -365,6 +342,35 @@ function Control({
           {leading}
         </span>
       )}
+      <span className={styles.controlLabel}>{label}</span>
+    </button>
+  )
+}
+
+/**
+ * A chip that opens a panel, for the controls with more than two options.
+ *
+ * `on` means this control is hiding books, and is the same accent the active
+ * sort carries — one mark, one meaning: *this is doing something right now*.
+ */
+function Control({
+  label,
+  open,
+  on,
+  onClick,
+}: {
+  label: string
+  open: boolean
+  on: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={on ? `${styles.control} ${styles.controlOn}` : styles.control}
+      aria-expanded={open}
+      onClick={onClick}
+    >
       <span className={styles.controlLabel}>{label}</span>
       <span className={open ? `${styles.caret} ${styles.caretUp}` : styles.caret} aria-hidden="true">
         ▾
@@ -379,10 +385,9 @@ function Panel({ children }: { children: React.ReactNode }) {
 
 /**
  * One option. `aria-pressed` rather than a radio or a checkbox because the same
- * control serves both the single-choice panels (sort, folder, view) and the
- * many-choice ones (status, reading progress), and "is this on" is the honest
- * description of all of them — the same reasoning `FilterSheet`'s chips are
- * built on.
+ * control serves both the single-choice panel (folders) and the many-choice ones
+ * (status, reading progress), and "is this on" is the honest description of both
+ * — the same reasoning `FilterSheet`'s chips are built on.
  */
 function Choice({
   label,

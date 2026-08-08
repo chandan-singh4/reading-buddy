@@ -59,8 +59,11 @@ export const SORT_OPTIONS: readonly { value: SortKey; group: string; label: stri
   { value: 'title-desc', group: 'Title', label: 'Z → A' },
   { value: 'author-asc', group: 'Author', label: 'A → Z' },
   { value: 'author-desc', group: 'Author', label: 'Z → A' },
-  { value: 'recently-opened', group: 'Recently', label: 'Recently opened' },
+  // Added before opened, so the first tap on the Recently chip lands on the
+  // app's own default rather than on the other one — a control whose first tap
+  // gives you something you didn't ask for takes two taps to trust.
   { value: 'recently-added', group: 'Recently', label: 'Recently added' },
+  { value: 'recently-opened', group: 'Recently', label: 'Recently opened' },
 ]
 
 /**

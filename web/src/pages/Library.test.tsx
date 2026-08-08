@@ -489,9 +489,17 @@ describe('folders', () => {
  * about the quick path, and about the two reading them from the same place.
  */
 describe('the filter controls under the search bar', () => {
-  /** Open one of the chips in the row and return its panel's options. */
+  /**
+   * Open one of the chips that still has a panel — reading progress, folders,
+   * reading status. The other four have two settings each and switch on the tap.
+   */
   function openControl(name: string | RegExp) {
     fireEvent.click(screen.getByRole('button', { name, expanded: false }))
+  }
+
+  /** Tap one of the chips that switches rather than opening anything. */
+  function tap(name: string | RegExp) {
+    fireEvent.click(screen.getByRole('button', { name }))
   }
 
   it('offers sort, folders, reading status and view without opening anything', async () => {
@@ -500,29 +508,45 @@ describe('the filter controls under the search bar', () => {
 
     // No sheet, no slide, no second tap: they are readable where they sit, and
     // each answers its own question rather than hiding behind one "Sort by".
-    expect(screen.getByRole('button', { name: /Title/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Author/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Title' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Author' })).toBeTruthy()
     // The sort in force says which way it is pointing; the other two say only
     // their own name.
-    expect(screen.getByRole('button', { name: /Recently added/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Recently added' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Reading progress/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Folders/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Reading status/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /List/ })).toBeTruthy()
   })
 
-  it('sorts from the row, and says on the chip what it sorted by', async () => {
+  it('sorts on the first tap, and reverses on the second', async () => {
+    // Two options is a switch, not a menu: nothing opens, and the chip's own
+    // label is the state.
     openLibrary()
     await screen.findByText('Aion')
 
-    // Its own chip now, not an item buried in a list of eight.
-    openControl(/Title/)
-    fireEvent.click(await screen.findByRole('button', { name: 'Title Z → A' }))
+    tap('Title')
 
+    // A → Z, because the shelf was not sorted by title before the tap — not
+    // whichever direction this chip was left in previously.
+    expect(screen.getByRole('button', { name: 'Title A → Z' })).toBeTruthy()
+    expect(screen.getAllByRole('link')[0]!.textContent).toContain('Aion')
+
+    tap('Title A → Z')
+
+    expect(screen.getByRole('button', { name: 'Title Z → A' })).toBeTruthy()
     expect(screen.getAllByRole('link')[0]!.textContent).toContain('Red Book')
-    // The chip is the only thing left showing the answer once the panel closes,
-    // and it says which way it is pointing rather than just "Title".
-    expect(screen.getByRole('button', { name: /Title Z → A/ })).toBeTruthy()
+  })
+
+  it('comes back round to where it started on the third tap', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    tap('Title')
+    tap('Title A → Z')
+    tap('Title Z → A')
+
+    expect(screen.getByRole('button', { name: 'Title A → Z' })).toBeTruthy()
   })
 
   it('has no filter button left inside the search bar', async () => {
@@ -535,32 +559,55 @@ describe('the filter controls under the search bar', () => {
     expect(within(search.parentElement!).queryByRole('button')).toBeNull()
   })
 
-  it('releases the other sort chips when one of them is chosen', async () => {
-    // Sort is one setting. Three chips that could each be on at once would be
-    // promising an order that cannot exist.
+  it('moves the highlight to the chip that was tapped, and off the others', async () => {
+    // The accent has to be able to move or it says nothing. Sort is one
+    // setting, so exactly one of the three ever carries it.
     openLibrary()
     await screen.findByText('Aion')
 
-    // Starts on "Recently added", which is the default — and says exactly
-    // that, not "Recently Recently added".
-    expect(screen.getByRole('button', { name: 'Recently added' })).toBeTruthy()
+    // Starts on "Recently added", the default — and says exactly that, not
+    // "Recently Recently added".
+    const recently = screen.getByRole('button', { name: 'Recently added' })
+    expect(recently.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Title' }).getAttribute('aria-pressed')).toBe('false')
 
-    openControl(/Title/)
-    fireEvent.click(await screen.findByRole('button', { name: 'Title A → Z' }))
+    tap('Title')
 
-    // The Recently chip has gone back to saying only its own name.
-    expect(screen.queryByRole('button', { name: /Recently added/ })).toBeNull()
-    expect(screen.getByRole('button', { name: /Recently/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Title A → Z' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+    // The Recently chip has gone back to saying only its own name, unlit.
+    expect(screen.queryByRole('button', { name: 'Recently added' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Recently' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    )
+  })
+
+  it('never lights up List/Grid, which always has a value', async () => {
+    // A chip lit on every screen the reader ever sees is the permanent yellow
+    // that made the mark meaningless. Its label is the whole story.
+    openLibrary()
+    await screen.findByText('Aion')
+
+    expect(screen.getByRole('button', { name: 'List' }).getAttribute('aria-pressed')).toBeNull()
   })
 
   it('sorts by author from its own chip', async () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    openControl(/Author/)
-    fireEvent.click(await screen.findByRole('button', { name: 'Author A → Z' }))
+    tap('Author')
 
-    expect(screen.getByRole('button', { name: /Author A → Z/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Author A → Z' })).toBeTruthy()
+  })
+
+  it('switches Recently between added and opened on the tap', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    tap('Recently added')
+
+    expect(screen.getByRole('button', { name: 'Recently opened' })).toBeTruthy()
   })
 
   it('filters to a band of reading progress', async () => {
@@ -623,15 +670,15 @@ describe('the filter controls under the search bar', () => {
     expect(screen.getByRole('button', { name: 'Currently reading' })).toBeTruthy()
   })
 
-  it('switches view from the row', async () => {
+  it('switches view on the tap, with nothing to open', async () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    openControl(/List/)
-    fireEvent.click(await screen.findByRole('button', { name: 'Grid' }))
+    tap('List')
+    expect(screen.getByRole('button', { name: 'Grid' })).toBeTruthy()
 
-    // Chosen, panel closed, and the chip now reads back what it is set to.
-    expect(screen.getByRole('button', { name: /Grid/, expanded: false })).toBeTruthy()
+    tap('Grid')
+    expect(screen.getByRole('button', { name: 'List' })).toBeTruthy()
   })
 
   it('still opens the full sheet, which is the only place content type lives', async () => {
@@ -647,8 +694,7 @@ describe('the filter controls under the search bar', () => {
     openLibrary()
     await screen.findByText('Aion')
 
-    openControl(/List/)
-    fireEvent.click(await screen.findByRole('button', { name: 'Grid' }))
+    tap('List')
     fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
 
     expect(

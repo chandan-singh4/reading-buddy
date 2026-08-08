@@ -59,21 +59,18 @@
   color: var(--color-text-muted);
 }
 
-/* The loud state: this control is hiding books. Filled, so it is findable from
-   across the screen by a reader wondering where a book went. */
+/* Lit: this control is doing something right now — the sort the shelf is in, or
+   a filter that is hiding books. One mark with one meaning, and it has to be
+   able to move: exactly one of the three sort chips carries it at a time, and
+   List/Grid never does. See `FilterBar.tsx` for why a permanently lit chip is
+   worse than no mark at all. */
 .controlOn {
   border-color: var(--color-accent);
   background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
   color: var(--color-accent);
 }
 
-/* The quiet state: this is the order the shelf is in. Outline only, no fill —
-   ordering hides nothing, and a sort painted as loudly as a filter would make an
-   unfiltered library look filtered. See `Control` for the full reasoning. */
-.controlSorted {
-  border-color: var(--color-accent);
-  font-weight: 600;
-}
+
 
 /* A long folder name truncates rather than stretching the chip past the width
    of the screen. */
@@ -89,8 +86,7 @@
   line-height: 1;
 }
 
-.controlOn .leading,
-.controlSorted .leading {
+.controlOn .leading {
   color: inherit;
 }
 
