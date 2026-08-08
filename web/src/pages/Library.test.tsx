@@ -559,16 +559,89 @@ describe('the filter controls under the search bar', () => {
     expect(within(search.parentElement!).queryByRole('button')).toBeNull()
   })
 
-  it('moves the highlight to the chip that was tapped, and off the others', async () => {
-    // The accent has to be able to move or it says nothing. Sort is one
-    // setting, so exactly one of the three ever carries it.
+  /**
+   * Which chips carry the accent.
+   *
+   * Read off the class rather than a `data-` attribute added for the test: the
+   * accent *is* a style, and a test that watched a parallel attribute could
+   * pass while the row looked wrong. CSS modules hash the name but keep it
+   * legible, so `_controlOn_ab12` still says what it is.
+   */
+  function litChips(): string[] {
+    return screen
+      .getAllByRole('button')
+      .filter((button) => button.className.includes('controlOn'))
+      .map((button) => button.textContent ?? '')
+  }
+
+  it('lights exactly one chip, and moves it to whichever was tapped', async () => {
+    // The reported fault: tapping Reading progress left the accent sitting on a
+    // sort chip, so the screen answered a tap by highlighting a different
+    // control. A mark that cannot move says nothing.
     openLibrary()
     await screen.findByText('Aion')
 
-    // Starts on "Recently added", the default — and says exactly that, not
-    // "Recently Recently added".
-    const recently = screen.getByRole('button', { name: 'Recently added' })
-    expect(recently.getAttribute('aria-pressed')).toBe('true')
+    // Before anything is touched it sits on the sort in force, so the row opens
+    // saying what the order is.
+    expect(litChips()).toHaveLength(1)
+    expect(litChips()[0]).toContain('Recently added')
+
+    openControl(/Reading progress/)
+    expect(litChips()).toHaveLength(1)
+    expect(litChips()[0]).toContain('Reading progress')
+
+    openControl(/Folders/)
+    expect(litChips()).toHaveLength(1)
+    expect(litChips()[0]).toContain('Folders')
+
+    openControl(/Reading status/)
+    expect(litChips()).toHaveLength(1)
+    expect(litChips()[0]).toContain('Reading status')
+
+    // And back to a sort chip, which takes it off the filters.
+    tap('Title')
+    expect(litChips()).toHaveLength(1)
+    expect(litChips()[0]).toContain('Title A → Z')
+  })
+
+  it('keeps the accent on a filter chip after its panel is closed', async () => {
+    // The reader is still working on it. Closing the panel is not leaving it.
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Reading status/)
+    fireEvent.click(await screen.findByRole('button', { name: 'Unread', pressed: false }))
+    // The chip now reads "Unread" as well as the option inside it, so it is
+    // named by the thing only the chip has: a panel it can close.
+    fireEvent.click(screen.getByRole('button', { name: 'Unread', expanded: true }))
+
+    expect(litChips()[0]).toContain('Unread')
+  })
+
+  it('never lights up List/Grid, and tapping it leaves the accent alone', async () => {
+    // The one control with no "off": lighting it would put a permanent mark
+    // back on the row, which is what made the accent meaningless before.
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Reading progress/)
+    tap('List')
+
+    expect(litChips()).toHaveLength(1)
+    expect(litChips()[0]).toContain('Reading progress')
+    expect(screen.getByRole('button', { name: 'Grid' }).className).not.toContain('controlOn')
+  })
+
+  it('still says which sort is in force for a screen reader', async () => {
+    // `aria-pressed` tracks the sort, not the accent — "which of these three is
+    // the shelf ordered by" is a fact a screen reader needs, and "which one did
+    // I last touch" is not.
+    openLibrary()
+    await screen.findByText('Aion')
+
+    expect(screen.getByRole('button', { name: 'Recently added' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
     expect(screen.getByRole('button', { name: 'Title' }).getAttribute('aria-pressed')).toBe('false')
 
     tap('Title')
@@ -576,19 +649,10 @@ describe('the filter controls under the search bar', () => {
     expect(screen.getByRole('button', { name: 'Title A → Z' }).getAttribute('aria-pressed')).toBe(
       'true',
     )
-    // The Recently chip has gone back to saying only its own name, unlit.
-    expect(screen.queryByRole('button', { name: 'Recently added' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Recently' }).getAttribute('aria-pressed')).toBe(
       'false',
     )
-  })
-
-  it('never lights up List/Grid, which always has a value', async () => {
-    // A chip lit on every screen the reader ever sees is the permanent yellow
-    // that made the mark meaningless. Its label is the whole story.
-    openLibrary()
-    await screen.findByText('Aion')
-
+    // List/Grid is not a pressed toggle at all — it has no "off" state to be in.
     expect(screen.getByRole('button', { name: 'List' }).getAttribute('aria-pressed')).toBeNull()
   })
 

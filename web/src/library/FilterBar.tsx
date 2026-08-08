@@ -23,17 +23,38 @@
  * The three that hold more than two — reading progress, folders, reading status
  * — still open a panel, because there the choice is real.
  *
- * ## What the yellow means, and why it is never permanent
+ * ## What the yellow means: the one chip you are working on
  *
- * The accent marks **the thing you are working on**, and it has to be able to
- * move or it says nothing. Exactly one of Title / Author / Recently carries it,
- * because sort is one setting: tap Title and it leaves Recently. The filter
- * chips carry it when they are hiding books.
+ * **Exactly one chip in the row is lit, and it is the last one the reader
+ * touched.** Tap Reading progress and the accent moves there, off whichever sort
+ * chip had it; tap Folders and it moves again.
  *
- * **List/Grid deliberately never carries it.** It always has a value, so a lit
- * View chip would be lit on every screen the reader ever sees — which is the
- * "permanent yellow" that made the mark meaningless in the first place. Its
- * label already says which of the two it is set to, which is the whole story.
+ * This replaces a rule that sounded better than it worked: "lit means this
+ * control is doing something", so the active sort was lit and a filter lit up
+ * only once it was actually hiding books. Two faults, both reported. Opening the
+ * Reading progress panel lit *nothing* — the reader had tapped a control and the
+ * screen answered by highlighting a different one, which reads as the tap having
+ * missed. And with sort always set, the accent sat on a sort chip permanently,
+ * so it stopped being a mark and became decoration.
+ *
+ * A mark that cannot move says nothing. This one moves on every tap.
+ *
+ * ## What the accent stopped carrying, and what carries it instead
+ *
+ * It no longer says "this filter is hiding books" — but nothing was lost with
+ * it, because **that was never the accent's job alone**. A filter that is on
+ * says so in its own label: the chip reads "Unread" rather than "Reading
+ * status", "0–25%" rather than "Reading progress", the folder's name rather than
+ * "Folders". And the line under the row spells it out in words — "Showing 3 of
+ * 12", next to the one tap that clears it. The reader who has lost a book has
+ * two plainer answers than a coloured border ever was.
+ *
+ * ## List/Grid still never lights up
+ *
+ * It is the one control with no "off": it always has a value and never hides
+ * anything, so lighting it would put a permanent mark back on the row. Its label
+ * already says which of the two it is set to, which is the whole story. Tapping
+ * it therefore leaves the accent where it was rather than claiming it.
  *
  * ## Why the open menu is a panel below the row, not a dropdown under the chip
  *
@@ -79,6 +100,16 @@ export interface FilterBarProps {
  * have one.
  */
 type OpenControl = 'progress' | 'folder' | 'status' | null
+
+/**
+ * A chip that can carry the accent. View is absent on purpose — it is the one
+ * control that never lights up.
+ *
+ * The three sort chips are named by their `SORT_OPTIONS` group, so "which chip
+ * is lit" and "which group is the shelf sorted by" are comparable without a
+ * lookup table between them.
+ */
+type ChipKey = 'Title' | 'Author' | 'Recently' | 'progress' | 'folder' | 'status'
 
 /** Add or remove one value from a filter list — the "empty means all" rule. */
 function toggled<T>(list: readonly T[], value: T): T[] {
@@ -153,23 +184,47 @@ function progressLabel(bands: readonly ProgressBand[]): string {
 export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProps) {
   const [open, setOpen] = useState<OpenControl>(null)
 
-  function toggle(control: OpenControl) {
+  /**
+   * The chip the reader is working on — the last one they tapped.
+   *
+   * `null` until they touch anything, which is why the fallback below matters:
+   * on a shelf nobody has touched yet, the sort chip that is in force carries
+   * the accent, so the row opens saying what the order is rather than saying
+   * nothing at all.
+   *
+   * Deliberately *not* derived from the preferences. "Which control am I
+   * working on" is a fact about this glance at the screen and nothing else — it
+   * should not survive a reload, and it has no business being written to
+   * `localStorage` alongside the reader's actual choices.
+   */
+  const [working, setWorking] = useState<ChipKey | null>(null)
+
+  /** The group of the sort in force — the accent's home before anything is tapped. */
+  const sortedGroup = SORT_OPTIONS.find((option) => option.value === prefs.sort)?.group
+  const lit: ChipKey | null = working ?? (sortedGroup as ChipKey | undefined) ?? null
+
+  function toggle(control: Exclude<OpenControl, null>) {
+    setWorking(control)
     setOpen((current) => (current === control ? null : control))
   }
 
   /** One of the three sort chips, which differ only in which group they hold. */
-  function sortChip(group: string) {
+  function sortChip(group: ChipKey) {
     const sorted = sortsIn(group).some((option) => option.value === prefs.sort)
     return (
       <Switch
         label={sortChipLabel(group, prefs.sort)}
         leading="⇅"
-        on={sorted}
-        // Announced as a pressed toggle: "Title Z → A, pressed" is the whole
-        // state of this control said out loud, which is what the accent says
-        // to everyone else.
+        on={lit === group}
+        // Announced as a pressed toggle: "Title Z → A, pressed" is this
+        // control's own state said out loud. It tracks the *sort*, not the
+        // accent — "which of these three is the shelf ordered by" is a fact a
+        // screen reader needs, and "which one did I last touch" is not.
         pressed={sorted}
-        onClick={() => onChange({ ...prefs, sort: nextSort(group, prefs.sort) })}
+        onClick={() => {
+          setWorking(group)
+          onChange({ ...prefs, sort: nextSort(group, prefs.sort) })
+        }}
       />
     )
   }
@@ -203,21 +258,21 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
         <Control
           label={progressLabel(prefs.bands)}
           open={open === 'progress'}
-          on={prefs.bands.length > 0}
+          on={lit === 'progress'}
           onClick={() => toggle('progress')}
         />
 
         <Control
           label={folder ? folder.name : 'Folders'}
           open={open === 'folder'}
-          on={prefs.folderId !== undefined}
+          on={lit === 'folder'}
           onClick={() => toggle('folder')}
         />
 
         <Control
           label={statusLabel(prefs.statuses)}
           open={open === 'status'}
-          on={prefs.statuses.length > 0}
+          on={lit === 'status'}
           onClick={() => toggle('status')}
         />
 
@@ -327,6 +382,7 @@ function Switch({
   leading?: string
   /** Carries the accent — "this is the one you are working on". */
   on?: boolean
+  /** The control's own state, for a screen reader. Not the same as `on`. */
   pressed?: boolean
   onClick: () => void
 }) {
@@ -350,8 +406,9 @@ function Switch({
 /**
  * A chip that opens a panel, for the controls with more than two options.
  *
- * `on` means this control is hiding books, and is the same accent the active
- * sort carries — one mark, one meaning: *this is doing something right now*.
+ * `on` is the accent, and means the same here as everywhere else in the row:
+ * *this is the chip you are working on*. It is set by tapping, not by whether
+ * the filter is doing anything — see this file's opening note.
  */
 function Control({
   label,
