@@ -50,14 +50,42 @@ textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
+/*
+ * Reading is a vertical activity: there is never anything to the left or right,
+ * so any sideways movement is drift rather than navigation. Without this the
+ * page slides under a thumb and the text stops sitting still, which is the
+ * first thing that makes an app feel unfinished.
+ *
+ * ## On `html` only, and this is load-bearing
+ *
+ * It used to be on `html, body` together, and that one extra selector quietly
+ * moved the app's scrollbar. The root element's overflow is **propagated to the
+ * viewport**, and once it has been, `html` itself behaves as `visible` and
+ * `body`'s own overflow applies to `body`. So `overflow-x: hidden` on the body
+ * made the body a *scroll container* — and because a scroll container does not
+ * grow with its content, the body sat at viewport height with all four screens
+ * scrolling around inside it.
+ *
+ * Everything that reads or writes the page's position talks to the window:
+ * `app/scrollMemory.ts` and `AppShell`'s save/restore, and
+ * `history.scrollRestoration` in `main.tsx`. With the body scrolling instead,
+ * `window.scrollY` was **always 0**, `window.scrollTo` moved nothing, and a
+ * `scroll` listener on the window never fired once — element scroll events do
+ * not bubble. Two rounds of work on "each screen keeps its own position" were
+ * therefore dead code, which is exactly what the reader reported: no change.
+ *
+ * Measured in Chrome at 420×860, both ways. With this on `html` alone the
+ * horizontal lock is unaffected — `scrollX` stays 0 and `scrollWidth` equals
+ * `clientWidth`, because the propagated value is doing the work either way.
+ * **Do not add `body` back to this selector.**
+ */
+html {
+  overflow-x: hidden;
+}
+
 html,
 body {
-  /* Reading is a vertical activity: there is never anything to the left or
-     right, so any sideways movement is drift rather than navigation. Without
-     this the page slides under a thumb and the text stops sitting still, which
-     is the first thing that makes an app feel unfinished.
-
-     `overscroll-behavior-x: none` also stops Chrome's swipe-to-go-back, which
+  /* `overscroll-behavior-x: none` also stops Chrome's swipe-to-go-back, which
      on a reading screen means a horizontal swipe throwing you out of the book
      and back to the shelf.
 
@@ -66,8 +94,10 @@ body {
      `100dvh` with `overflow: hidden`). Without it, a thumb resting slightly
      off-horizontal during a page-turn swipe still reaches the browser's own
      rubber-band/pull-to-refresh handling — which is what was making the whole
-     screen bob up and down while reading. */
-  overflow-x: hidden;
+     screen bob up and down while reading.
+
+     Unlike `overflow-x` above this is safe on both: it changes how a scroller
+     behaves at its edges, not which element is the scroller. */
   overscroll-behavior: none;
 }
 

@@ -52,18 +52,6 @@ const SLIDE_FROM = 5
  */
 const SLIDE_TO = 2.5
 
-/**
- * How long a freshly restored scroll position is defended against the previous
- * screen's momentum. See `settling`.
- *
- * Comfortably longer than the 300 ms slide, because a fling outlives it: the
- * window has to cover the whole crossing and the moment after it, or the page
- * arrives correctly and then drifts away while the reader watches. It costs
- * nothing when there is no fling — with no stray scroll events, nothing in here
- * ever runs — and any real touch, wheel or key ends it early regardless.
- */
-const SETTLE_MS = 700
-
 const DRAWER_LINKS: { to: string; label: string; icon: string }[] = [
   { to: '/', label: 'Home', icon: '⌂' },
   { to: '/library', label: 'Library', icon: '▤' },
@@ -173,84 +161,16 @@ export default function AppShell() {
    */
   const scrolled = useRef<string | null>(null)
 
-  /**
-   * The position just restored, defended for as long as the *previous* screen's
-   * movement might still be arriving.
-   *
-   * ## The half of the fault the first fix could not see
-   *
-   * Keeping one offset per screen was right and it was not enough, because it
-   * assumed every scroll event belongs to the screen that is on show. On a phone
-   * that is false, and the reader's own words are the giveaway: *scroll all the
-   * way down*. Flicking a long shelf hands the scroll to the browser's momentum,
-   * and momentum does not stop because a tab changed — it keeps moving the
-   * document, and keeps firing `scroll`, for a few hundred milliseconds after the
-   * finger has gone.
-   *
-   * So the tail of a fling started on Library lands on Home: it drags Home down
-   * to wherever the fling was heading, and — worse — the listener below writes
-   * that number into *Home's* memory, because Home is the screen on show by then.
-   * The position is not merely wrong on arrival, it is **poisoned**, so every
-   * later visit to Home restores to the bottom too. That is the report exactly,
-   * including its stubbornness.
-   *
-   * None of this is visible to jsdom, which has no momentum, and little of it is
-   * visible on a desktop, where a wheel stops when it stops.
-   *
-   * ## Why a held position rather than a suppressed listener
-   *
-   * Ignoring the stray events would keep the memory clean and still let the fling
-   * carry the page away — the reader would watch Home slide to the bottom and
-   * only be spared it the *next* time. The arriving screen has to be actively put
-   * back, which also cancels the fling: a programmatic scroll ends a momentum
-   * scroll, so the first correction is normally the only one needed.
-   *
-   * Released early by any real input, so a reader who arrives and immediately
-   * flicks is never fought — see the listeners below.
-   */
-  const settling = useRef<{ target: number; until: number } | null>(null)
-
   useEffect(() => {
     // Saved continuously rather than read at the moment of departure: by the
     // time any effect runs the swap has already happened and the browser has
     // already clamped, so the honest value is the last one seen *before* it.
     const onScroll = () => {
-      const owner = scrolled.current
-      if (owner === null) return
-
-      const hold = settling.current
-      if (hold !== null) {
-        if (performance.now() <= hold.until) {
-          // Not the reader's doing: the tail of a movement begun on the screen
-          // they have just left. Put the page back where they were and record
-          // nothing — writing this would be writing the old screen's momentum
-          // into the new screen's memory, which is the fault that outlives the
-          // moment.
-          if (window.scrollY !== hold.target) window.scrollTo(0, hold.target)
-          return
-        }
-        settling.current = null
-      }
-
-      rememberScroll(owner, window.scrollY)
+      if (scrolled.current !== null) rememberScroll(scrolled.current, window.scrollY)
     }
-
-    // Any of these is the reader taking hold of the page, which ends the defence
-    // at once. Without it, arriving somewhere and immediately flicking would
-    // spend its first fraction of a second being dragged back.
-    const release = () => {
-      settling.current = null
-    }
-
     window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('pointerdown', release, { passive: true })
-    window.addEventListener('wheel', release, { passive: true })
-    window.addEventListener('keydown', release)
     return () => {
       window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('pointerdown', release)
-      window.removeEventListener('wheel', release)
-      window.removeEventListener('keydown', release)
     }
   }, [])
 
@@ -262,9 +182,7 @@ export default function AppShell() {
     // screen is already laid out at its full height by now, so this scroll is
     // never clamped, and the reader never sees the frame in between. In an
     // ordinary effect the wrong position paints first, which is the jump.
-    const target = recallScroll(location.pathname)
-    window.scrollTo(0, target)
-    settling.current = { target, until: performance.now() + SETTLE_MS }
+    window.scrollTo(0, recallScroll(location.pathname))
   }, [location.pathname])
 
   /*
@@ -410,8 +328,23 @@ export default function AppShell() {
     }
     document.addEventListener('keydown', onKeyDown)
 
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    /*
+     * Locked on `<html>`, not on `<body>`, and the difference is not cosmetic.
+     *
+     * The root element's overflow is propagated to the viewport, which is what
+     * scrolls this app. Writing `overflow: hidden` on the *body* therefore does
+     * not lock that scroller at all — it makes the body into a **second, new**
+     * scroll container, one viewport tall, and the document's scrollable height
+     * collapses to a single screen. The page's position goes with it, and since
+     * the drawer is how a reader moves between screens, every drawer navigation
+     * threw away the position `scrollMemory.ts` had just been asked to keep.
+     *
+     * Measured: with the body locked, a 9000px Library reports a document
+     * 860px tall and `scrollY` 0. On `<html>` the scroller is genuinely frozen
+     * and keeps its offset, which is what a lock is supposed to mean.
+     */
+    const previous = document.documentElement.style.overflow
+    document.documentElement.style.overflow = 'hidden'
 
     // Focus moves into the drawer so a keyboard or screen-reader user lands on
     // it, and returns to the ☰ button on close rather than to the top of the
@@ -420,7 +353,7 @@ export default function AppShell() {
 
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = previous
+      document.documentElement.style.overflow = previous
       triggerRef.current?.focus()
     }
   }, [open])

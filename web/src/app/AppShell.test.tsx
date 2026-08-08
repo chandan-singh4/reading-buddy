@@ -306,6 +306,33 @@ describe('app shell', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
   })
 
+  /**
+   * The drawer's scroll lock has to land on `<html>`.
+   *
+   * jsdom cannot show the damage — it has no layout, so nothing here is ever
+   * scrolled — but the damage was real and it is worth pinning the rule down.
+   * The root element's overflow is propagated to the viewport, which is what
+   * scrolls this app; writing the lock on `<body>` instead does not freeze that
+   * scroller at all, it creates a *second* one a single viewport tall. Measured
+   * in Chrome: a 9000px Library reported a document 860px tall and a `scrollY`
+   * of 0 the moment the drawer opened. Since the drawer is how a reader changes
+   * screen, that threw the position away on every navigation through it — and
+   * silently undid the whole of `scrollMemory.ts`.
+   */
+  it('freezes the page on the element that actually scrolls', () => {
+    renderAt('/')
+
+    const trigger = screen.getByRole('button', { name: 'Open menu' })
+    fireEvent.click(trigger)
+
+    expect(document.documentElement.style.overflow).toBe('hidden')
+    // Emphatically not here. See above.
+    expect(document.body.style.overflow).toBe('')
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(document.documentElement.style.overflow).toBe('')
+  })
+
   it('has no bottom tab bar', () => {
     renderAt('/')
 
@@ -384,23 +411,8 @@ describe('each screen keeps its own scroll position', () => {
     return calls.map((call) => (typeof call[1] === 'number' ? call[1] : 0))
   }
 
-  /**
-   * Scroll the window as a finger would, and let the shell notice.
-   *
-   * The `pointerdown` is not decoration. A reader's scroll always begins with a
-   * touch, and the shell now uses exactly that to tell a scroll the reader asked
-   * for from the tail of a fling arriving from the screen they have just left —
-   * see `settling` in `AppShell.tsx`. A bare `scroll` event with no touch in
-   * front of it *is* the fling, which `carries no momentum onto the next screen`
-   * below relies on.
-   */
+  /** Scroll the window as a finger would, and let the shell notice. */
   function scrollTo(offset: number) {
-    fireEvent.pointerDown(window)
-    drift(offset)
-  }
-
-  /** A scroll with no finger behind it — momentum, or the browser clamping. */
-  function drift(offset: number) {
     Object.defineProperty(window, 'scrollY', { value: offset, configurable: true })
     fireEvent.scroll(window)
   }
@@ -466,77 +478,6 @@ describe('each screen keeps its own scroll position', () => {
 
     // Not 500. Arriving somewhere new part-way down is the fault, not the fix.
     expect(scrolls().at(-1)).toBe(0)
-  })
-
-  /**
-   * The reader's report, in the order they gave it: *scroll all the way down*,
-   * come back, and Home is at the bottom.
-   *
-   * Flicking a shelf to its end hands the scroll to the browser's momentum, and
-   * momentum outlives the tab change — so `scroll` events from Library go on
-   * arriving after Home is the screen on show. Two things must not happen: the
-   * page must not be carried away, and Home's *memory* must not be written with
-   * Library's number, which is what made this survive every later visit.
-   */
-  it('carries no momentum onto the next screen', async () => {
-    renderAt('/')
-    await screen.findByText('No books yet')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
-
-    scrollTo(4000)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Home/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /))
-
-    expect(scrolls().at(-1)).toBe(0)
-
-    // The fling, still going, with no finger behind it.
-    vi.mocked(window.scrollTo).mockClear()
-    drift(3800)
-    drift(3600)
-
-    // Put back, both times, rather than merely ignored.
-    expect(scrolls()).toEqual([0, 0])
-
-    // And Home's memory is untouched by any of it: leaving and returning must
-    // still be the top. This is the assertion that would have caught the
-    // shipped fault, which was sticky rather than momentary.
-    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Home/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /))
-
-    expect(scrolls().at(-1)).toBe(0)
-  })
-
-  it('lets the reader scroll the moment they arrive', async () => {
-    // The defence above must not become a 700 ms window in which the app
-    // ignores its reader. A touch ends it immediately, whenever it comes.
-    renderAt('/')
-    await screen.findByText('No books yet')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
-
-    // Straight away, with a finger: their scroll, and it must be remembered.
-    scrollTo(900)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Home/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /))
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
-
-    expect(scrolls().at(-1)).toBe(900)
   })
 })
 
