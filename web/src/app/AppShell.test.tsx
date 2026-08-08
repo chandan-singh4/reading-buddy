@@ -5,7 +5,7 @@
 // real repository, so there has to be a real database underneath it.
 import 'fake-indexeddb/auto'
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -339,5 +339,123 @@ describe('app shell', () => {
     renderAt('/nowhere')
 
     expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+  })
+})
+
+/**
+ * The crossing between two tabs, which needs the Web Animations API to happen
+ * at all — and jsdom has none.
+ *
+ * That absence is not a detail. Without a stub, `AppShell` correctly declines to
+ * animate, the outgoing screen is never revealed, and every assertion below
+ * would pass against code that does nothing. So `animate` is stubbed with
+ * something that records what it was asked to play and hands back a promise the
+ * test controls. What is being checked is the *shape* of the move — which layer
+ * fades, which layer is on top, and that the outgoing one is put away again —
+ * none of which needs a real animation, and all of which has been got wrong here
+ * before.
+ */
+describe('crossing between two tabs', () => {
+  interface Played {
+    node: HTMLElement
+    frames: Keyframe[]
+    finish: () => void
+  }
+
+  let played: Played[] = []
+  let original: typeof Element.prototype.animate | undefined
+
+  beforeEach(() => {
+    played = []
+    original = Element.prototype.animate
+    Element.prototype.animate = function (this: HTMLElement, frames: unknown): Animation {
+      let settle = () => {}
+      const finished = new Promise<void>((resolve) => {
+        settle = resolve
+      })
+      played.push({
+        node: this,
+        frames: (frames as Keyframe[]) ?? [],
+        finish: settle,
+      })
+      return { finished, cancel: settle } as unknown as Animation
+    } as typeof Element.prototype.animate
+  })
+
+  afterEach(() => {
+    if (original) Element.prototype.animate = original
+  })
+
+  function pageFor(path: string): HTMLElement {
+    const node = document.querySelector<HTMLElement>(`[data-path="${path}"]`)
+    if (!node) throw new Error(`no screen rendered for ${path}`)
+    return node
+  }
+
+  function swipeLeft() {
+    const at = (fraction: number) => ({
+      pointerId: 1,
+      pointerType: 'touch' as const,
+      clientX: 200 - 150 * fraction,
+      clientY: 300,
+    })
+    fireEvent.pointerDown(document, at(0))
+    fireEvent.pointerMove(document, at(0.5))
+    fireEvent.pointerMove(document, at(1))
+    fireEvent.pointerUp(document, at(1))
+  }
+
+  it('keeps the screen being left on show, and only it fades', async () => {
+    renderAt('/')
+    expect(await screen.findByText('Pick up where you left off.')).toBeDefined()
+
+    swipeLeft()
+    await screen.findByText('All books')
+
+    // Both screens are on screen at once. That is the whole change: the shelf
+    // used to be gone in the frame the library started moving, which reads as a
+    // cut with a movement stuck on the end of it.
+    const going = pageFor('/')
+    const arriving = pageFor('/library')
+    expect(going.hidden).toBe(false)
+    expect(arriving.hidden).toBe(false)
+
+    // …but the reader has been moved on, so the one that is leaving must not be
+    // reachable by a screen reader or by the tab key.
+    expect(going.getAttribute('aria-hidden')).toBe('true')
+    expect(going.hasAttribute('inert')).toBe(true)
+
+    const fade = (node: HTMLElement) =>
+      played.find((play) => play.node === node)?.frames.some((frame) => 'opacity' in frame)
+
+    /*
+     * The load-bearing assertion, and the one this file exists for.
+     *
+     * Both screens are transparent, so whichever layer fades must be the upper
+     * one with something opaque underneath it — otherwise the page background
+     * shows through the seam and every swipe flashes. That fault has now been
+     * shipped four times in this app under four different descriptions. The
+     * rule is written out in `AppShell.module.css`; this is the rule as a test.
+     */
+    expect(fade(going)).toBe(true)
+    expect(fade(arriving)).toBe(false)
+  })
+
+  it('puts the screen being left away once it has gone', async () => {
+    renderAt('/')
+    expect(await screen.findByText('Pick up where you left off.')).toBeDefined()
+
+    swipeLeft()
+    await screen.findByText('All books')
+    expect(pageFor('/').hidden).toBe(false)
+
+    // The animation ending is what hides it again. A screen left visible would
+    // sit over the one the reader actually asked for — the failure mode of
+    // driving this from state rather than from the animation's own promise.
+    for (const play of played) play.finish()
+    await waitFor(() => {
+      expect(pageFor('/').hidden).toBe(true)
+    })
+    expect(pageFor('/library').hidden).toBe(false)
   })
 })

@@ -61,14 +61,131 @@ export function holdOutgoing(strip: HTMLElement | null, by: 1 | -1): HeldPage | 
 }
 
 /**
- * A still picture of the strip exactly as it looks now, laid over it.
+ * What belongs to the page rather than to the app around it.
+ *
+ * Carried by the status line in `reader/Chrome.tsx` — the page number and the
+ * "% left". The top bar is deliberately *not* marked: it is navigation that
+ * happens to be over a book, and a sheet of paper does not take the room's
+ * furniture with it when it turns.
+ */
+const FURNITURE = '[data-page-furniture]'
+
+/**
+ * A picture, not a page: nothing in a copy may be tapped, focused, found by a
+ * search or read out by a screen reader, all of which would be describing
+ * something the reader can no longer see. Ids go too — the reading screen looks
+ * paragraphs up with `getElementById`, and a second copy of each would answer
+ * those lookups with an element on its way off the screen.
+ */
+function makeInert(node: HTMLElement): void {
+  node.removeAttribute('id')
+  for (const element of Array.from(node.querySelectorAll('[id]'))) {
+    element.removeAttribute('id')
+  }
+  node.setAttribute('aria-hidden', 'true')
+  node.inert = true
+}
+
+/**
+ * Lay a clone of `source` inside `wrapper` at the place `source` occupies on
+ * screen.
+ *
+ * Everything is placed from measured rectangles rather than inherited from the
+ * stylesheet, which is what lets a `position: fixed` element — the status line
+ * is one — travel inside a wrapper that rotates. Fractional widths, from the
+ * rect rather than `offsetWidth`: a copy a whole pixel wider than the original
+ * lays its columns out at a different pitch, and the still picture of the page
+ * you just left would not quite be it.
+ */
+function place(source: HTMLElement, frame: DOMRect, wrapper: HTMLElement): HTMLElement {
+  const clone = source.cloneNode(true) as HTMLElement
+  const box = source.getBoundingClientRect()
+
+  makeInert(clone)
+
+  clone.style.position = 'absolute'
+  clone.style.top = `${box.top - frame.top}px`
+  clone.style.left = `${box.left - frame.left}px`
+  clone.style.width = `${box.width}px`
+  clone.style.height = `${box.height}px`
+  clone.style.margin = '0'
+  clone.style.maxWidth = 'none'
+  clone.style.zIndex = 'auto'
+  // A backward turn copies the page a second time, by which point the real
+  // furniture is already hidden for the first copy — and `cloneNode` brings
+  // that inline `visibility` with it. Overridden here, or the second sheet
+  // would turn with a hole in it where the page number should be.
+  clone.style.visibility = 'visible'
+  // The clone inherits whatever entrance animation its original last played,
+  // and would replay it on being inserted.
+  clone.style.animation = 'none'
+  // It also inherits `scroll-behavior: smooth`, which turns the scroll
+  // assignment in `copyOf` into an *animation*. That was the whole of one
+  // earlier glitch, and it explains why only turning forwards looked wrong:
+  // going back you always leave from a section's first page, where the position
+  // to restore is zero and there is nothing to animate. Going forward you leave
+  // from the last page, so the copy — meant to be a still picture of where you
+  // just were — visibly raced from page one to that page as the turn started.
+  clone.style.scrollBehavior = 'auto'
+
+  wrapper.append(clone)
+  return clone
+}
+
+/**
+ * The real page furniture, hidden while a copy of it is doing the turning.
+ *
+ * Module-level rather than carried on the held page: a backward turn makes a
+ * second copy after the first, and both would otherwise hide and restore
+ * independently. One list, hidden once, restored once.
+ */
+let concealed: HTMLElement[] = []
+
+/**
+ * Take the real furniture off the screen for the length of a turn.
+ *
+ * It has to go, and `z-index` cannot do the job. The status line sits above the
+ * overlay on purpose so it stays readable while the bars are up — which also
+ * puts it above the turning sheet, where it would hang stationary over a page
+ * visibly rotating out from under it. That is exactly the fault this change is
+ * removing, so the real one steps aside and its copy, inside the sheet, is what
+ * the reader sees turn.
+ *
+ * `visibility` rather than `display`: it keeps the element's box, so nothing
+ * below it reflows for the length of a page turn.
+ */
+function concealFurniture(parent: HTMLElement): void {
+  if (concealed.length > 0) return
+  for (const item of Array.from(parent.querySelectorAll<HTMLElement>(FURNITURE))) {
+    item.style.visibility = 'hidden'
+    concealed.push(item)
+  }
+}
+
+/** Give it back. Called when a turn ends, however it ends. */
+function revealFurniture(): void {
+  for (const item of concealed) item.style.visibility = ''
+  concealed = []
+}
+
+/**
+ * A still picture of the whole page exactly as it looks now, laid over it.
  *
  * Both halves of a flip are made of these: the page being left, and — turning
  * backwards — the page arriving on top of it. Returns `null` when there is
  * nothing to copy or the reader has asked for less movement, in which case the
  * caller gets the instant change they asked for.
  *
- * ## Why the copy is wrapped rather than used bare
+ * ## Why this is the whole page and not just the text
+ *
+ * It used to copy the text strip alone, so a turn rotated the words while the
+ * page number and the "% left" printed underneath them stayed nailed to the
+ * screen. Paper does not do that. Everything printed on a sheet turns with the
+ * sheet, so the copy is now the page-sized box the reading screen occupies,
+ * holding the text *and* every element marked `data-page-furniture`, each laid
+ * at the position it really has. One wrapper, one rotation, one sheet.
+ *
+ * ## Why the copies are wrapped rather than used bare
  *
  * The strip is a *scrolling* box — that is what a page turn inside a section
  * moves — and a copy of it is scrolled too. Anything laid over it with
@@ -85,36 +202,18 @@ function copyOf(strip: HTMLElement | null, layer: number): HTMLElement | null {
   const parent = strip.parentElement
   if (!parent) return null
 
-  const node = strip.cloneNode(true) as HTMLElement
+  // The reading screen's own box, which is the sheet's size. `Reader.module.css`
+  // guarantees this element is positioned, so a child at `top: 0; left: 0` lands
+  // on its top-left corner and every measured offset below is relative to it.
+  const frame = parent.getBoundingClientRect()
+
   const wrapper = document.createElement('div')
-
-  // Every id, gone. This is the one thing that makes a clone safe: the reading
-  // screen looks paragraphs up by id, and a second copy of each would answer
-  // those lookups with an element that is on its way off the screen.
-  node.removeAttribute('id')
-  for (const element of Array.from(node.querySelectorAll('[id]'))) {
-    element.removeAttribute('id')
-  }
-
-  // A picture, not a page: nothing in it may be tapped, focused, found by a
-  // search or read out by a screen reader, all of which would be describing
-  // something the reader can no longer see.
-  node.setAttribute('aria-hidden', 'true')
-  node.inert = true
-
-  // The wrapper is laid exactly over the strip, in the strip's own coordinates.
-  // `offsetTop` and friends are relative to the nearest positioned ancestor,
-  // which `Reader.module.css` guarantees is the parent.
   wrapper.setAttribute('aria-hidden', 'true')
   wrapper.style.position = 'absolute'
-  wrapper.style.top = `${strip.offsetTop}px`
-  wrapper.style.left = `${strip.offsetLeft}px`
-  // Fractional, from the rect rather than from `offsetWidth`. A copy a whole
-  // pixel wider than the original lays its columns out at a different pitch,
-  // and the still picture of the page you just left would not quite be it.
-  const box = strip.getBoundingClientRect()
-  wrapper.style.width = `${box.width}px`
-  wrapper.style.height = `${box.height}px`
+  wrapper.style.top = '0'
+  wrapper.style.left = '0'
+  wrapper.style.width = `${frame.width}px`
+  wrapper.style.height = `${frame.height}px`
   wrapper.style.margin = '0'
   wrapper.style.pointerEvents = 'none'
   wrapper.style.zIndex = String(layer)
@@ -122,30 +221,16 @@ function copyOf(strip: HTMLElement | null, layer: number): HTMLElement | null {
   wrapper.style.background = 'var(--color-bg)'
   wrapper.style.overflow = 'hidden'
 
-  // The copy fills its wrapper and keeps its own scroll.
-  node.style.position = 'absolute'
-  node.style.inset = '0'
-  node.style.width = '100%'
-  node.style.height = '100%'
-  node.style.margin = '0'
-  node.style.maxWidth = 'none'
-  // The clone inherits whatever entrance animation the strip last played, and
-  // would replay it on being inserted.
-  node.style.animation = 'none'
+  const text = place(strip, frame, wrapper)
+  for (const item of Array.from(parent.querySelectorAll<HTMLElement>(FURNITURE))) {
+    place(item, frame, wrapper)
+  }
 
-  // And it inherits `scroll-behavior: smooth`, which turns the assignment below
-  // into an *animation*. That was the whole of the remaining glitch, and it
-  // explains why only turning forwards looked wrong: going back you always
-  // leave from a section's first page, where the position to restore is zero
-  // and there is nothing to animate. Going forward you leave from the last
-  // page, so the copy — meant to be a still picture of where you just were —
-  // visibly raced from page one to that page while the turn was starting.
-  node.style.scrollBehavior = 'auto'
-
-  wrapper.append(node)
   parent.append(wrapper)
   // After insertion: a node outside the document has no scroll position to set.
-  node.scrollLeft = strip.scrollLeft
+  text.scrollLeft = strip.scrollLeft
+
+  concealFurniture(parent)
 
   return wrapper
 }
@@ -210,6 +295,7 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
   // the instant change: drop the copy and let the new page stand.
   if (!strip || typeof strip.animate !== 'function') {
     held.node.remove()
+    revealFurniture()
     return
   }
 
@@ -223,6 +309,7 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
   // us). Falling back to the instant change beats a half-played turn.
   if (!moving) {
     held.node.remove()
+    revealFurniture()
     return
   }
 
@@ -287,6 +374,10 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
   const clear = () => {
     moving.remove()
     still?.remove()
+    // Last, and unconditionally. The real page number has to come back even if
+    // the turn was abandoned half-played — a reader left looking at a page with
+    // no number on it is a worse outcome than a turn that didn't finish.
+    revealFurniture()
   }
   turning.finished.then(clear, clear)
 }
@@ -326,4 +417,5 @@ function shadeOver(node: HTMLElement): HTMLElement | null {
  */
 export function cancelTurn(held: HeldPage | null): void {
   held?.node.remove()
+  revealFurniture()
 }

@@ -104,6 +104,9 @@
      to widen the document — otherwise every swipe adds a horizontal scrollbar
      for the length of the animation. */
   overflow-x: clip;
+  /* The containing block a screen on its way out is positioned against — see
+     `.pageLeaving`. */
+  position: relative;
   /*
    * Vertical scrolling and pinch-zoom stay the browser's; horizontal movement
    * is ours.
@@ -132,19 +135,22 @@
  *
  * ## What the slide must not do, which is worth keeping written down
  *
- * **Movement only. No opacity.** The two screens are stacked but only one is
- * rendered — `hidden` removes the other from layout entirely — so the arriving
- * screen still has nothing behind it but the page background, and it is itself
- * transparent. Fading it up does not blend two screens together, which is what a
- * cross-fade is for; it dips the only screen there is and lets the background
- * show straight through. Every swipe flashed. That is the camera-shutter fault
- * `decisions.md` already records twice, and it will come back the moment anyone
- * adds an opacity keyframe here.
+ * **Only the screen being left may change opacity, and it must be on top.**
+ * Both screens are transparent and what is behind them is the page background,
+ * so fading the *arriving* screen up leaves a stretch where nothing opaque
+ * covers that background and every swipe flashes. That is the camera-shutter
+ * fault `decisions.md` records, and `styles/transitions.css` solves the
+ * identical problem for opening a book with the identical rule.
  *
- * The slide alone reads as movement and cannot flash: what shows in the strip
- * the page has not yet covered is `--color-bg`, the colour the page sits on
- * anyway. 5% keeps that strip narrow enough that the top bar's blur has nothing
- * to shimmer against as it passes.
+ * This is not the older rule "movement only, no opacity" relaxed on a whim: that
+ * rule was correct for as long as only one screen was ever rendered, and the
+ * shell now deliberately keeps the outgoing one on screen for the length of the
+ * move. A cross-fade is safe **only** while there are genuinely two layers and
+ * the solid one is underneath. Take the outgoing screen away again and the old
+ * rule comes straight back with it.
+ *
+ * 5% keeps the strip the arriving page has not yet covered narrow enough that
+ * the top bar's blur has nothing to shimmer against as it passes.
  *
  * No `will-change` either. It promoted the page to its own compositor layer
  * underneath `.frame`'s always-on `filter` and the top bar's `backdrop-filter`,
@@ -155,6 +161,31 @@
  */
 .page {
   min-width: 0;
+}
+
+/*
+ * The screen being left, for the 300 ms it takes to leave.
+ *
+ * Out of the flow, so the two screens overlap instead of stacking into a
+ * document twice as long — which would move the scrollbar and shift the
+ * arriving page under the reader's thumb. Absolute positioning is measured from
+ * `.content`'s *padding box*, so the insets here repeat that padding rather than
+ * inheriting it; without them the outgoing screen would jump to the very edge of
+ * the frame at the instant it starts to fade, which is a bigger movement than
+ * the animation itself.
+ *
+ * On top: see the note above for why the fading layer has to be the upper one.
+ * `bottom` is deliberately unset — the leaving screen keeps its own height and
+ * is clipped by `.content`'s `overflow-x: clip` only sideways, which is all the
+ * clipping a horizontal drift needs.
+ */
+.pageLeaving {
+  position: absolute;
+  top: var(--space-5);
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: 1;
+  pointer-events: none;
 }
 
 /* Dims the page behind the drawer and swallows the tap that closes it. Kept

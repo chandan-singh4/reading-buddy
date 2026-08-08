@@ -40,6 +40,17 @@ const SLIDE_MS = 300
 const SLIDE_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const SLIDE_FROM = 5
 
+/**
+ * How far the screen being left drifts as it goes, against the arriving one.
+ *
+ * Deliberately smaller than `SLIDE_FROM`. Two layers moving the same distance
+ * read as one picture sliding; the arriving screen travelling further than the
+ * one it replaces is what gives the move its depth — the old page settling back
+ * as the new one comes over it, like turning from one section of a book to the
+ * next.
+ */
+const SLIDE_TO = 2.5
+
 const DRAWER_LINKS: { to: string; label: string; icon: string }[] = [
   { to: '/', label: 'Home', icon: '⌂' },
   { to: '/library', label: 'Library', icon: '▤' },
@@ -125,39 +136,110 @@ export default function AppShell() {
 
   const contentRef = useRef<HTMLElement>(null)
 
-  /**
-   * The arriving screen slides in from the side it came from.
+  /*
+   * ## Both screens move, and only the one leaving fades
    *
-   * Driven from JavaScript rather than a CSS class now, and that follows
-   * directly from the change above: a CSS animation restarts when its element
-   * is created, and these elements are no longer created — they are revealed.
-   * `animate()` runs on demand, which is what "revealed" needs.
+   * The arriving screen used to slide in alone, which reads as a cut with a
+   * movement stuck on the end of it: the screen being left simply ceased to
+   * exist in the frame the new one started travelling. Now the outgoing screen
+   * is held on screen for the length of the move, drifting a little the other
+   * way and fading out over the arriving one — the gentler, book-like crossing
+   * of two sections rather than a swap.
    *
-   * A layout effect, so the move starts in the same frame the screen appears
-   * in; in an ordinary effect the screen paints in place first and then jumps
-   * back to start sliding.
+   * **Which layer carries the fade is not a stylistic choice.** Both screens are
+   * transparent; what is behind them is the page background. Fade the *arriving*
+   * one up and there is a stretch where both are partly transparent at once and
+   * the background shows through the seam — the camera-shutter flash this
+   * project has now met four times, recorded in `decisions.md` and in
+   * `styles/transitions.css`, which solves the identical problem for opening a
+   * book by the identical rule. With the fade on the layer that is leaving, and
+   * that layer on top, something opaque covers the background on every frame.
+   * There is nothing to flash.
+   *
+   * The old note here said "movement only, no opacity" — that was right while
+   * only one screen was ever rendered, which is the condition this changes.
+   *
+   * ## Why the leaving screen is state rather than a hidden node un-hidden
+   *
+   * Reaching into the DOM to clear `hidden` works right up until React
+   * re-renders for some unrelated reason mid-animation, reconciles `hidden`
+   * back to `true`, and the outgoing screen vanishes half way through its fade.
+   * Naming it in state means React renders it visible on purpose and keeps
+   * rendering it that way until the animation says it is done.
    */
   const previous = useRef(location.pathname)
+  const [leaving, setLeaving] = useState<string | null>(null)
+  const direction = useRef(0)
+
   useLayoutEffect(() => {
     const from = PAGE_ORDER.indexOf(previous.current)
     const to = PAGE_ORDER.indexOf(location.pathname)
+    const was = previous.current
     previous.current = location.pathname
 
     // No direction to show: the first paint of a session, or arriving from a
     // book. A screen sliding in at launch reads as a glitch, not a transition.
     if (from === -1 || to === -1 || from === to) return
     if (prefersReducedMotion()) return
+    // Nothing to animate on a platform without the Web Animations API — jsdom
+    // is the one that matters. Checked before the screen is revealed, so it is
+    // never left visible waiting for an animation that cannot run.
+    if (typeof Element.prototype.animate !== 'function') return
 
-    const node = contentRef.current?.querySelector<HTMLElement>('[data-active="true"]')
-    // Absent in jsdom, which has no Web Animations API. The navigation itself
-    // does not depend on this, so there is nothing to fall back to.
-    if (!node || typeof node.animate !== 'function') return
-
-    node.animate(
-      [{ transform: `translateX(${to > from ? SLIDE_FROM : -SLIDE_FROM}%)` }, { transform: 'none' }],
-      { duration: SLIDE_MS, easing: SLIDE_EASING },
-    )
+    direction.current = to > from ? 1 : -1
+    // A layout effect, so this extra render lands before the browser paints and
+    // the two screens are on screen together from the very first frame of the
+    // move. In an ordinary effect the new screen paints alone first, which is
+    // the cut this is removing.
+    setLeaving(was)
   }, [location.pathname])
+
+  /**
+   * Run the crossing, once both screens are on screen to be crossed.
+   *
+   * A second layout effect rather than part of the first: the outgoing screen is
+   * `hidden` at the moment the move is decided, and animating a hidden element
+   * achieves nothing. This runs after the render that reveals it.
+   */
+  useLayoutEffect(() => {
+    if (leaving === null) return
+
+    const content = contentRef.current
+    const arriving = content?.querySelector<HTMLElement>('[data-active="true"]')
+    const going = content?.querySelector<HTMLElement>('[data-leaving="true"]')
+
+    const done = () => setLeaving(null)
+    if (!arriving || !going) {
+      done()
+      return
+    }
+
+    const away = direction.current === 1 ? -SLIDE_TO : SLIDE_TO
+    const towards = direction.current === 1 ? SLIDE_FROM : -SLIDE_FROM
+
+    // Opaque for every frame, and travelling the further of the two.
+    arriving.animate([{ transform: `translateX(${towards}%)` }, { transform: 'none' }], {
+      duration: SLIDE_MS,
+      easing: SLIDE_EASING,
+    })
+
+    const fading = going.animate(
+      [
+        { transform: 'none', opacity: 1 },
+        { transform: `translateX(${away}%)`, opacity: 0 },
+      ],
+      { duration: SLIDE_MS, easing: SLIDE_EASING, fill: 'both' },
+    )
+
+    // Hidden again when the fade ends *or* fails. An animation can be cancelled
+    // by a second navigation landing on top of this one, and a screen left
+    // visible would sit over the one the reader actually asked for.
+    fading.finished.then(done, done)
+
+    return () => {
+      fading.cancel()
+    }
+  }, [leaving])
 
   // Navigating is the drawer's whole purpose, so arriving somewhere new is the
   // signal to close it — no link needs to remember to do it itself.
@@ -232,8 +314,25 @@ export default function AppShell() {
           */}
           {[...screens.current].map(([path, screen]) => {
             const active = path === location.pathname
+            // On screen but on its way out. Taken out of the flow so it can
+            // cross over the arriving screen without the two stacking into a
+            // page twice as long, and out of the accessibility tree and the tab
+            // order because a screen reader has already been moved on.
+            const going = !active && path === leaving
             return (
-              <div key={path} className={styles.page} hidden={!active} data-active={active}>
+              <div
+                key={path}
+                // Which screen this is. Nothing in the app reads it; it is how
+                // a test names a screen that is deliberately mid-transition and
+                // therefore cannot be found by what is written on it.
+                data-path={path}
+                className={going ? `${styles.page} ${styles.pageLeaving}` : styles.page}
+                hidden={!active && !going}
+                data-active={active}
+                data-leaving={going || undefined}
+                aria-hidden={going || undefined}
+                inert={going || undefined}
+              >
                 {/* So a kept screen can still tell when the reader has come
                     back to it, and re-read what it shows. Without this it would
                     hold its first answer for the life of the session — see

@@ -126,5 +126,21 @@ export default defineConfig({
     // 'jsdom' when the first component test lands.
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
+    /*
+     * Four workers, not one per core.
+     *
+     * The component tests wait on real timers — a page turn, a fade, an indexed
+     * read — with the generous-but-finite timeouts Testing Library gives them.
+     * Run flat out, this suite starves its own workers: a different one or two
+     * cases time out on each run, every one of them passes in isolation, and the
+     * gate stops meaning anything. That has been true for a while and was
+     * written down as "timing-sensitive under load"; adding a file finally made
+     * it the common case rather than the occasional one.
+     *
+     * Capping the pool costs a few seconds and buys back the property the suite
+     * is *for*: **a red run is now a real failure.** If one fails here, do not
+     * re-run it hoping — find it.
+     */
+    maxWorkers: 4,
   },
 })

@@ -70,6 +70,57 @@ function areaOf(pathname: string): number {
 /** Attribute on `<html>` naming the direction, for the stylesheet to read. */
 const DIRECTION_ATTRIBUTE = 'data-route-move'
 
+/**
+ * Where the book opens *from*.
+ *
+ * ## Why the app listens for a tap rather than being told about one
+ *
+ * Opening a book should look like that book opening, not like a screen being
+ * replaced — so the shelf pulls apart around the cover the reader touched, and
+ * the book comes through the gap. That needs a focal point, and the focal point
+ * is simply where the finger went down.
+ *
+ * It could have been passed: every link into a book could hand its own position
+ * to the transition. There are a lot of them — two on each Home tile, the whole
+ * of the library's shelf in two layouts, the details page, the "continue
+ * reading" card — and each would be one more place to forget. A single listener
+ * on the document is one place, cannot be forgotten by a new screen, and is
+ * correct by construction: the last thing the reader touched is the thing the
+ * book is coming out of, whatever rendered it.
+ *
+ * Falls back to the middle of the screen, which is what a keyboard activation
+ * or a swipe-back deserves — there is no card to grow out of.
+ */
+const ORIGIN_X = '--route-origin-x'
+const ORIGIN_Y = '--route-origin-y'
+
+let touchedAt: { x: number; y: number } | null = null
+
+if (typeof document !== 'undefined') {
+  // Passive and capturing: it never interferes with the tap it is watching, and
+  // it still sees one that a handler below stops from propagating.
+  document.addEventListener(
+    'pointerdown',
+    (event) => {
+      touchedAt = { x: event.clientX, y: event.clientY }
+    },
+    { capture: true, passive: true },
+  )
+}
+
+/** Point the coming transition at the last thing touched. */
+function aimAtTouch(): void {
+  const root = document.documentElement
+  const point = touchedAt
+  if (!point || window.innerWidth === 0 || window.innerHeight === 0) {
+    root.style.setProperty(ORIGIN_X, '50%')
+    root.style.setProperty(ORIGIN_Y, '50%')
+    return
+  }
+  root.style.setProperty(ORIGIN_X, `${(point.x / window.innerWidth) * 100}%`)
+  root.style.setProperty(ORIGIN_Y, `${(point.y / window.innerHeight) * 100}%`)
+}
+
 interface Transitions {
   startViewTransition?: (callback: () => void) => { finished: Promise<void> }
 }
@@ -128,6 +179,7 @@ export function RouteTransition({ children }: { children: React.ReactNode }) {
     }
 
     document.documentElement.setAttribute(DIRECTION_ATTRIBUTE, to > from ? 'in' : 'out')
+    aimAtTouch()
 
     // `flushSync` is what makes this work at all: the callback has to leave the
     // DOM already changed when it returns, and React would otherwise schedule
@@ -141,6 +193,8 @@ export function RouteTransition({ children }: { children: React.ReactNode }) {
 
     const done = () => {
       document.documentElement.removeAttribute(DIRECTION_ATTRIBUTE)
+      document.documentElement.style.removeProperty(ORIGIN_X)
+      document.documentElement.style.removeProperty(ORIGIN_Y)
     }
     // Cleared on failure as well as success. A transition can be abandoned — a
     // second navigation on top of it, a tab going to the background — and a

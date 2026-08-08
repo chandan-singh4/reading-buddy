@@ -954,6 +954,15 @@ export default function Reader() {
    * the top — most visibly the one who was just put back where they left off.
    */
   useEffect(() => {
+    // A section that never arrives ends the turn rather than leaving it held.
+    // The copy would otherwise sit over the error message, and the real page
+    // number — hidden for the length of a turn, see `pageTurn.ts` — would stay
+    // hidden with it, until the reader left the book.
+    if (page.status === 'failed') {
+      cancelTurn(held.current)
+      held.current = null
+      return
+    }
     if (page.status !== 'ready') return
     if (landedOn.current === page.section.path) return
     landedOn.current = page.section.path

@@ -437,7 +437,15 @@ export function Chrome({
       number, the pages left in this chapter, and nothing at all. The third
       state is escapable because the button stays there, empty, to be tapped.
     */}
-    <div className={styles.statusLine}>
+    {/*
+      `data-page-furniture` marks this as belonging to the *page*, not to the
+      app around it — so a page turn takes it with it. A printed page number
+      turns over with the sheet it is printed on; it does not hover in place
+      while the paper moves out from under it. `reader/pageTurn.ts` reads this
+      attribute and nothing else, so anything else that comes to belong to the
+      page — a running header, a footnote rule — joins the flip by carrying it.
+    */}
+    <div className={styles.statusLine} data-page-furniture="">
       <button
         type="button"
         className={styles.status}
