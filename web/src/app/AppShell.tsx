@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { NavLink, useOutlet } from 'react-router'
 
+import { prefersReducedMotion } from '../reader/motion.ts'
 import { useViewLocation } from './routeTransition.tsx'
+import { ScreenActiveProvider } from './screenActive.tsx'
 import { useTabHistory } from './tabHistory.ts'
 import { PAGE_ORDER, useSwipeNav } from './useSwipeNav.ts'
 import styles from './AppShell.module.css'
@@ -20,6 +22,24 @@ function isTabPath(pathname: string): boolean {
  * reader who swipes to Settings and opens the drawer to go back needs Home to
  * be *in* it; "swipe right three times" is not a way home.
  */
+/*
+ * The page slide borrows the drawer's curve and very nearly its duration, on
+ * purpose. A swipe between the four screens and a tap in the drawer are the
+ * *same move* by two routes, so if they were timed differently the app would
+ * feel like two apps depending on which one the reader reached for.
+ *
+ * 300 ms rather than the 260 this once ran at: the old timing was short enough
+ * that the slide read as a cut with a flicker on it — the screen was already
+ * still by the time the eye found it. Long enough to be followed, short enough
+ * that a reader flicking through all four never queues.
+ *
+ * 5% rather than a full screen width, and no fade at all. See `.page` in the
+ * stylesheet for what happens when either of those changes.
+ */
+const SLIDE_MS = 300
+const SLIDE_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
+const SLIDE_FROM = 5
+
 const DRAWER_LINKS: { to: string; label: string; icon: string }[] = [
   { to: '/', label: 'Home', icon: '⌂' },
   { to: '/library', label: 'Library', icon: '▤' },
@@ -65,21 +85,79 @@ export default function AppShell() {
 
   useSwipeNav(moveToTab)
 
-  /**
-   * Which way the last move went, so the arriving screen slides in from the
-   * side it came from.
+  /*
+   * ## Every screen the reader has visited, kept alive
    *
-   * Held in a ref rather than state: it is read during render to pick a class
-   * and is never itself a reason to re-render. `previous` starts as the current
-   * path, so the first paint of a session has no direction and doesn't animate
-   * — a screen sliding in when the app opens looks like a glitch, not a
-   * transition.
+   * This is the root cause of the flash, and it is the one thing three rounds
+   * of caching could not reach.
+   *
+   * The page used to be keyed on the path, so a tab change **destroyed the
+   * whole screen and built a new one**. The caches made the *data* instant —
+   * the shelf, the covers, the object URLs are all there on the first frame
+   * now — but they cannot help with what happens next, because every `<img>` is
+   * a brand-new element that the browser has to decode again before it can
+   * paint. That decode is asynchronous, so there is at least one frame with
+   * empty boxes where the covers were, and on a shelf of a dozen they resolve
+   * a few milliseconds apart. Which is precisely the report, every time: "the
+   * covers flash, it looks like the page is refreshing".
+   *
+   * Nothing about it was an animation, and nothing about it was the data. It
+   * was the screen genuinely being rebuilt.
+   *
+   * So screens are no longer thrown away. `useOutlet` hands us the element for
+   * the matched route; we keep each one and go on rendering it, with everything
+   * but the current screen `hidden`. Coming back is then not a rebuild at all —
+   * the same DOM, the same decoded images, the same scroll position, the same
+   * typed-in search. There is nothing left to flash, because nothing is
+   * happening.
+   *
+   * Only screens actually visited are held, and only these four can be: Reader
+   * and BookInfo render outside this shell.
+   *
+   * The elements kept for inactive screens are from the render that last showed
+   * them, which is safe because none of these pages take props — React sees the
+   * same component in the same slot and leaves its state alone. That is the
+   * whole point.
+   */
+  const outlet = useOutlet()
+  const screens = useRef(new Map<string, ReactNode>())
+  if (outlet && isTabPath(location.pathname)) screens.current.set(location.pathname, outlet)
+
+  const contentRef = useRef<HTMLElement>(null)
+
+  /**
+   * The arriving screen slides in from the side it came from.
+   *
+   * Driven from JavaScript rather than a CSS class now, and that follows
+   * directly from the change above: a CSS animation restarts when its element
+   * is created, and these elements are no longer created — they are revealed.
+   * `animate()` runs on demand, which is what "revealed" needs.
+   *
+   * A layout effect, so the move starts in the same frame the screen appears
+   * in; in an ordinary effect the screen paints in place first and then jumps
+   * back to start sliding.
    */
   const previous = useRef(location.pathname)
-  const from = PAGE_ORDER.indexOf(previous.current)
-  const to = PAGE_ORDER.indexOf(location.pathname)
-  const direction = from === -1 || to === -1 || from === to ? 0 : Math.sign(to - from)
-  previous.current = location.pathname
+  useLayoutEffect(() => {
+    const from = PAGE_ORDER.indexOf(previous.current)
+    const to = PAGE_ORDER.indexOf(location.pathname)
+    previous.current = location.pathname
+
+    // No direction to show: the first paint of a session, or arriving from a
+    // book. A screen sliding in at launch reads as a glitch, not a transition.
+    if (from === -1 || to === -1 || from === to) return
+    if (prefersReducedMotion()) return
+
+    const node = contentRef.current?.querySelector<HTMLElement>('[data-active="true"]')
+    // Absent in jsdom, which has no Web Animations API. The navigation itself
+    // does not depend on this, so there is nothing to fall back to.
+    if (!node || typeof node.animate !== 'function') return
+
+    node.animate(
+      [{ transform: `translateX(${to > from ? SLIDE_FROM : -SLIDE_FROM}%)` }, { transform: 'none' }],
+      { duration: SLIDE_MS, easing: SLIDE_EASING },
+    )
+  }, [location.pathname])
 
   // Navigating is the drawer's whole purpose, so arriving somewhere new is the
   // signal to close it — no link needs to remember to do it itself.
@@ -143,24 +221,27 @@ export default function AppShell() {
           <span className={styles.topBarSpacer} aria-hidden="true" />
         </header>
 
-        <main className={styles.content}>
+        <main className={styles.content} ref={contentRef}>
           {/*
-            Keyed on the path so React rebuilds the subtree on every move,
-            which is what restarts the animation — without the key the same
-            element is reused and the CSS never re-runs. It also means each
-            screen mounts fresh, so the library isn't holding cover blobs open
-            while the reader is on Settings.
+            One wrapper per screen the reader has been to, all but one hidden.
+            `hidden` rather than unmounting: the DOM, the decoded cover images
+            and each screen's own state all survive, which is what makes coming
+            back feel like coming back rather than like a reload. It also takes
+            the hidden screens out of the accessibility tree and the tab order,
+            so a screen reader sees exactly one page, as before.
           */}
-          <div
-            key={location.pathname}
-            className={
-              direction === 0
-                ? styles.page
-                : `${styles.page} ${direction > 0 ? styles.pageFromRight : styles.pageFromLeft}`
-            }
-          >
-            <Outlet />
-          </div>
+          {[...screens.current].map(([path, screen]) => {
+            const active = path === location.pathname
+            return (
+              <div key={path} className={styles.page} hidden={!active} data-active={active}>
+                {/* So a kept screen can still tell when the reader has come
+                    back to it, and re-read what it shows. Without this it would
+                    hold its first answer for the life of the session — see
+                    `screenActive.tsx`. */}
+                <ScreenActiveProvider value={active}>{screen}</ScreenActiveProvider>
+              </div>
+            )
+          })}
         </main>
       </div>
 

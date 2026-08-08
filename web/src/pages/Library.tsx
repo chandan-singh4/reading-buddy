@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import {
   dropHasDirectory,
@@ -20,6 +20,7 @@ import {
   readLibraryMemory,
   writeLibraryMemory,
 } from '../app/libraryMemory.ts'
+import { useOnVisit } from '../app/screenActive.tsx'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
 import { forgetCovers, useCovers } from '../app/useCovers.ts'
 import { useRowMemory } from '../app/useRowMemory.ts'
@@ -190,7 +191,9 @@ export default function Library() {
     setState({ status: 'failed', message: prefix ? `${prefix} ${message}` : message })
   }
 
-  useEffect(() => {
+  // On arrival, not on mount — the screen is kept alive between visits now, so
+  // the two stopped being the same thing. See `app/screenActive.tsx`.
+  useOnVisit(() => {
     let cancelled = false
 
     reload().catch((error: unknown) => {
@@ -202,8 +205,7 @@ export default function Library() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at mount.
-  }, [])
+  })
 
   const busy =
     importing.status === 'busy' || importing.status === 'scanning' || updating.status === 'busy'

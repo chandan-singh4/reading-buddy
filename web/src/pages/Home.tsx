@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
+import { useOnVisit } from '../app/screenActive.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
 import { warmLibrary } from '../app/libraryMemory.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
@@ -48,7 +49,11 @@ export default function Home() {
   })
   const greeting = useMemo(() => greetingFor(new Date().getHours()), [])
 
-  useEffect(() => {
+  // On arrival rather than on mount. The screen is kept alive between visits now
+  // (`app/screenActive.tsx`), so mounting happens once and is no longer the same
+  // thing as the reader coming back — but the shelf still has to notice a book
+  // deleted or renamed while they were on another tab.
+  useOnVisit(() => {
     let cancelled = false
 
     Promise.all([repository.listBooks(), repository.listPositions()])
@@ -83,7 +88,7 @@ export default function Home() {
     return () => {
       cancelled = true
     }
-  }, [])
+  })
 
   return (
     <div className={styles.home}>

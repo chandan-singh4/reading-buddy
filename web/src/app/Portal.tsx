@@ -23,14 +23,26 @@
  * Layering is the other half. The drawer's scrim and panel sit at z-index 8 and
  * 9; everything portalled must stay *below* that, so opening the drawer covers
  * it rather than leaving a floating button on top of the frosted glass.
+ *
+ * **A portal from a screen that isn't showing renders nothing.** Tab screens are
+ * kept mounted between visits (see `AppShell.tsx`), and hiding one hides its own
+ * DOM — but not its portals, which are children of `<body>` and know nothing
+ * about the wrapper they were written inside. Without this check, the library's
+ * floating "+" would go on hovering over Home, Stats and Settings, having
+ * followed the reader off its own screen.
  */
 
 import { createPortal } from 'react-dom'
 
+import { useScreenActive } from './screenActive.tsx'
+
 export function Portal({ children }: { children: React.ReactNode }) {
+  const active = useScreenActive()
+
   // Guarded for a server or test environment with no document. Returning null
   // rather than throwing: a missing button is a degraded screen, a thrown error
   // is no screen at all.
   if (typeof document === 'undefined') return null
+  if (!active) return null
   return createPortal(children, document.body)
 }

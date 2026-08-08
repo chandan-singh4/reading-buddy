@@ -245,6 +245,57 @@ export function useTabHistory(isTabPath: (pathname: string) => boolean): (to: st
       seenKeys.add(location.key)
     }
 
+    /*
+     * Leaving the four screens ends the stretch of navigation, and takes the
+     * pending retrace with it.
+     *
+     * Without this: Home → Library → Stats → Home, open a book, press Back — and
+     * the reader lands on **Stats**, because the retrace recorded on the way to
+     * Home was still sitting there waiting to be spent, and Back out of a book
+     * looks from here exactly like Back within the tabs. Reported as "opening a
+     * book from Home and swiping back takes me to Stats".
+     *
+     * Closing a book is not a tab move and has nothing to retrace: it returns to
+     * the screen the book was opened from, which is the entry underneath it and
+     * needs no help from us.
+     *
+     * This runs while the shell is still mounted on the outgoing frame — the
+     * shell is held one step behind for the crossing (`routeTransition.tsx`),
+     * and the location this effect watches is the live one. If the shell has
+     * already gone instead, `lastIndex` was never advanced past the book, so the
+     * Back that follows doesn't read as a Back and no retrace fires either way.
+     * Both roads arrive at the same place, which is what makes this safe rather
+     * than merely lucky.
+     */
+    /*
+     * Leaving the four screens ends the stretch of navigation, and takes the
+     * pending retrace with it.
+     *
+     * Without this: Home → Library → Stats → Home, open a book, press Back — and
+     * the reader lands on **Stats**, because the retrace recorded on the way to
+     * Home was still sitting there waiting to be spent, and a Back out of a book
+     * looks from in here exactly like a Back within the tabs. Reported as
+     * "opening a book from Home and swiping back takes me to Stats".
+     *
+     * Closing a book is not a tab move and has nothing to retrace: it returns to
+     * the screen the book was opened from, which is the entry underneath it and
+     * needs no help from us.
+     *
+     * **Read from the address bar, not from `location`.** This is the whole
+     * subtlety, and the first attempt at this fix got it wrong. While a book is
+     * opening the shell is deliberately held a step behind (`routeTransition`),
+     * and `<Routes location=…>` hands that lagged location to everything inside
+     * it — including `useLocation` here. So at the very moment the reader leaves
+     * for a book, this effect runs with the *tab's* path and the *book's*
+     * history index, and a check against `location.pathname` sees nothing
+     * unusual at all. `window.location` is never lagged.
+     */
+    if (!isTabPath(pathNow(location.pathname))) {
+      previousTab = null
+      hasSpare = false
+      return
+    }
+
     if (!wentBack) return
 
     // The level no longer has a spare entry to rewrite — whether it is about to
@@ -260,9 +311,6 @@ export function useTabHistory(isTabPath: (pathname: string) => boolean): (to: st
     previousTab = null
 
     if (!back) return
-    // Back has left the four screens altogether — for a book, most likely. That
-    // is a real destination and it is where the reader asked to go.
-    if (!isTabPath(location.pathname)) return
     // Already showing it. The entry Back landed on happened to be the right one.
     if (back === location.pathname) return
 
