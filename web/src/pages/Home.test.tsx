@@ -240,3 +240,63 @@ describe('coming back to Home', () => {
     expect(shown().getByText('The Wind in the Willows')).toBeDefined()
   })
 })
+
+describe('opening the app', () => {
+  /*
+   * The launch case, which every other test here starts past.
+   *
+   * The reader's report survived the rebuild fix and came back narrowed: "when
+   * I open the app I see the refresh on the home screen". Nothing is being
+   * rebuilt any more at launch — there is nothing yet to rebuild. What was left
+   * is that the very first paint of a session is the one visit where no earlier
+   * screen has warmed anything, so Home used to appear in three stages: empty,
+   * then a shelf of coloured placeholder letters, then the real artwork. Two
+   * swaps in the space of a blink, on the screen the reader is looking at.
+   *
+   * These two cases pin the fix: nothing appears before it is finished.
+   */
+  beforeEach(() => {
+    // jsdom has no object URLs. The `blob:` prefix is what the assertions read,
+    // and a counter keeps each one distinct as the real thing would.
+    let n = 0
+    vi.stubGlobal('URL', Object.assign(URL, {
+      createObjectURL: () => `blob:test/${++n}`,
+      revokeObjectURL: () => {},
+    }))
+  })
+
+  it('shows the shelf with its real covers already on it, never placeholders first', async () => {
+    await repository.saveAssets(BOOKS[0]!.id, [
+      { path: '__cover__', data: new Blob(['art'], { type: 'image/png' }) },
+    ])
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    const title = await screen.findByText('The Wind in the Willows')
+
+    // Synchronously, in the same frame the title first appears. A `waitFor`
+    // here would pass against the old code a moment later — and that moment is
+    // precisely what the reader was seeing.
+    const tile = title.closest('div')?.parentElement ?? document.body
+    expect(tile.querySelector('img[src^="blob:"]')).not.toBeNull()
+
+    await repository.saveAssets(BOOKS[0]!.id, [])
+  })
+
+  it('shows nothing rather than the word Loading while it waits', async () => {
+    // Empty space for a frame is invisible; a word that appears and is replaced
+    // is indistinguishable from a reload.
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByText('Loading…')).toBeNull()
+    expect(await screen.findByText('Breath')).toBeDefined()
+  })
+})

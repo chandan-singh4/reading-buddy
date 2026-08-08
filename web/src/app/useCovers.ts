@@ -147,6 +147,48 @@ export function forgetCovers(bookIds?: readonly BookId[]): void {
  * nobody. A screen that mounts mid-warm finds whatever is ready and fetches the
  * rest itself, which is the behaviour it had anyway.
  */
+async function fetchInto(bookId: BookId): Promise<void> {
+  // Re-checked at the moment of fetching: a screen may have fetched this one
+  // while we waited, and a second object URL for the same blob is both a leak
+  // and — if it reached an `<img>` — a flash of its own.
+  if (covers.has(bookId) || uncovered.has(bookId)) return
+  try {
+    const assets = await repository.getAssets(bookId, [COVER_ASSET_PATH])
+    const blob = assets.get(COVER_ASSET_PATH)
+    if (!blob) {
+      uncovered.add(bookId)
+      return
+    }
+    if (covers.has(bookId)) return
+    remember(bookId, URL.createObjectURL(blob))
+  } catch {
+    // A cover that can't be read is a placeholder, which is a complete and
+    // working outcome. Nothing here is worth surfacing.
+  }
+}
+
+/**
+ * The same reads as `warmCovers`, but now and awaitable.
+ *
+ * For the one case a fire-and-forget warm cannot serve: the very first paint of
+ * a session, where there is no earlier screen to have warmed anything and the
+ * shelf is about to appear. A caller that waits on this can render its covers
+ * and its titles in a single frame instead of showing placeholders and then
+ * swapping them — which, at launch, is exactly what reads as the page
+ * refreshing itself.
+ *
+ * Never rejects: a cover that can't be read is a placeholder, and no caller
+ * should be made to handle that.
+ */
+export async function loadCovers(bookIds: readonly BookId[]): Promise<void> {
+  const wanted = bookIds
+    .filter((bookId) => !covers.has(bookId) && !uncovered.has(bookId))
+    .slice(0, LIMIT)
+  if (wanted.length === 0) return
+
+  await Promise.all(wanted.map(fetchInto))
+}
+
 export function warmCovers(bookIds: readonly BookId[]): void {
   // Never more than the cache can hold: warming past the limit would evict the
   // covers warmed a moment earlier and finish having achieved nothing.
@@ -156,27 +198,7 @@ export function warmCovers(bookIds: readonly BookId[]): void {
   if (wanted.length === 0) return
 
   const run = () => {
-    void Promise.all(
-      wanted.map(async (bookId) => {
-        // Re-checked: a screen may have fetched this one while we waited for
-        // an idle moment, and a second object URL for the same blob is both a
-        // leak and — if it reached an `<img>` — a flash of its own.
-        if (covers.has(bookId) || uncovered.has(bookId)) return
-        try {
-          const assets = await repository.getAssets(bookId, [COVER_ASSET_PATH])
-          const blob = assets.get(COVER_ASSET_PATH)
-          if (!blob) {
-            uncovered.add(bookId)
-            return
-          }
-          if (covers.has(bookId)) return
-          remember(bookId, URL.createObjectURL(blob))
-        } catch {
-          // A cover that can't be read is a placeholder, which is a complete
-          // and working outcome. Nothing here is worth surfacing.
-        }
-      }),
-    )
+    void Promise.all(wanted.map(fetchInto))
   }
 
   // After the screen that triggered this has finished painting. `requestIdleCallback`

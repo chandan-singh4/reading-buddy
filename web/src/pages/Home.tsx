@@ -6,8 +6,8 @@ import { useOnVisit } from '../app/screenActive.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
 import { warmLibrary } from '../app/libraryMemory.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
-import { useCovers, warmCovers } from '../app/useCovers.ts'
-import type { BookMeta } from '../structure/index.ts'
+import { loadCovers, useCovers, warmCovers } from '../app/useCovers.ts'
+import type { BookId, BookMeta } from '../structure/index.ts'
 import { repository } from '../storage/index.ts'
 import styles from './Home.module.css'
 
@@ -16,6 +16,38 @@ type LoadState =
   | { status: 'ready'; shelves: HomeShelves; total: number }
   | { status: 'failed'; message: string }
 
+
+/**
+ * How long the first paint of a session will wait for cover art before giving
+ * up and showing the shelf with placeholders.
+ *
+ * An indexed read of a dozen small blobs is a few milliseconds, so in practice
+ * this is never reached — it is here so that a slow or damaged store degrades
+ * to the old behaviour (placeholders, then art) instead of holding the app on
+ * an empty screen. Short enough to pass for part of the launch.
+ */
+const COVER_WAIT_MS = 900
+
+/** Every book the shelves will actually draw, in the order they appear. */
+function shelfBookIds(shelves: HomeShelves): BookId[] {
+  return [
+    ...(shelves.currentlyReading ? [shelves.currentlyReading.book.id] : []),
+    ...shelves.upNext.map((entry) => entry.book.id),
+    ...shelves.unread.map((book) => book.id),
+    ...shelves.finished.map((book) => book.id),
+  ]
+}
+
+/** Resolves when `work` does, or after `ms`, whichever is first. */
+function atMost(work: Promise<unknown>, ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, ms)
+    void work.then(() => {
+      window.clearTimeout(timer)
+      resolve()
+    })
+  })
+}
 
 /** "Good morning" / "Good afternoon" / "Good evening", by the clock. */
 function greetingFor(hour: number): string {
@@ -56,10 +88,39 @@ export default function Home() {
   useOnVisit(() => {
     let cancelled = false
 
+    // Whether this is the first paint of the session — nothing on screen yet, no
+    // memory to have seeded it. See the wait below.
+    const cold = readShelfMemory() === null
+
     Promise.all([repository.listBooks(), repository.listPositions()])
-      .then(([books, positions]) => {
+      .then(async ([books, positions]) => {
         if (cancelled) return
         const shelves = shelvesOf(books, positions)
+
+        /*
+         * At launch, the covers are fetched *before* the shelf is shown.
+         *
+         * Every other visit to Home is instant because something earlier warmed
+         * the caches, and this is the one visit where nothing did: opening the
+         * app went blank → shelf of coloured placeholder letters → real artwork
+         * fading in a few milliseconds apart. Two swaps in the space of a blink,
+         * on the screen the reader is looking straight at, which is why it read
+         * as the page refreshing itself even after the rebuild was fixed.
+         *
+         * So the first paint waits for the reads it would otherwise race, and
+         * the shelf appears once, finished. It costs a few milliseconds of blank
+         * screen during a launch that already has some — and unlike a swap,
+         * nothing the reader can see moves.
+         *
+         * Only when cold. A return must never wait: it already has the whole
+         * shelf on screen, and holding *that* back would be the very flash this
+         * is removing.
+         */
+        if (cold && books.length > 0) {
+          await atMost(loadCovers(shelfBookIds(shelves)), COVER_WAIT_MS)
+          if (cancelled) return
+        }
+
         writeShelfMemory({ shelves, total: books.length })
         setState({ status: 'ready', shelves, total: books.length })
 
@@ -97,7 +158,15 @@ export default function Home() {
         <p className={styles.greetingSub}>Pick up where you left off.</p>
       </header>
 
-      {state.status === 'loading' && <p className={styles.pending}>Loading…</p>}
+      {/*
+        Nothing at all while loading — deliberately, and not an oversight.
+        "Loading…" is one more thing that appears and is then replaced by
+        something else, and at launch it is on screen for roughly a frame. A
+        word that flickers past under the greeting is indistinguishable from the
+        page reloading; empty space for the same moment is invisible. The
+        `failed` branch below is what the reader sees if it genuinely doesn't
+        arrive.
+      */}
 
       {state.status === 'failed' && (
         <div className={styles.error} role="alert">
