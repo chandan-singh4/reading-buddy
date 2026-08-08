@@ -14,6 +14,12 @@ import {
 import type { BookId, BookMeta, Shelf } from '../structure/index.ts'
 import { repository, type StoredFolder } from '../storage/index.ts'
 import { Portal } from '../app/Portal.tsx'
+import {
+  forgetLibraryMemory,
+  loadLibrary,
+  readLibraryMemory,
+  writeLibraryMemory,
+} from '../app/libraryMemory.ts'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
 import { forgetCovers, useCovers } from '../app/useCovers.ts'
 import { useRowMemory } from '../app/useRowMemory.ts'
@@ -28,7 +34,6 @@ import {
   writeLibraryPrefs,
   type LibraryPrefs,
 } from '../library/prefs.ts'
-import { progressMap } from '../library/status.ts'
 import styles from './page.module.css'
 import libraryStyles from './Library.module.css'
 
@@ -67,9 +72,21 @@ type UpdateState =
  * anything, which is the only way the sorting stays honest as filters are added.
  */
 export default function Library() {
-  const [state, setState] = useState<LoadState>({ status: 'loading' })
-  const [books, setBooks] = useState<BookMeta[]>([])
-  const [folders, setFolders] = useState<StoredFolder[]>([])
+  /*
+   * Seeded from the memory rather than started empty, so a shelf that has been
+   * loaded once — or warmed from Home before it was ever opened — paints on the
+   * first frame instead of showing "Loading…" where the books were. Lazy
+   * initialisers: they must read on mount, not on every render.
+   *
+   * All four together, or none: a `ready` state over an empty book list is the
+   * "No books yet" screen, which would be a far worse flash than the one this
+   * removes.
+   */
+  const [state, setState] = useState<LoadState>(() =>
+    readLibraryMemory() ? { status: 'ready' } : { status: 'loading' },
+  )
+  const [books, setBooks] = useState<BookMeta[]>(() => readLibraryMemory()?.books ?? [])
+  const [folders, setFolders] = useState<StoredFolder[]>(() => readLibraryMemory()?.folders ?? [])
 
   const [importing, setImporting] = useState<ImportState>({ status: 'idle' })
   const [updating, setUpdating] = useState<UpdateState>({ status: 'idle' })
@@ -104,10 +121,14 @@ export default function Library() {
    * Which books still have the file they were imported from — asked once for
    * the whole shelf, and answered without touching a single blob.
    */
-  const [withSource, setWithSource] = useState<Set<BookId>>(new Set())
+  const [withSource, setWithSource] = useState<Set<BookId>>(
+    () => readLibraryMemory()?.sources ?? new Set(),
+  )
 
   /** How far into each book the reader has got, and when they last opened it. */
-  const [progress, setProgress] = useState<LibraryContext['progress']>(new Map())
+  const [progress, setProgress] = useState<LibraryContext['progress']>(
+    () => readLibraryMemory()?.progress ?? new Map(),
+  )
 
   const folderMap = useMemo(
     () => new Map(folders.map((folder) => [folder.id, folder])),
@@ -152,18 +173,15 @@ export default function Library() {
     if (changed) {
       forgetCovers()
       forgetShelfMemory()
+      forgetLibraryMemory()
     }
 
-    const [books, sources, positions, folders] = await Promise.all([
-      repository.listBooks(),
-      repository.booksWithSource(),
-      repository.listPositions(),
-      repository.listFolders(),
-    ])
-    setBooks(books)
-    setWithSource(sources)
-    setProgress(progressMap(positions))
-    setFolders(folders)
+    const memory = await loadLibrary()
+    writeLibraryMemory(memory)
+    setBooks(memory.books)
+    setWithSource(memory.sources)
+    setProgress(memory.progress)
+    setFolders(memory.folders)
     setState({ status: 'ready' })
   }
 

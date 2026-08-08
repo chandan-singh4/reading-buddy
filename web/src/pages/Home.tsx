@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
+import { warmLibrary } from '../app/libraryMemory.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
 import { useCovers, warmCovers } from '../app/useCovers.ts'
 import type { BookMeta } from '../structure/index.ts'
@@ -63,6 +64,13 @@ export default function Home() {
         // screen or two ahead of them, which is exactly the head start needed for
         // the library to open with its covers already on it. See `warmCovers`.
         warmCovers(books.map((book) => book.id))
+
+        // And the *data* the library opens with, for the same reason and at the
+        // same moment. The covers were only half of that first-visit flash: the
+        // other half was the library starting at "Loading…" while four indexed
+        // reads ran. Warmed here, both halves are answered before the reader can
+        // reach the screen that needs them. See `libraryMemory.ts`.
+        warmLibrary()
       })
       .catch((error: unknown) => {
         if (cancelled) return
