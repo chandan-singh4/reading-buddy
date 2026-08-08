@@ -49,6 +49,16 @@ function atMost(work: Promise<unknown>, ms: number): Promise<void> {
   })
 }
 
+/**
+ * Who the greeting addresses.
+ *
+ * A constant rather than a setting: this is a single-reader app on a single
+ * phone, and a name field in Settings would be four screens of plumbing for a
+ * value that changes never. If it ever has to be editable, this is the one
+ * place that has to learn where to read it from.
+ */
+const READER_NAME = 'Chandan'
+
 /** "Good morning" / "Good afternoon" / "Good evening", by the clock. */
 function greetingFor(hour: number): string {
   if (hour < 12) return 'Good morning'
@@ -154,7 +164,7 @@ export default function Home() {
   return (
     <div className={styles.home}>
       <header className={styles.greeting}>
-        <h1 className={styles.greetingTitle}>{greeting}, reader.</h1>
+        <h1 className={styles.greetingTitle}>{greeting}, {READER_NAME}.</h1>
         <p className={styles.greetingSub}>Pick up where you left off.</p>
       </header>
 

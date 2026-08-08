@@ -147,6 +147,43 @@ export function forgetCovers(bookIds?: readonly BookId[]): void {
  * nobody. A screen that mounts mid-warm finds whatever is ready and fetches the
  * rest itself, which is the behaviour it had anyway.
  */
+/**
+ * Get the browser to decode this image before anything on screen needs it.
+ *
+ * ## The half of the flash a cache cannot reach
+ *
+ * Fetching a cover gives us a URL. Painting one needs a *decoded* image, and
+ * decoding is asynchronous work the browser does the first time some `<img>`
+ * actually asks — so a screen can have every URL it needs, on its first frame,
+ * and still show empty boxes for a frame or two while they decode. That is the
+ * whole of the remaining first-visit flash on the library: its data is warmed,
+ * its URLs are warmed, and its `<img>` elements are still brand new.
+ *
+ * Home never had this problem *after* launch because its covers are already
+ * decoded — they are on screen. The library shows books Home doesn't, so its
+ * extra covers had never been decoded by anything.
+ *
+ * A detached `Image` is enough: the decoded bitmap goes into the browser's own
+ * cache under this URL, and any later `<img>` with the same `src` is served
+ * from it without a repaint. Nothing is added to the document and the element
+ * is dropped as soon as this resolves.
+ *
+ * Never rejects — a cover that won't decode is a placeholder, which is a
+ * complete outcome.
+ */
+async function predecode(url: string): Promise<void> {
+  // Absent in jsdom, and in any browser too old for it. Skipping simply leaves
+  // the behaviour as it was: decoded on first paint instead of before it.
+  if (typeof Image !== 'function') return
+  try {
+    const image = new Image()
+    image.src = url
+    if (typeof image.decode === 'function') await image.decode()
+  } catch {
+    // Broken bytes, a revoked URL, a browser that declines. Not worth surfacing.
+  }
+}
+
 async function fetchInto(bookId: BookId): Promise<void> {
   // Re-checked at the moment of fetching: a screen may have fetched this one
   // while we waited, and a second object URL for the same blob is both a leak
@@ -160,7 +197,9 @@ async function fetchInto(bookId: BookId): Promise<void> {
       return
     }
     if (covers.has(bookId)) return
-    remember(bookId, URL.createObjectURL(blob))
+    const url = URL.createObjectURL(blob)
+    remember(bookId, url)
+    await predecode(url)
   } catch {
     // A cover that can't be read is a placeholder, which is a complete and
     // working outcome. Nothing here is worth surfacing.
@@ -248,17 +287,10 @@ export function useCovers(bookIds: readonly BookId[]): ReadonlyMap<BookId, strin
       return
     }
 
-    void Promise.all(
-      wanted.map(async (bookId) => {
-        const assets = await repository.getAssets(bookId, [COVER_ASSET_PATH])
-        const blob = assets.get(COVER_ASSET_PATH)
-        if (!blob) {
-          uncovered.add(bookId)
-          return
-        }
-        remember(bookId, URL.createObjectURL(blob))
-      }),
-    ).then(() => {
+    // The same read, and the same decode, the warm path does — a cover that
+    // arrives here has to be paintable, not merely fetched, or the tile shows a
+    // placeholder for the frames the decode takes.
+    void Promise.all(wanted.map(fetchInto)).then(() => {
       // Nothing to undo if this screen has gone: the URLs belong to the cache
       // now, not to this component, and the next screen to want them will find
       // them already made. That is the point.
