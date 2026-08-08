@@ -23,8 +23,14 @@
   /* The foot leaves room for the status line, which is `fixed` and so takes no
      space of its own — without this the last line of every page would be read
      through the page number. */
-  padding: calc(var(--safe-top) + var(--space-4)) 0
-    calc(var(--safe-bottom) + var(--space-4) + var(--status-line));
+  /* Room at both ends for the overlay's bars, so raising them covers furniture
+     and never prose — see `--reader-bar-top` in `theme.css` for why this is a
+     permanent margin rather than something that appears with the bars. The foot
+     also clears the status line, which is `fixed` and takes no space of its
+     own; without that the last line of every page would be read through the
+     page number. */
+  padding: calc(var(--safe-top) + var(--reader-bar-top)) 0
+    calc(var(--safe-bottom) + var(--reader-bar-bottom) + var(--status-line));
   /*
    * No entry animation on the reading screen itself.
    *

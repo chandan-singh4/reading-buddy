@@ -91,6 +91,31 @@
      overlay's bottom bar, which must not cover it. */
   --status-line: 2rem;
 
+  /*
+   * The two bars of the reading overlay, named here for the same reason as the
+   * status line above: the page has to leave room for them.
+   *
+   * The reader's complaint was that raising the toolbar hid the top and bottom
+   * of the page — a bar over a page of prose covers two or three lines, and the
+   * two lines you cannot read are as good as missing.
+   *
+   * The fix is a reservation rather than anything clever. Two other approaches
+   * were possible and both are worse: shrinking the text box when the bars
+   * appear re-flows the columns, so the page you are on changes under you; and
+   * scaling the page down needs a transform on the reading screen, which would
+   * redefine what `position: fixed` means for the bars themselves and break the
+   * measured rectangles every page turn is built from (see `pageTurn.ts`).
+   *
+   * So the page keeps a margin at each end, always, whether the bars are up or
+   * not. It costs a line or two of prose per page and buys the rule this whole
+   * screen is built on: showing or hiding the overlay never moves a word.
+   *
+   * These must equal the bars' real heights — `Chrome.module.css` sets them as
+   * `min-height` on the bars themselves, so the two cannot drift apart.
+   */
+  --reader-bar-top: 3.5rem;
+  --reader-bar-bottom: 4.5rem;
+
   color-scheme: light;
 }
 
