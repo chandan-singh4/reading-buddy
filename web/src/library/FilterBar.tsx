@@ -208,6 +208,23 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
     setOpen((current) => (current === control ? null : control))
   }
 
+  /**
+   * Move to a control that has no panel: the accent goes with it, and whatever
+   * was open closes.
+   *
+   * The closing is the part worth naming. A panel belongs to the chip that
+   * opened it, so leaving it standing while the reader works somewhere else
+   * makes the row lie twice over — the shelf is pushed down by a list of options
+   * for a control nobody is on, and the accent is somewhere the open panel is
+   * not. Tapping List with the Reading progress options showing should leave the
+   * row as it would have been if they had never been opened.
+   */
+  function switchTo(chip: ChipKey | null, change: () => void) {
+    if (chip) setWorking(chip)
+    setOpen(null)
+    change()
+  }
+
   /** One of the three sort chips, which differ only in which group they hold. */
   function sortChip(group: ChipKey) {
     const sorted = sortsIn(group).some((option) => option.value === prefs.sort)
@@ -221,10 +238,7 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
         // accent — "which of these three is the shelf ordered by" is a fact a
         // screen reader needs, and "which one did I last touch" is not.
         pressed={sorted}
-        onClick={() => {
-          setWorking(group)
-          onChange({ ...prefs, sort: nextSort(group, prefs.sort) })
-        }}
+        onClick={() => switchTo(group, () => onChange({ ...prefs, sort: nextSort(group, prefs.sort) }))}
       />
     )
   }
@@ -242,7 +256,9 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
           type="button"
           className={styles.iconButton}
           aria-label="All filters"
-          onClick={onOpenAll}
+          // The sheet holds these same options, so a panel left open behind it
+          // would be the reader's choices offered twice at once.
+          onClick={() => switchTo(null, onOpenAll)}
         >
           <span className={styles.tuneIcon} aria-hidden="true">
             <span />
@@ -277,11 +293,17 @@ export function FilterBar({ prefs, folders, onChange, onOpenAll }: FilterBarProp
         />
 
         {/* Two options, so it switches on the tap — and never lights up, for
-            the reason in this file's opening note. */}
+            the reason in this file's opening note. `null` because it takes the
+            accent from nobody: it closes whatever was open and leaves the mark
+            where it was. */}
         <Switch
           label={prefs.view === 'grid' ? 'Grid' : 'List'}
           leading={prefs.view === 'grid' ? '▦' : '☰'}
-          onClick={() => onChange({ ...prefs, view: prefs.view === 'grid' ? 'list' : 'grid' })}
+          onClick={() =>
+            switchTo(null, () =>
+              onChange({ ...prefs, view: prefs.view === 'grid' ? 'list' : 'grid' }),
+            )
+          }
         />
       </div>
 

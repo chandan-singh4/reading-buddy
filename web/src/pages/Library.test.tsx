@@ -618,6 +618,45 @@ describe('the filter controls under the search bar', () => {
     expect(litChips()[0]).toContain('Unread')
   })
 
+  it('closes an open panel when a control with no panel is tapped', async () => {
+    // A panel belongs to the chip that opened it. Left standing while the
+    // reader works somewhere else it pushes the shelf down with options for a
+    // control nobody is on.
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Reading progress/)
+    expect(screen.getByRole('button', { name: '0–25%' })).toBeTruthy()
+
+    tap('List')
+
+    expect(screen.queryByRole('button', { name: '0–25%' })).toBeNull()
+  })
+
+  it('closes an open panel when a sort chip is tapped', async () => {
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Reading status/)
+    expect(screen.getByRole('button', { name: 'Currently reading' })).toBeTruthy()
+
+    tap('Title')
+
+    expect(screen.queryByRole('button', { name: 'Currently reading' })).toBeNull()
+  })
+
+  it('closes an open panel when the full sheet is opened over it', async () => {
+    // The sheet holds these same options, so a panel left open behind it would
+    // be the reader's choices offered twice at once.
+    openLibrary()
+    await screen.findByText('Aion')
+
+    openControl(/Folders/)
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
+
+    expect(screen.queryByRole('button', { name: 'All books' })).toBeNull()
+  })
+
   it('never lights up List/Grid, and tapping it leaves the accent alone', async () => {
     // The one control with no "off": lighting it would put a permanent mark
     // back on the row, which is what made the accent meaningless before.
