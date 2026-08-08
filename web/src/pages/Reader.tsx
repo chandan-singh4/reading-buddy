@@ -272,6 +272,12 @@ export default function Reader() {
    * Google Books trains.
    */
   const [chromeShown, setChromeShown] = useState(false)
+  /** The three-dot menu on the top bar. */
+  const [menuOpen, setMenuOpen] = useState(false)
+  /** Whether the search panel is up. Declared here with the other two layers
+      rather than beside the search machinery below, because the three of them
+      are governed together — see "the layers over the page". */
+  const [searchOpen, setSearchOpen] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetTab, setSheetTab] = useState<SheetTab>('contents')
   const [barState, setBarState] = useState<BarState>('pages')
@@ -751,13 +757,66 @@ export default function Reader() {
     return () => window.removeEventListener('keydown', onKey)
   }, [turnPage])
 
+  /*
+   * ## The layers over the page, and the one rule they follow
+   *
+   * There are three: the menu, the sheet, and search. Only one is ever open,
+   * and every route in says which one it wants rather than toggling. That is
+   * not tidiness — it is what makes the back gesture below correct, because
+   * "close whatever is over the book" is then a single, unambiguous action.
+   */
+
+  const openSheet = useCallback((tab: SheetTab) => {
+    setSheetTab(tab)
+    setMenuOpen(false)
+    setSearchOpen(false)
+    setSheetOpen(true)
+  }, [])
+
   const closeSheet = useCallback(() => {
     setSheetOpen(false)
   }, [])
 
-  // A back swipe with the sheet open used to leave the book entirely. Now it
-  // closes the sheet — the gesture people actually mean by it.
-  useBackDismiss(sheetOpen, closeSheet)
+  const toggleMenu = useCallback(() => {
+    setMenuOpen((open) => !open)
+  }, [])
+
+  const openSearch = useCallback(() => {
+    setMenuOpen(false)
+    setSheetOpen(false)
+    setSearchOpen(true)
+  }, [])
+
+  /**
+   * Leaving search keeps the query, which is what "remember the last search"
+   * means in practice: come back to the panel and the word is still there,
+   * ready to be run again or edited. Cleared only when the book is left,
+   * because the screen goes with it.
+   */
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+  }, [])
+
+  const closeLayers = useCallback(() => {
+    setMenuOpen(false)
+    setSheetOpen(false)
+    setSearchOpen(false)
+  }, [])
+
+  /**
+   * A back gesture closes what is over the book rather than leaving the book.
+   *
+   * Asked of *both* panels through one flag, not once per panel. Two separate
+   * calls would each push and pop their own history entry, and moving from one
+   * panel straight to the other would pop one entry while pushing another in
+   * the same commit — a swallowed gesture at best, and at worst a `popstate`
+   * arriving a moment later to close the panel just opened.
+   *
+   * The bug this fixes, reported from the phone: opening search, typing
+   * nothing, and swiping back threw the reader out of the book and onto the
+   * shelf. Search had never been wired to this at all.
+   */
+  useBackDismiss(sheetOpen || searchOpen, closeLayers)
 
   const toggleFocus = useCallback(() => {
     setFocusMode((on) => !on)
@@ -1337,7 +1396,6 @@ export default function Reader() {
   const bookText = useRef<Section[] | null>(null)
   const [textLoaded, setTextLoaded] = useState(false)
 
-  const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   /**
    * The query the results below actually answer.
@@ -1395,16 +1453,6 @@ export default function Reader() {
     return searchBook(bookText.current, settledQuery)
   }, [searchOpen, textLoaded, settledQuery])
 
-  /**
-   * Closing search keeps the query, which is what "remember the last search"
-   * means in practice: come back to the panel and the word is still there, ready
-   * to be run again or edited. Cleared only when the book is left, because the
-   * screen goes with it.
-   */
-  const toggleSearch = useCallback(() => {
-    setSearchOpen((open) => !open)
-  }, [])
-
   /** Going to a result closes the panel — the reader asked to be taken there. */
   const jumpToHit = useCallback(
     (anchor: Anchor) => {
@@ -1450,27 +1498,28 @@ export default function Reader() {
             pages={pages}
             shown={chromeShown}
             focusMode={focusMode}
+            menuOpen={menuOpen}
             sheetOpen={sheetOpen}
             sheetTab={sheetTab}
             barState={barState}
             settings={settings}
             onToggleFocus={toggleFocus}
-            onToggleSheet={() => setSheetOpen((open) => !open)}
-            onSelectTab={setSheetTab}
+            onToggleMenu={toggleMenu}
+            onOpenSheet={openSheet}
+            onCloseSheet={closeSheet}
             onBarStateChange={setBarState}
             onJumpToChapter={(chapter) => goTo({ chapter, section: 1 })}
             onJumpToPage={jumpToPage}
             onSettingsChange={changeSettings}
             bookmarks={bookmarkRows}
-            bookmarkedHere={bookmarkHere !== undefined}
-            onToggleBookmark={toggleBookmark}
             onJumpToBookmark={jumpToAnchor}
             onRenameBookmark={renameBookmark}
             onDeleteBookmark={deleteBookmark}
             searchOpen={searchOpen}
             query={query}
             results={results}
-            onToggleSearch={toggleSearch}
+            onOpenSearch={openSearch}
+            onCloseSearch={closeSearch}
             onQueryChange={setQuery}
             onJumpToHit={jumpToHit}
           />
@@ -1529,7 +1578,7 @@ export default function Reader() {
               }
 
               setChromeShown((shown) => !shown)
-              setSheetOpen(false)
+              closeLayers()
               // The note has done its job the moment reading is touched.
               setResumed(false)
             }}
@@ -1590,6 +1639,42 @@ export default function Reader() {
                 />
               ))}
           </article>
+
+          {/*
+            The bookmark, as a corner of the paper rather than a button in a bar.
+
+            This used to be a ribbon glyph up in the toolbar, which meant marking
+            a page cost two taps — one to raise the toolbar, one to hit the
+            ribbon — and put a control for *this page* in the strip of controls
+            for *the book*. Now the top right corner of the page is the mark, the
+            way the corner of a paper page is: tap it and it folds down, tap it
+            again and it lifts. Nothing is drawn there until it is marked, so an
+            unmarked page is bare paper, which is the point.
+
+            It sits outside the pager rather than inside `<article>` so it holds
+            still while pages slide under it, and outside the overlay so it is
+            reachable without raising anything. The corner overlaps the strip
+            that turns a page forward, and it wins there deliberately: it is a
+            small, deliberate target in a corner, and the rest of that edge —
+            the other ninety per cent of it — still turns the page.
+          */}
+          <button
+            type="button"
+            className={styles.ribbon}
+            data-marked={bookmarkHere !== undefined}
+            aria-pressed={bookmarkHere !== undefined}
+            aria-label={bookmarkHere ? 'Remove bookmark' : 'Bookmark this page'}
+            onClick={(event) => {
+              event.stopPropagation()
+              toggleBookmark()
+            }}
+          >
+            {/* The fold itself: a tab of colour with a notch cut out of its
+                foot, which is the shape every reader already reads as a
+                bookmark. Hidden from assistive tech — the button's label
+                already says both what it is and what tapping it will do. */}
+            <span className={styles.ribbonMark} aria-hidden="true" />
+          </button>
 
           {/*
             The way back from a followed link. Shown only after one has been

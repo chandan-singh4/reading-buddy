@@ -55,29 +55,48 @@
   border-top: 1px solid var(--color-border);
 }
 
-.control {
+/*
+ * A control on the top bar: a glyph in a 44px square, no border, no box.
+ *
+ * They used to be bordered pills with words in them, which is what a bar with
+ * two controls on it can afford. With four, boxes turn the top of the page into
+ * a strip of buttons competing with the text below; a row of quiet glyphs reads
+ * as a toolbar and gets out of the way. Every one still carries a real
+ * `aria-label`, so nothing is lost to the reader who can't see the glyph.
+ */
+.iconControl {
+  flex: none;
+  min-width: 44px;
   min-height: 44px;
-  padding: 0 var(--space-3);
   display: inline-flex;
   align-items: center;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  justify-content: center;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--text-md);
+  color: var(--color-text);
+  text-decoration: none;
   background: transparent;
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
-.control[aria-pressed='true'] {
-  color: var(--color-accent-contrast);
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+.iconControl:active,
+.iconControl[aria-expanded='true'] {
+  background: var(--color-surface);
 }
 
+/*
+ * The book's title, in the gap the toolbar leaves. Quiet on purpose — it is
+ * there to tell you which book you have open, not to be read; it is set in the
+ * muted colour so the four controls stay the things the eye lands on.
+ */
 .bookTitle {
   flex: 1;
+  min-width: 0;
   font-size: var(--text-sm);
-  font-weight: 600;
+  color: var(--color-text-muted);
   /* One line, ellipsised: a long title must not push the controls off screen. */
   overflow: hidden;
   text-overflow: ellipsis;
@@ -91,13 +110,59 @@
   cursor: pointer;
 }
 
-/* Just the hamburger now — the status line moved out of the overlay entirely.
-   Kept as a row because the sheet toggle sits at the left edge, and a bare
-   button would centre itself under the slider. */
-.statusRow {
+/*
+ * The three-dot menu, hung under the right-hand end of the top bar.
+ *
+ * Anchored to the corner it was opened from rather than centred or risen from
+ * the bottom, because a menu that appears somewhere other than under the button
+ * you pressed makes you find it again. `--safe-top` plus the bar's own height is
+ * where the bar ends; the menu starts there.
+ */
+.menuScrim {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.menu {
+  position: absolute;
+  top: calc(var(--safe-top) + 3.25rem);
+  right: var(--space-3);
+  z-index: 4;
+  pointer-events: auto;
+  min-width: 11rem;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) 0;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  font-family: var(--font-ui);
+}
+
+.menuItem {
+  min-height: 44px;
+  padding: 0 var(--space-4);
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.menuItem:active {
+  background: var(--color-surface);
+}
+
+.menuItem[aria-pressed='true'] {
+  color: var(--color-accent);
+  font-weight: 600;
 }
 
 /*
@@ -130,19 +195,6 @@
   padding-bottom: var(--safe-bottom);
   font-family: var(--font-ui);
   pointer-events: none;
-}
-
-.sheetButton {
-  min-width: 44px;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--text-md);
-  color: var(--color-text-muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
 }
 
 /* A button styled as text — it has to read as information rather than as a
@@ -210,27 +262,44 @@
   font-family: var(--font-ui);
 }
 
-.tabs {
+/*
+ * The sheet's heading, where the row of tabs used to be.
+ *
+ * A tab row told you what else you could open; a heading tells you what you
+ * *did* open. That is the right trade now that panels are opened by name from
+ * the menu — the reader chose "Bookmarks", and the sheet confirms it rather
+ * than offering three other places to go.
+ */
+.sheetHead {
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--color-border);
 }
 
-.tab {
+.sheetTitle {
   flex: 1;
-  min-height: 44px;
+  margin: 0;
   font-family: inherit;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
 }
 
-.tab[aria-selected='true'] {
-  color: var(--color-text);
-  font-weight: 600;
-  border-bottom-color: var(--color-accent);
+.sheetClose {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  cursor: pointer;
 }
 
 .sheetPanel {
@@ -288,7 +357,16 @@
 .searchPanel {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 5;
+  /*
+   * Not optional, and its absence was a real bug the reader hit. `.chrome` sets
+   * `pointer-events: none` so the gap between the bars belongs to the book
+   * underneath — every panel inside it has to claim its taps back. Without this
+   * line every tap on this panel went *through* it to the page: the ✕ did
+   * nothing, tapping the field to edit a query toggled the overlay instead, and
+   * the whole panel behaved like a picture of a search box.
+   */
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   padding: calc(var(--safe-top) + 3.5rem) var(--space-4) var(--space-4);

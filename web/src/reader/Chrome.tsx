@@ -10,17 +10,24 @@
  * reason WP-12 was built bare: hiding this removes nothing and reveals nothing
  * — the text underneath never moves.
  *
- * WP-40 shaped the bottom half after Google Books, which the reader uses daily:
- * a hamburger on the left opening a tabbed sheet, a tappable status line that
- * cycles through three states, a percentage on the right, and a slider that
- * moves one page at a time.
+ * WP-55 rebuilt the shape after Google Books, which the reader uses daily. The
+ * arrangement is worth stating because it is the opposite of where this started:
+ *
+ * - The book is on screen alone. Nothing overlays it until it is asked for.
+ * - A tap in the middle raises **one** bar, at the top: back, search, Aa, and a
+ *   three-dot menu. Four controls, all reachable, none of them furniture.
+ * - Contents, Bookmarks and Notes moved *out* of the bottom of the screen and
+ *   into that menu; Aa opens the same sheet straight at its own panel. The
+ *   bottom keeps only the slider, which is the one control that is about
+ *   *moving* rather than about *opening something*.
+ * - The bookmark left the bar entirely. It is a corner of the page now — see
+ *   the ribbon in `pages/Reader.tsx`, which is where a bookmark belongs: on the
+ *   paper, not in the toolbar.
  */
 
-import { useRef } from 'react'
 import { Link } from 'react-router'
 
 import { advanceBar, barLabel, showsPercent, type BarState } from './bar.ts'
-import { stepThrough, swipeOf, type Touch } from './swipe.ts'
 import { progressLabel, progressOf, type Pages } from './progress.ts'
 import { MIN_QUERY, type SearchOutcome } from './search.ts'
 import type { SectionRef } from './navigation.ts'
@@ -36,8 +43,29 @@ import {
 } from './readerSettings.ts'
 import styles from './Chrome.module.css'
 
-/** The sheet's four tabs. Notes is a stub until WP-25; the rest are WP-14's. */
+/**
+ * Which panel the sheet is showing. Notes is a stub until WP-25; the rest are
+ * WP-14's.
+ *
+ * These used to be tabs along the top of the sheet. They are not any more — one
+ * of them is opened at a time, by name, from the menu or from Aa — but the type
+ * survives because "which panel" is still the question the sheet answers.
+ */
 export type SheetTab = 'contents' | 'bookmarks' | 'notes' | 'aa'
+
+/**
+ * What the sheet calls itself when it is showing each panel.
+ *
+ * It needs a heading now that the row of tabs is gone: a sheet that rises with
+ * no title on it leaves the reader to infer what they opened from its contents,
+ * which works for a chapter list and not at all for an empty one.
+ */
+const SHEET_TITLES: Record<SheetTab, string> = {
+  contents: 'Contents',
+  bookmarks: 'Bookmarks',
+  notes: 'Notes',
+  aa: 'Text and display',
+}
 
 /**
  * A bookmark as this component needs it — an id, where it points, what it is
@@ -74,14 +102,19 @@ export interface ChromeProps {
   /** Whether the overlay is currently on screen. */
   shown: boolean
   focusMode: boolean
+  /** Whether the three-dot menu is down. */
+  menuOpen: boolean
   sheetOpen: boolean
   sheetTab: SheetTab
   barState: BarState
   /** The reading-comfort settings: theme, font, text size, spacing, margins. */
   settings: ReaderSettings
   onToggleFocus: () => void
-  onToggleSheet: () => void
-  onSelectTab: (tab: SheetTab) => void
+  onToggleMenu: () => void
+  /** Open the sheet at one panel. There is no "toggle" any more: every route in
+      names the panel it wants, which is what let the tab row go. */
+  onOpenSheet: (tab: SheetTab) => void
+  onCloseSheet: () => void
   onBarStateChange: (state: BarState) => void
   /** Go to the first section of a chapter. */
   onJumpToChapter: (chapter: number) => void
@@ -92,16 +125,6 @@ export interface ChromeProps {
 
   /** Every mark in this book, already in the book's own order. */
   bookmarks: readonly BookmarkRow[]
-  /**
-   * Whether the paragraph at the top of the page is marked.
-   *
-   * A boolean rather than the bookmark itself, because the ribbon only ever
-   * needs to know which of two things to draw and which of two callbacks to
-   * fire. Which bookmark would be removed is the reading page's business.
-   */
-  bookmarkedHere: boolean
-  /** Mark the current page, or unmark it if it is already marked. */
-  onToggleBookmark: () => void
   /** Go to a mark. */
   onJumpToBookmark: (anchor: Anchor) => void
   onRenameBookmark: (id: string, label: string) => void
@@ -118,7 +141,8 @@ export interface ChromeProps {
    * during that wait would be a wrong answer rather than a slow one.
    */
   results: SearchOutcome | null
-  onToggleSearch: () => void
+  onOpenSearch: () => void
+  onCloseSearch: () => void
   onQueryChange: (query: string) => void
   /** Go to a result. */
   onJumpToHit: (anchor: Anchor) => void
@@ -135,12 +159,8 @@ function chapterNameOf(manifest: Manifest, chapter: number): string {
   return manifest.chapters.find((entry) => entry.chapter === chapter)?.title ?? 'Elsewhere'
 }
 
-const TABS: { id: SheetTab; label: string }[] = [
-  { id: 'contents', label: 'Contents' },
-  { id: 'bookmarks', label: 'Bookmarks' },
-  { id: 'notes', label: 'Notes' },
-  { id: 'aa', label: 'Aa' },
-]
+/** What the three-dot menu opens, in the order it lists them. */
+const MENU_PANELS: SheetTab[] = ['contents', 'bookmarks', 'notes']
 
 // Themes and faces come from `readerSettings.ts`, which is also what validates
 // a stored setting. Keeping a second copy here is how the tab ends up offering
@@ -167,27 +187,28 @@ export function Chrome({
   pages,
   shown,
   focusMode,
+  menuOpen,
   sheetOpen,
   sheetTab,
   barState,
   settings,
   onToggleFocus,
-  onToggleSheet,
-  onSelectTab,
+  onToggleMenu,
+  onOpenSheet,
+  onCloseSheet,
   onBarStateChange,
   onJumpToChapter,
   onJumpToPage,
   onSettingsChange,
   bookmarks,
-  bookmarkedHere,
-  onToggleBookmark,
   onJumpToBookmark,
   onRenameBookmark,
   onDeleteBookmark,
   searchOpen,
   query,
   results,
-  onToggleSearch,
+  onOpenSearch,
+  onCloseSearch,
   onQueryChange,
   onJumpToHit,
 }: ChromeProps) {
@@ -195,30 +216,15 @@ export function Chrome({
   const label = barLabel(barState, pages, progressLabel(manifest, here))
 
   /**
-   * Where the finger went down on the sheet. A ref rather than state: it
-   * changes on every touch and nothing renders from it, so putting it in state
-   * would re-render the whole overlay mid-gesture.
+   * What the ✕ in the search field means, which depends on whether there is
+   * anything to clear.
+   *
+   * This is the whole of a bug the reader hit: with an empty field the ✕ has
+   * nothing to erase, so a button that only ever erased sat there doing
+   * literally nothing. One control, two honest jobs — clear the word, and when
+   * there is no word, leave.
    */
-  const touchStart = useRef<Touch | null>(null)
-
-  const onTouchStart = (event: React.TouchEvent) => {
-    const point = event.touches[0]
-    touchStart.current = point ? { x: point.clientX, y: point.clientY } : null
-  }
-
-  const onTouchEnd = (event: React.TouchEvent) => {
-    const from = touchStart.current
-    const point = event.changedTouches[0]
-    touchStart.current = null
-    if (!from || !point) return
-
-    const next = stepThrough(
-      TABS.map((tab) => tab.id),
-      sheetTab,
-      swipeOf(from, { x: point.clientX, y: point.clientY }),
-    )
-    if (next !== sheetTab) onSelectTab(next)
-  }
+  const clears = query.length > 0
 
   return (
     <>
@@ -226,59 +232,99 @@ export function Chrome({
         the contents list, and a hidden control must not be reachable by tab or
         by a screen reader while it is invisible. */}
     <div className={styles.chrome} data-shown={shown} inert={!shown}>
+      {/*
+        One bar, at the top, and four controls on it. The bottom of the screen
+        used to carry a second row of buttons; a phone is held at the bottom, so
+        that is exactly where a reader's thumb rests while reading, and putting
+        controls under it meant tapping "contents" while trying to turn a page.
+      */}
       <header className={styles.bar}>
-        <Link to="/" className={styles.control}>
-          ← Library
+        <Link to="/" className={styles.iconControl} aria-label="Back to library">
+          <span aria-hidden="true">←</span>
         </Link>
 
         <span className={styles.bookTitle}>{bookTitle}</span>
 
-        {/*
-          A toggle, not an "add" button — see `bookmarkOn` in `bookmarks.ts`.
-          Tapping it on a page that is already marked takes the mark off, which
-          is the only behaviour that makes a ribbon mean anything: a control that
-          only ever added would leave a reader with no way to undo a mistap
-          except to go hunting in the sheet for the thing they just made.
-
-          `aria-pressed` carries the state properly; the filled and hollow
-          glyphs are the sighted half of the same fact, and the label changes
-          with it so a screen reader hears the *action*, not the state twice.
-        */}
         <button
           type="button"
-          className={styles.control}
-          aria-pressed={bookmarkedHere}
-          aria-label={bookmarkedHere ? 'Remove bookmark' : 'Bookmark this page'}
-          onClick={onToggleBookmark}
-        >
-          <span aria-hidden="true">{bookmarkedHere ? '🔖' : '🏳'}</span>
-        </button>
-
-        <button
-          type="button"
-          className={styles.control}
+          className={styles.iconControl}
           aria-expanded={searchOpen}
           aria-label="Search this book"
-          onClick={onToggleSearch}
+          onClick={onOpenSearch}
         >
           <span aria-hidden="true">🔍</span>
         </button>
 
+        {/*
+          Aa opens the sheet straight at the settings, rather than opening it
+          somewhere else and asking the reader to find a tab. It is the one
+          panel worth a control of its own: text size is adjusted mid-sentence,
+          in the middle of reading, and it should cost one tap.
+        */}
         <button
           type="button"
-          className={styles.control}
-          aria-pressed={focusMode}
-          onClick={onToggleFocus}
+          className={styles.iconControl}
+          aria-expanded={sheetOpen && sheetTab === 'aa'}
+          aria-label="Text and display"
+          onClick={() => onOpenSheet('aa')}
         >
-          {focusMode ? 'Focus on' : 'Focus off'}
+          <span aria-hidden="true">Aa</span>
+        </button>
+
+        <button
+          type="button"
+          className={styles.iconControl}
+          aria-expanded={menuOpen}
+          aria-haspopup="menu"
+          aria-label="More"
+          onClick={onToggleMenu}
+        >
+          <span aria-hidden="true">⋮</span>
         </button>
       </header>
 
       {/*
-        Search, in a panel of its own rather than as a fifth tab in the sheet.
-        The reader's call, and it has one consequence worth naming: the results
-        are a jump-to list exactly like the contents and the bookmarks, but it
-        does not live beside them, so it has to carry its own way out (the ✕).
+        The three-dot menu: the things you open occasionally, kept off the bar
+        so the bar stays four controls wide however many of them there are.
+      */}
+      {menuOpen && (
+        <>
+          {/* Clear rather than dimmed: a dropdown is a small thing and dimming
+              the whole book behind it overstates it. It still has to catch the
+              tap that dismisses it. */}
+          <div className={styles.menuScrim} onClick={onToggleMenu} aria-hidden="true" />
+
+          <div className={styles.menu} role="menu" aria-label="More">
+            {MENU_PANELS.map((panel) => (
+              <button
+                key={panel}
+                type="button"
+                role="menuitem"
+                className={styles.menuItem}
+                onClick={() => onOpenSheet(panel)}
+              >
+                {SHEET_TITLES[panel]}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.menuItem}
+              aria-pressed={focusMode}
+              onClick={onToggleFocus}
+            >
+              {focusMode ? 'Focus on' : 'Focus off'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {/*
+        Search, in a panel of its own rather than as one more thing in the
+        sheet. The results are a jump-to list exactly like the contents and the
+        bookmarks, but it does not live beside them, so it carries its own way
+        out (the ✕, and the back gesture the reading page wires to it).
       */}
       {searchOpen && (
         <div className={styles.searchPanel} role="dialog" aria-label="Search this book">
@@ -299,8 +345,8 @@ export function Chrome({
             <button
               type="button"
               className={styles.searchClose}
-              aria-label="Close search"
-              onClick={onToggleSearch}
+              aria-label={clears ? 'Clear search' : 'Close search'}
+              onClick={() => (clears ? onQueryChange('') : onCloseSearch())}
             >
               <span aria-hidden="true">✕</span>
             </button>
@@ -352,51 +398,42 @@ export function Chrome({
       {/*
         The space above the sheet, which closes it. Without this the sheet
         filled everything between the two bars, so there was nowhere to tap to
-        mean "no thanks" and the only way out was to find the ☰ again.
+        mean "no thanks" and the only way out was to find the control again.
 
         Not a button: it is a large invisible target, so announcing it to a
-        screen reader would be noise — the ☰ toggle and the back gesture are the
-        two routes that get announced.
+        screen reader would be noise — the sheet's own ✕ and the back gesture
+        are the two routes that get announced.
       */}
       {sheetOpen && (
         <div
           className={styles.scrim}
           data-scrim="true"
-          onClick={onToggleSheet}
+          onClick={onCloseSheet}
           aria-hidden="true"
         />
       )}
 
       {sheetOpen && (
-        // Swipe sideways to change tab — the row of tabs is a row, so a
-        // sideways gesture is what it looks like it should answer to. Tapping a
-        // tab still works and is still the announced route; this is the
-        // shortcut, not the only way.
-        <div className={styles.sheet} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          <div className={styles.tabs} role="tablist" aria-label="Book navigation">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                id={`sheet-tab-${tab.id}`}
-                aria-selected={tab.id === sheetTab}
-                aria-controls={`sheet-panel-${tab.id}`}
-                className={styles.tab}
-                onClick={() => onSelectTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <div className={styles.sheet} role="dialog" aria-label={SHEET_TITLES[sheetTab]}>
+          {/*
+            The heading the tab row used to supply. It is also where the ✕ went:
+            with four tabs there was always another tab to move to, so closing
+            was rare; opened by name from a menu, the only move left is out.
+          */}
+          <div className={styles.sheetHead}>
+            <h2 className={styles.sheetTitle}>{SHEET_TITLES[sheetTab]}</h2>
+            <button
+              type="button"
+              className={styles.sheetClose}
+              aria-label="Close"
+              onClick={onCloseSheet}
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
           </div>
 
           {sheetTab === 'contents' && (
-            <nav
-              role="tabpanel"
-              id="sheet-panel-contents"
-              aria-labelledby="sheet-tab-contents"
-              className={styles.sheetPanel}
-            >
+            <nav className={styles.sheetPanel} aria-label="Contents">
               <ul>
                 {manifest.chapters.map((entry) => (
                   <li key={entry.chapter}>
@@ -426,16 +463,11 @@ export function Chrome({
             — is exactly once per chapter.
           */}
           {sheetTab === 'bookmarks' && (
-            <div
-              role="tabpanel"
-              id="sheet-panel-bookmarks"
-              aria-labelledby="sheet-tab-bookmarks"
-              className={styles.sheetPanel}
-            >
+            <div className={styles.sheetPanel}>
               {bookmarks.length === 0 ? (
                 <p className={styles.empty}>
-                  No bookmarks yet. Tap the ribbon at the top of the screen to mark the
-                  page you’re on.
+                  No bookmarks yet. Tap the top right corner of the page to mark where
+                  you are, the way you’d fold a corner down.
                 </p>
               ) : (
                 <ul>
@@ -494,12 +526,7 @@ export function Chrome({
           )}
 
           {sheetTab === 'notes' && (
-            <div
-              role="tabpanel"
-              id="sheet-panel-notes"
-              aria-labelledby="sheet-tab-notes"
-              className={styles.sheetPanel}
-            >
+            <div className={styles.sheetPanel}>
               <p className={styles.empty}>
                 Notes and highlights arrive with the tutor — anything you ask about gets
                 saved here, filed by chapter.
@@ -508,12 +535,7 @@ export function Chrome({
           )}
 
           {sheetTab === 'aa' && (
-            <div
-              role="tabpanel"
-              id="sheet-panel-aa"
-              aria-labelledby="sheet-tab-aa"
-              className={styles.sheetPanel}
-            >
+            <div className={styles.sheetPanel}>
               <div className={styles.settingRow}>
                 <span className={styles.settingLabel}>Theme</span>
                 <div className={styles.settingOptions} role="group" aria-label="Theme">
@@ -617,6 +639,12 @@ export function Chrome({
         </div>
       )}
 
+      {/*
+        The bottom is the slider and nothing else now. Everything that used to
+        sit beside it opens from the top bar instead — see the note at the head
+        of this file for why the foot of a phone screen is the wrong place for
+        anything you are not deliberately dragging.
+      */}
       <footer className={styles.bar}>
         {/*
           The slider moves one page at a time when the book knows its length,
@@ -648,18 +676,6 @@ export function Chrome({
             onChange={(event) => onJumpToChapter(Number(event.target.value))}
           />
         )}
-
-        <div className={styles.statusRow}>
-          <button
-            type="button"
-            className={styles.sheetButton}
-            aria-expanded={sheetOpen}
-            aria-label="Contents, bookmarks and notes"
-            onClick={onToggleSheet}
-          >
-            <span aria-hidden="true">☰</span>
-          </button>
-        </div>
       </footer>
     </div>
 

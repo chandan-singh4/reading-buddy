@@ -307,6 +307,77 @@
   font-size: var(--text-sm);
 }
 
+/*
+ * The bookmark corner (WP-55).
+ *
+ * A tap target in the top right corner of the page that draws nothing until the
+ * page is marked. Fixed rather than in the flow: it belongs to the screen's
+ * corner, and a corner that scrolled away with the text would be a bookmark you
+ * had to go and find.
+ *
+ * `z-index: 9` puts it above the page and *below* the overlay (10) — while the
+ * toolbar is up it tucks behind it, which is right: the toolbar was asked for,
+ * and a mark half under a bar would look like a rendering fault. It is still
+ * there the moment the toolbar goes.
+ */
+.ribbon {
+  position: fixed;
+  top: var(--safe-top);
+  right: 0;
+  z-index: 9;
+  /* Deliberately larger than it looks. The visible fold is narrow, but a corner
+     tapped with a thumb needs the usual 44px of forgiveness around it. */
+  width: 56px;
+  height: 56px;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--space-4) 0 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  /* No flash on tap: an unmarked corner has nothing drawn in it, so lighting up
+     a blank square would be the only thing that ever happened there. The mark
+     appearing is the feedback. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ribbonMark {
+  width: 1.25rem;
+  /* Hangs from the very top of the page, as a ribbon slipped between the pages
+     of a real book does — it is not centred in its target. */
+  height: 2.25rem;
+  background: var(--color-text);
+  /* The notch: a V cut out of the foot, which is the whole of the shape. */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+  /* Grows out of the top of the page rather than fading in on the spot — the
+     movement is small and it reads as the mark being put in. */
+  transform-origin: top center;
+  transform: scaleY(0);
+  opacity: 0;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.ribbon[data-marked='true'] .ribbonMark {
+  transform: scaleY(1);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ribbonMark {
+    transition: none;
+  }
+}
+
+/* Nothing is drawn for an unmarked page, so a keyboard needs the target itself
+   outlined or the focus ring would land on empty air. */
+.ribbon:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -4px;
+  border-radius: var(--radius-sm);
+}
+
 /* The Previous and Next buttons that lived here are gone — the book is turned
    by swiping, by tapping the edge of the page, and by the arrow keys. */
 

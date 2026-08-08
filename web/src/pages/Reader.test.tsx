@@ -117,10 +117,31 @@ beforeEach(async () => {
 })
 
 /**
- * The hamburger that opens the Contents / Bookmarks / Notes sheet. It shows an
- * icon, so its accessible name is the label, not its text.
+ * The three-dot menu on the top bar, which is where Contents, Bookmarks and
+ * Notes live now (WP-55). It shows a glyph, so its accessible name is the
+ * label, not its text.
  */
-const SHEET_BUTTON = 'Contents, bookmarks and notes'
+const MENU_BUTTON = 'More'
+
+/**
+ * Open one of the sheet's panels the way a reader does: the menu, then the
+ * panel by name. Aa has its own button on the bar and doesn't come through here.
+ */
+function openSheetAt(panel: 'Contents' | 'Bookmarks' | 'Notes') {
+  fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
+  fireEvent.click(screen.getByRole('menuitem', { name: panel }))
+}
+
+/** Focus Mode moved into the menu with everything else that isn't a bar button. */
+function turnFocusOn() {
+  fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Focus off' }))
+}
+
+/** The sheet showing a named panel, for scoping a query inside it. */
+function sheet(name: string) {
+  return within(screen.getByRole('dialog', { name }))
+}
 
 /**
  * Turn a page, the way a reader without a touch screen does.
@@ -262,7 +283,7 @@ describe('the overlay', () => {
 
     fireEvent.click(text)
     expect(chromeShown(container)).toBe(true)
-    expect(screen.getByRole('button', { name: SHEET_BUTTON })).toBeTruthy()
+    expect(screen.getByRole('button', { name: MENU_BUTTON })).toBeTruthy()
 
     // Hidden, never removed — that distinction is the whole of the Focus Mode
     // decision, and a tap has to work both ways.
@@ -357,12 +378,12 @@ describe('the bottom bar', () => {
   })
 })
 
-describe('the navigation sheet', () => {
+describe('the top bar and its menu', () => {
   it('lists the chapters and jumps to one', async () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
+    openSheetAt('Contents')
     fireEvent.click(screen.getByRole('button', { name: /The Middle/ }))
 
     expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
@@ -372,11 +393,11 @@ describe('the navigation sheet', () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
+    openSheetAt('Contents')
     fireEvent.click(screen.getByRole('button', { name: /The Middle/ }))
     await screen.findByText('The second chapter begins.')
 
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Contents' })).toBeNull()
   })
 
   it('lands on the start of a chapter, not wherever you were in it', async () => {
@@ -386,29 +407,53 @@ describe('the navigation sheet', () => {
     await turnForward()
     await screen.findByText('Later in the first chapter.')
 
-    fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
+    openSheetAt('Contents')
     fireEvent.click(screen.getByRole('button', { name: /The Beginning/ }))
 
     expect(await screen.findByText('The opening words.')).toBeTruthy()
   })
 
-  it('says Notes is not here yet, and points at the ribbon for bookmarks', async () => {
+  it('says Notes is not here yet, and points at the corner for bookmarks', async () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
-
     // Bookmarks is real now (WP-14); with none made, the empty state has to say
-    // how to make one rather than naming a waypoint.
-    fireEvent.click(screen.getByRole('tab', { name: 'Bookmarks' }))
+    // how to make one — and since WP-55 that means the corner of the page, not
+    // a ribbon in a toolbar that no longer has one.
+    openSheetAt('Bookmarks')
     expect(screen.getByText(/No bookmarks yet/)).toBeTruthy()
+    expect(screen.getByText(/top right corner/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Notes' }))
+    openSheetAt('Notes')
     expect(screen.getByText(/Notes and highlights arrive/)).toBeTruthy()
 
-    // The chapter list must still be there to come back to.
-    fireEvent.click(screen.getByRole('tab', { name: 'Contents' }))
+    // The chapter list must still be reachable to come back to.
+    openSheetAt('Contents')
     expect(screen.getByRole('button', { name: /The Middle/ })).toBeTruthy()
+  })
+
+  // Aa is the one panel with its own button, because text size is adjusted
+  // mid-sentence and should not cost a trip through a menu.
+  it('opens the display settings straight from the bar', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Text and display' }))
+
+    expect(sheet('Text and display').getByRole('button', { name: 'Larger text' })).toBeTruthy()
+  })
+
+  // The menu is a dropdown, and a dropdown that can only be closed by choosing
+  // something from it is a trap.
+  it('closes the menu when the space around it is tapped', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
+    expect(screen.getByRole('menu')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 })
 
@@ -425,11 +470,6 @@ describe('bookmarks', () => {
   const MARK = 'Bookmark this page'
   const UNMARK = 'Remove bookmark'
 
-  const openSheetAt = (tab: string) => {
-    fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
-    fireEvent.click(screen.getByRole('tab', { name: tab }))
-  }
-
   it('marks the page, names it from the paragraph, and lists it under its chapter', async () => {
     openReader()
     await screen.findByText('The opening words.')
@@ -442,7 +482,7 @@ describe('bookmarks', () => {
     openSheetAt('Bookmarks')
     // Scoped to the panel: the chapter title is also printed elsewhere on the
     // reading screen, and an unscoped match would pass without the list.
-    const panel = within(screen.getByRole('tabpanel'))
+    const panel = sheet('Bookmarks')
     expect(panel.getByRole('button', { name: 'The opening words.' })).toBeTruthy()
     // Filed under the chapter it falls in, not listed loose.
     expect(panel.getByText('The Beginning')).toBeTruthy()
@@ -628,11 +668,71 @@ describe('searching inside a book', () => {
     typeQuery('opening')
     await screen.findByText('1 result.')
 
+    // Clear, then close: two jobs for the one ✕, and with a word in the field
+    // the first of them is the one it does.
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(screen.getByRole('searchbox')).toHaveProperty('value', '')
+
     fireEvent.click(screen.getByRole('button', { name: 'Close search' }))
     expect(screen.queryByRole('searchbox')).toBeNull()
 
     openSearch()
-    expect(screen.getByRole('searchbox')).toHaveProperty('value', 'opening')
+    expect(screen.getByRole('searchbox')).toHaveProperty('value', '')
+  })
+
+  /*
+   * The three ways out of search, all reported broken from the phone and all
+   * the same underlying fault: the panel sat inside an overlay that lets taps
+   * through to the book, and never claimed them back. Every one of these is a
+   * regression test for a thing the reader actually hit.
+   */
+
+  it('leaves the panel, not the book, when there is nothing typed', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    // Nothing typed: the ✕ has nothing to erase, so it closes instead of
+    // sitting there doing nothing — which is what it used to do.
+    fireEvent.click(screen.getByRole('button', { name: 'Close search' }))
+
+    expect(screen.queryByRole('searchbox')).toBeNull()
+    expect(screen.getByText('The opening words.')).toBeTruthy()
+  })
+
+  it('closes on a back gesture instead of throwing you out of the book', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    // The gesture, as the browser delivers it. Search had never been wired to
+    // this, so a back swipe skipped the panel and left the book entirely.
+    window.history.back()
+
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('searchbox')).toBeNull()
+    })
+    expect(screen.getByText('The opening words.')).toBeTruthy()
+  })
+
+  it('keeps taps on the field to itself once there are results', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSearch()
+    typeQuery('opening')
+    await screen.findByText('1 result.')
+
+    // Editing the query after seeing results used to dismiss the panel — the
+    // tap fell through to the page underneath. Worth stating plainly: jsdom has
+    // no layout and so no hit testing, which means this cannot see the
+    // `pointer-events` rule that actually caused it. What it does hold is the
+    // behaviour on top of it — the field survives being tapped and keeps what
+    // was typed — and the fix itself is a comment in `Chrome.module.css`.
+    fireEvent.click(screen.getByRole('searchbox'))
+    typeQuery('opening w')
+
+    expect(screen.getByRole('searchbox')).toHaveProperty('value', 'opening w')
   })
 })
 
@@ -657,7 +757,7 @@ describe('Focus Mode', () => {
     const { unmount } = openReader()
     await screen.findByText('The opening words.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Focus off' }))
+    turnFocusOn()
     unmount()
 
     // Reopening is the real test: the setting outlives the screen.
@@ -669,7 +769,7 @@ describe('Focus Mode', () => {
   it('still lets a tap bring everything back', async () => {
     openReader()
     await screen.findByText('The opening words.')
-    fireEvent.click(screen.getByRole('button', { name: 'Focus off' }))
+    turnFocusOn()
     cleanup()
 
     const { container } = openReader()
@@ -677,13 +777,16 @@ describe('Focus Mode', () => {
     fireEvent.click(text)
 
     expect(chromeShown(container)).toBe(true)
-    expect(screen.getByRole('button', { name: 'Focus on' })).toBeTruthy()
+    // And the way out of Focus Mode is still there to be found — in the menu,
+    // saying it is on.
+    fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
+    expect(screen.getByRole('menuitem', { name: 'Focus on' })).toBeTruthy()
   })
 
   it('leaves the book turnable — reading never loses its controls', async () => {
     openReader()
     await screen.findByText('The opening words.')
-    fireEvent.click(screen.getByRole('button', { name: 'Focus off' }))
+    turnFocusOn()
     cleanup()
 
     openReader()
@@ -783,25 +886,25 @@ describe('closing the navigation sheet', () => {
     const { container } = openReader()
     await screen.findByText('The opening words.')
 
-    fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
-    expect(screen.getByRole('tab', { name: 'Contents' })).toBeTruthy()
+    openSheetAt('Contents')
+    expect(screen.getByRole('dialog', { name: 'Contents' })).toBeTruthy()
 
     const scrim = container.querySelector('[data-scrim]')
     if (!scrim) throw new Error('expected something to tap outside the sheet')
     fireEvent.click(scrim)
 
-    expect(screen.queryByRole('tab', { name: 'Contents' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Contents' })).toBeNull()
   })
 
   it('closes on a back gesture instead of leaving the book', async () => {
     openReader()
     await screen.findByText('The opening words.')
-    fireEvent.click(screen.getByRole('button', { name: SHEET_BUTTON }))
+    openSheetAt('Contents')
 
     window.history.back()
 
     await vi.waitFor(() => {
-      expect(screen.queryByRole('tab', { name: 'Contents' })).toBeNull()
+      expect(screen.queryByRole('dialog', { name: 'Contents' })).toBeNull()
     })
     // Still in the book — the whole point. Swiping back used to land the
     // reader on the shelf.
