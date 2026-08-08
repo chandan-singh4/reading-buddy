@@ -42,6 +42,29 @@
  *
  * Step 3 is the whole idea: the retrace and the collapse are the same act.
  *
+ * ## And then it re-arms
+ *
+ * The rule above is per *stretch* of navigation, not per session — which is the
+ * correction the reader asked for after living with it:
+ *
+ * > If I navigate and then backswipe and backswipe again, that should get me out
+ * > of the app. But if I only backswipe and then continue to navigate in the app,
+ * > then backswipe should not get me out but one step before.
+ *
+ * Home → Library → Stats, Back → Library. Then Stats again, Back → **Library**,
+ * not out. The retrace was spent, and moving again earns a new one.
+ *
+ * Mechanically that is one flag: `hasSpare`, whether the level is currently
+ * holding its second, rewritable entry. A retrace consumes it, and the next
+ * move pushes rather than replaces — claiming a fresh second entry, exactly as
+ * arriving at the level did. So the level oscillates between one entry and two
+ * and never grows past two, however long the reader swipes and presses Back.
+ *
+ * Which is also why reading the entry's `state` was not enough on its own:
+ * after a retrace the top entry is still a tab entry — it was rewritten to one
+ * — so the state alone says "replace" when the truth is that the entry
+ * underneath has just been used up.
+ *
  * ## The case this deliberately does not cover
  *
  * Reaching the tabs *forwards* out of a book — following a link into the
@@ -101,6 +124,15 @@ let previousTab: string | null = null
 /** How deep in the history the last render was, or `null` before the first. */
 let lastIndex: number | null = null
 
+/**
+ * Whether the tab level is currently holding its second, rewritable entry.
+ *
+ * `true` means a move rewrites the top entry; `false` means it must claim a new
+ * one. A Back sets it back to `false`, which is what re-arms the whole mechanism
+ * for the next stretch of navigation — see the note at the top.
+ */
+let hasSpare = false
+
 /** Fallback pop detection where there is no history index. See `wentBack`. */
 const seenKeys = new Set<string>()
 
@@ -108,6 +140,7 @@ const seenKeys = new Set<string>()
 export function forgetTabHistory(): void {
   previousTab = null
   lastIndex = null
+  hasSpare = false
   seenKeys.clear()
 }
 
@@ -187,10 +220,13 @@ export function useTabHistory(isTabPath: (pathname: string) => boolean): (to: st
     // nothing behind it yet and Back should simply return there.
     previousTab = isTab.current(from) ? from : null
 
-    // Claim an entry on the way in; rewrite it from then on. Two entries is
-    // what the retrace spends, and it never grows past them however long the
-    // reader swipes around.
-    navigate(to, { replace: isTabEntry(here.current.state), state: TAB_ENTRY })
+    // Claim a second entry when the level hasn't got one — arriving from
+    // outside, or having just spent it on a Back — and rewrite it from then on.
+    // Both conditions matter: the flag alone would push on the way in from a
+    // book, and the entry's state alone can't tell a spent retrace from an
+    // ordinary swipe, because the retrace leaves a tab entry on top either way.
+    navigate(to, { replace: hasSpare && isTabEntry(here.current.state), state: TAB_ENTRY })
+    hasSpare = true
   }, [navigate])
 
   useEffect(() => {
@@ -210,6 +246,13 @@ export function useTabHistory(isTabPath: (pathname: string) => boolean): (to: st
     }
 
     if (!wentBack) return
+
+    // The level no longer has a spare entry to rewrite — whether it is about to
+    // be retraced into, or Back has left the four screens altogether. Either
+    // way the next move must claim a fresh one, which is what gives the reader
+    // another Back to spend. Set before the returns below, so every path
+    // through a Back agrees on it.
+    hasSpare = false
 
     const back = previousTab
     // Consumed whether or not it is used: one Back retraces one move, and a

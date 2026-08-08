@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
+import { forgetLibraryMemory, readLibraryMemory } from '../app/libraryMemory.ts'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
 import { forgetTabHistory } from '../app/tabHistory.ts'
 import { forgetCovers } from '../app/useCovers.ts'
@@ -38,6 +39,7 @@ beforeEach(async () => {
   // That makes clearing them between cases the test's job, or one case's shelf
   // would satisfy the next case's assertions without the code doing anything.
   forgetShelfMemory()
+  forgetLibraryMemory()
   forgetCovers()
   // The history memory is module-level for the same reason and with the same
   // hazard — left over, it reads a fresh render as a Back press and retraces a
@@ -110,6 +112,38 @@ describe('coming back to Home', () => {
     await waitFor(() => {
       expect(screen.getByText('Breath')).toBeDefined()
     })
+  })
+
+  it('opens the library with its books already on it, first visit of the session', async () => {
+    // The reader's report: "the first time I go from home to all books I see
+    // that refresh flash, and then back to home and again to all books and I
+    // don't see it." The first visit was the one that still flashed, because
+    // the library began every mount at "Loading…" and only a warm database was
+    // hiding it on later visits.
+    //
+    // Home warms the library's data in idle time, so by the time a swipe can
+    // reach it the answer is already waiting.
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Breath')).toBeDefined()
+
+    // The warm is deliberately deferred to an idle moment — this is that moment
+    // arriving, not the test reaching past the code to make it pass.
+    await waitFor(() => {
+      expect(readLibraryMemory()).not.toBeNull()
+    })
+
+    swipe(-150)
+
+    // Synchronously, on the library's first frame. `findBy` would pass against
+    // the old code a moment later, which is exactly the moment being complained
+    // about.
+    expect(screen.getByText('All books')).toBeDefined()
+    expect(screen.getByText('The Wind in the Willows')).toBeDefined()
+    expect(screen.queryByText('Loading…')).toBeNull()
   })
 
   it('picks up a book removed while the reader was elsewhere', async () => {
