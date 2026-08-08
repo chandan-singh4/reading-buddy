@@ -15,7 +15,7 @@
      of the screen reaches the text and dismisses the overlay. */
   pointer-events: none;
   opacity: 0;
-  transition: opacity 160ms ease;
+  transition: opacity var(--motion-ui) var(--ease-standard);
 }
 
 .chrome[data-shown='true'] {

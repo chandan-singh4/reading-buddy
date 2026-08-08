@@ -103,7 +103,11 @@
      as the whole screen jumping. */
   transform-origin: top center;
   transform: scale(1);
-  transition: transform 200ms ease;
+  /* The same token the toolbar's own fade uses, and that matters more than the
+     number does: the page stepping back and the bars arriving are one event.
+     At 200 against the bars' 160 they finished at different moments, and the
+     eye reads two things finishing separately as two things happening. */
+  transition: transform var(--motion-ui) var(--ease-standard);
 }
 
 /*
@@ -445,8 +449,8 @@
   transform: scaleY(0);
   opacity: 0;
   transition:
-    transform 160ms ease,
-    opacity 160ms ease;
+    transform var(--motion-micro) var(--ease-standard),
+    opacity var(--motion-micro) var(--ease-standard);
 }
 
 .ribbon[data-marked='true'] .ribbonMark {

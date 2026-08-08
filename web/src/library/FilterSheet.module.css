@@ -18,7 +18,7 @@
   background-color: rgb(0 0 0 / 0.4);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 240ms ease;
+  transition: opacity var(--motion-ui) var(--ease-standard);
 }
 
 .scrimOpen {
@@ -43,7 +43,9 @@
      `inert` covers focus, this covers announcement. */
   transform: translateY(100%);
   visibility: hidden;
-  transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1), visibility 280ms;
+  transition:
+    transform var(--motion-ui) var(--ease-emphasis),
+    visibility var(--motion-ui);
 }
 
 .sheetOpen {
@@ -94,7 +96,9 @@
   font: inherit;
   font-size: var(--text-sm);
   cursor: pointer;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  transition:
+    background-color var(--motion-micro) var(--ease-standard),
+    border-color var(--motion-micro) var(--ease-standard);
 }
 
 .choiceActive {

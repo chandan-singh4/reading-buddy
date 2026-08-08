@@ -127,7 +127,7 @@ const PAGE_SCALE = 0.85
  * a fraction of a per cent off, and a fraction of a per cent of a
  * forty-thousand-pixel strip is a page and a half.
  *
- * During the 200ms the shrink is animating, the real scale is somewhere between
+ * While the shrink is animating (`--motion-ui`), the real scale is between
  * the two values and this answers with the destination. Nothing is measured in
  * that window except by a reader turning a page in the same fifth of a second
  * as they raised the toolbar, and the next scroll settles it.

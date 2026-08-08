@@ -1,11 +1,18 @@
-/* The chrome around every non-reading screen: top bar, content, left drawer.
-   The drawer's motion tokens live here rather than in `theme.css` because
-   nothing else in the app opens a panel. */
+/* The chrome around every non-reading screen: top bar, content, left drawer. */
 
 .shell {
   --drawer-width: min(17rem, 82vw);
-  --drawer-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  --drawer-duration: 320ms;
+  /*
+   * Aliases now, not values. They were the drawer's own numbers, on the
+   * reasoning that nothing else in the app opens a panel — which was true of
+   * panels and beside the point about *timing*: the drawer is one of several
+   * things that replace most of the screen, and it was moving at a speed none
+   * of the others used. It is kept as a pair of local names only because the
+   * slide is declared in `AppShell.tsx` rather than here (see `.page`), and
+   * two files agreeing on one name is what stops them drifting apart again.
+   */
+  --drawer-ease: var(--ease-emphasis);
+  --drawer-duration: var(--motion-screen);
 
   /* The page slide is timed to match these, and is declared in `AppShell.tsx`
      rather than here — see the note on `.page` for why it had to move. */
@@ -74,7 +81,7 @@
   border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
-  transition: background 160ms ease;
+  transition: background var(--motion-micro) var(--ease-standard);
 }
 
 .menuButton:active {
@@ -296,8 +303,8 @@
   font-size: var(--text-base);
   color: var(--color-text);
   transition:
-    background 180ms ease,
-    color 180ms ease;
+    background var(--motion-micro) var(--ease-standard),
+    color var(--motion-micro) var(--ease-standard);
 }
 
 .drawerLink:active {

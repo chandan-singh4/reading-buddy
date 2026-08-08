@@ -10,7 +10,7 @@
   padding: var(--space-2) var(--space-4) var(--space-3);
   background-color: var(--color-surface-raised);
   border-bottom: 1px solid var(--color-border);
-  animation: drop 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: drop var(--motion-ui) var(--ease-standard);
 }
 
 @keyframes drop {

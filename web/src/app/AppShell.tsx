@@ -24,15 +24,24 @@ function isTabPath(pathname: string): boolean {
  * be *in* it; "swipe right three times" is not a way home.
  */
 /*
- * The page slide borrows the drawer's curve and very nearly its duration, on
- * purpose. A swipe between the four screens and a tap in the drawer are the
- * *same move* by two routes, so if they were timed differently the app would
- * feel like two apps depending on which one the reader reached for.
+ * The page slide borrows the drawer's curve and duration, on purpose. A swipe
+ * between the four screens and a tap in the drawer are the *same move* by two
+ * routes, so if they were timed differently the app would feel like two apps
+ * depending on which one the reader reached for.
  *
  * 300 ms rather than the 260 this once ran at: the old timing was short enough
  * that the slide read as a cut with a flicker on it — the screen was already
  * still by the time the eye found it. Long enough to be followed, short enough
  * that a reader flicking through all four never queues.
+ *
+ * These two are `--motion-screen` and `--ease-emphasis` from `theme.css`,
+ * written out as literals because the Web Animations API wants values rather
+ * than custom-property references. This comment used to say the slide matched
+ * the drawer "very nearly" — it was 300 against the drawer's 320, near enough
+ * to *sound* deliberate and far enough to be visible when a reader did both in
+ * a row. Now that both read the token, the two really are one number — and
+ * `styles/motionTokens.test.ts` fails if these literals and the token ever
+ * part company again, which is the only reason this comment can be believed.
  *
  * 5% rather than a full screen width, and no fade at all. See `.page` in the
  * stylesheet for what happens when either of those changes.

@@ -30,7 +30,7 @@
   -webkit-touch-callout: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 160ms ease;
+  transition: background-color var(--motion-micro) var(--ease-standard);
 }
 
 .cardList + .cardList {
@@ -72,7 +72,7 @@
   border-radius: var(--radius-sm);
   overflow: hidden;
   box-shadow: var(--shadow-raised);
-  transition: width 200ms ease;
+  transition: width var(--motion-ui) var(--ease-standard);
 }
 
 .cardGrid .media {
@@ -171,7 +171,7 @@
   display: block;
   height: 100%;
   background-color: var(--color-accent);
-  transition: width 240ms ease;
+  transition: width var(--motion-ui) var(--ease-standard);
 }
 
 /* The tick, drawn over the corner of the cover. */

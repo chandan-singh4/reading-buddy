@@ -20,9 +20,211 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Reading" />
     <title>Reading Buddy</title>
+
+    <!--
+      The theme, before the first pixel.
+
+      `applyStoredTheme()` in `main.tsx` already does this, but `main.tsx` is a
+      module: it does not run until the bundle has been fetched and parsed, and
+      the browser has painted at least one frame by then. So a reader who has
+      chosen Dark used to get a flash of the *light* background on every cold
+      start — the app's own launch, contradicting itself.
+
+      Deliberately duplicated and deliberately dumb. It reads the attribute and
+      nothing else; the validation, the fallbacks and the reading font remain
+      `readerSettings.ts`'s job, and it re-applies all of them a moment later.
+      The worst this can do on a corrupt value is set an attribute no stylesheet
+      matches, which is the same as setting none.
+    -->
+    <script>
+      try {
+        var saved = JSON.parse(localStorage.getItem('reading-buddy:reader-settings') || '{}')
+        if (saved.theme && saved.theme !== 'auto') document.documentElement.dataset.theme = saved.theme
+      } catch (error) {
+        /* Private mode, or nothing saved. The OS preference is a fine answer. */
+      }
+    </script>
+
+    <!--
+      The launch screen's styles live here, inline, and not in `index.css`.
+
+      That is the entire point of it. `index.css` is imported by `main.tsx`, so
+      in a production build it becomes a stylesheet the browser must fetch
+      before it can paint — and in dev it does not exist until the module runs.
+      A launch screen that waits for either is a launch screen that appears
+      after the wait it was meant to cover.
+
+      Which is also why the colours below are literal hex rather than
+      `var(--color-bg)`: the tokens live in a file that has not loaded yet.
+      They are the same values `theme.css` gives the default and dark themes,
+      and the same `#14130f` the manifest names as the background colour, so
+      the splash matches the app it is in front of and the OS's own splash
+      behind it. If those change, change these — the duplication is the price
+      of painting first, and there are only two of them.
+    -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        background: #fbfaf8;
+        /* The mark is drawn in `currentColor`, and nothing has set a colour on
+           this document yet — `index.css` is still in flight. Without this the
+           book would be UA-stylesheet black on a near-black splash. */
+        color: #1a1815;
+        /* Not `opacity: 0` with a fade in. On a fast launch the splash is on
+           screen for a few frames, and fading it *in* would mean the reader
+           watches an empty coloured rectangle for the whole of its short life.
+           It arrives solid and only ever animates on the way out. */
+        transition:
+          opacity 300ms cubic-bezier(0.4, 0, 0.2, 1),
+          transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      :root[data-theme='dark'] #splash,
+      :root[data-theme='dim'] #splash,
+      :root[data-theme='forest'] #splash {
+        background: #14130f;
+        color: #ece7df;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']):not([data-theme='sepia']):not([data-theme='slate']):not([data-theme='contrast'])
+          #splash {
+          background: #14130f;
+          color: #ece7df;
+        }
+      }
+
+      /*
+       * Leaving: the mark grows very slightly as it fades, so the launch screen
+       * reads as being *stepped through* rather than switched off — the same
+       * grammar as opening a book from the shelf (`styles/transitions.css`),
+       * which is the next motion a reader will see.
+       */
+      #splash[data-leaving='true'] {
+        opacity: 0;
+        transform: scale(1.04);
+        pointer-events: none;
+      }
+
+      #splash svg {
+        width: 5rem;
+        height: 5rem;
+        /* Settles into place over the first third of a second. Enough to read
+           as the app arriving; short enough that a boot which beats it is not
+           interrupted mid-gesture. */
+        animation: splashMark 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+      }
+
+      #splash p {
+        margin: 0;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        font-size: 0.875rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #7a5c3e;
+        animation: splashWord 320ms cubic-bezier(0.32, 0.72, 0, 1) 60ms both;
+      }
+
+      :root[data-theme='dark'] #splash p,
+      :root[data-theme='dim'] #splash p {
+        color: #c9a227;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']):not([data-theme='sepia']) #splash p {
+          color: #c9a227;
+        }
+      }
+
+      @keyframes splashMark {
+        from {
+          opacity: 0;
+          transform: scale(0.92);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes splashWord {
+        from {
+          opacity: 0;
+          transform: translateY(0.375rem);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      /* The splash still shows — it is what stops the blank window — it simply
+         stops moving. Removing it entirely would be answering "less motion"
+         with "less information". */
+      @media (prefers-reduced-motion: reduce) {
+        #splash,
+        #splash svg,
+        #splash p {
+          animation: none;
+          transition: opacity 300ms linear;
+        }
+
+        #splash[data-leaving='true'] {
+          transform: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+
+    <!--
+      Painted before the bundle has been fetched, let alone run. `app/splash.ts`
+      takes it away once the first screen is actually on the glass.
+
+      `aria-hidden`, and no live region: a screen-reader user gains nothing from
+      "Reading Buddy" being announced twice a second apart, and the app's real
+      first screen is the thing worth landing on.
+    -->
+    <div id="splash" aria-hidden="true">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="18,39 48,30 48,73 18,75" fill="currentColor" opacity="0.9" />
+        <polygon points="82,39 52,30 52,73 82,75" fill="currentColor" opacity="0.9" />
+        <rect x="48" y="29" width="4" height="44" fill="#c9a227" />
+      </svg>
+      <p>Reading Buddy</p>
+    </div>
+
+    <!--
+      The backstop, and it earns its place.
+
+      Everything about taking the splash down lives in `app/splash.ts` — which
+      is inside the bundle. If the bundle fails to fetch, or throws before it
+      reaches that call, the launch screen has no one left to remove it, and
+      because it is a fixed lid at z-index 9999 it would also hide whatever
+      error React managed to render underneath. A permanent logo over an
+      invisible error message is the worst outcome available here.
+
+      Eight seconds is not a target and should never be reached; it is long
+      enough that a genuinely slow first load on a bad connection is never cut
+      short by it. `splash.ts` guards against running twice, so whichever gets
+      there first wins and the other does nothing.
+    -->
+    <script>
+      setTimeout(function () {
+        var splash = document.getElementById('splash')
+        if (splash) splash.remove()
+      }, 8000)
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

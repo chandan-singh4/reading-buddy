@@ -51,6 +51,61 @@
   --radius-lg: 16px;
   --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
 
+  /*
+   * Motion — three durations and two curves, for everything outside a book.
+   *
+   * ## Why these are tokens
+   *
+   * They were not. Before this there were ten different durations across the
+   * app — 140, 160, 180, 200, 220, 240, 260, 280, 320, 380 — each chosen on its
+   * own, in its own file, and none of them wrong on its own terms. The trouble
+   * is that a reader does not meet them on their own terms; they meet them one
+   * after another. Tapping a filter (140), opening the sheet (280), picking an
+   * option (140), watching the shelf reflow (240) is four different speeds in
+   * about a second, and that is what "a collection of web pages" actually feels
+   * like from the inside. Not any one animation being wrong — the absence of a
+   * house tempo.
+   *
+   * `reader/motion.ts` already made exactly this argument for the inside of a
+   * book, and made it well enough that page turns, chapter crossings and jumps
+   * all share one number. This is the same idea for the other side of the app.
+   *
+   * ## The three, and how to choose
+   *
+   * The question is never "how big is this element" but **how much of the
+   * screen changed meaning**.
+   *
+   * - `--motion-micro` — a control acknowledging a touch. A press state, a
+   *   chip filling in, a chevron flipping. Nothing has moved; something has
+   *   *responded*, and it has to feel attached to the finger, so this is as
+   *   short as it can be without becoming a flicker.
+   * - `--motion-ui` — something appearing, leaving, or resizing *within* a
+   *   screen. A sheet, a menu, a shelf reflowing, the drawer.
+   * - `--motion-screen` — a whole screen changing. Opening a book, the launch
+   *   screen leaving. Longer because more of the picture is being replaced and
+   *   the eye needs time to follow it somewhere.
+   *
+   * Deliberately three and not seven: the point is that a reader can *learn*
+   * the app's tempo, and they cannot learn seven of them.
+   *
+   * Inside a book, `reader/motion.ts` still rules and is not derived from
+   * these. Reading is a different activity at a different pace — a page turn is
+   * 400 ms on purpose, having twice been reported as too fast — and flattening
+   * that into a UI token would undo work done in response to real feedback.
+   */
+  --motion-micro: 140ms;
+  --motion-ui: 240ms;
+  --motion-screen: 300ms;
+
+  /* The everyday curve: brisk away, soft arrival. */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  /*
+   * For anything covering real distance. Much softer at the end, so a panel
+   * that has crossed the screen settles instead of stopping — the same curve
+   * the drawer and the book-opening transition were already using by hand.
+   */
+  --ease-emphasis: cubic-bezier(0.32, 0.72, 0, 1);
+
   /* Layout */
   --reading-measure: 34rem; /* comfortable line length for body text */
 

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
+import { dismissSplash } from './app/splash.ts'
 import { watchForUpdates } from './app/updates.ts'
 import { applyStoredTheme } from './reader/readerSettings.ts'
 import { repository } from './storage/index.ts'
@@ -49,6 +50,14 @@ async function boot(container: HTMLElement): Promise<void> {
       <App />
     </StrictMode>,
   )
+
+  // After the render, and inside the same function as the `healTitles()` await
+  // above — which is the whole reason the launch screen exists. That await is
+  // an indexed pass over the books table before the first screen may be built,
+  // so on a large library `#root` was empty for as long as it took. The splash
+  // covers exactly that window and leaves as soon as it closes; it does not
+  // wait for anything of its own. See `app/splash.ts`.
+  dismissSplash()
 }
 
 // Passed in rather than read from the outer scope: the check above doesn't
