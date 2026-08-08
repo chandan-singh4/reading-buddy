@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
+import { forgetShelfMemory } from '../app/shelfMemory.ts'
 import { useCovers } from '../app/useCovers.ts'
 import { repository, type StoredQuote } from '../storage/index.ts'
 import type { ReadingPosition } from '../storage/db.ts'
@@ -75,6 +76,11 @@ export default function BookInfo() {
   async function rename(title: string) {
     if (state.status !== 'ready') return
     setState({ ...state, book: { ...state.book, title } })
+    // Home shows this title, and it remembers its shelf between visits so that
+    // returning to it doesn't visibly reload — see `shelfMemory.ts`. Without
+    // this, a book renamed here would keep its old name on Home until something
+    // else happened to clear that memory.
+    forgetShelfMemory()
     await repository.renameBook(id, title)
   }
 

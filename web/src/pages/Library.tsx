@@ -14,7 +14,8 @@ import {
 import type { BookId, BookMeta, Shelf } from '../structure/index.ts'
 import { repository, type StoredFolder } from '../storage/index.ts'
 import { Portal } from '../app/Portal.tsx'
-import { useCovers } from '../app/useCovers.ts'
+import { forgetShelfMemory } from '../app/shelfMemory.ts'
+import { forgetCovers, useCovers } from '../app/useCovers.ts'
 import { useRowMemory } from '../app/useRowMemory.ts'
 import { AddButton } from '../library/AddButton.tsx'
 import { BookShelf } from '../library/BookShelf.tsx'
@@ -134,8 +135,25 @@ export default function Library() {
     writeLibraryPrefs(next)
   }
 
-  /** Re-read everything the shelf shows, in one round of queries. */
-  async function reload() {
+  /**
+   * Re-read everything the shelf shows, in one round of queries.
+   *
+   * `changed` says whether the books themselves were altered rather than merely
+   * re-read. Only then are the cached covers dropped: `useCovers` keeps object
+   * URLs alive across screens so returning to a shelf doesn't visibly reload it,
+   * and a cache nobody invalidates is how a re-imported book goes on showing the
+   * art the *old* parser gave it — indistinguishable, from the reader's side,
+   * from the new parser having failed.
+   *
+   * Every path that writes to the books table comes through here, which is why
+   * the invalidation lives at this one door rather than at each of them.
+   */
+  async function reload(changed = false) {
+    if (changed) {
+      forgetCovers()
+      forgetShelfMemory()
+    }
+
     const [books, sources, positions, folders] = await Promise.all([
       repository.listBooks(),
       repository.booksWithSource(),
@@ -195,7 +213,7 @@ export default function Library() {
     })
 
     setUpdating({ status: 'done', outcomes })
-    await reload().catch((error: unknown) => failed(error))
+    await reload(true).catch((error: unknown) => failed(error))
   }
 
   /**
@@ -219,7 +237,7 @@ export default function Library() {
     })
 
     setImporting({ status: 'done', outcomes })
-    await reload().catch((error: unknown) => failed(error))
+    await reload(true).catch((error: unknown) => failed(error))
   }
 
   async function onDrop(event: React.DragEvent) {
@@ -257,7 +275,7 @@ export default function Library() {
     try {
       await work(chosen)
       setSelected(null)
-      await reload()
+      await reload(true)
     } catch (error: unknown) {
       failed(error, prefix)
     }

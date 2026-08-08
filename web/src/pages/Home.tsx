@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
+import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
 import { useCovers } from '../app/useCovers.ts'
 import type { BookMeta } from '../structure/index.ts'
 import { repository } from '../storage/index.ts'
@@ -12,6 +13,7 @@ type LoadState =
   | { status: 'loading' }
   | { status: 'ready'; shelves: HomeShelves; total: number }
   | { status: 'failed'; message: string }
+
 
 /** "Good morning" / "Good afternoon" / "Good evening", by the clock. */
 function greetingFor(hour: number): string {
@@ -36,7 +38,13 @@ function greetingFor(hour: number): string {
  * being held back. Finished is uncapped — it simply scrolls.
  */
 export default function Home() {
-  const [state, setState] = useState<LoadState>({ status: 'loading' })
+  // Seeded from the last visit, so a return paints the shelf on its first frame
+  // rather than showing "Loading…" where the books were. A lazy initialiser: it
+  // must read the memory on mount, not on every render.
+  const [state, setState] = useState<LoadState>(() => {
+    const memory = readShelfMemory()
+    return memory ? { status: 'ready', ...memory } : { status: 'loading' }
+  })
   const greeting = useMemo(() => greetingFor(new Date().getHours()), [])
 
   useEffect(() => {
@@ -45,7 +53,9 @@ export default function Home() {
     Promise.all([repository.listBooks(), repository.listPositions()])
       .then(([books, positions]) => {
         if (cancelled) return
-        setState({ status: 'ready', shelves: shelvesOf(books, positions), total: books.length })
+        const shelves = shelvesOf(books, positions)
+        writeShelfMemory({ shelves, total: books.length })
+        setState({ status: 'ready', shelves, total: books.length })
       })
       .catch((error: unknown) => {
         if (cancelled) return
