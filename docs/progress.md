@@ -14,21 +14,24 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing in the code.** WP-55 is merged and on Vercel across eleven commits
-  (`d9a7c06` → `4f96fb3`), most of them the reader's own corrections made live
-  in the same thread. The session ended abruptly — the connection dropped before
-  `/wrap-session` ran — so these notes were reconstructed from the commits on
-  2026-08-09. Nothing was left half-built: the tree was clean, the branch and
-  `origin/main` were on the same commit, and the gates were green.
-- **WP-55 was verified in headless Chromium on 2026-08-09** at 412×869 with a
-  real shelf and a real book — twelve checks, all passing. The scroll fix runs
-  (a window scroll listener fires; Home opens at 0 after leaving Library at 600;
-  Library returns to 600), the page measures **85.0%** under the toolbar, and
-  both bars clear the text (14 px at the top, 40 px at the foot). **The 85% is no
-  longer a guess.** See the table in `active-task.md`.
-- **Still unseen:** how it *feels* — whether 557 ms of splash reads as arriving
-  or as a toll gate, whether 85% looks like too much shrink, and every gesture
-  (swipe, the 500 ms / 10 px long press). A synthetic click is not a finger.
+- **Nothing in the code.** WP-55 and its fast-follow are merged and on Vercel
+  (`7ac706d`). The 2026-08-08 session's notes were reconstructed from its
+  commits on 2026-08-09 — the connection dropped before `/wrap-session` ran —
+  and nothing was half-built when it did.
+- **WP-55 was measured, not just shipped**: twelve checks in headless Chromium
+  at 412×869, all passing. See the table in `active-task.md`. **The 85% is no
+  longer a guess** (it measures 85.0%, with 14 px and 40 px of bar clearance).
+- **Waiting on the reader — the one open question.** They reported *"I don't
+  see the logo"*. **The most likely answer is that their phone is on an older
+  build, not that the splash is broken**: the splash was the last commit of
+  eleven (`4f96fb3`), their screenshot showed the toolbar and the page-shrink
+  from commits five and seven, and `registerType: 'prompt'` means an installed
+  app never updates itself. They were asked to take the update and look again.
+  **Don't debug the splash until they confirm they are on a current build** —
+  it is verified present, ~557 ms, and removed from the DOM afterwards.
+- **Still unseen:** how it *feels* — whether 557 ms reads as arriving or as a
+  toll gate, whether 85% looks like too much shrink, and every gesture (swipe,
+  the 500 ms / 10 px long press). A synthetic click is not a finger.
 
 ### Recently done
 - **WP-55 fast-follow · Back puts the toolbar away before it leaves the book**
@@ -227,62 +230,8 @@ Get that loop working before building any breadth.
     app's root empty, so every judgement about how it *looks* is unverified —
     see the two questions in `active-task.md`.
   - Gates at close: **656 tests** (40 new), typecheck, build. Precache 500.66 KiB.
-- **WP-51 · A shelf of real books, and a page that turns** — 2026-08-06, merged
-  to `main` (`f5e4bf7`). Four UI complaints from a phone screenshot, plus the
-  page-flip that had been an open slot since WP-14.
-  - **Covers are books now.** A spine down the left edge, a block of page edges
-    down the right, and the weight of a solid object on the plank — built from
-    a stack of hard `box-shadow`s and two pseudo-elements on `.tileMedia`,
-    **deliberately not a 3D transform**: a rotated element carries its own width
-    with it and would undo the row alignment fixed in the same commit. Scoped to
-    `Home.module.css`, so `Cover.tsx` stays the printed face and Library/BookInfo
-    are untouched.
-  - **The missing cover was a parser gap, not a display bug.** An epub declares
-    its cover two standard ways (`properties="cover-image"`, `<meta
-    name="cover">`) and conversion tools drop both routinely — the book then
-    imports fine and shows a coloured placeholder forever with nothing to say
-    why. Two *guesses* added behind the two declarations: a manifest image
-    plainly called "cover", and the lone picture on the book's own cover page.
-    Both strict — a page with >12 words is a chapter, several pictures is a
-    title page, and a single-document book has no separate cover page at all
-    (that last guard is what stopped the figure tests going red).
-    **`PARSER_VERSION` → 9**, so the shelf offers the rebuild.
-  - **Alignment: `align-items: flex-end` was the bug.** Aligning tiles by their
-    *bottoms* pushes a one-line-title book down — that is why "Breath" sat low.
-    Now `stretch` with `grid-template-rows: auto 1fr`, so every tile shares a top
-    edge and (same width, same 2:3 shape) one baseline under the covers.
-  - **Padding: the bleed cost the thing it decorated.** The row was pulled to the
-    panel edges with negative margins so a cover would slide under the rounded
-    corner; the first book of every shelf ended up flush with the border while
-    its heading kept its inset, which is the "title touching the edge" report.
-    Bleed removed — the row lives inside the shelf's own padding.
-  - **The page turns over instead of sliding.** A slide is what a *scroll* looks
-    like and paper pivots about the binding. Forwards: one copy of the outgoing
-    page rotates over the spine (`rotateY` 0 → −118°, `perspective(1600px)`,
-    origin `0% 50%`) and uncovers the strip beneath. **Backwards is not a mirror
-    image** — the *arriving* page is the one that moves, so it needs two copies:
-    the page being left sitting still, and a copy of the strip flipping onto it,
-    played with `direction: 'reverse'`. Both dropped at the end. A shade overlay
-    fades to `--color-bg` as the sheet goes edge-on, so what shows past halfway
-    is the blank back of the page rather than its own text mirrored.
-  - **`copyOf` now returns a wrapper, not the bare clone.** The strip is a
-    *scrolling* box, so an overlay at `inset: 0` inside a copy of it lands at the
-    copy's scroll origin — thirty-nine screens off to the left on page forty. The
-    shade hangs on a non-scrolling wrapper with the scrolled copy inside; the
-    wrapper is also what gets rotated. `playTurn` is gone, replaced by `playFlip`.
-  - **Now cloning per tap, not per section.** Within-section turns used to be a
-    pure scroll; they take a `cloneNode(true)` of the laid-out section now. The
-    reader was told to watch for stutter on a long chapter — **the named fix is
-    to cache the clone per section and reset its `scrollLeft`, not to rebuild the
-    animation.** Don't guess at it without their device as evidence.
-  - **`CLAUDE.md` gained a ship-at-end-of-thread ritual** at the reader's
-    request: build, commit, merge to `main`, push, so work reaches Vercel rather
-    than sitting on a branch. Note this **contradicts `/wrap-session`'s "do not
-    commit or push unless I ask"** — the ritual is newer and explicit, and won.
-  - Gates at close: **616 tests** (3 new, on the cover rules), typecheck, build.
-**Gates:** `npm test` (805), `npm run typecheck`, `npm run build` — all passing,
-re-verified 2026-08-09 on a clean checkout. Main bundle 449.3 kB, precache 34
-entries / 1071.86 KiB. Every parser stays behind a dynamic `import()`, so pdf.js
+**Gates:** `npm test` (809), `npm run typecheck`, `npm run build` — all passing
+as of 2026-08-09. Main bundle 449.3 kB, precache 34 entries / 1072.01 KiB. Every parser stays behind a dynamic `import()`, so pdf.js
 (434 kB) and mammoth (500 kB) remain in their own chunks and are fetched only
 when a file of that type is imported.
 
@@ -297,16 +246,18 @@ when a file of that type is imported.
 AI.** Nothing is in flight. **Expect another round of reaction and treat it as
 the real next task** — WP-55 was itself eleven commits of it, and the whole of
 that round is still unseen on a phone.
-- **Waiting on the reader's eye, in likely order of what they hit first.**
-  (a) The launch screen — does the mark read as the app arriving, or as a toll
-  gate? (b) The page scaling back for the toolbar: **85% is a guess made without
-  a real screen**, and whether the bars clear it is a question jsdom cannot
-  answer. (c) Whether every screen now comes back where it was left, which is the
-  first time that code has actually run. (d) The new tempo — three durations
-  where there were ten. (e) The library's list and grid, still never reacted to:
-  proportions, the progress bar, whether the "+" clears the last book. (f) Run
-  **Update** to pull covers forward to `PARSER_VERSION` 9 — the fix does nothing
-  for books already on the shelf until it runs.
+- **First: did taking the update bring the logo back?** This is the live
+  question and it has a likely answer already (an older cached build — see "In
+  flight"). Everything else waits on it, because a reader on a stale build will
+  report other absences too.
+- **Then, waiting on the reader's eye.** (a) Does the launch screen read as the
+  app arriving or as a toll gate — 557 ms is a healthy number, but whether it
+  *feels* right is not a measurement. (b) Does 85% look like too much shrink? It
+  clears both bars with room, so there is budget to raise it toward 90%.
+  (c) Gestures: swipe between screens, the 500 ms / 10 px long press, whether
+  swiping fights scrolling — **the only area still verified on the phone or not
+  at all.** (d) The new tempo. (e) The library's list and grid, still never
+  reacted to. (f) Run **Update** to pull covers forward to `PARSER_VERSION` 9.
 - **Cheap follow-ons the redesign made cheap**, if the reader wants them:
   favourites (a boolean, one filter clause, one chip) and renaming/deleting a
   folder from the filter sheet — `repository.renameFolder` and `deleteFolder`

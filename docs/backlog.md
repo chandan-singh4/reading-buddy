@@ -315,7 +315,12 @@
   re-flow the columns and change the page under the reader's thumb. **The
   launch screen and one tempo** — a splash in `index.html` (inline, or it would
   arrive after the wait it covers), the saved theme applied before first paint,
-  and ten hand-picked durations collapsed to three motion tokens · *after 54*
+  and ten hand-picked durations collapsed to three motion tokens. **Measured**
+  in headless Chromium on 2026-08-09 — twelve checks, all passing, and the 85%
+  scale confirmed at 85.0% with both bars clearing the text. **Fast-followed the
+  same day**: raising the toolbar shrinks the page, and a back gesture left the
+  book instead of undoing that — the toolbar was the one layer never wired to
+  `useBackDismiss`, and Back now peels one layer at a time · *after 54*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*

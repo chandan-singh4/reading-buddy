@@ -8,18 +8,36 @@
 
 ---
 
-## Task — see WP-55 on the phone, and say what it should do next
+## Task — find out whether the reader's phone is on a current build
 
-Shipped 2026-08-08 across eleven commits (`d9a7c06` → `4f96fb3`) and on Vercel.
-Nothing is half-built. The next task is whatever the reader says when they open
-it.
+**Start here. One question, and most of the next round depends on it.**
 
-**These notes were reconstructed on 2026-08-09**, not written at the time: the
-previous session's connection dropped before `/wrap-session` could run. The code
-was fine — clean tree, branch level with `origin/main`, 805 tests / typecheck /
-build all green on a fresh checkout. Only the notes were missing.
+The reader reported *"I don't see the logo"* on 2026-08-09. **The likely answer
+is not a broken splash — it is an older build.** Three facts line up:
 
-### The one lesson worth keeping from this round — 2026-08-08
+- The splash was the **last of eleven** commits (`4f96fb3`).
+- Their screenshot showed the one-toolbar reading screen and the page-shrink,
+  which are commits **five and seven**. So their build is new enough for those
+  and old enough to miss the splash.
+- `vite.config.ts` sets **`registerType: 'prompt'`** — an installed app never
+  updates itself. It waits to be told.
+
+They were asked to take the update and look again. **Do not debug `splash.ts` or
+`index.html` until they confirm they are on a current build**: the splash is
+measured present, ~557 ms, and removed from the DOM afterwards. If it is still
+missing on a confirmed-current build, then it is real, and the first thing to
+check is whether a cold start is happening at all (resuming a backgrounded app
+is not one).
+
+Everything else is the reader's reaction, in `progress.md` → "Next up".
+
+### Shipped this session — 2026-08-09
+
+- **WP-55 measured**, twelve checks, all passing (table below).
+- **WP-55 fast-follow**: Back now puts the toolbar away before it leaves the
+  book. Merged at `7ac706d`. 809 tests.
+
+### The lesson worth keeping from the WP-55 round — 2026-08-08
 
 Two rounds of work on per-screen scroll positions changed nothing the reader
 could see. The WP-54 notes explained why in detail — a hidden screen has no
@@ -126,8 +144,12 @@ Everything above is settled. What is left needs a hand on a real device:
 - `web/src/app/AppShell.tsx` + `.module.css` — where it is saved and restored.
 
 *For a reaction to the reading screen:*
-- `web/src/pages/Reader.tsx` + `.module.css` — the scale-for-toolbar, and the
-  constant it hands to CSS.
+- `web/src/pages/Reader.tsx` + `.module.css` — the scale-for-toolbar, the
+  constant it hands to CSS, and **`dismissTopLayer`**: wire anything new that
+  covers or resizes the page into it in the same commit.
+- `web/src/reader/useBackDismiss.ts` — one history entry, re-armed inside its
+  own `popstate` handler. Read the note there before touching the effect's
+  dependency array.
 - `web/src/reader/Chrome.module.css` — the one toolbar.
 - `web/src/reader/pageTurn.ts` — the copy, and why it is built at full size and
   drawn at the scale.

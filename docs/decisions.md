@@ -635,3 +635,31 @@
   is four speeds in a second. Inside a book `reader/motion.ts` still rules and is
   untouched: a 400ms page turn was reported as too fast twice, and that is not a
   UI-transition question. — 2026-08-08
+- **Anything drawn over the reading page that changes the page is a layer, and
+  every layer owes Back an answer.** The toolbar took two rounds of the same bug
+  to be recognised as one, because it does not *look* like a panel — but it
+  covers the page and resizes it, and a reader who raised it has somewhere to
+  come back to. Back peels one layer at a time rather than clearing the screen:
+  closing a sheet should leave the toolbar it was opened from, not discard the
+  state the reader was in. — 2026-08-09
+- **`history.back()` is asynchronous; `pushState` is not — never rebuild a
+  history entry from a React effect that a `popstate` can also be changing.**
+  The teardown's queued traversal can land *after* the replacement push, undo
+  it, and deliver a `popstate` that closes the layer just opened. So
+  `useBackDismiss` re-arms inside its own `popstate` handler, where the push is
+  synchronous, and holds its callback in a ref so the effect depends on `open`
+  alone — a handler that closes over which layers are open changes identity
+  whenever one does, which would have rebuilt the entry on every change.
+  — 2026-08-09
+- **Verify a headless-browser fix by whether the app's own state survives, not
+  by whether the gesture fired.** jsdom's history is shared across a test file,
+  so a second `history.back()` always finds an older entry and fires a
+  `popstate` — a test asking "did it fire?" passes against the broken code. The
+  first draft of one test in this round did exactly that. Assert on whether an
+  entry of *ours* is still on top. — 2026-08-09
+- **Headless Chromium is now the first stop for layout, and the reader's phone
+  is for feel.** Serving the built app over plain HTTP and driving it with the
+  pre-installed Chromium measured twelve WP-55 behaviours in one pass, including
+  the 85% page scale that had shipped as an admitted guess. What it still cannot
+  answer is unchanged: a synthetic click is not a finger, so gestures and
+  anything about *feel* remain a phone question. — 2026-08-09
