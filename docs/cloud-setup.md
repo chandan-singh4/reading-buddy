@@ -192,7 +192,9 @@ the token and make another. No harm done, just redo this step.
 ## Part 3 — The environment variables
 
 Copy `.env.example` to `.env` at the repo root and fill it in. `.env` is
-gitignored and never gets committed.
+gitignored and never gets committed. **The repo root, not `web/`** — Vite is
+pointed there by `envDir: '..'` in `web/vite.config.ts`, so that one file serves
+both the browser half and the server half.
 
 ```
 # --- Browser-visible. Safe: these are public by design. ---
@@ -249,6 +251,19 @@ the desk.
 
 ## Part 5 — Checking it works
 
+Do this in **two passes**, because the two halves need different dev servers and
+finding that out mid-import is confusing.
+
+> **`npm run dev` does not serve `/api/r2/sign`.** It is Vite, and Vite serves
+> `web/` only — the functions in `api/` are run by Vercel. Signing in needs no
+> server at all (the browser talks to Supabase directly), so **pass 1** works
+> under plain `npm run dev`. Importing a book needs an upload link from that
+> endpoint, so **pass 2** needs `npx vercel dev` (run `npx vercel link` once
+> first) or a real deploy. Under `npm run dev` an import fails at the upload
+> with a 404 on `/api/r2/sign` — that is the missing server, not a broken key.
+
+### Pass 1 — does sign-in work? (`npm run dev`)
+
 1. `npm run dev` and open the app. It starts on **the library on this device**,
    exactly as before — the cloud is opt-in and nothing has moved.
 2. **Settings → Where your library lives → The cloud.** The page reloads onto
@@ -259,12 +274,16 @@ the desk.
    land back in the app signed in.
 4. Now go and turn sign-ups off — Part 1.4. Your account exists, so the door can
    be shut behind you.
-5. Import one book. Not thirty — one, and a small one.
-6. Supabase → **Table Editor** → `books`. There should be a row, with `user_id`
+
+### Pass 2 — does a book make the round trip? (`npx vercel dev`)
+
+5. Stop Vite. `npx vercel dev` instead, so `/api/r2/sign` exists.
+6. Import one book. Not thirty — one, and a small one.
+7. Supabase → **Table Editor** → `books`. There should be a row, with `user_id`
    filled in and `ready` true.
-7. Cloudflare → your bucket → **Objects**. There should be
+8. Cloudflare → your bucket → **Objects**. There should be
    `users/<your-id>/books/<book-id>/source/...`.
-8. Open the book, turn some pages, then switch back to **This device** in
+9. Open the book, turn some pages, then switch back to **This device** in
    Settings and confirm your original library is still all there.
 
 > **Switching backends never moves a book.** The cloud library starts empty even
@@ -279,6 +298,7 @@ the desk.
 |---|---|
 | `new row violates row-level security policy` | You're not signed in, or the row's `user_id` isn't yours. Check the session first. |
 | Upload fails, console says CORS | Part 2.3, and check the origin matches **exactly** — `https://` vs `http://`, and no trailing slash. |
+| `404` on `/api/r2/sign` | You're on `npm run dev`, which serves `web/` and nothing else. Use `npx vercel dev`, which runs the `api/` functions too. |
 | `401` from `/api/r2/sign` | Session expired. Sign in again. |
 | `SignatureDoesNotMatch` | `R2_SECRET_ACCESS_KEY` was copied with a stray space, or `R2_ACCOUNT_ID` has the rest of the endpoint URL in it — it's just the id, not the whole address. |
 | Everything worked, now nothing does | A free Supabase project **pauses after a week of no activity**. Open the dashboard and click *Restore*. |

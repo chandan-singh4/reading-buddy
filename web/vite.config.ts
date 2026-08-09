@@ -109,6 +109,17 @@ export default defineConfig({
       mammoth: 'mammoth/mammoth.browser.js',
     },
   },
+  // `.env` lives at the repo root, next to `.env.example` — one file for the
+  // whole project, because the same Supabase URL and key are read twice: by the
+  // browser here, and by `api/r2/sign.ts` on the server, which has no idea
+  // `web/` exists. Without this, Vite looks only in `web/` and silently finds
+  // nothing, so the cloud option stays greyed out with every value filled in
+  // correctly — a failure with no error message anywhere.
+  //
+  // This does not widen what reaches the browser. Vite still only exposes
+  // `VITE_`-prefixed variables; `R2_SECRET_ACCESS_KEY` sitting in the same file
+  // is loaded into the dev server's process and never compiled into the bundle.
+  envDir: '..',
   server: {
     // The phone reaches the dev server over the LAN, so it must not bind to
     // localhost only. See `docs/phone.md` for the certificate half.
