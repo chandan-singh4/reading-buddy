@@ -24,8 +24,19 @@
 
 import { CloudError, accessToken } from './client.ts'
 
-/** Where the signing endpoint lives. Overridable for `vercel dev` on another port. */
-const SIGN_URL = (import.meta.env.VITE_R2_SIGN_URL as string | undefined) ?? '/api/r2/sign'
+/**
+ * Where the signing endpoint lives. Overridable for `vercel dev` on another
+ * port.
+ *
+ * `||` rather than `??`, because `.env.example` ships this key with an empty
+ * value — it is optional, and the blank line is the documentation. Vite hands
+ * an empty string to the bundle rather than `undefined`, and `??` treats that
+ * as a deliberate choice, leaving every upload posting to `''` — which resolves
+ * to the current page. The failure lands far from here, as HTML coming back
+ * where a signed URL was expected.
+ */
+const SIGN_URL =
+  (import.meta.env.VITE_R2_SIGN_URL as string | undefined)?.trim() || '/api/r2/sign'
 
 /** Matches `MAX_KEYS` in `api/r2/sign.ts`. */
 const MAX_KEYS_PER_REQUEST = 100
