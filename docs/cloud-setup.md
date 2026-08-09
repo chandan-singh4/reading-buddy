@@ -308,6 +308,8 @@ finding that out mid-import is confusing.
 | The cloud option is greyed out | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` weren't there **when the app was built**. Locally: restart `npm run dev` after editing `.env`. On Vercel: add them in Project Settings and then **redeploy** — adding a variable does nothing to the build already live. |
 | Stuck on the sign-in screen with no email arriving | Tap **Use the library on this device instead** at the bottom. Your books are still there; the cloud is a separate library, not a replacement for that one. |
 | Signed in, but the library is empty | Expected. Switching backends copies nothing — see the note in Part 5. |
+| Vercel's own `404: NOT_FOUND` on a path like `/settings` | The SPA rewrite in `vercel.json` is missing or wasn't deployed. Only `/` is a real file; every other path is drawn by the app, so the server has to hand back `index.html` and let the app route it. |
+| A blank page, console shows `404` for `assets/index-<hash>.js` | A stale service worker is serving an old `index.html` that names a bundle the current deploy no longer has. DevTools → Application → **Service Workers → Unregister**, then **Cache storage → Delete**, then hard reload. Do *not* use *Clear site data* — that wipes IndexedDB, where the books are. |
 
 ---
 

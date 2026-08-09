@@ -97,6 +97,47 @@ export class CloudError extends Error {
 // --- Sign in -----------------------------------------------------------------
 
 /**
+ * Why the link didn't go, in words that name the thing to go and change.
+ *
+ * This used to be one sentence — "check the address and try again" — for every
+ * possible cause. It is a kind message and a useless one: the address is almost
+ * never the problem, and the reader is left re-typing an email that was correct
+ * the first time while the real reason sits in the console. It cost two
+ * evenings during the first live setup before anyone opened DevTools.
+ *
+ * So the underlying message is now always surfaced, and the three failures that
+ * actually happen get named outright. Supabase's wording for them is accurate
+ * but assumes you know how its dashboard is laid out; these say which screen to
+ * open.
+ */
+export function signInFailureMessage(error: { message?: string; status?: number }): string {
+  const detail = error.message?.trim() ?? ''
+  const lower = detail.toLowerCase()
+
+  // Far and away the most common, and the least obvious: the built-in mailer is
+  // rate-limited to a handful of messages an hour, and setting the project up
+  // means sending several sign-in links in a row while getting the redirect
+  // right. So the limit is hit precisely when nothing else is working either.
+  if (error.status === 429 || lower.includes('rate limit')) {
+    return 'Supabase’s built-in email allowance — a few messages an hour — is used up. Wait an hour and try again, or connect your own SMTP under Authentication → Emails.'
+  }
+
+  // The lock-yourself-out case: sign-ups were turned off (rightly, on a
+  // single-account app) before this address ever signed in once.
+  if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) {
+    return 'New sign-ups are turned off for this project and this address has no account yet. Turn Allow new users to sign up back on in Supabase → Authentication → Sign Ups, sign in once, then turn it off again.'
+  }
+
+  if (lower.includes('email') && (lower.includes('invalid') || lower.includes('not valid'))) {
+    return 'Supabase wouldn’t accept that email address. Check it for a typo and try again.'
+  }
+
+  return detail
+    ? `That sign-in link couldn’t be sent: ${detail}`
+    : 'That sign-in link couldn’t be sent, and Supabase gave no reason. Check the console for the failed request.'
+}
+
+/**
  * Send a sign-in link to an email address.
  *
  * A link rather than a password, deliberately: there is exactly one account,
@@ -109,10 +150,7 @@ export async function sendSignInLink(email: string, redirectTo?: string): Promis
     options: { emailRedirectTo: redirectTo ?? window.location.origin },
   })
   if (error) {
-    throw new CloudError(
-      'That sign-in link couldn’t be sent. Check the address and try again.',
-      { cause: error },
-    )
+    throw new CloudError(signInFailureMessage(error), { cause: error })
   }
 }
 

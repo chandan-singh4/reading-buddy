@@ -767,3 +767,26 @@ sign-in screen.
   Loading it dynamically would make `repository` an async value at every one of
   its ~30 call sites — a change to the whole app to save a fifth of what one
   font file costs. — 2026-08-09
+
+### Settled 2026-08-09 (deploying it — the routing hole)
+
+- **`vercel.json` rewrites every non-asset path to `index.html`.** The app draws
+  `/settings` and `/book/<id>` itself; only `/` is a real file on disk. Without
+  the rewrite, opening one of those addresses directly — a refresh, a bookmark,
+  a shared link — reaches Vercel, which finds no such file and shows its own
+  `404: NOT_FOUND`. This was hidden for weeks because the service worker's
+  `navigateFallback` answers exactly the same question offline, so it only
+  surfaces where the worker isn't: a first visit, or right after clearing it.
+  Vercel's Vite preset does not add this; it has to be written down.
+- **`/api/` and `/assets/` are excluded from that rewrite, for opposite
+  reasons.** `/api/` must reach the function. `/assets/` must be allowed to
+  **fail** — a request for a hashed bundle that no longer exists should be an
+  honest 404, not `index.html` served with a JavaScript content type, which
+  turns a missing-file problem into an unreadable parse error.
+- **A stale service worker can outlive the files it names.** An old cached
+  `index.html` points at `assets/index-<old-hash>.js`, and a later deploy
+  deletes it — so the page loads, requests a bundle that 404s, and paints
+  nothing. Under `registerType: 'prompt'` the old worker keeps serving until the
+  update is accepted, which widens that window. The recovery is Unregister +
+  delete Cache storage, and it is now written down in `cloud-setup.md`;
+  the rewrite above at least means the fallback lands on a real page. — 2026-08-09
