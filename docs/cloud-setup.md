@@ -150,22 +150,30 @@ starts with an empty one — so without this step every upload fails with a
 confusing network error and nothing in the logs.
 
 1. Open the bucket → **Settings** tab → scroll to **CORS Policy** → **Edit**.
-2. Paste this, replacing the Vercel address with your real one:
+2. Paste this, replacing the Vercel address with **your own deployment's real
+   address** — copy it from the browser's address bar rather than guessing, and
+   leave off the trailing slash:
 
 ```json
 [
   {
     "AllowedOrigins": [
       "http://localhost:5173",
-      "https://reading-buddy.vercel.app"
+      "https://your-project.vercel.app"
     ],
-    "AllowedMethods": ["GET", "PUT"],
+    "AllowedMethods": ["GET", "PUT", "DELETE"],
     "AllowedHeaders": ["content-type"],
     "ExposeHeaders": ["etag"],
     "MaxAgeSeconds": 3600
   }
 ]
 ```
+
+`DELETE` is in that list because deleting a book removes its files as well as
+its rows (`blobs.ts` → `remove`). Leaving it out costs nothing visible at first
+— deletion is best-effort by design, so the book disappears and no error is
+shown — and then quietly bills you for the files of every book you ever
+deleted.
 
 ### 2.4 Make an API token
 
