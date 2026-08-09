@@ -20,9 +20,15 @@ Get that loop working before building any breadth.
   `/wrap-session` ran — so these notes were reconstructed from the commits on
   2026-08-09. Nothing was left half-built: the tree was clean, the branch and
   `origin/main` were on the same commit, and the gates were green.
-- **Unseen on the phone:** the launch screen, the new motion tempo, the scroll
-  fix now that it actually runs, and the page-scales-for-the-toolbar behaviour
-  (85% is a guess made without a real screen).
+- **WP-55 was verified in headless Chromium on 2026-08-09** at 412×869 with a
+  real shelf and a real book — twelve checks, all passing. The scroll fix runs
+  (a window scroll listener fires; Home opens at 0 after leaving Library at 600;
+  Library returns to 600), the page measures **85.0%** under the toolbar, and
+  both bars clear the text (14 px at the top, 40 px at the foot). **The 85% is no
+  longer a guess.** See the table in `active-task.md`.
+- **Still unseen:** how it *feels* — whether 557 ms of splash reads as arriving
+  or as a toll gate, whether 85% looks like too much shrink, and every gesture
+  (swipe, the 500 ms / 10 px long press). A synthetic click is not a finger.
 
 ### Recently done
 - **WP-55 · The reading screen, the launch, and the scroller that was never

@@ -40,24 +40,49 @@ and the cheaper one is "it never ran".** Ask that before believing a theory that
 merely fits the symptom. The clamping story was plausible, self-consistent, and
 cost a round because nothing ever checked whether the handler fired.
 
-### Ask these first
+### Measured 2026-08-09 — twelve checks, all passing
 
-1. **Does the launch screen feel like the app arriving, or like a toll gate?**
-   It leaves the moment the first screen paints, so on a warm start it should be
-   barely there. If it reads as a *flash*, `MIN_VISIBLE` (260 ms, in
-   `app/splash.ts`) is the number to raise, not the animation to rebuild.
-2. **Does the page still read well when the toolbar is up?** It scales to 85%
-   and slides down. **That number is a guess made without a real screen** — jsdom
-   has no layout, so the tests hold the switch and not the geometry. Whether the
-   bars clear the text, and whether 85% is too much shrink, is a phone question.
-3. **Does each screen come back where you left it?** Scroll Library down, go to
-   Home, come back. This is the *first* time that code has actually executed, so
-   treat it as new rather than as previously-tested behaviour.
+Headless Chromium at 412×869, real layout, a shelf of twelve books and one
+21-page book. **This is the first round whose geometry was verified before the
+reader saw it**, and it is only possible because the "headless renders `#root`
+empty" note turned out to be a certificate error.
+
+| What | Result |
+|---|---|
+| Splash paints before the bundle runs | present at `DOMContentLoaded` |
+| Splash lifetime | ~557 ms — above the 260 ms flicker floor, well under a toll gate |
+| Splash leaves no invisible lid | removed from the DOM, not parked at `opacity: 0` |
+| **Root element is the scroller** | `scrollingElement=html`, `body overflow-y: visible` |
+| **A window scroll listener fires** | `true`, and `scrollTo` lands at 600 — *this is the check that would have caught the WP-54 mistake* |
+| Home does not inherit Library's offset | left Library at 600, Home opened at **0** |
+| Library returns where it was left | left at 600, returned to **600** |
+| Page scales for the toolbar | 412 → 350 px wide = **85.0%**, height 789 → 671 |
+| Top bar clears the text | bar ends y=56, page starts y=70 — **14 px clear** |
+| Bottom bar clears the text | page ends y=740, bar starts y=780 — **40 px clear** |
+| Page does not scroll sideways | `scrollWidth == clientWidth` |
+
+**The 85% is no longer a guess** — it measures 85.0% and both bars clear the
+text. The scroll fix genuinely runs now, which two rounds of it never did.
+
+### Ask these first — only what a browser cannot answer
+
+Everything above is settled. What is left needs a hand on a real device:
+
+1. **Does the launch screen *feel* like the app arriving, or like a toll gate?**
+   557 ms is a healthy number; whether it reads as one is not a measurement. If
+   it reads as a flash, raise `MIN_VISIBLE` in `app/splash.ts` — don't rebuild
+   the animation.
+2. **Does 85% *look* right?** It clears the bars with room to spare, so if it
+   feels like too much shrink there is budget to raise it toward 90%.
+3. **Gestures.** Swipe between screens, the 500 ms / 10 px long press, whether
+   swiping fights scrolling. jsdom never cancels a pointer and a synthetic click
+   is not a finger — this is the one area still verified on the phone or not at
+   all.
 4. **Is the tempo right?** Three durations where there were ten. Tap a filter,
    open the sheet, pick an option — that sequence used to be four speeds in a
    second.
-5. **Bookmarks and search** — the corner of the page marks it; the magnifier
-   searches the whole book. Both are new and neither has been used on a phone.
+5. **Bookmarks and search in use** — the corner marks the page; the magnifier
+   searches the book. Both work; neither has been *lived with*.
 
 ### Decisions made this round the reader may want to revisit
 
@@ -167,10 +192,18 @@ notes/highlights.
 - **Anything with `overflow` other than `visible` cannot be broken across a
   column.** A scroll container has no seam to cut, so giving an element its own
   scroller is what makes a tall one run off the bottom of the page.
-- **Headless Chrome renders this app correctly.** The old note saying `#root`
-  comes back empty was the dev server's self-signed certificate, not the app.
-  Real layout *is* testable — the scroll fix was verified against a 9000 px
-  screen. **Gestures are still a phone question**: jsdom never cancels a pointer.
+- **Headless Chrome renders this app correctly, and layout is now routinely
+  checkable.** The old note saying `#root` comes back empty was the dev server's
+  self-signed certificate. Serve the built app over plain HTTP
+  (`npx vite preview` from `web/`, *not* through the npm workspace — the flags
+  get eaten and `--port` is read as a directory) and drive it with Playwright
+  against `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Two traps worth
+  knowing: a fresh browser context is a **fresh install** with an empty library
+  and no scroll memory, so import books in the same context you measure in; and
+  **tab screens stay mounted while hidden** (WP-53 keep-alive), so a bare
+  `text=` locator will happily resolve to an element on an invisible screen —
+  scope with `visible=true`. **Gestures are still a phone question**: jsdom
+  never cancels a pointer and a synthetic click is not a finger.
 - **Books imported before a parser change keep the old parse, silently.**
   `PARSER_VERSION` is 9 and the shelf offers the update — but it needs the kept
   source file, and a book imported without one can never be brought forward.
