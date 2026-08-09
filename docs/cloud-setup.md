@@ -240,11 +240,29 @@ the desk.
 
 ## Part 5 — Checking it works
 
-1. `npm run dev`, open the app, sign in with your email, click the magic link.
-2. Supabase → **Table Editor** → `books`. You should see a row after your first
-   import, with `user_id` filled in.
-3. Cloudflare → your bucket → **Objects**. You should see
+1. `npm run dev` and open the app. It starts on **the library on this device**,
+   exactly as before — the cloud is opt-in and nothing has moved.
+2. **Settings → Where your library lives → The cloud.** The page reloads onto
+   the cloud library, which is empty, and asks you to sign in. (If that card is
+   greyed out, the `VITE_SUPABASE_*` variables aren't reaching the build —
+   restart `npm run dev` after editing `.env`.)
+3. Enter your email, open the link it sends you **on the same device**, and you
+   land back in the app signed in.
+4. Now go and turn sign-ups off — Part 1.4. Your account exists, so the door can
+   be shut behind you.
+5. Import one book. Not thirty — one, and a small one.
+6. Supabase → **Table Editor** → `books`. There should be a row, with `user_id`
+   filled in and `ready` true.
+7. Cloudflare → your bucket → **Objects**. There should be
    `users/<your-id>/books/<book-id>/source/...`.
+8. Open the book, turn some pages, then switch back to **This device** in
+   Settings and confirm your original library is still all there.
+
+> **Switching backends never moves a book.** The cloud library starts empty even
+> though your device library isn't, and that is correct rather than data loss —
+> the two are separate libraries and the toggle only chooses which one you are
+> looking at. Settings shows a count under the option you're *not* using so this
+> is obvious rather than alarming. There is no "copy my library up" yet.
 
 ### When it doesn't
 
@@ -255,6 +273,9 @@ the desk.
 | `401` from `/api/r2/sign` | Session expired. Sign in again. |
 | `SignatureDoesNotMatch` | `R2_SECRET_ACCESS_KEY` was copied with a stray space, or `R2_ACCOUNT_ID` has the rest of the endpoint URL in it — it's just the id, not the whole address. |
 | Everything worked, now nothing does | A free Supabase project **pauses after a week of no activity**. Open the dashboard and click *Restore*. |
+| The cloud option is greyed out | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` weren't set when the app was built. Vite reads `.env` at startup — restart the dev server. |
+| Stuck on the sign-in screen with no email arriving | Tap **Use the library on this device instead** at the bottom. Your books are still there; the cloud is a separate library, not a replacement for that one. |
+| Signed in, but the library is empty | Expected. Switching backends copies nothing — see the note in Part 5. |
 
 ---
 

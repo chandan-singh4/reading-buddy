@@ -94,10 +94,28 @@ export async function signOut(): Promise<void> {
   await cloudClient().auth.signOut()
 }
 
+/**
+ * The signed-in reader, as much of them as the app has any use for.
+ *
+ * The email is here so the settings screen can show *which* account is signed
+ * in. On a single-account app that reads like a nicety, but it is the only way
+ * to notice you signed in with the wrong address — at which point the library
+ * looks empty and nothing anywhere says why.
+ */
+export interface CloudUser {
+  id: string
+  email?: string
+}
+
+export async function currentUser(): Promise<CloudUser | undefined> {
+  const { data } = await cloudClient().auth.getSession()
+  const user = data.session?.user
+  return user ? { id: user.id, email: user.email } : undefined
+}
+
 /** The signed-in reader's id, or undefined when signed out. */
 export async function currentUserId(): Promise<string | undefined> {
-  const { data } = await cloudClient().auth.getSession()
-  return data.session?.user.id
+  return (await currentUser())?.id
 }
 
 /**
@@ -122,9 +140,10 @@ export async function accessToken(): Promise<string | undefined> {
 }
 
 /** Tell the app when the reader signs in or out, so it can redraw. */
-export function onAuthChange(listener: (userId: string | undefined) => void): () => void {
+export function onAuthChange(listener: (user: CloudUser | undefined) => void): () => void {
   const { data } = cloudClient().auth.onAuthStateChange((_event, session) => {
-    listener(session?.user.id)
+    const user = session?.user
+    listener(user ? { id: user.id, email: user.email } : undefined)
   })
   return () => data.subscription.unsubscribe()
 }

@@ -732,3 +732,38 @@ sign-in screen.
   is a network call. A cache that reads locally and writes through to here is
   the natural next layer, and `cloud/` holds no state between calls so that it
   can sit underneath one. — 2026-08-09
+
+### Settled 2026-08-09 (turning the cloud on — sign-in and the toggle)
+
+- **Switching backends is a change of view, not a migration.** Nothing is
+  copied, moved or deleted, so a reader with 32 books on the device can switch
+  to the cloud, find it empty, and switch back to find everything intact. That
+  property is what makes it safe to ship the toggle *before* there is any way to
+  copy books between the two — and it is why the settings screen shows a book
+  count under the option that is **not** selected. An empty shelf and a lost
+  library look identical from the outside; the count is what tells them apart.
+- **The choice is read once at load, and changing it reloads the page.** Around
+  thirty modules import `repository` from `storage/index.ts` as a plain value,
+  and several cache what it returned — covers, shelf memory, library memory, the
+  reading position. Swapping the object underneath all of that at runtime would
+  leave one library's covers over another library's books and need an
+  invalidation path per cache. A reload costs about 300 ms and cannot be
+  half-applied.
+- **A build with no Supabase keys ignores a remembered `cloud` choice.** A fork,
+  a preview deploy or a fresh checkout would otherwise boot straight into a
+  sign-in screen it can never satisfy. `resolveBackend(stored, configured)` is
+  pure and tested for exactly this.
+- **The sign-in screen always offers the way back to the device library.** It is
+  not a courtesy: turning the cloud on before the Supabase project exists — or
+  simply not receiving the email — otherwise locks the reader out of books that
+  are still sitting in the browser underneath that screen. A gate in front of a
+  library you already own needs a door on both sides.
+- **A session has three states, not two.** Supabase reads its stored session
+  asynchronously, so a boolean starts `false` and flashes the sign-in form at a
+  perfectly signed-in reader on every single launch. `loading` renders the page
+  background rather than `null`, because the launch screen is removed as soon as
+  React has rendered once and an empty render is a white flash on a dark phone.
+- **The Supabase client is imported statically, and the bundle pays 21 kB.**
+  Loading it dynamically would make `repository` an async value at every one of
+  its ~30 call sites — a change to the whole app to save a fifth of what one
+  font file costs. — 2026-08-09

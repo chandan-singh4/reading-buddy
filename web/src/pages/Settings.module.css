@@ -1,0 +1,87 @@
+/* The backend picker. Two cards rather than a switch: the difference between
+   them is a paragraph, not a word, and a switch has nowhere to put one. */
+
+.choices {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+  min-height: 44px;
+  transition: border-color var(--motion-micro) var(--ease-standard);
+}
+
+/* The selected card is disabled — tapping what you already have should do
+   nothing — so it must not look like the unavailable one. Fully opaque, and
+   the accent border carries the state. */
+.choice[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  cursor: default;
+}
+
+.choice:disabled[aria-pressed='false'] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.choiceTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.badge {
+  padding: 2px var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+.choiceBody {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: var(--leading-ui);
+}
+
+.choiceNote {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.reassure {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: var(--leading-ui);
+  max-width: var(--reading-measure);
+}
+
+.account {
+  margin-bottom: var(--space-3);
+  line-height: var(--leading-ui);
+}

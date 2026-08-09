@@ -175,23 +175,42 @@ notes/highlights.
 
 ---
 
-## Second thread — the cloud backend, waiting on accounts
+## Second thread — the cloud backend, now switchable
 
-Written and green (838 tests, typecheck, build) but **switched off**: nothing
-imports `storage/cloud/`, and `storage/index.ts` still exports the Dexie
-repository. Three things stand between it and being usable, in order:
+Written and green (851 tests, typecheck, build). The app still **starts on the
+device library**, but the cloud is now reachable: **Settings → Where your
+library lives → The cloud** reloads onto it and asks for a sign-in link.
 
-1. **The accounts don't exist yet.** `docs/cloud-setup.md` is click-by-click.
-2. **There is no sign-in screen.** `client.ts` has `sendSignInLink` / `signOut`
-   / `onAuthChange`; nothing calls them. Every cloud read and write throws a
-   plain-language refusal until someone is signed in.
-3. **There is no offline.** Every call is a network call, so switching over as
-   things stand would mean a phone in a tunnel has no library. The intended
-   shape is a cache that reads locally and writes through — `cloud/` holds no
-   state between calls specifically so one can sit on top.
+**The reader has 32 books on the device.** Switching backends moves none of
+them — it changes which library is on screen, and switching back returns all 32.
+Settings shows a count under the option not in use so an empty cloud shelf reads
+as reversible. **There is still no way to copy books between the two.**
 
-**Untested against a real database.** The pure halves are covered; the SQL and
-the round trip have never run. Expect the first live import to find something.
+What is left, in order:
+
+1. **The accounts don't exist yet.** `docs/cloud-setup.md` is click-by-click,
+   and its Part 5 is now the real walkthrough — switch, sign in, import *one*
+   small book, check both dashboards, switch back.
+2. **Untested against a real database.** The pure halves are covered; the SQL
+   and the round trip have never run. **Expect the first live import to find
+   something** — most likely a column name or an RPC argument, since that is
+   the one thing the compiler could not check.
+3. **No way to move the 32 books up.** The obvious next build: read from
+   `deviceRepository`, write through `repository`, book by book, resumable.
+   Wait until (2) has actually worked once.
+4. **There is no offline.** Every cloud call is a network call, so a phone in a
+   tunnel on the cloud library has nothing. The intended shape is a cache that
+   reads locally and writes through — `cloud/` holds no state between calls
+   specifically so one can sit on top.
+
+### Files in scope for the cloud thread
+- `web/src/storage/backend.ts` — the preference, and **why the switch reloads**.
+- `web/src/storage/index.ts` — the one line that chooses the backend.
+- `web/src/auth/` — `AuthGate.tsx` (the gate), `SignIn.tsx` (the door, and the
+  escape hatch that must never be removed), `useSession.ts` (three states, not
+  a boolean).
+- `web/src/pages/Settings.tsx` — the toggle, and the book count that makes it
+  legible as reversible.
 
 ---
 

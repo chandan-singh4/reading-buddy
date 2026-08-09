@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 
 import AppShell from './app/AppShell.tsx'
+import { AuthGate } from './auth/AuthGate.tsx'
 import { RouteTransition, useViewLocation } from './app/routeTransition.tsx'
 import { UpdatePrompt } from './app/UpdatePrompt.tsx'
 import BookInfo from './pages/BookInfo.tsx'
@@ -41,13 +42,19 @@ export default function App() {
   return (
     <BrowserRouter>
       {/*
+       * Inside the router, not around it: the sign-in screen has no links, but
+       * it hands the reader back to the device library, and that switch reloads
+       * the page — which needs a router already mounted underneath it.
+       *
        * Wraps the routes only — not `UpdatePrompt`, which is a panel over
        * whatever is on screen rather than a place, and has no business being
        * held a step behind while a book opens.
        */}
-      <RouteTransition>
-        <AppRoutes />
-      </RouteTransition>
+      <AuthGate>
+        <RouteTransition>
+          <AppRoutes />
+        </RouteTransition>
+      </AuthGate>
       {/*
        * Outside the routes, not inside `AppShell`: the reading screen is the
        * one place a reader is most likely to be when a build lands, and it

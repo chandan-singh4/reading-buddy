@@ -34,6 +34,40 @@ Get that loop working before building any breadth.
   the 500 ms / 10 px long press). A synthetic click is not a finger.
 
 ### Recently done
+- **The cloud backend can now be switched on · sign-in and the library toggle**
+  — 2026-08-09. The reader has 32 books on the device, which is the constraint
+  the whole design answers.
+  - **Switching backends moves nothing.** It changes *which library you are
+    looking at*, so the device's 32 books survive any amount of flipping back
+    and forth. That is the only reason it is safe to offer the toggle before
+    there is any way to copy books between the two — and Settings shows a count
+    under the option you're *not* on, so an empty cloud shelf reads as
+    reversible rather than as loss.
+  - **The choice is read once at load and applied by reloading the page.**
+    ~30 modules import `repository` as a plain value and several cache what it
+    returned (covers, shelf memory, library memory, position). Swapping the
+    object underneath all of that would need an invalidation path per cache; a
+    reload costs ~300 ms and cannot be half-applied. `storage/backend.ts`.
+  - **`storage/index.ts` is still the only switch** — `activeBackend() ===
+    'cloud' ? createCloudRepository() : deviceRepository`. Every other call site
+    is unchanged and unaware there is a choice, which is what the `Repository`
+    type was for.
+  - **A build with no Supabase keys falls back to the device library** even if
+    `cloud` is remembered, so a fork or a preview deploy can't strand someone on
+    a sign-in screen it can never satisfy. `resolveBackend` is pure and tested.
+  - **The sign-in screen always offers the way back to the device library.**
+    Without that button, turning the cloud on before the accounts exist locks
+    the reader out of books that are sitting in the browser underneath the
+    screen. Two of the five sign-in tests are about that button alone.
+  - **Three session states, not a boolean.** Supabase reads its stored session
+    asynchronously, so a boolean starts `false` and flashes the sign-in form at
+    a signed-in reader on every launch. `loading` paints the page background
+    instead — the splash is gone by then, so `null` would be a white flash.
+  - Cost: the Supabase client is now a static import, so the main bundle moved
+    **449.5 → 470.5 kB** (151.3 kB gzipped). Deliberate — a dynamic import would
+    make `repository` async at all ~30 call sites.
+  - Gates: **851 tests** (13 new), typecheck, build. **Still untested against a
+    real database** — the SQL and the round trip have never run.
 - **The cloud backend · Supabase + R2, written but not switched on** —
   2026-08-09. Asked for directly: keep the parser in the browser, move storage
   to a Postgres database and an object store.

@@ -3,10 +3,9 @@
  * `@/storage/cloud` — never from the modules inside it, so the split between
  * Postgres and R2 stays an implementation detail.
  *
- * Nothing in the app imports this yet. `storage/index.ts` still exports the
- * IndexedDB repository as the app-wide one, because that is the only one that
- * works on a phone with no signal. Switching is one line there, once the
- * accounts in `docs/cloud-setup.md` exist and a sign-in screen does.
+ * `storage/index.ts` still defaults to the IndexedDB repository, because that is
+ * the only one that works on a phone with no signal. The reader switches in
+ * Settings; see `../backend.ts` for what that does and why it reloads.
  */
 
 export { createCloudRepository } from './cloudRepository.ts'
@@ -15,6 +14,7 @@ export type { CloudRepositoryOptions } from './cloudRepository.ts'
 export {
   CloudError,
   cloudClient,
+  currentUser,
   currentUserId,
   isCloudConfigured,
   onAuthChange,
@@ -22,6 +22,7 @@ export {
   sendSignInLink,
   signOut,
 } from './client.ts'
+export type { CloudUser } from './client.ts'
 
 export { createR2BlobStore } from './blobs.ts'
 export type { BlobEntry, BlobStore } from './blobs.ts'

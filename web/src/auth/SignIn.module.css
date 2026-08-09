@@ -1,0 +1,123 @@
+/*
+ * Deliberately not inside `AppShell` — no top bar, no tabs, no drawer. There is
+ * exactly one thing to do on this screen, and offering navigation to places
+ * that will refuse to load is worse than offering none.
+ */
+
+.screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.panel {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  color: var(--color-text-muted);
+  line-height: var(--leading-ui);
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.input {
+  padding: var(--space-3);
+  /* 16px minimum, or iOS Safari zooms the whole page on focus. */
+  font-size: var(--text-base);
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  min-height: 44px;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.primary {
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  min-height: 44px;
+  transition: opacity var(--motion-micro) var(--ease-standard);
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.secondary {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.error {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+/* Quiet, but always reachable — see the note at the top of `SignIn.tsx`. */
+.escape {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  cursor: pointer;
+  min-height: 44px;
+  text-align: center;
+}
