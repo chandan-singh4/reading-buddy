@@ -15,7 +15,8 @@
 /
 ├─ web/             # reusable UI — the actual product (React + Vite + TS, PWA)
 ├─ shell/           # Tauri desktop harness — disposable, retired at WP-34
-├─ api/             # tiny endpoint holding the Claude key
+├─ api/             # server-side endpoints: the Claude key, and R2 presigning
+├─ supabase/        # SQL migrations for the cloud backend (run by hand, once)
 ├─ docs/            # the session-state context files (this folder)
 └─ .claude/skills/  # /startup, /wrap-session, /plan-task
 ```
@@ -170,6 +171,40 @@ web/src/
 
 - **Import `./storage`, never `./storage/db.ts`.** `repository.ts` is the door;
   the database behind it stays swappable.
+
+### The cloud backend (written 2026-08-09, not yet wired in)
+
+`web/src/storage/cloud/` is a second implementation of the **same `Repository`
+shape** — declared as returning `Repository`, so a missed method fails the build
+rather than the app. Swapping is one line in `storage/index.ts`.
+
+| | Where it goes | Why |
+|---|---|---|
+| books, manifests, chapters, sections, positions, folders, quotes, bookmarks | **Supabase Postgres** | small, queryable, indexed |
+| the original file, the pictures | **Cloudflare R2** | large, fetched one at a time, free to read back out |
+
+```
+web/src/storage/cloud/
+├─ client.ts          Supabase connection + sign-in + `unwrap`
+├─ keys.ts            the R2 key layout (pure, tested)
+├─ rows.ts            row ↔ domain mapping + chunking (pure, tested)
+├─ blobs.ts           R2 via presigned URLs
+├─ cloudRepository.ts the 48 methods
+└─ index.ts           the only entry point other code should import from
+api/r2/sign.ts        mints short-lived R2 URLs, scoped to the caller's prefix
+supabase/migrations/  0001 schema + RLS · 0002 the atomic RPCs
+```
+
+- **The parser does not move.** Bytes → `Block[]` → `assembleBook` still happens
+  in the browser; only the result travels.
+- **Row Level Security is the protection, not the key.** Every table matches
+  `user_id` against `auth.uid()`, so the public anon key in the bundle reads as
+  an empty database until someone signs in.
+- **R2 needs a server because it has no anon key.** See `decisions.md`,
+  2026-08-09 — the `users/<id>/` prefix check in `api/r2/sign.ts` is the whole
+  security model, and traversal segments are refused in two places.
+- **Set-up is `docs/cloud-setup.md`.** Accounts, secrets, CORS, env vars.
+- **No offline yet**, which is why Dexie is still the default.
 - **There is deliberately no `loadBook()`.** Retrieval is `getManifest` +
   `getChapterIndex` + one `getSection`. Adding a whole-book read would quietly
   undo the token strategy.

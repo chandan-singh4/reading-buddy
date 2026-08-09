@@ -663,3 +663,72 @@
   the 85% page scale that had shipped as an admitted guess. What it still cannot
   answer is unchanged: a synthetic click is not a finger, so gestures and
   anything about *feel* remain a phone question. — 2026-08-09
+
+### Settled 2026-08-09 (the cloud backend — Supabase + R2)
+
+Written but **not wired in**. `storage/index.ts` still exports the Dexie
+repository as the app-wide one; `storage/cloud/` is a complete second
+implementation of the same `Repository` shape, waiting on accounts and a
+sign-in screen.
+
+- **Two services, split by weight.** Postgres holds the records (books,
+  manifest, chapters, sections, positions, folders, quotes, bookmarks); R2 holds
+  the two heavy things (the original file, the pictures). The deciding factor is
+  egress: R2 charges nothing to read bytes back out, and the library is roughly
+  90% bytes by size and 10% records. `sources` and `assets` keep a key, a size
+  and a media type — enough for "what are the kept files costing me?" to stay
+  one cheap query, exactly as the denormalised `size` did under Dexie.
+- **The parser stays in the browser.** It works offline, needs no server CPU,
+  and the phone already does it. Only the results travel.
+- **Row Level Security is what makes a public key safe.** The Supabase anon key
+  is compiled into the bundle and is meant to be — it names the project, not a
+  person. Every table has one policy matching `user_id` against `auth.uid()`,
+  so signed out the whole database reads as empty. The `service_role` key must
+  never appear in `web/`.
+- **R2 gets a signing endpoint because it has no anon key.** R2 credentials are
+  all-or-nothing, so they live on the server. `api/r2/sign.ts` verifies the
+  caller's Supabase session, checks every key requested starts with their own
+  `users/<id>/`, and mints URLs that expire in ten minutes. The bytes go phone →
+  Cloudflare directly; nothing large ever passes through the function.
+  **The prefix check is the whole security model** — a signed URL is a
+  capability, so what Postgres would have shown the caller is irrelevant.
+- **`..` is refused, in two places.** A key is a literal string to R2, but the
+  signing endpoint builds a `URL` from it and the URL constructor *normalises*
+  traversal. So `users/<me>/../<someone-else>/…` would pass a `startsWith` check
+  and then resolve elsewhere. `keys.ts` strips traversal segments and the
+  endpoint rejects them outright.
+- **Transactions become Postgres functions.** IndexedDB let one `transaction`
+  span four tables; HTTP gives one statement per request. Everything that must
+  not half-happen is an RPC in `0002_functions.sql`, all `security invoker` so
+  RLS still applies inside them — a function makes statements atomic, it is
+  never a way around the policies.
+- **A new import is written in three steps; a re-parse in one.** A large book's
+  sections don't reliably fit in one request. A *new* book can be written hidden
+  (`ready = false`), filled in, then revealed — if it fails, nothing existed to
+  lose, and the next attempt at the same file sweeps the dead row up. A
+  *re-parse* cannot work that way: `reparseBook` promises a failure leaves the
+  old book exactly as it was, and that dies the moment the old sections are
+  deleted in one request and the next one fails. So it pays for a single atomic
+  call and fails cleanly on an enormous book, which is the right way round.
+- **Deletion is rows first, objects after, and the objects are best-effort.**
+  Foreign keys cascade from `books`, so there is no way to half-delete. Doing
+  R2 first would leave a book on the shelf whose pictures had gone; this way the
+  worst case is an unreferenced object costing a fraction of a penny.
+- **`null` and absent are not the same thing, and `rows.ts` is where that is
+  kept true.** SQL has no missing column; the app's types are full of optionals
+  whose *absence* means something (`folderIds` absent = loose in the library).
+  Reads omit rather than assign `undefined`, so the objects are indistinguishable
+  from the ones IndexedDB returns.
+- **Every timestamp is normalised on read.** Postgres returns
+  `2026-08-09T10:00:00+00:00`; the app has always written `…000Z`. They name the
+  same instant and **sort differently as strings** — and the library sorts them
+  as strings, so left alone the recently-added shelf would come back in the
+  wrong order.
+- **Unbounded reads page explicitly.** PostgREST caps a response invisibly: you
+  get 1000 rows and no signal there were 1200. It matters most for
+  `listSections`, which feeds in-book search — a silently truncated book would
+  just stop matching half way through.
+- **There is no offline, and that is why this is not the default.** Every call
+  is a network call. A cache that reads locally and writes through to here is
+  the natural next layer, and `cloud/` holds no state between calls so that it
+  can sit underneath one. — 2026-08-09

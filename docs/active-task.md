@@ -156,9 +156,42 @@ Everything above is settled. What is left needs a hand on a real device:
 - `web/src/reader/bookmarks.ts`, `search.ts` — both pure and tested.
 - `web/src/storage/db.ts` — schema **v10** and its migration.
 
+*For the cloud backend (written 2026-08-09, not wired in):*
+- `docs/cloud-setup.md` — **start here.** Making the two accounts, the secrets,
+  CORS, the env vars. Nothing else works until this is done.
+- `supabase/migrations/0001_schema.sql` — tables, indexes, Row Level Security.
+- `supabase/migrations/0002_functions.sql` — the RPCs that carry the atomicity
+  IndexedDB transactions used to.
+- `web/src/storage/cloud/cloudRepository.ts` — the 48 methods. Read its header
+  before changing anything: it says what changed from Dexie and why.
+- `web/src/storage/cloud/rows.ts` + `keys.ts` — the pure, tested halves.
+  **`null` is not the same as absent** and Postgres timestamps sort differently
+  as strings; both are load-bearing and both have tests.
+- `api/r2/sign.ts` — the `users/<id>/` prefix check **is** the security model.
+
 ### Out of scope
 The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half, WP-25
 notes/highlights.
+
+---
+
+## Second thread — the cloud backend, waiting on accounts
+
+Written and green (838 tests, typecheck, build) but **switched off**: nothing
+imports `storage/cloud/`, and `storage/index.ts` still exports the Dexie
+repository. Three things stand between it and being usable, in order:
+
+1. **The accounts don't exist yet.** `docs/cloud-setup.md` is click-by-click.
+2. **There is no sign-in screen.** `client.ts` has `sendSignInLink` / `signOut`
+   / `onAuthChange`; nothing calls them. Every cloud read and write throws a
+   plain-language refusal until someone is signed in.
+3. **There is no offline.** Every call is a network call, so switching over as
+   things stand would mean a phone in a tunnel has no library. The intended
+   shape is a cache that reads locally and writes through — `cloud/` holds no
+   state between calls specifically so one can sit on top.
+
+**Untested against a real database.** The pure halves are covered; the SQL and
+the round trip have never run. Expect the first live import to find something.
 
 ---
 

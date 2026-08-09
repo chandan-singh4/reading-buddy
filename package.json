@@ -14,5 +14,8 @@
     "preview": "npm run preview --workspace web",
     "lan": "npm run lan --workspace web",
     "icons": "npm run icons --workspace web"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
   }
 }

@@ -34,6 +34,35 @@ Get that loop working before building any breadth.
   the 500 ms / 10 px long press). A synthetic click is not a finger.
 
 ### Recently done
+- **The cloud backend · Supabase + R2, written but not switched on** —
+  2026-08-09. Asked for directly: keep the parser in the browser, move storage
+  to a Postgres database and an object store.
+  - **`web/src/storage/cloud/` is a second `Repository`, not a rewrite.** It is
+    declared as returning `Repository`, so the compiler checks all 48 methods —
+    which is how the first pass found its only two real mistakes. Swapping is
+    one line in `storage/index.ts`; **nothing imports it yet**, and the main
+    bundle moved 449.3 → 449.5 kB, which is the measurement that says so.
+  - **The split is by weight**: records to Postgres, the original file and the
+    pictures to R2, which charges nothing to read bytes back out. `sources` and
+    `assets` keep a key and a size, so "what are the kept files costing me?"
+    still never touches an object.
+  - **Row Level Security is what makes the browser key safe**, and **R2 needs a
+    signing endpoint because it has no equivalent** — `api/r2/sign.ts` checks
+    the caller's session and refuses any key outside their own `users/<id>/`.
+    Traversal (`..`) is refused in two places, because the `URL` constructor
+    normalises it after a `startsWith` check would have passed.
+  - **Transactions became Postgres functions.** A new import is written hidden,
+    filled in and revealed (`ready`), because a big book's sections don't fit in
+    one request; a *re-parse* is one atomic call instead, because `reparseBook`
+    promises a failure leaves the old book untouched and that cannot survive
+    being split. Full reasoning in `decisions.md`.
+  - **Two traps found by writing it down**, both in `rows.ts` and both tested:
+    `null` is not the same as *absent* (`folderIds: []` would file a loose book),
+    and Postgres timestamps sort differently as strings from the app's own
+    (`+00:00` vs `Z`) — which the library sorts on.
+  - Gates: **838 tests** (29 new), typecheck, build. **Still needs**: the
+    accounts made (`docs/cloud-setup.md`), a sign-in screen, and a decision on
+    offline — there is none today, which is why Dexie is still the default.
 - **WP-55 fast-follow · Back puts the toolbar away before it leaves the book**
   — 2026-08-09, merged to `main`. Reported from the phone with a screenshot.
   - **The toolbar was the one layer never wired to `useBackDismiss`.** Raising
@@ -230,8 +259,8 @@ Get that loop working before building any breadth.
     app's root empty, so every judgement about how it *looks* is unverified —
     see the two questions in `active-task.md`.
   - Gates at close: **656 tests** (40 new), typecheck, build. Precache 500.66 KiB.
-**Gates:** `npm test` (809), `npm run typecheck`, `npm run build` — all passing
-as of 2026-08-09. Main bundle 449.3 kB, precache 34 entries / 1072.01 KiB. Every parser stays behind a dynamic `import()`, so pdf.js
+**Gates:** `npm test` (838), `npm run typecheck`, `npm run build` — all passing
+as of 2026-08-09. Main bundle 449.5 kB, precache 34 entries / 1072.01 KiB. Every parser stays behind a dynamic `import()`, so pdf.js
 (434 kB) and mammoth (500 kB) remain in their own chunks and are fetched only
 when a file of that type is imported.
 
