@@ -86,10 +86,29 @@ function corsHeaders(origin: string | null): Record<string, string> {
   }
 }
 
+/**
+ * The project origin, however `SUPABASE_URL` was pasted in — a trailing slash,
+ * or the dashboard's RESTful endpoint (`.../rest/v1`) copied instead of the
+ * Project URL sitting right above it. Both would make the check below request a
+ * path that doesn't exist, and every failure here is indistinguishable from a
+ * bad token: the caller just gets a 401 and no clue why. Mirrors
+ * `normaliseSupabaseUrl` in `web/src/storage/cloud/client.ts`; duplicated
+ * rather than shared because `api/` is built separately from `web/`.
+ */
+function supabaseOrigin(): string | undefined {
+  const raw = process.env.SUPABASE_URL?.trim()
+  if (!raw) return undefined
+  try {
+    return new URL(raw).origin
+  } catch {
+    return raw
+  }
+}
+
 /** The signed-in reader's id, or undefined if the token isn't good. */
 async function userIdFrom(token: string): Promise<string | undefined> {
-  const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_ANON_KEY
+  const supabaseUrl = supabaseOrigin()
+  const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim()
   if (!supabaseUrl || !supabaseKey) return undefined
 
   const response = await fetch(`${supabaseUrl}/auth/v1/user`, {

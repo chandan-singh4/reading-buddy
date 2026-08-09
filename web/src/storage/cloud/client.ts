@@ -18,8 +18,34 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+/**
+ * The project origin, however it was pasted in.
+ *
+ * Supabase's dashboard shows the Project URL and the RESTful endpoint —
+ * `https://<ref>.supabase.co` and `https://<ref>.supabase.co/rest/v1` — a
+ * couple of centimetres apart, and copying the wrong one is silent. The client
+ * appends its own paths, so `/rest/v1` on the end produces requests to
+ * `/rest/v1/auth/v1/otp`, which PostgREST answers with a 404 and `PGRST125:
+ * Invalid path specified in request URL`. Nothing in that message mentions the
+ * URL you typed, and everything else about the setup looks correct.
+ *
+ * No Supabase project is legitimately reached at a path, so anything after the
+ * host is a paste error and can simply be dropped.
+ */
+export function normaliseSupabaseUrl(raw: string | undefined): string | undefined {
+  const trimmed = raw?.trim()
+  if (!trimmed) return undefined
+  try {
+    return new URL(trimmed).origin
+  } catch {
+    // Not a parseable URL. Hand it back untouched — `createClient` throws a
+    // clearer complaint about it than we could invent here.
+    return trimmed
+  }
+}
+
+const SUPABASE_URL = normaliseSupabaseUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined)
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim()
 
 /**
  * Whether the cloud backend has been configured at all.

@@ -110,6 +110,7 @@ Sidebar → **Project Settings** → **API Keys**.
 | What | Looks like | Where it goes |
 |---|---|---|
 | **Project URL** | `https://abcdefgh.supabase.co` | `VITE_SUPABASE_URL` |
+| ⚠️ *not* the **RESTful endpoint** | `https://abcdefgh.supabase.co/rest/v1` | nowhere |
 | **Publishable / anon key** | `sb_publishable_...` or a long `eyJ...` | `VITE_SUPABASE_ANON_KEY` |
 
 > **Do not copy the `service_role` / `secret` key.** It's on the same page and
@@ -298,6 +299,7 @@ finding that out mid-import is confusing.
 |---|---|
 | `new row violates row-level security policy` | You're not signed in, or the row's `user_id` isn't yours. Check the session first. |
 | Upload fails, console says CORS | Part 2.3, and check the origin matches **exactly** — `https://` vs `http://`, and no trailing slash. |
+| Sign-in fails; console shows `POST .../rest/v1/auth/v1/otp` 404 and `PGRST125` | `SUPABASE_URL` has `/rest/v1` on the end — the RESTful endpoint got copied instead of the Project URL above it. Stop at `.supabase.co`. Newer builds strip this for you; restart the dev server after editing. |
 | `404` on `/api/r2/sign` | You're on `npm run dev`, which serves `web/` and nothing else. Use `npx vercel dev`, which runs the `api/` functions too. |
 | `401` from `/api/r2/sign` | Session expired. Sign in again. |
 | `SignatureDoesNotMatch` | `R2_SECRET_ACCESS_KEY` was copied with a stray space, or `R2_ACCOUNT_ID` has the rest of the endpoint URL in it — it's just the id, not the whole address. |
