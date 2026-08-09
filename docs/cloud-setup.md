@@ -83,7 +83,16 @@ tables: `books`, `manifests`, `chapters`, `sections`, `positions`, `sources`,
    - **Redirect URLs:** add `http://localhost:5173/**` so sign-in works while
      you're developing too.
 
-### 1.4 Lock it to just you (do this after your first sign-in)
+### 1.4 Lock it to just you — ⚠️ not yet, come back after Part 5
+
+> **You cannot do this step now, and the app will not ask you to sign in yet.**
+> This setting is written here because it belongs with the other auth settings,
+> but it can only be done *last*: turning sign-ups off before you have signed in
+> once locks you out of your own database. The app also won't offer the cloud at
+> all until Part 3 has put the keys in front of it — until then the option in
+> **Settings** is greyed out and there is no sign-in prompt anywhere. That is
+> correct, not a fault. Carry on to Part 2, and Part 5 step 4 will send you back
+> here at the right moment.
 
 Once you have signed in once and your own account exists:
 
@@ -273,7 +282,8 @@ the desk.
 | `401` from `/api/r2/sign` | Session expired. Sign in again. |
 | `SignatureDoesNotMatch` | `R2_SECRET_ACCESS_KEY` was copied with a stray space, or `R2_ACCOUNT_ID` has the rest of the endpoint URL in it — it's just the id, not the whole address. |
 | Everything worked, now nothing does | A free Supabase project **pauses after a week of no activity**. Open the dashboard and click *Restore*. |
-| The cloud option is greyed out | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` weren't set when the app was built. Vite reads `.env` at startup — restart the dev server. |
+| The app never asks me to sign in | Working as intended. The app always opens on the device library; sign-in only appears once you switch to the cloud in **Settings**. If that switch is greyed out, see the row below. |
+| The cloud option is greyed out | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` weren't there **when the app was built**. Locally: restart `npm run dev` after editing `.env`. On Vercel: add them in Project Settings and then **redeploy** — adding a variable does nothing to the build already live. |
 | Stuck on the sign-in screen with no email arriving | Tap **Use the library on this device instead** at the bottom. Your books are still there; the cloud is a separate library, not a replacement for that one. |
 | Signed in, but the library is empty | Expected. Switching backends copies nothing — see the note in Part 5. |
 
