@@ -14,10 +14,16 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing in the code.** WP-55 and its fast-follow are merged and on Vercel
-  (`7ac706d`). The 2026-08-08 session's notes were reconstructed from its
-  commits on 2026-08-09 — the connection dropped before `/wrap-session` ran —
-  and nothing was half-built when it did.
+- **Turning the cloud on for real — paused mid-setup, not blocked.** The reader
+  is working through `docs/cloud-setup.md` on their own machine. Accounts,
+  tables, keys, `.env`, Vercel variables and **R2 CORS are all done**. The one
+  thing left before an import can be tried is **signing in**, and that is
+  waiting on Supabase's free mailer: `POST /auth/v1/otp` returned **429**
+  because setting the redirect up burned the couple-of-messages-an-hour
+  allowance. **Nothing is broken — the allowance refills.** Resume by clicking
+  *Send me a link* on `reading-buddy-web-nu.vercel.app`.
+- **Nothing is half-built in the code.** Everything from this session is merged
+  and pushed (`1fd0c62`); build green, 863 tests.
 - **WP-55 was measured, not just shipped**: twelve checks in headless Chromium
   at 412×869, all passing. See the table in `active-task.md`. **The 85% is no
   longer a guess** (it measures 85.0%, with 14 px and 40 px of bar clearance).
@@ -34,6 +40,39 @@ Get that loop working before building any breadth.
   the 500 ms / 10 px long press). A synthetic click is not a finger.
 
 ### Recently done
+- **The first live setup, and the three faults it found** — 2026-08-09, merged
+  to `main` (`4b1066c`, `1fd0c62`). All three were found by walking the reader
+  through `cloud-setup.md` step by step. **Every one of them was invisible until
+  a real person hit it**, and every one was a message that named the wrong thing.
+  - **Opening `/settings` directly gave Vercel's own `404: NOT_FOUND`.** Only
+    `/` is a real file; every other path is drawn by the app, so the server has
+    to hand back `index.html`. There was no `vercel.json` — Vercel's Vite preset
+    does not add one. **It stayed hidden for weeks because the service worker's
+    `navigateFallback` answers the same question**, so it only appears where
+    there is no worker yet, or just after clearing one.
+  - **`/api/` and `/assets/` are excluded from that rewrite, for opposite
+    reasons.** `/api/` must reach the function; `/assets/` must be allowed to
+    **fail**, or a missing hashed bundle comes back as HTML served where a
+    script was expected.
+  - **A stale service worker can outlive the files it names.** An old cached
+    `index.html` asks for `assets/index-<old-hash>.js`, a later deploy has
+    deleted it, and the page paints nothing at all — no error, because the code
+    that would show one never loaded. Recovery (Unregister + delete Cache
+    storage, **never** *Clear site data*, which wipes the books) is now a row in
+    `cloud-setup.md`.
+  - **Every sign-in failure said "check the address and try again."** The
+    address was never once the problem. `signInFailureMessage` now always
+    surfaces Supabase's own reason and names the three that really happen — the
+    email allowance, sign-ups closed before the first sign-in, and a rejected
+    address. The 429 above took a DevTools session to find; it now says so on
+    the screen.
+  - **The R2 CORS policy in the guide allowed only `GET` and `PUT`.** Deleting
+    a book sends a `DELETE` straight to R2, and blob removal is best-effort by
+    contract — so the book would vanish, no error would show, and the files
+    would stay on the bill forever. The example origin was also a
+    plausible-looking guess rather than a placeholder.
+  - Gates: **863 tests** (12 new, all on the two pure helpers), typecheck,
+    build.
 - **The cloud backend can now be switched on · sign-in and the library toggle**
   — 2026-08-09. The reader has 32 books on the device, which is the constraint
   the whole design answers.
@@ -293,23 +332,30 @@ Get that loop working before building any breadth.
     app's root empty, so every judgement about how it *looks* is unverified —
     see the two questions in `active-task.md`.
   - Gates at close: **656 tests** (40 new), typecheck, build. Precache 500.66 KiB.
-**Gates:** `npm test` (838), `npm run typecheck`, `npm run build` — all passing
-as of 2026-08-09. Main bundle 449.5 kB, precache 34 entries / 1072.01 KiB. Every parser stays behind a dynamic `import()`, so pdf.js
+**Gates:** `npm test` (863), `npm run typecheck`, `npm run build` — all passing
+as of 2026-08-09. Main bundle 470.5 kB, precache 34 entries / 1096.8 KiB. Every parser stays behind a dynamic `import()`, so pdf.js
 (434 kB) and mammoth (500 kB) remain in their own chunks and are fetched only
 when a file of that type is imported.
 
 ### Blockers
-- **None.** The `autoUpdate` → `prompt` crossing that stranded installed clients
+- **Supabase's email allowance, and it clears itself.** A few sign-in messages
+  an hour on the free built-in mailer, used up on 2026-08-09. Wait an hour, or
+  connect real SMTP under Authentication → Emails if this keeps getting in the
+  way. Not a code problem and nothing to fix.
+- **None otherwise.** The `autoUpdate` → `prompt` crossing that stranded installed clients
   is closed: the reader confirmed on 2026-08-05 that the phone is on the current
   build and that the stale client was a desktop-app session, not a deploy or
   worker problem. Don't raise it again.
 
 ### Next up
-**The reader's order, set 2026-08-02: make it a proper reading app first, then
-AI.** Nothing is in flight. **Expect another round of reaction and treat it as
-the real next task** — WP-55 was itself eleven commits of it, and the whole of
-that round is still unseen on a phone.
-- **First: did taking the update bring the logo back?** This is the live
+**Finish the live cloud setup first — it is one sign-in away from done**, and
+the two steps after it are short. See `active-task.md`. Then back to the
+reader's order, set 2026-08-02: make it a proper reading app first, then AI.
+- **First: sign in, turn sign-ups off, import one small book.** The SQL and the
+  round trip have still never run against a real database — **expect that first
+  import to find something**, most likely a column name or an RPC argument,
+  since that is the one thing the compiler could not check.
+- **Then: did taking the update bring the logo back?** This is the older live
   question and it has a likely answer already (an older cached build — see "In
   flight"). Everything else waits on it, because a reader on a stale build will
   report other absences too.

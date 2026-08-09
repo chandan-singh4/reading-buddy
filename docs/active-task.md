@@ -8,209 +8,150 @@
 
 ---
 
-## Task — find out whether the reader's phone is on a current build
+## Task — finish turning the cloud on, live
 
-**Start here. One question, and most of the next round depends on it.**
+**Pick up exactly here: the reader clicks *Send me a link* on
+`https://reading-buddy-web-nu.vercel.app` and signs in.** Everything before that
+is done. This is a hand-holding task, not a building one — the reader is
+following `docs/cloud-setup.md` on their own Windows machine and reporting
+screenshots. Read that file before anything else.
 
-The reader reported *"I don't see the logo"* on 2026-08-09. **The likely answer
-is not a broken splash — it is an older build.** Three facts line up:
+### Where the setup actually stands
 
-- The splash was the **last of eleven** commits (`4f96fb3`).
-- Their screenshot showed the one-toolbar reading screen and the page-shrink,
-  which are commits **five and seven**. So their build is new enough for those
-  and old enough to miss the splash.
-- `vite.config.ts` sets **`registerType: 'prompt'`** — an installed app never
-  updates itself. It waits to be told.
+| Step | State |
+|---|---|
+| Supabase project, tables, RLS (`0001`, `0002`) | ✅ run |
+| Cloudflare R2 bucket + API token | ✅ |
+| `.env` at the repo root, locally | ✅ |
+| Vercel Environment Variables (bulk `.env` import) | ✅ |
+| R2 CORS policy | ✅ done 2026-08-09, `GET`/`PUT`/`DELETE` |
+| **Sign in once** | ⏳ **429 — email allowance used up. Wait an hour.** |
+| Supabase 1.4 — *Allow new users to sign up* → **off** | ⬜ only after signing in |
+| Import one small book, check both dashboards | ⬜ the real test |
 
-They were asked to take the update and look again. **Do not debug `splash.ts` or
-`index.html` until they confirm they are on a current build**: the splash is
-measured present, ~557 ms, and removed from the DOM afterwards. If it is still
-missing on a confirmed-current build, then it is real, and the first thing to
-check is whether a cold start is happening at all (resuming a backgrounded app
-is not one).
+### Definition of done
 
-Everything else is the reader's reaction, in `progress.md` → "Next up".
+1. Signed in on the Vercel deployment, and the session survives a reload.
+2. Sign-ups turned off (§ 1.4) — **do this only after step 1**, or the project
+   locks the one account out of itself. The app now says so when it happens.
+3. One small book imported on the cloud backend, and both halves verified by
+   eye: a `books` row in Supabase with the right `user_id` and `ready` true,
+   and `users/<id>/books/<book-id>/source/…` objects in R2.
+4. Switch back to the device library and confirm all **32 books** are still
+   there. This is the reassurance the whole design was built around; don't skip
+   it because it seems obvious.
+
+### The thing to expect
+
+**The SQL and the round trip have never run against a real database.** The pure
+halves are covered by tests and the compiler checked all 48 methods against the
+`Repository` type — but a column name, an RPC argument name, or a policy that
+refuses a legitimate write are exactly what neither of those can catch. **Expect
+the first live import to find something.** That is the point of doing it with
+one small book rather than thirty-two.
+
+### How this session found its bugs, and the rule that came out of it
+
+Three faults, and **all three reported the wrong thing to the reader**:
+
+- Sign-in failures all said *"check the address and try again."* The address was
+  never once the problem. The real cause (`PGRST125` on one occasion, `429` on
+  another) was only ever visible in DevTools.
+- A blank page with a `404` for a hashed bundle — no error on screen, because
+  the code that renders errors is the code that failed to load.
+- Vercel's own `404: NOT_FOUND`, which says nothing about SPA routing.
+
+**Rule: when a setup step fails, get the console before theorising.** Both
+opaque messages were fixed rather than merely diagnosed — `signInFailureMessage`
+and `normaliseSupabaseUrl` exist because the same paste error cost two evenings.
+If a new class of setup failure turns up, fix the message in the same commit as
+the diagnosis. A guide that needs DevTools is a guide that failed.
+
+### Recovery moves worth having to hand
+
+- **Blank page, `404` on `assets/index-<hash>.js`** — stale service worker
+  serving an old `index.html`. DevTools → Application → **Service Workers →
+  Unregister**, then **Cache storage → Delete**, then Ctrl+Shift+R. **Never
+  *Clear site data*** — it wipes IndexedDB, where the 32 books are.
+- **Stuck on the sign-in screen** — *Use the library on this device instead* at
+  the bottom. That escape hatch is load-bearing; never remove it.
+- **Forced back to the device library from the console** —
+  `localStorage.setItem('rb.backend','local')`, then reload. Chrome blocks
+  console pastes until you type `allow pasting`, so prefer clicking through the
+  Application panel where there is a UI for it.
 
 ### Shipped this session — 2026-08-09
 
-- **WP-55 measured**, twelve checks, all passing (table below).
-- **WP-55 fast-follow**: Back now puts the toolbar away before it leaves the
-  book. Merged at `7ac706d`. 809 tests.
+`4b1066c` and `1fd0c62`, both on `main`. 863 tests, typecheck, build.
 
-### The lesson worth keeping from the WP-55 round — 2026-08-08
-
-Two rounds of work on per-screen scroll positions changed nothing the reader
-could see. The WP-54 notes explained why in detail — a hidden screen has no
-height, the document shrinks, the browser clamps `scrollY` — and it was wrong.
-Not subtly wrong. **None of that code had ever run.**
-
-`index.css` carried `overflow-x: hidden` on `html, body` together. The root
-element's overflow is *propagated* to the viewport; once it has been, the body's
-own overflow applies to the body. So that one extra selector made the **body** a
-scroll container, one viewport tall, with all four screens scrolling inside it —
-while `scrollMemory`, `AppShell` and `scrollRestoration` all talked to the
-`window`. Measured: `window.scrollY` always 0, `window.scrollTo` moved nothing,
-and a window scroll listener never fired once, because element scroll events do
-not bubble.
-
-**A fix that changes nothing the reader can see has two possible explanations,
-and the cheaper one is "it never ran".** Ask that before believing a theory that
-merely fits the symptom. The clamping story was plausible, self-consistent, and
-cost a round because nothing ever checked whether the handler fired.
-
-### Measured 2026-08-09 — twelve checks, all passing
-
-Headless Chromium at 412×869, real layout, a shelf of twelve books and one
-21-page book. **This is the first round whose geometry was verified before the
-reader saw it**, and it is only possible because the "headless renders `#root`
-empty" note turned out to be a certificate error.
-
-| What | Result |
-|---|---|
-| Splash paints before the bundle runs | present at `DOMContentLoaded` |
-| Splash lifetime | ~557 ms — above the 260 ms flicker floor, well under a toll gate |
-| Splash leaves no invisible lid | removed from the DOM, not parked at `opacity: 0` |
-| **Root element is the scroller** | `scrollingElement=html`, `body overflow-y: visible` |
-| **A window scroll listener fires** | `true`, and `scrollTo` lands at 600 — *this is the check that would have caught the WP-54 mistake* |
-| Home does not inherit Library's offset | left Library at 600, Home opened at **0** |
-| Library returns where it was left | left at 600, returned to **600** |
-| Page scales for the toolbar | 412 → 350 px wide = **85.0%**, height 789 → 671 |
-| Top bar clears the text | bar ends y=56, page starts y=70 — **14 px clear** |
-| Bottom bar clears the text | page ends y=740, bar starts y=780 — **40 px clear** |
-| Page does not scroll sideways | `scrollWidth == clientWidth` |
-
-**The 85% is no longer a guess** — it measures 85.0% and both bars clear the
-text. The scroll fix genuinely runs now, which two rounds of it never did.
-
-### Ask these first — only what a browser cannot answer
-
-Everything above is settled. What is left needs a hand on a real device:
-
-1. **Does the launch screen *feel* like the app arriving, or like a toll gate?**
-   557 ms is a healthy number; whether it reads as one is not a measurement. If
-   it reads as a flash, raise `MIN_VISIBLE` in `app/splash.ts` — don't rebuild
-   the animation.
-2. **Does 85% *look* right?** It clears the bars with room to spare, so if it
-   feels like too much shrink there is budget to raise it toward 90%.
-3. **Gestures.** Swipe between screens, the 500 ms / 10 px long press, whether
-   swiping fights scrolling. jsdom never cancels a pointer and a synthetic click
-   is not a finger — this is the one area still verified on the phone or not at
-   all.
-4. **Is the tempo right?** Three durations where there were ten. Tap a filter,
-   open the sheet, pick an option — that sequence used to be four speeds in a
-   second.
-5. **Bookmarks and search in use** — the corner marks the page; the magnifier
-   searches the book. Both work; neither has been *lived with*.
-
-### Decisions made this round the reader may want to revisit
-
-- **The bookmark left the toolbar and became the page's top-right corner.** Bare
-  paper until marked. If it is hard to hit, or hit by accident while turning
-  pages, that is the trade to revisit — the corner is close to the edge-tap zone.
-- **A wide table now wraps instead of scrolling sideways.** A genuinely wide
-  table reads cramped. Deliberate: cramped text can be read, text below the fold
-  could not be reached at all.
-- **The bottom bar keeps only the slider.** Contents, Bookmarks and Notes are in
-  the ⋯ menu. If reaching them feels buried, the menu is the thing to change, not
-  the bottom bar — controls under a resting thumb were being hit by accident.
-- **Search is case-insensitive but not accent-insensitive.** "resume" will not
-  find "résumé". The narrow rule can be widened later without surprising anyone;
-  the reverse is not true.
+- `vercel.json` — SPA rewrite, excluding `/api/` and `/assets/`.
+- `signInFailureMessage` in `cloud/client.ts` — surfaces Supabase's real reason,
+  names the three that happen. Six new tests.
+- `cloud-setup.md` — `DELETE` added to the CORS policy, the guessed Vercel
+  address replaced with a placeholder, two new troubleshooting rows.
 
 ### Files in scope
 
-*For a reaction to the launch screen or the logo:*
-- `web/index.html` — the splash markup, its inline CSS, the pre-paint theme
-  script, and the watchdog. **Start here**; the notes in it explain why each
-  piece cannot live in the bundle.
-- `web/src/app/splash.ts` — when it goes. `MIN_VISIBLE` and `FADE_MS`.
-- `web/scripts/make-icons.mjs` — the mark itself, drawn from theme tokens.
-  `npm run icons` regenerates all four PNGs. The same mark is hand-inlined as
-  SVG in `index.html` and in `web/public/favicon.svg` — **change one, change all
-  three.**
+**Read `docs/cloud-setup.md` first and mostly only that** — this is a setup
+task, not a code task. Open the rest only when a live failure points at it.
 
-*For a reaction to motion or timing:*
-- `web/src/styles/theme.css` — `--motion-micro`, `--motion-ui`, `--motion-screen`
-  and the two curves.
-- `web/src/styles/motionTokens.test.ts` — the two timings that must live outside
-  the stylesheet, checked rather than asserted in a comment.
-- `web/src/reader/motion.ts` — **inside a book only, and deliberately untouched.**
-  A page turn is 400 ms because it was reported as too fast twice.
-
-*For a reaction to scrolling or navigation:*
-- `web/src/index.css` — the `overflow-x` rule. **Start here for anything about
-  landing in the wrong place**, and read the note before changing it.
-- `web/src/app/scrollMemory.ts` — the per-path offsets.
-- `web/src/app/AppShell.tsx` + `.module.css` — where it is saved and restored.
-
-*For a reaction to the reading screen:*
-- `web/src/pages/Reader.tsx` + `.module.css` — the scale-for-toolbar, the
-  constant it hands to CSS, and **`dismissTopLayer`**: wire anything new that
-  covers or resizes the page into it in the same commit.
-- `web/src/reader/useBackDismiss.ts` — one history entry, re-armed inside its
-  own `popstate` handler. Read the note there before touching the effect's
-  dependency array.
-- `web/src/reader/Chrome.module.css` — the one toolbar.
-- `web/src/reader/pageTurn.ts` — the copy, and why it is built at full size and
-  drawn at the scale.
-- `web/src/reader/bookmarks.ts`, `search.ts` — both pure and tested.
-- `web/src/storage/db.ts` — schema **v10** and its migration.
-
-*For the cloud backend (written 2026-08-09, not wired in):*
-- `docs/cloud-setup.md` — **start here.** Making the two accounts, the secrets,
-  CORS, the env vars. Nothing else works until this is done.
-- `supabase/migrations/0001_schema.sql` — tables, indexes, Row Level Security.
-- `supabase/migrations/0002_functions.sql` — the RPCs that carry the atomicity
-  IndexedDB transactions used to.
-- `web/src/storage/cloud/cloudRepository.ts` — the 48 methods. Read its header
-  before changing anything: it says what changed from Dexie and why.
+- `docs/cloud-setup.md` — the click-by-click walkthrough and its troubleshooting
+  table. **Start here.**
+- `web/src/storage/cloud/client.ts` — `normaliseSupabaseUrl`,
+  `signInFailureMessage`, and the session helpers. Where any *new* opaque
+  sign-in message gets fixed.
+- `web/src/storage/cloud/cloudRepository.ts` — the 48 methods. **Open this when
+  the first import fails**; its header says what changed from Dexie and why.
 - `web/src/storage/cloud/rows.ts` + `keys.ts` — the pure, tested halves.
-  **`null` is not the same as absent** and Postgres timestamps sort differently
-  as strings; both are load-bearing and both have tests.
+  `null` is not the same as absent, and Postgres timestamps sort differently as
+  strings.
+- `supabase/migrations/0001_schema.sql` — tables, indexes, RLS. Check here when
+  a write is refused rather than wrong.
+- `supabase/migrations/0002_functions.sql` — the RPCs. Check here when an
+  argument name doesn't match.
 - `api/r2/sign.ts` — the `users/<id>/` prefix check **is** the security model.
+  Also where a 401 on upload comes from.
+- `web/src/storage/cloud/blobs.ts` — the browser half of R2. CORS errors and
+  upload failures surface here.
+- `vercel.json` — the SPA rewrite, if any path 404s from the server again.
 
 ### Out of scope
-The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half, WP-25
-notes/highlights.
+
+Copying the 32 device books into the cloud (the obvious next build — read from
+`deviceRepository`, write through `repository`, book by book, resumable — but
+**wait until one live import has actually worked**). Offline for the cloud
+backend. The tutor loop (WP-17→20), WP-43, WP-25.
 
 ---
 
-## Second thread — the cloud backend, now switchable
+## Second thread — the reader's eye, still unspent
 
-Written and green (851 tests, typecheck, build). The app still **starts on the
-device library**, but the cloud is now reachable: **Settings → Where your
-library lives → The cloud** reloads onto it and asks for a sign-in link.
+Untouched this session and still the real next task once the cloud is up. **The
+whole WP-55 round remains unseen on a phone**, and the live question from
+2026-08-09 was never answered:
 
-**The reader has 32 books on the device.** Switching backends moves none of
-them — it changes which library is on screen, and switching back returns all 32.
-Settings shows a count under the option not in use so an empty cloud shelf reads
-as reversible. **There is still no way to copy books between the two.**
+- **Did taking the update bring the logo back?** The likely answer is an older
+  cached build, not a broken splash — the splash was the last of eleven commits,
+  and `registerType: 'prompt'` means an installed app never updates itself.
+  **Don't debug `splash.ts` or `index.html` until a current build is confirmed**;
+  the splash is measured present at ~557 ms and removed from the DOM after.
+- **Then, only what a browser cannot answer.** Does 557 ms read as arriving or
+  as a toll gate? Does 85% look like too much shrink (there is budget to 90%)?
+  Gestures — swipe, the 500 ms / 10 px long press — **verified on the phone or
+  not at all**. The new three-token tempo. The library's list and grid, still
+  never reacted to.
+- **Run Library → Update** to pull covers forward to `PARSER_VERSION` 9.
 
-What is left, in order:
-
-1. **The accounts don't exist yet.** `docs/cloud-setup.md` is click-by-click,
-   and its Part 5 is now the real walkthrough — switch, sign in, import *one*
-   small book, check both dashboards, switch back.
-2. **Untested against a real database.** The pure halves are covered; the SQL
-   and the round trip have never run. **Expect the first live import to find
-   something** — most likely a column name or an RPC argument, since that is
-   the one thing the compiler could not check.
-3. **No way to move the 32 books up.** The obvious next build: read from
-   `deviceRepository`, write through `repository`, book by book, resumable.
-   Wait until (2) has actually worked once.
-4. **There is no offline.** Every cloud call is a network call, so a phone in a
-   tunnel on the cloud library has nothing. The intended shape is a cache that
-   reads locally and writes through — `cloud/` holds no state between calls
-   specifically so one can sit on top.
-
-### Files in scope for the cloud thread
-- `web/src/storage/backend.ts` — the preference, and **why the switch reloads**.
-- `web/src/storage/index.ts` — the one line that chooses the backend.
-- `web/src/auth/` — `AuthGate.tsx` (the gate), `SignIn.tsx` (the door, and the
-  escape hatch that must never be removed), `useSession.ts` (three states, not
-  a boolean).
-- `web/src/pages/Settings.tsx` — the toggle, and the book count that makes it
-  legible as reversible.
+### Files in scope for that thread
+- `web/index.html` — the splash markup, inline CSS, pre-paint theme script,
+  watchdog. **Start here**; its notes say why each piece can't live in the
+  bundle.
+- `web/src/app/splash.ts` — `MIN_VISIBLE`, `FADE_MS`.
+- `web/src/styles/theme.css` + `styles/motionTokens.test.ts` — the tempo.
+- `web/src/pages/Reader.tsx` + `.module.css` — the scale-for-toolbar, and
+  **`dismissTopLayer`**.
+- `web/scripts/make-icons.mjs` — the mark. Also hand-inlined in `index.html` and
+  `web/public/favicon.svg` — **change one, change all three.**
 
 ---
 
@@ -235,6 +176,7 @@ What is left, in order:
   One line in `blocks.module.css` to restore.
 - **Subtitle cutting is a guess** and will occasionally take a real title too
   far. The manual rename on the detail page is the way back.
+- **A garbled-diacritics report is open**, waiting on the reader's actual file.
 
 ---
 
@@ -243,70 +185,65 @@ What is left, in order:
 - **Ship at the end of every thread.** Build, commit, merge to `main`, push —
   Vercel deploys from `main`. This is in `CLAUDE.md` at the reader's request and
   it **overrides `/wrap-session`'s older "do not commit or push unless I ask".**
+- **This container's local `main` was an unrelated history** (a 2026-08-02 root,
+  kept as `main-stale-local`). `origin/main` is authoritative. If `git merge`
+  ever refuses unrelated histories again, **check `git log origin/main` before
+  believing the local branch** — `git checkout -B main origin/main` is the fix,
+  not a force push.
+- **Only `/` is a real file on the server.** Every other path is the app's. The
+  service worker's `navigateFallback` hides a missing server rewrite completely,
+  so test deep links with the worker unregistered or not at all.
+- **A `VITE_`-prefixed variable is baked into the bundle at build time.** Adding
+  one in Vercel does nothing to the deploy already live — it needs a redeploy,
+  with the build cache unticked. Locally it needs the dev server restarted.
+- **Vite hands the bundle `''`, not `undefined`, for an empty env var.** So `??`
+  does not fall back and `||` does. `.env.example` ships optional keys blank, so
+  this is a live trap, not a hypothetical one (`blobs.ts`, `SIGN_URL`).
+- **Never prefix an R2 credential or the Anthropic key with `VITE_`.** It would
+  be compiled into every visitor's JavaScript. Same for Supabase's
+  `service_role` key — if one ever appears in `web/`, it is an incident.
 - **The scroller is the root element, not the document and not the body.**
   `overflow-x: hidden` on `html, body` *together* is not the same rule twice: it
   makes the body a second scroll container and silently detaches every
   `window.scrollY` / `window.scrollTo` / window scroll listener in the app.
-  **This replaces WP-54's "the document is the only scroller, and a hidden screen
-  has no height", which was wrong** — see `decisions.md`, 2026-08-08.
 - **When a fix changes nothing the reader can see, check that it ran before
   refining the theory.** Cost a round.
 - **`position: fixed` does not work anywhere inside the app frame. Use
   `app/Portal.tsx`.** `.frame` carries a `filter` at all times (at no-op values,
   because `none → blur()` snaps instead of animating), and an element with a
-  filter is a containing block for every fixed descendant. This has now cost two
-  rounds. **The same trap applies to the reading screen's scale transform**: the
-  page number had to become part of the page for exactly this reason.
+  filter is a containing block for every fixed descendant. This has cost two
+  rounds. **The same trap applies to the reading screen's scale transform.**
 - **To make the page look smaller, scale it — never resize it.** A real resize
   re-flows the columns and the browser re-decides every page break, so the page
   under the reader's thumb changes as they tap. Scaled rectangles come back
   scaled while `scrollLeft` and the column gap do not — divide on the way in, and
-  never derive the factor from `offsetWidth` (whole-pixel rounded; a fraction of
-  a per cent of a 40,000 px strip is a page and a half).
+  never derive the factor from `offsetWidth`.
 - **Anything drawn over the page that changes the page is a layer, and every
-  layer owes Back an answer.** The toolbar took two reports to be seen as one
-  because it does not *look* like a panel. When adding anything that covers or
-  resizes the reading page, wire it into `dismissTopLayer` in `Reader.tsx` in
+  layer owes Back an answer.** Wire it into `dismissTopLayer` in `Reader.tsx` in
   the same commit.
 - **`history.back()` is asynchronous; `pushState` is not.** Never tear down and
   rebuild a history entry in a React effect that a `popstate` can also be
-  changing — the queued traversal can land after the rebuild and undo it. This
-  is why `useBackDismiss` holds its callback in a ref and depends on `open`
-  alone, and why re-arming happens inside the `popstate` handler.
-- **jsdom's history is shared across a test file.** A second `history.back()`
-  will happily fire a `popstate` off an older entry, so "did the gesture fire?"
-  passes with or without a fix. Assert on **whether an entry of yours is on
-  top** instead. One test in this round passed against the broken code before
-  being rewritten that way.
+  changing.
+- **jsdom's history is shared across a test file.** Assert on **whether an entry
+  of yours is on top**, not on whether the gesture fired.
 - **Anything with `overflow` other than `visible` cannot be broken across a
-  column.** A scroll container has no seam to cut, so giving an element its own
-  scroller is what makes a tall one run off the bottom of the page.
-- **Headless Chrome renders this app correctly, and layout is now routinely
-  checkable.** The old note saying `#root` comes back empty was the dev server's
-  self-signed certificate. Serve the built app over plain HTTP
+  column.**
+- **Headless Chrome renders this app correctly**, over plain HTTP
   (`npx vite preview` from `web/`, *not* through the npm workspace — the flags
-  get eaten and `--port` is read as a directory) and drive it with Playwright
-  against `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. Two traps worth
-  knowing: a fresh browser context is a **fresh install** with an empty library
-  and no scroll memory, so import books in the same context you measure in; and
-  **tab screens stay mounted while hidden** (WP-53 keep-alive), so a bare
-  `text=` locator will happily resolve to an element on an invisible screen —
-  scope with `visible=true`. **Gestures are still a phone question**: jsdom
-  never cancels a pointer and a synthetic click is not a finger.
+  get eaten and `--port` is read as a directory), driven with Playwright against
+  `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. A fresh context is a
+  **fresh install** (empty library, no scroll memory), and **tab screens stay
+  mounted while hidden**, so scope locators with `visible=true`. **Gestures are
+  still a phone question.**
 - **Books imported before a parser change keep the old parse, silently.**
   `PARSER_VERSION` is 9 and the shelf offers the update — but it needs the kept
-  source file, and a book imported without one can never be brought forward.
+  source file.
 - **A title fix reaches everyone; a parser fix does not.** `TITLE_CLEAN_VERSION`
-  recomputes from what is already stored, at boot, for free. Keep new work on the
-  title side of that line wherever there is a choice.
+  recomputes from what is already stored, at boot, for free.
 - **Anything that adds, removes or re-parses a book must clear all three
-  caches** — `forgetCovers()`, `forgetShelfMemory()`, `forgetLibraryMemory()`.
-  `Library.reload(changed)` is the one door they live behind; keep it that way.
-- **A copy of the strip is a scrolling box.** Anything laid over one at
-  `inset: 0` lands at its scroll origin, not on screen — hang it on the
-  non-scrolling wrapper `copyOf` returns.
-- **A page is a column plus its gap.** Anything that scrolls or measures the
-  strip must use `measure().pageWidth`, never the element's width.
-- **No 3D transform on a shelf tile.** A rotated element takes its own width with
-  it and breaks the row alignment. Spine and page edges are shadows and
-  pseudo-elements for exactly this reason.
+  caches** — `forgetCovers()`, `forgetShelfMemory()`, `forgetLibraryMemory()`,
+  behind `Library.reload(changed)`.
+- **A copy of the strip is a scrolling box.** Hang overlays on the non-scrolling
+  wrapper `copyOf` returns.
+- **A page is a column plus its gap.** Use `measure().pageWidth`.
+- **No 3D transform on a shelf tile.**
