@@ -866,17 +866,37 @@ export default function Reader() {
   /**
    * A back gesture closes what is over the book rather than leaving the book.
    *
-   * Asked of *both* panels through one flag, not once per panel. Two separate
-   * calls would each push and pop their own history entry, and moving from one
-   * panel straight to the other would pop one entry while pushing another in
-   * the same commit — a swallowed gesture at best, and at worst a `popstate`
-   * arriving a moment later to close the panel just opened.
+   * Asked of every layer through one flag, not once per layer. Separate calls
+   * would each push and pop their own history entry, and moving from one layer
+   * straight to another would pop one entry while pushing another in the same
+   * commit — a swallowed gesture at best, and at worst a `popstate` arriving a
+   * moment later to close the layer just opened.
    *
-   * The bug this fixes, reported from the phone: opening search, typing
-   * nothing, and swiping back threw the reader out of the book and onto the
-   * shelf. Search had never been wired to this at all.
+   * Two bugs from the phone, the same shape both times. First: opening search,
+   * typing nothing, and swiping back threw the reader out of the book — search
+   * had never been wired to this. Then, 2026-08-09: raising the toolbar shrinks
+   * the page, and swiping back left the book rather than putting the page back.
+   *
+   * **The toolbar is a layer.** It is the one that took two reports to see,
+   * because it does not *look* like a panel — but it covers the page, it
+   * changes the page's size, and a reader who raised it has somewhere to come
+   * back to. That is the whole definition.
    */
-  useBackDismiss(sheetOpen || searchOpen, closeLayers)
+  const dismissTopLayer = useCallback((): boolean => {
+    // One gesture, one layer. A reader with the sheet open over the toolbar
+    // expects Back to close the sheet and leave them looking at the toolbar —
+    // not to clear the screen in one go, which loses the state they were in.
+    if (menuOpen || sheetOpen || searchOpen) {
+      closeLayers()
+      // The toolbar is still up behind the panel, so there is more to peel.
+      return chromeShown
+    }
+
+    setChromeShown(false)
+    return false
+  }, [menuOpen, sheetOpen, searchOpen, chromeShown, closeLayers])
+
+  useBackDismiss(menuOpen || sheetOpen || searchOpen || chromeShown, dismissTopLayer)
 
   const toggleFocus = useCallback(() => {
     setFocusMode((on) => !on)

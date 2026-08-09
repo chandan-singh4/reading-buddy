@@ -189,6 +189,21 @@ notes/highlights.
   scaled while `scrollLeft` and the column gap do not — divide on the way in, and
   never derive the factor from `offsetWidth` (whole-pixel rounded; a fraction of
   a per cent of a 40,000 px strip is a page and a half).
+- **Anything drawn over the page that changes the page is a layer, and every
+  layer owes Back an answer.** The toolbar took two reports to be seen as one
+  because it does not *look* like a panel. When adding anything that covers or
+  resizes the reading page, wire it into `dismissTopLayer` in `Reader.tsx` in
+  the same commit.
+- **`history.back()` is asynchronous; `pushState` is not.** Never tear down and
+  rebuild a history entry in a React effect that a `popstate` can also be
+  changing — the queued traversal can land after the rebuild and undo it. This
+  is why `useBackDismiss` holds its callback in a ref and depends on `open`
+  alone, and why re-arming happens inside the `popstate` handler.
+- **jsdom's history is shared across a test file.** A second `history.back()`
+  will happily fire a `popstate` off an older entry, so "did the gesture fire?"
+  passes with or without a fix. Assert on **whether an entry of yours is on
+  top** instead. One test in this round passed against the broken code before
+  being rewritten that way.
 - **Anything with `overflow` other than `visible` cannot be broken across a
   column.** A scroll container has no seam to cut, so giving an element its own
   scroller is what makes a tall one run off the bottom of the page.

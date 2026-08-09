@@ -1,10 +1,15 @@
 /**
- * Make a back gesture close an open panel instead of leaving the page.
+ * Make a back gesture close what is over the page instead of leaving the page.
  *
  * The problem this solves, found on a real phone: with the contents sheet open,
  * swiping back — the natural "I'm done with this" gesture — threw the reader
  * out of the book and onto the shelf. The sheet is not a page as far as the
  * browser is concerned, so Back skipped straight past it.
+ *
+ * Reported again 2026-08-09 with the *toolbar* in that role: raising it shrinks
+ * the page, which is plainly a state to come back out of, and Back left the
+ * book instead of undoing it. Anything drawn over the page is a layer, and the
+ * toolbar was the one layer never wired to this.
  *
  * It cannot be fixed by refusing the gesture. In an installed app on iOS the
  * back swipe belongs to the system and no amount of CSS or `preventDefault`
@@ -13,19 +18,40 @@
  * panel. Which is also exactly how Android's back button is expected to behave.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 /** Marks the history entry as ours, so we only ever remove our own. */
 const LAYER = 'reading-buddy-layer'
 
-export function useBackDismiss(open: boolean, onDismiss: () => void): void {
+/**
+ * `onDismiss` peels the topmost layer and says whether another is still there.
+ *
+ * Returning `true` re-arms the gesture, so Back peels one layer at a time —
+ * closing the contents sheet leaves the toolbar up, and it takes another Back
+ * to put that away. Returning `false` (or nothing) means the page is bare
+ * again and the next Back belongs to the book.
+ */
+export function useBackDismiss(open: boolean, onDismiss: () => boolean | void): void {
+  // Held in a ref so the effect below depends on `open` alone. If it depended
+  // on the callback, a handler that changes identity when a layer opens would
+  // tear the entry down and build it again — and the teardown's `history.back()`
+  // is *asynchronous*, so the queued traversal can land after the new
+  // `pushState`, undoing it and firing a `popstate` that closes the layer just
+  // opened. The callback is always read fresh, so nothing is lost by it.
+  const handler = useRef(onDismiss)
+  handler.current = onDismiss
+
   useEffect(() => {
     if (!open) return
 
     window.history.pushState({ [LAYER]: true }, '')
 
     const onPopState = () => {
-      onDismiss()
+      // Re-armed here, inside the handler, rather than by letting the effect
+      // re-run: this `pushState` is synchronous and immediately replaces the
+      // entry the gesture just consumed. Going back out to the effect would
+      // mean the asynchronous `history.back()` above, and the race it brings.
+      if (handler.current() === true) window.history.pushState({ [LAYER]: true }, '')
     }
 
     window.addEventListener('popstate', onPopState)
@@ -44,5 +70,5 @@ export function useBackDismiss(open: boolean, onDismiss: () => void): void {
       // they just left.
       if (window.history.state?.[LAYER] === true) window.history.back()
     }
-  }, [open, onDismiss])
+  }, [open])
 }

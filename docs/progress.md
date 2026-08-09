@@ -31,6 +31,33 @@ Get that loop working before building any breadth.
   (swipe, the 500 ms / 10 px long press). A synthetic click is not a finger.
 
 ### Recently done
+- **WP-55 fast-follow · Back puts the toolbar away before it leaves the book**
+  — 2026-08-09, merged to `main`. Reported from the phone with a screenshot.
+  - **The toolbar was the one layer never wired to `useBackDismiss`.** Raising
+    it shrinks the page to 85%, which is plainly a state to come back out of,
+    but `Reader` asked the hook only about `sheetOpen || searchOpen` — so the
+    gesture fell through to the router and left the book. The fix is to treat
+    the toolbar as what it is: anything drawn over the page, that changes the
+    page, is a layer.
+  - **Back now peels one layer at a time.** Sheet over toolbar: the first Back
+    closes the sheet and leaves the toolbar up, the second puts the toolbar
+    away, the third leaves the book. Clearing everything in one gesture would
+    throw away the state the reader was in.
+  - **Re-arming happens inside the `popstate` handler, not by re-running the
+    effect.** The effect's teardown calls `history.back()`, which is
+    *asynchronous* — the queued traversal can land after the new `pushState`,
+    undo it, and fire a `popstate` that closes the layer just opened. A
+    synchronous `pushState` in the handler has no such race. For the same
+    reason the hook now holds its callback in a ref and depends on `open`
+    alone: `Reader`'s handler closes over which layers are open, so its
+    identity changes whenever one does, and depending on it would have rebuilt
+    the entry on every change.
+  - **Verified in the browser, not only in jsdom**: page 412 → 350 on tap,
+    → 412 and still in the book after one Back, → `/library` after a second.
+  - Gates: **809 tests** (4 new), typecheck, build. Both new tests were checked
+    to fail against the old behaviour — the first draft of one *passed* against
+    it, because jsdom's shared history let a stray `popstate` through, so it now
+    asserts on whether an entry of ours survives the gesture.
 - **WP-55 · The reading screen, the launch, and the scroller that was never
   there** — 2026-08-08, merged to `main` (`d9a7c06` → `4f96fb3`). Eleven
   commits. **Closes WP-14.**
