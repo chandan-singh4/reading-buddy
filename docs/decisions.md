@@ -577,3 +577,61 @@
   better elsewhere — an active filter says so in its own label ("Unread", not
   "Reading status") and the line beneath says "Showing 3 of 12" next to the tap
   that clears it. — 2026-08-08
+- **The app's scroller is the root element, and WP-54's "the document is the only
+  scroller" diagnosis was wrong.** `overflow-x: hidden` written on `html, body`
+  together is not the same rule twice: the root's overflow is *propagated* to the
+  viewport, and once it has been, the body's own overflow applies to the body —
+  so the body became a scroll container one viewport tall with all four screens
+  inside it. Everything that reads or writes a position talks to the `window`, so
+  two rounds of scroll-memory work never executed a single line that mattered
+  (`window.scrollY` measured 0 always; a window scroll listener never fired). The
+  clamping theory explained the symptom plausibly and was never tested against
+  the question *is this code running at all* — the cheaper question, and the one
+  worth asking first when a fix changes nothing the reader can see. — 2026-08-08
+- **Headless Chrome renders this app fine; the standing note saying otherwise was
+  a certificate error.** The dev server's self-signed cert was what produced an
+  empty `#root`, not the app. Real layout is testable again — the scroll fix was
+  verified against a genuine 9000px screen. — 2026-08-08
+- **A bookmark points at an anchor, never a page number.** Pages are laid out
+  from the reader's own type size and this app puts that control two taps away,
+  so a stored page number names a different sentence the moment the text grows.
+  Marking a page and then enlarging the text keeps the mark on the sentence.
+  — 2026-08-08
+- **To make the page look smaller, scale it — never resize it.** The text is laid
+  out in CSS columns, so a box that genuinely changed size would re-flow and the
+  browser would re-decide every page break: the page a reader is standing on
+  would change under them the moment they tapped. A transform moves nothing. The
+  price is paid explicitly — measured rectangles come back scaled while
+  `scrollLeft` and the column gap do not, so every rectangle is divided by the
+  factor on the way in, and the factor is a constant in TypeScript handed to CSS
+  because the two must be the same number and one of them has to own it. It is
+  *not* derived from `offsetWidth`, which is rounded to a whole pixel — a
+  fraction of a per cent of a forty-thousand-pixel strip is a page and a half.
+  — 2026-08-08
+- **A wide table wraps; it does not get its own scroller.** Anything with
+  `overflow` other than `visible` is monolithic — the browser will not break it
+  across a column, because a scroll container has no seam to cut — so the one
+  line meant to stop a wide table scrolling the page was what made a *tall* table
+  run off the bottom with no gesture that could reach the lost rows. Cramped text
+  can be read; text below the fold cannot. Code blocks could not take the same
+  fix, since wrapping a line of code changes what it means, so they are capped
+  under a page height and scroll within themselves. — 2026-08-08
+- **A re-flow lands the reader on the same words, not the same page number.**
+  Every control in the Aa tab re-decides where page breaks fall while the strip
+  stays scrolled to a pixel offset that no longer sits on a column edge. Landing
+  on the paragraph is not merely the fix — it is the only behaviour that means
+  anything once the number of pages has changed underneath you. — 2026-08-08
+- **The launch screen lives in `index.html`, inline, and leaves on first paint.**
+  Anything in the bundle arrives after the wait it exists to cover. It leaves
+  when the first screen is actually on the glass rather than on a timer — nobody
+  opened the app to look at the logo — with `MIN_VISIBLE` guarding only against
+  the opposite failure, a logo that appears and vanishes in 60ms and reads as the
+  screen glitching. The HTML also carries a watchdog: a fixed lid at z-index 9999
+  whose remover is inside the bundle would, on a failed boot, sit over an
+  invisible error. — 2026-08-08
+- **Three motion durations, chosen by how much of the screen changed meaning.**
+  Ten hand-picked values were each defensible alone, but a reader meets them in
+  sequence — tap a filter, open the sheet, pick an option, watch the shelf reflow
+  is four speeds in a second. Inside a book `reader/motion.ts` still rules and is
+  untouched: a 400ms page turn was reported as too fast twice, and that is not a
+  UI-transition question. — 2026-08-08

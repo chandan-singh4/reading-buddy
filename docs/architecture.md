@@ -133,7 +133,7 @@ web/src/
 ### Storage (WP-03)
 
 `web/src/storage/` is the only code allowed to touch IndexedDB. Dexie database
-`reading-buddy`, currently schema version 9:
+`reading-buddy`, currently schema version 10:
 
 | Table | Primary key | Holds | Since |
 |---|---|---|---|
@@ -146,6 +146,7 @@ web/src/
 | `assets` | `[bookId+path]` | one row per picture, addressed like a section | v6 |
 | `quotes` | `[bookId+id]` | favourite passages | v7 |
 | `folders` | `id` | the reader's own shelves, indexed on name | v8 |
+| `bookmarks` | `[bookId+id]` | a marked place, indexed on `bookId` | v10 |
 
 - **Everything per-book is its own table, keyed by `bookId`.** A reading
   position is written every few seconds while reading, and a picture can be a
@@ -161,6 +162,11 @@ web/src/
   from the book's own progress. Their ids are namespaced `system:` and the
   repository refuses to write them onto a book — see
   `library/systemFolders.ts`.
+- **A bookmark stores an anchor, never a page number.** Pages are laid out from
+  the reader's own type size, so a stored page number would name a different
+  sentence the moment the text grew — and this app puts that control two taps
+  away. `deleteBook` cascades to `bookmarks`, or a mark would outlive its book
+  and reattach to whatever was next imported under that id.
 
 - **Import `./storage`, never `./storage/db.ts`.** `repository.ts` is the door;
   the database behind it stays swappable.

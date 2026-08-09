@@ -8,118 +8,119 @@
 
 ---
 
-## Task — see WP-54 on the phone, and say what it should do next
+## Task — see WP-55 on the phone, and say what it should do next
 
-Shipped 2026-08-08 across five commits (`378b43f` → `d304ef1`) and on Vercel.
+Shipped 2026-08-08 across eleven commits (`d9a7c06` → `4f96fb3`) and on Vercel.
 Nothing is half-built. The next task is whatever the reader says when they open
 it.
 
+**These notes were reconstructed on 2026-08-09**, not written at the time: the
+previous session's connection dropped before `/wrap-session` could run. The code
+was fine — clean tree, branch level with `origin/main`, 805 tests / typecheck /
+build all green on a fresh checkout. Only the notes were missing.
+
 ### The one lesson worth keeping from this round — 2026-08-08
 
-Five rounds of "the covers flash, it looks like Home is refreshing" ended last
-session with screens being kept mounted. This session found the *rest* of that
-same report, and it was never about painting at all:
+Two rounds of work on per-screen scroll positions changed nothing the reader
+could see. The WP-54 notes explained why in detail — a hidden screen has no
+height, the document shrinks, the browser clamps `scrollY` — and it was wrong.
+Not subtly wrong. **None of that code had ever run.**
 
-**There is one scroller in this app and it is the document.** A hidden screen is
-`display: none`, so it has no height, so the document is only ever as tall as the
-screen on show — which means **every tab change changes the height of the
-document**, and the browser has no choice but to clamp `scrollY` into the new
-screen's range. A long Library → a short Home clamps to Home's last pixel; the
-clamp lands hard against the document edge, which is the jolt that reads as
-pull-to-refresh; and Library then comes back to that clamped number, because
-there was only ever one number for two screens.
+`index.css` carried `overflow-x: hidden` on `html, body` together. The root
+element's overflow is *propagated* to the viewport; once it has been, the body's
+own overflow applies to the body. So that one extra selector made the **body** a
+scroll container, one viewport tall, with all four screens scrolling inside it —
+while `scrollMemory`, `AppShell` and `scrollRestoration` all talked to the
+`window`. Measured: `window.scrollY` always 0, `window.scrollTo` moved nothing,
+and a window scroll listener never fired once, because element scroll events do
+not bubble.
 
-The tell was in the reader's own report and it took reading twice to hear:
-*"Library is also restored to the top."* Two screens overwriting one value. **A
-symptom that describes a shared resource is worth more than a symptom that
-describes a wrong value.**
+**A fix that changes nothing the reader can see has two possible explanations,
+and the cheaper one is "it never ran".** Ask that before believing a theory that
+merely fits the symptom. The clamping story was plausible, self-consistent, and
+cost a round because nothing ever checked whether the handler fired.
 
 ### Ask these first
 
-1. **Does each screen come back where you left it?** Scroll Library down, go to
-   Home, come back. Home should be where *it* was, Library where *it* was, and
-   neither should jolt. This is the only part of the round jsdom genuinely
-   cannot see — it has no layout, so nothing there is ever tall enough to clamp.
-   The bookkeeping rule is tested; the layout is verified on the phone or not at
-   all.
-2. **Does the filter row fit one-handed?** It scrolls sideways and now carries
-   eight controls. The reader steered its behaviour four times by eye but has
-   said nothing about its *size* — chip height, how far the row runs off the
-   right edge, whether the open panel pushes the shelf too far down.
-3. **Do the reading-progress bands answer the real question?** 0–25% / 25–50% /
-   50–75% / 75–100%, several at once. **A book with no recorded percentage is in
-   none of them** — deliberate, since an unknown percentage means never opened,
-   and Unread already holds those. If the reader expects unread books in
-   "0–25%", that is a one-line change in `inBand` and a decision, not a bug.
-4. **Do Unread and Finished behave?** Finish a book; it should be in Finished on
-   the next paint with nothing filed. Clear its position; it should be back in
-   Unread. There is no sync step to go wrong — if it misbehaves, the fault is in
-   `progressMap`, not in folders.
+1. **Does the launch screen feel like the app arriving, or like a toll gate?**
+   It leaves the moment the first screen paints, so on a warm start it should be
+   barely there. If it reads as a *flash*, `MIN_VISIBLE` (260 ms, in
+   `app/splash.ts`) is the number to raise, not the animation to rebuild.
+2. **Does the page still read well when the toolbar is up?** It scales to 85%
+   and slides down. **That number is a guess made without a real screen** — jsdom
+   has no layout, so the tests hold the switch and not the geometry. Whether the
+   bars clear the text, and whether 85% is too much shrink, is a phone question.
+3. **Does each screen come back where you left it?** Scroll Library down, go to
+   Home, come back. This is the *first* time that code has actually executed, so
+   treat it as new rather than as previously-tested behaviour.
+4. **Is the tempo right?** Three durations where there were ten. Tap a filter,
+   open the sheet, pick an option — that sequence used to be four speeds in a
+   second.
+5. **Bookmarks and search** — the corner of the page marks it; the magnifier
+   searches the whole book. Both are new and neither has been used on a phone.
 
 ### Decisions made this round the reader may want to revisit
 
-- **A book may now be in several folders**, reversing WP-53's "at most one".
-  What keeps it a folder and not a tag is that the shelf shows each book once.
-  The consequence they haven't seen: a book in three folders wears three badges
-  on its row.
-- **Sorting by folder was dropped** (folders have their own control) and
-  **sorting by reading progress became a filter**. Both were removed, not
-  hidden; a stored preference naming either falls back to "Recently added".
-- **The accent no longer marks "this filter is hiding books"** — it marks the
-  chip last tapped. The information moved to the chip's own label and the
-  "Showing 3 of 12" line. If the reader misses spotting an active filter at a
-  glance, the fix is a *second, quieter* cue, not taking the yellow back.
-- **"Unread" appears twice in the full sheet** — once as a reading status, once
-  as a folder. Inherent in having asked for both. Droppable by removing the
-  Reading status group from the sheet, since the folders cover it.
+- **The bookmark left the toolbar and became the page's top-right corner.** Bare
+  paper until marked. If it is hard to hit, or hit by accident while turning
+  pages, that is the trade to revisit — the corner is close to the edge-tap zone.
+- **A wide table now wraps instead of scrolling sideways.** A genuinely wide
+  table reads cramped. Deliberate: cramped text can be read, text below the fold
+  could not be reached at all.
+- **The bottom bar keeps only the slider.** Contents, Bookmarks and Notes are in
+  the ⋯ menu. If reaching them feels buried, the menu is the thing to change, not
+  the bottom bar — controls under a resting thumb were being hit by accident.
+- **Search is case-insensitive but not accent-insensitive.** "resume" will not
+  find "résumé". The narrow rule can be widened later without surprising anyone;
+  the reverse is not true.
 
 ### Files in scope
 
+*For a reaction to the launch screen or the logo:*
+- `web/index.html` — the splash markup, its inline CSS, the pre-paint theme
+  script, and the watchdog. **Start here**; the notes in it explain why each
+  piece cannot live in the bundle.
+- `web/src/app/splash.ts` — when it goes. `MIN_VISIBLE` and `FADE_MS`.
+- `web/scripts/make-icons.mjs` — the mark itself, drawn from theme tokens.
+  `npm run icons` regenerates all four PNGs. The same mark is hand-inlined as
+  SVG in `index.html` and in `web/public/favicon.svg` — **change one, change all
+  three.**
+
+*For a reaction to motion or timing:*
+- `web/src/styles/theme.css` — `--motion-micro`, `--motion-ui`, `--motion-screen`
+  and the two curves.
+- `web/src/styles/motionTokens.test.ts` — the two timings that must live outside
+  the stylesheet, checked rather than asserted in a comment.
+- `web/src/reader/motion.ts` — **inside a book only, and deliberately untouched.**
+  A page turn is 400 ms because it was reported as too fast twice.
+
 *For a reaction to scrolling or navigation:*
-- `web/src/app/scrollMemory.ts` — the per-path offsets, and the whole diagnosis.
-  **Start here for anything about landing in the wrong place.**
-- `web/src/app/AppShell.tsx` + `.module.css` — where it is saved and restored,
-  and `leavingShift`, which offsets the outgoing screen during the slide.
-- `web/src/app/screenActive.tsx`, `tabHistory.ts`, `routeTransition.tsx`,
-  `useSwipeNav.ts` — unchanged this round; read only if the fault is Back, the
-  slide, or a stale screen rather than a position.
+- `web/src/index.css` — the `overflow-x` rule. **Start here for anything about
+  landing in the wrong place**, and read the note before changing it.
+- `web/src/app/scrollMemory.ts` — the per-path offsets.
+- `web/src/app/AppShell.tsx` + `.module.css` — where it is saved and restored.
 
-*For a reaction to the filter controls:*
-- `web/src/library/FilterBar.tsx` + `.module.css` — the row. Its opening note
-  holds the three rules the reader arrived at by correction: two options is a
-  switch, the accent follows the tap, a panel closes when you move on.
-- `web/src/library/prefs.ts` — **add a new filter here first**: a field on
-  `LibraryPrefs`, a default, a validator, then one clause in `filter.ts`. The
-  reading-progress bands are the worked example.
-- `web/src/library/filter.ts` — search → filter → sort, all of it pure.
-- `web/src/library/FilterSheet.tsx` — the complete set behind the ⚙ icon, and
-  the only place content type lives.
-
-*For a reaction to folders:*
-- `web/src/library/systemFolders.ts` — why Unread and Finished are computed.
-- `web/src/library/folders.ts` — `foldersOf`, `folderChoices`.
-- `web/src/storage/db.ts` (schema v9 + the migration) and `repository.ts`
-  (`addBooksToFolder`, `removeBooksFromFolder`, `clearFoldersFor`).
-- `web/src/library/SelectionBar.tsx` — "Change folders", with its three-state
-  rows (none / some / all of the ticked books).
+*For a reaction to the reading screen:*
+- `web/src/pages/Reader.tsx` + `.module.css` — the scale-for-toolbar, and the
+  constant it hands to CSS.
+- `web/src/reader/Chrome.module.css` — the one toolbar.
+- `web/src/reader/pageTurn.ts` — the copy, and why it is built at full size and
+  drawn at the scale.
+- `web/src/reader/bookmarks.ts`, `search.ts` — both pure and tested.
+- `web/src/storage/db.ts` — schema **v10** and its migration.
 
 ### Out of scope
-The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half, in-book
-search and real bookmarks (the rest of WP-14).
+The tutor loop (WP-17→20), WP-43 folder re-scan, WP-39's second half, WP-25
+notes/highlights.
 
 ---
 
 ## Still unseen from earlier rounds
 
-- **The library's *looks*.** Every round since 2026-08-06 has been the reader
-  reporting something broken; not one has been them saying how it reads. Grid
-  card proportions, the progress bar in list view, whether the floating "+"
-  clears the last book.
-- **Does the page flip stutter on a long chapter?** A turn inside a section takes
-  a `cloneNode(true)` of the laid-out section on every tap. **If it does, the fix
-  is named already: cache the clone per section in a ref and reset its
-  `scrollLeft` before each flip.** Invalidate on section change, resize, and any
-  reader-settings change.
+- **The library's *looks*.** Grid card proportions, the progress bar in list
+  view, whether the floating "+" clears the last book. Every round since
+  2026-08-06 has been the reader reporting something broken; not one has been
+  them saying how it reads.
 - **Did the covers come back?** The fix is in the *parser*, so it reaches a book
   already on the shelf only when **Library → Update** is run. If *Beyond
   Mindfulness in Plain English* still shows a placeholder afterwards, **ask for
@@ -143,19 +144,33 @@ search and real bookmarks (the rest of WP-14).
 - **Ship at the end of every thread.** Build, commit, merge to `main`, push —
   Vercel deploys from `main`. This is in `CLAUDE.md` at the reader's request and
   it **overrides `/wrap-session`'s older "do not commit or push unless I ask".**
-- **The document is the only scroller, and a hidden screen has no height.**
-  Anything that changes what a screen contains changes the document's height,
-  and the browser will clamp the scroll to match. Kept here because it is not
-  visible from any one file and cost a round to find.
+- **The scroller is the root element, not the document and not the body.**
+  `overflow-x: hidden` on `html, body` *together* is not the same rule twice: it
+  makes the body a second scroll container and silently detaches every
+  `window.scrollY` / `window.scrollTo` / window scroll listener in the app.
+  **This replaces WP-54's "the document is the only scroller, and a hidden screen
+  has no height", which was wrong** — see `decisions.md`, 2026-08-08.
+- **When a fix changes nothing the reader can see, check that it ran before
+  refining the theory.** Cost a round.
 - **`position: fixed` does not work anywhere inside the app frame. Use
   `app/Portal.tsx`.** `.frame` carries a `filter` at all times (at no-op values,
   because `none → blur()` snaps instead of animating), and an element with a
   filter is a containing block for every fixed descendant. This has now cost two
-  rounds. It is also why `FilterBar`'s panels sit in the normal flow rather than
-  hanging under their chips.
-- **Layout and gestures are verified on the reader's phone or not at all.** jsdom
-  has no layout and never cancels a pointer; headless Chrome renders this app's
-  `#root` empty. Three faults once shipped under 656 green tests.
+  rounds. **The same trap applies to the reading screen's scale transform**: the
+  page number had to become part of the page for exactly this reason.
+- **To make the page look smaller, scale it — never resize it.** A real resize
+  re-flows the columns and the browser re-decides every page break, so the page
+  under the reader's thumb changes as they tap. Scaled rectangles come back
+  scaled while `scrollLeft` and the column gap do not — divide on the way in, and
+  never derive the factor from `offsetWidth` (whole-pixel rounded; a fraction of
+  a per cent of a 40,000 px strip is a page and a half).
+- **Anything with `overflow` other than `visible` cannot be broken across a
+  column.** A scroll container has no seam to cut, so giving an element its own
+  scroller is what makes a tall one run off the bottom of the page.
+- **Headless Chrome renders this app correctly.** The old note saying `#root`
+  comes back empty was the dev server's self-signed certificate, not the app.
+  Real layout *is* testable — the scroll fix was verified against a 9000 px
+  screen. **Gestures are still a phone question**: jsdom never cancels a pointer.
 - **Books imported before a parser change keep the old parse, silently.**
   `PARSER_VERSION` is 9 and the shelf offers the update — but it needs the kept
   source file, and a book imported without one can never be brought forward.

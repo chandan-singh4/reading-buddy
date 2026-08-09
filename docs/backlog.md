@@ -37,7 +37,7 @@
 ### Leg 2 — Reading Room (reader UI & comfort)
 - [x] **WP-12 Structured renderer** — anchored paragraphs, paginated · *after 05,11*
 - [x] **WP-13 Nav overlay (Books-style)** — tap-fade, progress slider, ToC, Focus Mode toggle · *after 12*
-- [~] **WP-14 Reader conveniences** — font/spacing, day/night, in-book search, bookmarks, **page turning (see below)** · *after 12*
+- [x] **WP-14 Reader conveniences** — font/spacing, day/night, in-book search, bookmarks, **page turning (see below)** · *after 12* — **closed 2026-08-08** by WP-55: bookmarks (`d2f6fa2`) and in-book search (`2de66c1`) were the last two stubs.
 
 > **Page turning shipped 2026-08-02**, exactly as the note below decided: CSS
 > columns, one column per screen, `column-fill: auto`. `reader/columns.ts` holds
@@ -49,10 +49,11 @@
 > neighbouring *section* at either end — the seam, working as intended. Turning
 > back into a section lands on its **last** page.
 >
-> **Still open in WP-14:** in-book search and real bookmarks — the two stub tabs
-> in the nav sheet, which are a visible promise. Font size, line spacing,
-> margins and themes shipped 2026-08-03; the page-turn *animation* was carved
-> out as **WP-51** and shipped 2026-08-06.
+> **WP-14 is closed as of 2026-08-08.** Its last two open pieces — real
+> bookmarks and in-book search, the two stub tabs that had been a visible
+> promise since WP-40 — shipped in WP-55. Font size, line spacing, margins and
+> themes shipped 2026-08-03; the page-turn *animation* was carved out as
+> **WP-51** and shipped 2026-08-06.
 >
 > **Book typography shipped 2026-08-05** and belongs here: justified text with
 > hyphenation (the two are close to useless apart on a phone-width column),
@@ -294,6 +295,27 @@
   multiEntry, migrated from v8's single `folderId`), which overturns WP-53's
   "one folder per book" — the shelf still shows each book once, which is what
   keeps it a folder and not a tag · *after 53*
+- [x] **WP-55 The reading screen, the launch, and the scroller that was never
+  there** — added and shipped 2026-08-08, eleven commits, all on `main`. Closes
+  **WP-14**. Five strands. **The scroll bug was never what WP-54 said it was**:
+  `index.css` carried `overflow-x: hidden` on `html, body` *together*, which
+  propagates the root's overflow to the viewport and then leaves the body its
+  own — making the body a scroll container one viewport tall. Every reader and
+  writer of the position talks to the `window`, so none of it ran at all
+  (`window.scrollY` measured 0 always, a window scroll listener never fired
+  once). `overflow-x` on `html` alone; the drawer's lock had the same bug and
+  now locks the root. **One toolbar**: back / search / Aa / ⋯ at the top,
+  slider alone at the bottom, Contents-Bookmarks-Notes moved into the menu, and
+  the bookmark became the page's top-right corner rather than a control for
+  *the book* sitting among controls for *this page*. **Bookmarks and search**
+  (schema **v10**, new table, cascade on delete) — bookmarks anchor to a
+  paragraph, never a page number, because type size is two taps away.
+  **The page scales back for the toolbar** instead of hiding under it or paying
+  a standing margin: a transform, because a box that genuinely resized would
+  re-flow the columns and change the page under the reader's thumb. **The
+  launch screen and one tempo** — a splash in `index.html` (inline, or it would
+  arrive after the wait it covers), the saved theme applied before first paint,
+  and ten hand-picked durations collapsed to three motion tokens · *after 54*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*

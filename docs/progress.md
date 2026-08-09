@@ -14,12 +14,70 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing in the code.** WP-54 is merged and on Vercel across five commits,
-  the last four of them the reader's own corrections made live in the same
-  thread. They have seen and steered the filter row itself; **they have not yet
-  seen the scroll fix, the folders, or the reading-progress bands on the phone.**
+- **Nothing in the code.** WP-55 is merged and on Vercel across eleven commits
+  (`d9a7c06` → `4f96fb3`), most of them the reader's own corrections made live
+  in the same thread. The session ended abruptly — the connection dropped before
+  `/wrap-session` ran — so these notes were reconstructed from the commits on
+  2026-08-09. Nothing was left half-built: the tree was clean, the branch and
+  `origin/main` were on the same commit, and the gates were green.
+- **Unseen on the phone:** the launch screen, the new motion tempo, the scroll
+  fix now that it actually runs, and the page-scales-for-the-toolbar behaviour
+  (85% is a guess made without a real screen).
 
 ### Recently done
+- **WP-55 · The reading screen, the launch, and the scroller that was never
+  there** — 2026-08-08, merged to `main` (`d9a7c06` → `4f96fb3`). Eleven
+  commits. **Closes WP-14.**
+  - **The scroll bug was never what WP-54 said it was, and the previous fix had
+    never run.** `index.css` carried `overflow-x: hidden` on `html, body`
+    *together*. The root element's overflow is propagated to the viewport, and
+    once it has been, the body's own overflow applies to the body — so that one
+    extra selector made the **body** a scroll container, one viewport tall, with
+    all four screens scrolling inside it. Everything that reads or writes the
+    position talks to the `window`: `scrollMemory`, `AppShell`'s save/restore,
+    `scrollRestoration`. Measured at 420×860: `window.scrollY` was always 0,
+    `window.scrollTo` moved nothing, and a window scroll listener never fired
+    once, because element scroll events do not bubble. `overflow-x` sits on
+    `html` alone now; the drawer's scroll lock had the same bug in miniature and
+    locks the root instead. **The clamping theory in WP-54 was plausible and
+    untested** — see `decisions.md`.
+  - **One toolbar, the Google Books shape.** A tap raises one top bar — back,
+    search, Aa, ⋯ — and the bottom keeps the slider and nothing else, because a
+    phone is held at the bottom and controls under a resting thumb were being
+    hit by accident. Contents / Bookmarks / Notes moved into the ⋯ menu and the
+    sheet swapped its tab row for a heading. **The bookmark became the page's
+    top-right corner**: a control for *this page* had been sitting among the
+    controls for *the book*, and marking a page cost two taps.
+  - **Bookmarks and in-book search — the two stub tabs are real.** Schema
+    **v10**, new table, cascade on `deleteBook`, tested by opening a database
+    genuinely written at v9. Search scans the text rather than an index (an
+    index would need building at import, versioning, migrating and rebuilding on
+    every parser change, to save a few milliseconds of `indexOf` over text
+    already in memory), one result per occurrence, literal rather than regex,
+    case-insensitive but not accent-insensitive.
+  - **The page steps back for the toolbar** instead of hiding under it or paying
+    a permanent margin at both ends. A transform, not a resize — see
+    `decisions.md` for the three costs and how each is paid.
+  - **A re-flow keeps the reader on the same words.** Every Aa control re-decides
+    where page breaks fall; the strip used to stay at an offset that no longer
+    landed on a column edge, which is the tail-of-one-page-plus-next-page-off-
+    the-right the reader photographed. Margins also did nothing on a phone (a cap
+    wider than the screen) and now set the space either side of the text.
+  - **A long table no longer runs off the bottom of the page**, and the cause was
+    the line meant to help: a sideways scroller makes an element monolithic, and
+    the browser will not break a scroll container across a column.
+  - **The launch screen and one tempo.** A splash in `index.html` covering the
+    `healTitles()` boot wait, leaving on first paint with an 8s watchdog; the
+    saved theme applied before first paint, ending the light-flash on every cold
+    start for a reader on Dark; and ten hand-picked durations collapsed to three
+    tokens in `theme.css`. `styles/motionTokens.test.ts` now checks the two
+    timings that still have to live outside the stylesheet — `transitions.css`
+    had claimed for months to match `reader/motion.ts` while running 380 against
+    its 400.
+  - **Headless Chrome works after all.** The standing note that it renders this
+    app's `#root` empty was the dev server's self-signed certificate, not the
+    app. The scroll fix was verified against a real 9000px screen.
+  - Gates at close: **805 tests**, typecheck, build.
 - **WP-54 · Scroll positions, the filter row, and folders that hold a book
   twice** — 2026-08-08, merged to `main` (`378b43f` → `d304ef1`). Four asks,
   and then four rounds of the reader correcting the controls by eye.
@@ -189,77 +247,11 @@ Get that loop working before building any breadth.
     than sitting on a branch. Note this **contradicts `/wrap-session`'s "do not
     commit or push unless I ask"** — the ritual is newer and explicit, and won.
   - Gates at close: **616 tests** (3 new, on the cover rules), typecheck, build.
-- **WP-52 · Drawer navigation and the bookshelf Home** — 2026-08-05, merged to
-  `main`. Asked for against a reference screenshot the reader shared; purely
-  UI and navigation, no data or repository change.
-  - **The bottom tab bar is gone.** Four tabs spent the screen's most reachable
-    strip on three screens a reader visits occasionally. Home is the front door
-    and stays the front door; All Books / Stats / Settings moved into a left
-    drawer behind a ☰ in a new sticky top bar. Home is deliberately *not* in
-    the drawer — it is the screen the ☰ is sitting on.
-  - **The frosted-glass blur is on a sibling of the drawer, not its parent.**
-    A CSS `filter` makes an element a containing block for fixed-position
-    descendants, so a drawer nested inside the blurred wrapper would be blurred
-    along with the page. The filter is also written at no-op values rather than
-    `none`, so the browser has two filter lists of the same shape to
-    interpolate between — `none → blur()` snaps.
-  - **Open means open**: body scroll locked, page behind `pointer-events:
-    none`, drawer `inert` while closed so a keyboard user can't tab into
-    off-screen links, focus moved in on open and back to the ☰ on close.
-    Escape, the scrim, and any navigation all close it. Reduced-motion keeps
-    the dim and drops the blur and the slide.
-  - **Home is three shelves** — Current Reading, Up Next, Unread — each its own
-    card with a gradient "plank" drawn under the covers, which is the edge that
-    makes the screen read as a bookshelf rather than a list of cards. Covers
-    carry a shadow and press down on tap. **Finished no longer appears on
-    Home** (still on `/library`) — the reader asked for three shelves, and the
-    reference screenshot does show a Finished shelf, so this is the one thing
-    here worth a second look.
-  - **"View All" is on Unread only**, going to `/library` — Unread is the only
-    capped shelf (ten of however many are owned), so it is the only one
-    actually holding anything back.
-  - `--tab-bar-height` deleted from `theme.css`; nothing else read it.
-  - Gates at close: **613 tests**, typecheck, build. Precache 475.54 KiB.
-- **Text escaping the page, twice — both merged to `main`** — 2026-08-05
-  (`1f450f9`, `bbeb6b8`). Two separate causes behind one symptom the reader
-  reported as "letters from the previous page". Both were reproduced and
-  measured in headless Chrome before being fixed, which is what separated them.
-  - **Ink from the previous page at the left margin.** The columns sat flush
-    against each other, so a turn that lands short of a column edge leaves the
-    tail of the previous page on screen. It lands short on the **last page of a
-    section**: the browser caps `scrollLeft` at `scrollWidth - clientWidth` and
-    rounds both to whole pixels while the real column is fractional (392.72px on
-    a phone). Measured: the last page parks 0.44px short and 0.44px of the
-    previous column shows. **The fix is a `column-gap`**, not better rounding —
-    with a gap the same misalignment lands on blank paper, whatever its size. It
-    costs no reading width: the column is still exactly one box wide, so the gap
-    is scrolled past. A page is now a column *plus its gap*; `Strip.pageWidth`
-    was always documented that way. Verified 0.44px → 0.00px, page count
-    unchanged.
-  - **Long contents entries cut off at the right edge.** Two holes.
-    (a) **The guard only reached direct children.** `.page > *` caps the
-    outermost element of a block and nothing inside it — and `min-width` is the
-    one that bites: a grid child defaults to `min-width: auto`, "never narrower
-    than my contents", and `.list` is a grid. Every contents entry was a grid
-    item refusing to shrink, so a long chapter title made the track wider than
-    the column and the line was sliced. Measured with real chapter titles:
-    **215.7px of text past the column → 0.0px** with the guard applied at every
-    depth. `.tableScroll` keeps its exemption.
-    (b) **A link was still a box.** The previous round's note claimed
-    `display: inline` had made the `<button>` behave like a word. It had not —
-    measured, a button holding a long entry reports **one** line box where the
-    same text in a span reports **two**. A box is laid out whole and cannot
-    break across a line or a column. Internal links are `<span role="link">`
-    now, with Enter/Space handled to give back what the element loses.
-  - **Not fully closed:** the reader's exact clipped line could not be
-    reproduced on desktop Chrome — desktop shrinks that button where Android
-    apparently does not. The *mechanism* is fixed and measured; if clipping
-    survives, the epub (Nestor, *Breath*) is needed to finish it.
-  - Gates at close: **611 tests**, typecheck, build. Precache 468.69 KiB.
-**Gates:** `npm test` (658), `npm run typecheck`, `npm run build` — all passing.
-Main bundle 426.7 kB, CSS 47.4 kB, precache 501.28 KiB. Every parser stays
-behind a dynamic `import()`, so pdf.js (434 kB) and mammoth (500 kB) remain in
-their own chunks and are fetched only when a file of that type is imported.
+**Gates:** `npm test` (805), `npm run typecheck`, `npm run build` — all passing,
+re-verified 2026-08-09 on a clean checkout. Main bundle 449.3 kB, precache 34
+entries / 1071.86 KiB. Every parser stays behind a dynamic `import()`, so pdf.js
+(434 kB) and mammoth (500 kB) remain in their own chunks and are fetched only
+when a file of that type is imported.
 
 ### Blockers
 - **None.** The `autoUpdate` → `prompt` crossing that stranded installed clients
@@ -270,22 +262,25 @@ their own chunks and are fetched only when a file of that type is imported.
 ### Next up
 **The reader's order, set 2026-08-02: make it a proper reading app first, then
 AI.** Nothing is in flight. **Expect another round of reaction and treat it as
-the real next task** — the last round produced three faults within the hour, and
-none of the *looks* of the new library has been reacted to yet.
+the real next task** — WP-55 was itself eleven commits of it, and the whole of
+that round is still unseen on a phone.
 - **Waiting on the reader's eye, in likely order of what they hit first.**
-  (a) The library's list and grid — proportions, the progress bar, whether the
-  "+" clears the last book now. (b) The long press: 500 ms, 10 px. (c) Whether
-  swiping fights scrolling. (d) Run **Update** to pull covers forward to
-  `PARSER_VERSION` 9 — the fix does nothing for books already on the shelf until
-  it runs. (e) Does the page flip stutter on a long chapter? The fix is named
-  already; don't guess at it without their device.
+  (a) The launch screen — does the mark read as the app arriving, or as a toll
+  gate? (b) The page scaling back for the toolbar: **85% is a guess made without
+  a real screen**, and whether the bars clear it is a question jsdom cannot
+  answer. (c) Whether every screen now comes back where it was left, which is the
+  first time that code has actually run. (d) The new tempo — three durations
+  where there were ten. (e) The library's list and grid, still never reacted to:
+  proportions, the progress bar, whether the "+" clears the last book. (f) Run
+  **Update** to pull covers forward to `PARSER_VERSION` 9 — the fix does nothing
+  for books already on the shelf until it runs.
 - **Cheap follow-ons the redesign made cheap**, if the reader wants them:
   favourites (a boolean, one filter clause, one chip) and renaming/deleting a
   folder from the filter sheet — `repository.renameFolder` and `deleteFolder`
   both exist and have no UI yet.
-- **Reading comfort (rest of WP-14)** — in-book search and real bookmarks are
-  what is left; font size, line spacing, margins, sepia and the page turn are
-  all done.
+- **Reading comfort is done.** WP-14 closed with WP-55's bookmarks and in-book
+  search; font size, line spacing, margins, sepia and the page turn were already
+  in. Notes/highlights are WP-25 and need the tutor loop's selection work first.
 - **WP-43 · Re-scan a folder + name what's new.**
 - **WP-17 → 18 → 19 → 20 · the tutor loop** — select text → assemble a prompt →
   call Claude → stream an answer. This is the rest of the walking skeleton and
