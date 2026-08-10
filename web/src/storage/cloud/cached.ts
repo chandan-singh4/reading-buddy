@@ -38,7 +38,14 @@
  */
 
 import type { BookId, BookMeta, Manifest, SectionPath } from '../../structure/index.ts'
-import { cacheRepository } from '../cache.ts'
+import {
+  cacheRepository,
+  evictLeastRecent,
+  evictOverflow,
+  forgetCachedBooks,
+  looksFull,
+  touchCachedBook,
+} from '../cache.ts'
 import type {
   ReadingPosition,
   StoredBookmark,
@@ -122,20 +129,51 @@ function keepOffline(cloud: Repository, cache: Repository, bookId: BookId): void
 
   void (async () => {
     try {
+      // Marked read whether or not it needs copying — this is the record the
+      // eviction order is built from, so it has to be kept on every visit, not
+      // only on the first one. Otherwise the book you read every day would
+      // still look, to the cache, like the oldest thing in it.
+      touchCachedBook(bookId)
       if (await cache.getBook(bookId)) return
+
       const meta = await cloud.getBook(bookId)
       if (!meta) return
       // Folders first, or the book lands loose on the offline shelf.
       const folders = await copyFolders(cloud, cache)
       await copyBook(cloud, cache, meta, folders)
-    } catch {
+      await evictOverflow(cache)
+    } catch (error) {
       // The copy is a convenience. A reader who is reading successfully must
       // never see an error about a background download — and leaving the id out
       // of `filling` means the next page turn simply tries again.
+      //
+      // Out of room is the one failure worth acting on: make room now, and that
+      // retry has somewhere to go. A half-written book is left behind, which is
+      // why the *next* attempt starts by evicting rather than by trusting it.
+      if (looksFull(error)) {
+        await dropPartial(cache, bookId)
+      }
     } finally {
       filling.delete(bookId)
     }
   })()
+}
+
+/**
+ * Clear up after a copy that ran out of room.
+ *
+ * The half-written book goes first — it is unreadable and it is occupying the
+ * space the retry needs — and then one more, because a fill that failed on a
+ * full disk will fail again against the same disk.
+ */
+async function dropPartial(cache: Repository, bookId: BookId): Promise<void> {
+  try {
+    await cache.deleteBooks([bookId])
+    forgetCachedBooks([bookId])
+    await evictLeastRecent(cache)
+  } catch {
+    // Nothing left to try. The reader is still reading from the cloud.
+  }
 }
 
 /**
