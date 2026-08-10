@@ -232,6 +232,33 @@ SUPABASE_ANON_KEY=sb_publishable_...
 Project → **Settings** → **Environment Variables**. Add all eight, for
 Production and Preview. Set them in the dashboard, never in a committed file.
 
+### ⚠️ Root Directory must be the repo root — not `web`
+
+Project → **Settings** → **Build and Deployment** → **Root Directory**. It must
+be **empty**. If it says `web`, clear it and redeploy.
+
+This is the single most expensive setting on the page, because getting it wrong
+breaks two things and announces neither:
+
+- **`api/` disappears.** It sits *next to* `web/`, not inside it, so a
+  deployment rooted at `web` doesn't contain it. Every call to `/api/r2/sign`
+  returns **404**, no upload URL is ever issued, and the app quietly keeps every
+  book while storing none of its pictures. The bucket stays at **0 B** with
+  **Class A Operations: 0** — the tell that nothing ever *reached* Cloudflare,
+  as opposed to Cloudflare refusing it.
+- **`vercel.json` is ignored**, taking the SPA rewrite with it. Deep links like
+  `/settings` then work only because the service worker's `navigateFallback` is
+  covering for the server. A first-time visitor, or anyone with the worker
+  unregistered, gets Vercel's own `404: NOT_FOUND`.
+
+Everything else comes from `vercel.json` at the repo root, which pins the build
+command to `npm run build` and the output to `web/dist`. Leave the dashboard's
+Build Command and Output Directory alone — `vercel.json` overrides them anyway.
+
+`aws4fetch` is a dependency of the **root** `package.json` for this reason: the
+endpoint that uses it lives at the root, and only a root-rooted deployment
+installs it.
+
 ---
 
 ## Part 4 — Why there's a signing endpoint in `api/`
@@ -308,7 +335,9 @@ finding that out mid-import is confusing.
 | `new row violates row-level security policy` | You're not signed in, or the row's `user_id` isn't yours. Check the session first. |
 | Upload fails, console says CORS | Part 2.3, and check the origin matches **exactly** — `https://` vs `http://`, and no trailing slash. |
 | Sign-in fails; console shows `POST .../rest/v1/auth/v1/otp` 404 and `PGRST125` | `SUPABASE_URL` has `/rest/v1` on the end — the RESTful endpoint got copied instead of the Project URL above it. Stop at `.supabase.co`. Newer builds strip this for you; restart the dev server after editing. |
-| `404` on `/api/r2/sign` | You're on `npm run dev`, which serves `web/` and nothing else. Use `npx vercel dev`, which runs the `api/` functions too. |
+| `404` on `/api/r2/sign`, **locally** | You're on `npm run dev`, which serves `web/` and nothing else. Use `npx vercel dev`, which runs the `api/` functions too. |
+| `404` on `/api/r2/sign`, **on the deployed site** | Vercel's **Root Directory** is set to `web`, so `api/` — which sits next to `web/`, not inside it — isn't in the deployment. Clear the field and redeploy. See Part 3. |
+| Books import fine but have no pictures, and covers are placeholder letters | The plates were dropped on the way to storage. `saveAssets` failing never fails an import, by design. Check the **`assets` table in Supabase**: empty means the save broke (look for the console warning naming the reason); rows present means the pictures are stored and it's the read back that's failing — CORS on `GET`, Part 2.3. |
 | `401` from `/api/r2/sign` | Session expired. Sign in again. |
 | `SignatureDoesNotMatch` | `R2_SECRET_ACCESS_KEY` was copied with a stray space, or `R2_ACCOUNT_ID` has the rest of the endpoint URL in it — it's just the id, not the whole address. |
 | Everything worked, now nothing does | A free Supabase project **pauses after a week of no activity**. Open the dashboard and click *Restore*. |

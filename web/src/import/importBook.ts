@@ -263,12 +263,26 @@ async function backfillQuietly(repository: Repository): Promise<void> {
  * Same standing as the kept file below: a book whose plates wouldn't fit is a
  * book with captions, which is exactly what every book looked like before
  * WP-39. A book that failed to import because of a plate is a regression.
+ *
+ * **Quiet to the reader, not quiet to the console.** This used to catch and say
+ * nothing at all, which is a different and worse thing. On the first live cloud
+ * import every one of Jung's 141 plates was dropped here — the signing endpoint
+ * was returning 404 because `api/` wasn't in the deployment — and the only
+ * evidence anywhere was a placeholder cover. Diagnosing it took a bucket
+ * dashboard, a table editor and a network trace to reach a fact this line now
+ * states outright. Swallowing the failure is still right; swallowing the
+ * *reason* never was.
  */
 async function saveAssetsQuietly(repository: Repository, book: ParsedBook): Promise<void> {
+  const assets = book.assets ?? []
   try {
-    await repository.saveAssets(book.meta.id, book.assets ?? [])
-  } catch {
-    // Nothing the reader can act on, and nothing they had a moment ago.
+    await repository.saveAssets(book.meta.id, assets)
+  } catch (error) {
+    console.warn(
+      `Reading Buddy: kept “${book.meta.title}” but couldn’t store its ${assets.length} picture(s). ` +
+        `They will show as captions. Reason:`,
+      error,
+    )
   }
 }
 
