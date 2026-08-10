@@ -8,119 +8,76 @@
 
 ---
 
-## Task — finish turning the cloud on, live
+## Task — WP-58 step 5: the offline write queue
 
-**Pick up exactly here: the reader clicks *Send me a link* on
-`https://reading-buddy-web-nu.vercel.app` and signs in.** Everything before that
-is done. This is a hand-holding task, not a building one — the reader is
-following `docs/cloud-setup.md` on their own Windows machine and reporting
-screenshots. Read that file before anything else.
+**Reading a cloud book with no signal works. Writing still needs one.** Position,
+highlights and bookmarks go straight to the cloud and fail honestly when it is
+unreachable. This task makes those three survive a tunnel.
 
-### Where the setup actually stands
+**Every design question is already answered** — see the WP-58 block in
+`decisions.md`, settled 2026-08-10. Do not re-open them:
 
-| Step | State |
+| Question | Settled answer |
 |---|---|
-| Supabase project, tables, RLS (`0001`, `0002`) | ✅ run |
-| Cloudflare R2 bucket + API token | ✅ |
-| `.env` at the repo root, locally | ✅ |
-| Vercel Environment Variables (bulk `.env` import) | ✅ |
-| R2 CORS policy | ✅ done 2026-08-09, `GET`/`PUT`/`DELETE` |
-| **Sign in once** | ⏳ **429 — email allowance used up. Wait an hour.** |
-| Supabase 1.4 — *Allow new users to sign up* → **off** | ⬜ only after signing in |
-| Import one small book, check both dashboards | ⬜ the real test |
+| Two devices both add a highlight | **Both survive.** Highlights and bookmarks are *additive* — that is not a conflict, it is the right answer arriving by itself. |
+| Two devices disagree on position | **Most recent write wins**, on `at`, which is already an ISO timestamp. Not furthest — that would undo a deliberate re-read forever. |
+| Delete offline | **Refused.** The one action with no honest automatic merge, and a reading app should not have a conflict UI. |
 
 ### Definition of done
 
-1. Signed in on the Vercel deployment, and the session survives a reload.
-2. Sign-ups turned off (§ 1.4) — **do this only after step 1**, or the project
-   locks the one account out of itself. The app now says so when it happens.
-3. One small book imported on the cloud backend, and both halves verified by
-   eye: a `books` row in Supabase with the right `user_id` and `ready` true,
-   and `users/<id>/books/<book-id>/source/…` objects in R2.
-4. Switch back to the device library and confirm all **32 books** are still
-   there. This is the reassurance the whole design was built around; don't skip
-   it because it seems obvious.
+1. A bookmark, a highlight and a page turn made with the Wi-Fi off are still
+   there after the app is closed and reopened — **still offline.**
+2. Turning the network back on drains the queue to the cloud without the reader
+   doing anything, and a second device sees them.
+3. A queued write that the cloud *rejects* (not a lost signal — a row RLS
+   refuses, a book deleted elsewhere) is dropped from the queue and does not
+   retry for ever. Distinguishing the two is `looksOffline` in
+   `cloud/cached.ts`, which already exists and is tested.
+4. Deleting a book with no signal still refuses, with a message that says why.
+5. Gates: typecheck, full suite, `npm run build`.
 
-### The thing to expect
+### The shape that is already there
 
-**The SQL and the round trip have never run against a real database.** The pure
-halves are covered by tests and the compiler checked all 48 methods against the
-`Repository` type — but a column name, an RPC argument name, or a policy that
-refuses a legitimate write are exactly what neither of those can catch. **Expect
-the first live import to find something.** That is the point of doing it with
-one small book rather than thirty-two.
-
-### How this session found its bugs, and the rule that came out of it
-
-Three faults, and **all three reported the wrong thing to the reader**:
-
-- Sign-in failures all said *"check the address and try again."* The address was
-  never once the problem. The real cause (`PGRST125` on one occasion, `429` on
-  another) was only ever visible in DevTools.
-- A blank page with a `404` for a hashed bundle — no error on screen, because
-  the code that renders errors is the code that failed to load.
-- Vercel's own `404: NOT_FOUND`, which says nothing about SPA routing.
-
-**Rule: when a setup step fails, get the console before theorising.** Both
-opaque messages were fixed rather than merely diagnosed — `signInFailureMessage`
-and `normaliseSupabaseUrl` exist because the same paste error cost two evenings.
-If a new class of setup failure turns up, fix the message in the same commit as
-the diagnosis. A guide that needs DevTools is a guide that failed.
-
-### Recovery moves worth having to hand
-
-- **Blank page, `404` on `assets/index-<hash>.js`** — stale service worker
-  serving an old `index.html`. DevTools → Application → **Service Workers →
-  Unregister**, then **Cache storage → Delete**, then Ctrl+Shift+R. **Never
-  *Clear site data*** — it wipes IndexedDB, where the 32 books are.
-- **Stuck on the sign-in screen** — *Use the library on this device instead* at
-  the bottom. That escape hatch is load-bearing; never remove it.
-- **Forced back to the device library from the console** —
-  `localStorage.setItem('rb.backend','local')`, then reload. Chrome blocks
-  console pastes until you type `allow pasting`, so prefer clicking through the
-  Application panel where there is a UI for it.
-
-### Shipped this session — 2026-08-09
-
-`4b1066c` and `1fd0c62`, both on `main`. 863 tests, typecheck, build.
-
-- `vercel.json` — SPA rewrite, excluding `/api/` and `/assets/`.
-- `signInFailureMessage` in `cloud/client.ts` — surfaces Supabase's real reason,
-  names the three that happen. Six new tests.
-- `cloud-setup.md` — `DELETE` added to the CORS policy, the guessed Vercel
-  address replaced with a placeholder, two new troubleshooting rows.
+- `cached.ts` overrides ~19 **read** methods and spreads the rest through. The
+  queue is the same trick on the **write** side — wrap, don't rewrite.
+- `cache.ts` is a full `Repository` over a second Dexie database, so an offline
+  write can be applied to the copy immediately (so the reader sees it) *and*
+  recorded for later.
+- **Where the queue itself lives is the one open call.** A Dexie table in the
+  *cache* database is free — that schema is disposable, so unlike the device
+  library it can gain a table with no migration cost. That is probably the
+  answer; it was not settled because the queue was deferred.
 
 ### Files in scope
 
-**Read `docs/cloud-setup.md` first and mostly only that** — this is a setup
-task, not a code task. Open the rest only when a live failure points at it.
-
-- `docs/cloud-setup.md` — the click-by-click walkthrough and its troubleshooting
-  table. **Start here.**
-- `web/src/storage/cloud/client.ts` — `normaliseSupabaseUrl`,
-  `signInFailureMessage`, and the session helpers. Where any *new* opaque
-  sign-in message gets fixed.
-- `web/src/storage/cloud/cloudRepository.ts` — the 48 methods. **Open this when
-  the first import fails**; its header says what changed from Dexie and why.
-- `web/src/storage/cloud/rows.ts` + `keys.ts` — the pure, tested halves.
-  `null` is not the same as absent, and Postgres timestamps sort differently as
-  strings.
-- `supabase/migrations/0001_schema.sql` — tables, indexes, RLS. Check here when
-  a write is refused rather than wrong.
-- `supabase/migrations/0002_functions.sql` — the RPCs. Check here when an
-  argument name doesn't match.
-- `api/r2/sign.ts` — the `users/<id>/` prefix check **is** the security model.
-  Also where a 401 on upload comes from.
-- `web/src/storage/cloud/blobs.ts` — the browser half of R2. CORS errors and
-  upload failures surface here.
-- `vercel.json` — the SPA rewrite, if any path 404s from the server again.
+- `web/src/storage/cloud/cached.ts` — **start here.** The wrapper, `looksOffline`,
+  `knownOffline`, `readThrough`, and the header explaining what is deliberately
+  absent.
+- `web/src/storage/cache.ts` — the second database, the LRU bookkeeping, `looksFull`.
+- `web/src/storage/cloud/cached.test.ts` + `cache.test.ts` — the patterns to
+  copy: two real Dexie databases and a `Proxy` that fakes a lost signal.
+- `web/src/storage/repository.ts` — the `Repository` interface. The write methods
+  to wrap (`savePosition`, `addQuote`, `addBookmark`, `removeBookmark`, …) are
+  named here.
+- `web/src/storage/cloud/cloudRepository.ts` — what those writes do today.
+- `docs/decisions.md` — the WP-58 block. **Read the seven bullets before writing
+  anything.**
 
 ### Out of scope
 
-Copying the 32 device books into the cloud (the obvious next build — read from
-`deviceRepository`, write through `repository`, book by book, resumable — but
-**wait until one live import has actually worked**). Offline for the cloud
-backend. The tutor loop (WP-17→20), WP-43, WP-25.
+The tutor loop (WP-17→20), WP-43, WP-25. Any change to the eviction rule or the
+twenty-book cap. A "keep this book offline" pin — deliberately not built, and
+`decisions.md` says why.
+
+### Two answers owed by the reader, both cheap and neither blocking
+
+1. **Offline, the shelf shows only the books it can open.** The alternative is
+   all 33 with the unavailable ones greyed out, Spotify-style. Working as
+   designed either way; this is a taste question, not a bug.
+2. **Two design-hook findings, never triaged.** The side-stripe in
+   `pages/page.module.css` (L114, L134 — **pre-existing**) and the width
+   animation in `pages/LibraryCopy.module.css` (L46 — added 2026-08-10). Keep,
+   change, or silence the rule.
 
 ---
 
@@ -182,6 +139,22 @@ whole WP-55 round remains unseen on a phone**, and the live question from
 
 ## Carried forward — things that will bite
 
+- **`Promise.all` fails as a group, so a fallback has to cover the whole
+  bundle.** `loadLibrary` fires four reads together; three had an offline
+  fallback and the fourth — a check about the *Update* button — did not, and its
+  failure binned three good answers and blanked the Library screen. **"Is this a
+  reading call?" is the wrong question.** Ask what it is *bundled with*.
+- **`navigator.onLine === false` is trustworthy; `true` is not.** It is
+  specified as a promise about failure. `false` means there is no connection at
+  all, so skipping the network is safe; `true` only means there is an interface,
+  which is why a captive portal reports it. Never use `true` to skip a fallback.
+- **A dead network is not free to ask.** With Wi-Fi off, opening the app is
+  dozens of requests each with its own DNS attempt and teardown. This file
+  previously asserted the opposite; a phone disproved it.
+- **The cache database can gain tables; the device library cannot, cheaply.**
+  `reading-buddy-cache` is disposable, so a new `.version(n)` there costs
+  nothing. The same table in `reading-buddy` runs a migration over the reader's
+  32 real books. This is why the LRU bookkeeping is in `localStorage`.
 - **Ship at the end of every thread.** Build, commit, merge to `main`, push —
   Vercel deploys from `main`. This is in `CLAUDE.md` at the reader's request and
   it **overrides `/wrap-session`'s older "do not commit or push unless I ask".**

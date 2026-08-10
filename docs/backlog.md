@@ -333,7 +333,11 @@
   library look identical from the outside. **Switching is a change of view, not
   a migration** — which is exactly the gap WP-57 and WP-58 exist to close ·
   *after 03,30*
-- [ ] **WP-57 Copy a library between device and cloud** — an import writes to
+- [x] **WP-57 Copy a library between device and cloud** — shipped 2026-08-10
+  (`7ff0415`). `storage/transfer.ts` reads through one `Repository` and writes
+  through the other, so it never learns which direction it is pointing — which
+  is what let WP-58 reuse it whole. An import writes to
+
   whichever backend is selected and only that one, so today the only way to have
   a book in both is to import the file twice. This is the "push my 32 books up"
   button, and its reverse. Reads through one `Repository` and writes through the
@@ -343,7 +347,13 @@
   expensive half and the bytes are already sitting there. **Needs a real
   progress screen** — 32 books is minutes, not seconds, and a silent spinner
   over a multi-minute upload is indistinguishable from a hang · *after 56*
-- [ ] **WP-58 Keep cloud books readable offline** — today the toggle is a choice
+- [~] **WP-58 Keep cloud books readable offline** — **reading works offline as of
+  2026-08-10** (`5476ac6`, `23e3787`, `39773be`): the conflict decision is
+  settled in `decisions.md`, `storage/cache.ts` is a second database filled by
+  WP-57's copier, `cloud/cached.ts` falls back to it on a lost-signal failure,
+  and at most 20 books are kept, least recently read dropped first. **What's
+  left is the write queue** — position, highlights and bookmarks still need a
+  signal and still fail honestly without one. Original framing: today the toggle is a choice
   between "works on a train" and "follows me to my laptop", and WP-57 does not
   fix that: it copies once, it doesn't keep two libraries honest. The cloud
   stays the source of truth; books you have opened get kept on the device and

@@ -870,4 +870,24 @@ sign-in screen.
   merge — a delete on one device racing an edit on another can only be resolved
   by asking, and a reading app should not have a conflict UI. Refusing the
   action offline costs a reader almost nothing and removes the entire class.
+- **Twenty books, and the reading order lives in `localStorage`.** A count
+  rather than megabytes, because a count is the thing a reader could be told and
+  would understand; twenty is past what anyone has in flight, so in normal use
+  nothing is dropped and the whole mechanism is invisible. The bookkeeping is
+  not a table because the schema is shared with the *device* library — a new
+  table means a migration running over the reader's 32 real books to support a
+  copy that can be thrown away — and because it is read on every page turn,
+  where `localStorage` is synchronous and IndexedDB is not.
+- **`navigator.onLine === false` skips the network; `true` proves nothing.**
+  Added after the first phone test, which disproved this file's own earlier
+  claim that asking a dead network was free: with Wi-Fi off, opening the app is
+  dozens of requests each with its own DNS attempt, and the library visibly
+  crawled. The flag is specified as a promise about *failure*, so `false` is
+  trustworthy enough to skip the fetch while `true` (a captive portal reports
+  it) is not trustworthy enough to skip the fallback.
+- **Everything bundled with the reading path has to survive offline too.** The
+  library screen opens four reads in one `Promise.all`; three were cached and
+  the fourth — a check about the *Update* button — was not, so its failure binned
+  three good answers and showed *"Couldn't open your library"*. `Promise.all`
+  fails as a group, which makes "is this a reading call?" the wrong question.
   — 2026-08-10

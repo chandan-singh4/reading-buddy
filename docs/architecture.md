@@ -172,7 +172,7 @@ web/src/
 - **Import `./storage`, never `./storage/db.ts`.** `repository.ts` is the door;
   the database behind it stays swappable.
 
-### The cloud backend (written 2026-08-09, not yet wired in)
+### The cloud backend (live since 2026-08-09)
 
 `web/src/storage/cloud/` is a second implementation of the **same `Repository`
 shape** — declared as returning `Repository`, so a missed method fails the build
@@ -180,8 +180,8 @@ rather than the app. Swapping is one line in `storage/index.ts`.
 
 | | Where it goes | Why |
 |---|---|---|
-| books, manifests, chapters, sections, positions, folders, quotes, bookmarks | **Supabase Postgres** | small, queryable, indexed |
-| the original file, the pictures | **Cloudflare R2** | large, fetched one at a time, free to read back out |
+| books, manifests, chapters, positions, folders, quotes, bookmarks | **Supabase Postgres** | small, queryable, indexed |
+| the original file, the pictures, **and the section text** | **Cloudflare R2** | large, fetched one at a time, free to read back out |
 
 ```
 web/src/storage/cloud/
@@ -190,10 +190,23 @@ web/src/storage/cloud/
 ├─ rows.ts            row ↔ domain mapping + chunking (pure, tested)
 ├─ blobs.ts           R2 via presigned URLs
 ├─ cloudRepository.ts the 48 methods
+├─ cached.ts          the cloud with the offline copy behind it (WP-58)
 └─ index.ts           the only entry point other code should import from
+web/src/storage/cache.ts     the offline copy: a *second* Dexie database (WP-58)
+web/src/storage/transfer.ts  copies a book between any two repositories (WP-57)
 api/r2/sign.ts        mints short-lived R2 URLs, scoped to the caller's prefix
 supabase/migrations/  0001 schema + RLS · 0002 the atomic RPCs
 ```
+
+**There are three databases on a device, and only two are libraries.**
+`reading-buddy` is the device library. `reading-buddy-cache` is the same schema
+under a different name, holding copies of cloud books you have opened — it never
+appears on any shelf, it is the one store safe to delete at any moment, and
+nothing outside `storage/` may import it. The cloud is the third.
+
+`storage/transfer.ts` is written against `Repository` on both sides, so it has
+no idea which direction it is pointing: the same function backs the Settings
+copy button (device ⇄ cloud) and the offline cache fill (cloud → cache).
 
 - **The parser does not move.** Bytes → `Block[]` → `assembleBook` still happens
   in the browser; only the result travels.
@@ -204,7 +217,12 @@ supabase/migrations/  0001 schema + RLS · 0002 the atomic RPCs
   2026-08-09 — the `users/<id>/` prefix check in `api/r2/sign.ts` is the whole
   security model, and traversal segments are refused in two places.
 - **Set-up is `docs/cloud-setup.md`.** Accounts, secrets, CORS, env vars.
-- **No offline yet**, which is why Dexie is still the default.
+- **Reading works offline; writing does not.** `cached.ts` tries the cloud and
+  falls back to `cache.ts` when the failure looks like a lost signal (or when
+  `navigator.onLine` already said so). Position, highlights and bookmarks still
+  go straight to the cloud and still fail without one — deliberately, until the
+  queue lands: a bookmark that appears to save and is then lost is worse than
+  one that says it couldn't.
 - **There is deliberately no `loadBook()`.** Retrieval is `getManifest` +
   `getChapterIndex` + one `getSection`. Adding a whole-book read would quietly
   undo the token strategy.
