@@ -321,6 +321,38 @@
   same day**: raising the toolbar shrinks the page, and a back gesture left the
   book instead of undoing that — the toolbar was the one layer never wired to
   `useBackDismiss`, and Back now peels one layer at a time · *after 54*
+- [x] **WP-56 The cloud library — Supabase + Cloudflare R2** — added and shipped
+  2026-08-09/10, never had a waypoint until now. A second `Repository`
+  implementation behind the same interface `storage/db.ts` already satisfied, so
+  ~30 call sites never learned it existed. Postgres holds the rows and Row Level
+  Security holds the door; the bytes — the source file, the pictures, and as of
+  2026-08-10 **the text itself** — live in R2, reached by presigned URL so they
+  never transit our server. Email-link sign-in, a Settings toggle that reloads
+  rather than swapping the object underneath thirty caches, and a book count
+  under the option that *isn't* selected, because an empty shelf and a lost
+  library look identical from the outside. **Switching is a change of view, not
+  a migration** — which is exactly the gap WP-57 and WP-58 exist to close ·
+  *after 03,30*
+- [ ] **WP-57 Copy a library between device and cloud** — an import writes to
+  whichever backend is selected and only that one, so today the only way to have
+  a book in both is to import the file twice. This is the "push my 32 books up"
+  button, and its reverse. Reads through one `Repository` and writes through the
+  other, book by book so a dropped signal costs one book rather than the run;
+  skips what is already there by `contentHash`; re-uploads the source and the
+  pictures from the device copy rather than re-parsing, since the parse is the
+  expensive half and the bytes are already sitting there. **Needs a real
+  progress screen** — 32 books is minutes, not seconds, and a silent spinner
+  over a multi-minute upload is indistinguishable from a hang · *after 56*
+- [ ] **WP-58 Keep cloud books readable offline** — today the toggle is a choice
+  between "works on a train" and "follows me to my laptop", and WP-57 does not
+  fix that: it copies once, it doesn't keep two libraries honest. The cloud
+  stays the source of truth; books you have opened get kept on the device and
+  served from there when the network is gone. **The seam already exists** — the
+  2026-08-10 text move means every read of a book's bytes goes through one
+  chapter-object fetch, which is the single place a cache belongs. The hard part
+  is not the cache, it is deciding what happens when a bookmark is made offline
+  and the same book is read elsewhere — so this waypoint owes a decision on
+  conflict before it owes any code · *after 56, better after 57*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*
