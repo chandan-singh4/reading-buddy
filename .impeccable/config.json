@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "wayfinder_build_board.html"
+        ],
+        "createdAt": "2026-08-10T03:28:39.228Z",
+        "reason": "Planning artifact, not the product. The left border is the board's status encoding: grey=to do, brass=doing, teal=done (lines 82-83). User confirmed 2026-08-10."
+      }
+    ]
+  }
+}
