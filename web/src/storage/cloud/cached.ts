@@ -13,12 +13,20 @@
  * reader who has just bookmarked something on their laptop should see it on
  * their phone, not a cached shelf from this morning.
  *
- * Asking the network first costs nothing when it is genuinely gone — `fetch`
- * fails in about a millisecond with no interface to try, rather than sitting on
- * a timeout. Reading `navigator.onLine` and skipping straight to the copy would
- * save that millisecond and buy a real hazard: the flag reports the network
- * card, not the internet, so it is false on some machines that are perfectly
- * online, and the reader would silently get yesterday's library.
+ * With one exception, added after the first real test on a phone. This file
+ * originally argued that asking the doomed network first was free — that `fetch`
+ * fails instantly with no interface to try. On a phone with the Wi-Fi switched
+ * off it is not free: opening the app is dozens of requests, each with its own
+ * DNS attempt and its own teardown, and the reader watched the library take
+ * seconds to appear. So `navigator.onLine === false` now goes straight to the
+ * copy.
+ *
+ * That is safe in the direction it is used, and only that direction. The flag is
+ * specified as a promise about failure, not about success: `false` means the
+ * browser knows it has no connection at all, while `true` merely means it has an
+ * interface — which is why a captive portal still reports `true`. So `false` is
+ * trustworthy enough to skip the network, and `true` is not trustworthy enough
+ * to skip the copy. The `catch` below is what covers the second case.
  *
  * ## What is *not* here
  *
@@ -38,6 +46,7 @@ import type {
   StoredFolder,
   StoredQuote,
   StoredSection,
+  StoredSource,
 } from '../db.ts'
 import type { Repository } from '../repository.ts'
 import { copyBook, copyFolders } from '../transfer.ts'
@@ -82,6 +91,17 @@ export function looksOffline(error: unknown): boolean {
     current = (current as { cause?: unknown }).cause
   }
   return false
+}
+
+/**
+ * Whether the browser has already told us there is no connection.
+ *
+ * Guarded for the tests and for anything running outside a browser, where there
+ * is no `navigator` — absent means "don't know", which correctly falls through
+ * to asking the network.
+ */
+export function knownOffline(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false
 }
 
 /** Books whose copy is being made right now, so a page turn doesn't start a second. */
@@ -134,6 +154,9 @@ export function createCachedRepository(
     fromCloud: () => Promise<T>,
     fromCache: () => Promise<T>,
   ): Promise<T> {
+    // See the header: `false` is a promise that the network cannot work, so
+    // there is nothing to gain by proving it a few dozen times per screen.
+    if (knownOffline()) return fromCache()
     try {
       return await fromCloud()
     } catch (error) {
@@ -172,6 +195,40 @@ export function createCachedRepository(
       return readThrough(
         () => cloud.listPositions(),
         () => cache.listPositions(),
+      )
+    },
+
+    /**
+     * Which books could be re-parsed — not a reading question, but a fatal one.
+     *
+     * The library screen opens with four reads in a single `Promise.all`, and
+     * this is one of them. Leaving it out meant three good answers were thrown
+     * away because the fourth — a check about the *Update* button, which the
+     * reader had not pressed — could not reach the network. The whole screen
+     * showed "Couldn't open your library" with a `TypeError` under it.
+     *
+     * The lesson is worth more than the fix: it is not enough for the reading
+     * path to survive offline. Everything the reading path is *bundled with*
+     * has to survive too, because `Promise.all` fails as a group.
+     */
+    async booksWithSource(): Promise<Set<BookId>> {
+      return readThrough(
+        () => cloud.booksWithSource(),
+        () => cache.booksWithSource(),
+      )
+    },
+
+    async sourcesSize(): Promise<number> {
+      return readThrough(
+        () => cloud.sourcesSize(),
+        () => cache.sourcesSize(),
+      )
+    },
+
+    async getSource(bookId: BookId): Promise<StoredSource | undefined> {
+      return readThrough(
+        () => cloud.getSource(bookId),
+        () => cache.getSource(bookId),
       )
     },
 

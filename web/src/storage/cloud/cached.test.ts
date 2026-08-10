@@ -8,7 +8,7 @@
 // and it is checked by the compiler against all 51 methods.
 import 'fake-indexeddb/auto'
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { formatAnchor, sectionPath } from '../../structure/index.ts'
 import type {
@@ -49,6 +49,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.unstubAllGlobals()
   await Promise.all([cloudDb.delete(), cacheDb.delete()])
 })
 
@@ -303,6 +304,94 @@ describe('when the signal is gone', () => {
 
     expect(await repository.listBooks()).toEqual([])
     expect(await repository.getManifest(bookId('a'))).toBeUndefined()
+  })
+})
+
+// --- The library screen's opening round --------------------------------------
+
+describe('the four reads the library screen opens with', () => {
+  /**
+   * They run as one `Promise.all`, so any one of them rejecting throws away the
+   * other three and the screen shows "Couldn't open your library". The first
+   * phone test found exactly that: `booksWithSource` — a question about the
+   * *Update* button — took the whole library down with it.
+   */
+  it('all survive with no signal', async () => {
+    await inTheCloud('a')
+    await origin.saveSource(bookId('a'), new Blob(['the original epub']), 'a.epub')
+    await origin.savePosition(bookId('a'), anchor(1, 2), 30)
+    await readAndCache('a')
+    await until(async () => (await cache.booksWithSource()).has(bookId('a')))
+
+    signal.up = false
+
+    const [books, sources, positions, folders] = await Promise.all([
+      repository.listBooks(),
+      repository.booksWithSource(),
+      repository.listPositions(),
+      repository.listFolders(),
+    ])
+
+    expect(books.map((book) => book.title)).toEqual(['Book a'])
+    expect(sources.has(bookId('a'))).toBe(true)
+    expect(positions).toHaveLength(1)
+    expect(folders).toEqual([])
+  })
+
+  it('still knows how much room the kept files take', async () => {
+    await inTheCloud('a')
+    await origin.saveSource(bookId('a'), new Blob(['the original epub']), 'a.epub')
+    await readAndCache('a')
+    await until(async () => (await cache.sourcesSize()) > 0)
+
+    signal.up = false
+
+    expect(await repository.sourcesSize()).toBeGreaterThan(0)
+    expect((await repository.getSource(bookId('a')))?.filename).toBe('a.epub')
+  })
+})
+
+// --- Not asking a network the browser has already ruled out ------------------
+
+describe('when the browser says there is no connection', () => {
+  it('goes straight to the copy without asking', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    vi.stubGlobal('navigator', { onLine: false })
+
+    // Any call to the far side throws something that is *not* a lost signal, so
+    // it would surface rather than fall back — which is how the test can tell
+    // the network was never asked at all.
+    const listening = createCachedRepository(
+      {
+        ...origin,
+        async listBooks(): Promise<BookMeta[]> {
+          throw new Error('the network was asked')
+        },
+      },
+      cache,
+    )
+
+    expect((await listening.listBooks()).map((book) => book.title)).toEqual(['Book a'])
+  })
+
+  it('asks the network again once the flag says there is one', async () => {
+    await inTheCloud('a', { title: 'The current title' })
+    await cache.saveBook(makeBook('a', { title: 'A stale copy' }))
+
+    vi.stubGlobal('navigator', { onLine: true })
+
+    expect((await repository.getBook(bookId('a')))?.title).toBe('The current title')
+  })
+
+  it('asks the network when there is no navigator to ask', async () => {
+    await inTheCloud('a', { title: 'The current title' })
+    await cache.saveBook(makeBook('a', { title: 'A stale copy' }))
+
+    vi.stubGlobal('navigator', undefined)
+
+    expect((await repository.getBook(bookId('a')))?.title).toBe('The current title')
   })
 })
 
