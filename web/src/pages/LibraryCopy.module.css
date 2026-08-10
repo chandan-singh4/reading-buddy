@@ -39,11 +39,17 @@
   overflow: hidden;
 }
 
+/* Scaled rather than widened. Animating `width` re-runs layout on every frame;
+   a transform is composited and touches nothing around it. The track's
+   `overflow: hidden` supplies the rounded end, so the bar needs no radius of
+   its own — which is just as well, since scaling one would squash it. */
 .fill {
   height: 100%;
+  width: 100%;
   background: var(--color-accent);
-  border-radius: inherit;
-  transition: width var(--motion-page) var(--ease-standard);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--motion-page) var(--ease-standard);
 }
 
 /* A shelf of books is minutes of work, so the bar is the one thing on this

@@ -168,7 +168,7 @@ function Running({ progress }: { progress?: CopyProgress }) {
       aria-label="Copying books"
     >
       <div className={local.track}>
-        <div className={local.fill} style={{ width: `${percent}%` }} />
+        <div className={local.fill} style={{ transform: `scaleX(${percent / 100})` }} />
       </div>
       <p className={local.status}>
         {total === 0 ? 'Starting…' : `${done} of ${total} — ${progress?.title ?? ''}`}
