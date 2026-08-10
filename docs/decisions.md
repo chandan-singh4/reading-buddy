@@ -830,3 +830,44 @@ sign-in screen.
   the cloud backend has never had an offline copy, so a dropped signal already
   stopped the reading. This trades a little latency for a database that stays
   slim for years. — 2026-08-10
+
+### Settled 2026-08-10 (offline for the cloud library — WP-58)
+
+- **The cloud stays the source of truth; the device keeps a copy of what you
+  have read.** The alternative — two equal libraries reconciling with each
+  other — is a distributed-systems problem, and this is a reading app. One side
+  is authoritative, the other is a convenience that can be thrown away and
+  rebuilt at any time without anyone losing anything.
+- **The cache is its own database, not the device library.** `reading-buddy-cache`,
+  the same schema as `reading-buddy`, opened through the same `createRepository`
+  so it is a full `Repository` with no new interface to learn. Caching cloud
+  books into the device library instead would have been fewer lines and quietly
+  catastrophic: the two shelves the whole design keeps separate would start
+  blending, "32 books here" under the unselected option would stop meaning
+  anything, and a reader who switched back would find books they never imported
+  there. Separate database, invisible on the device shelf, safe to delete.
+- **This is what WP-57 was secretly for.** Filling the cache is
+  `copyBook(cloud, cache, …)` — the engine written for the copy button, pointed
+  at a different target. It was written against `Repository` so it would never
+  learn direction; the payoff arrives one waypoint later than expected.
+- **Books you open are kept; the least recently read is dropped first.** Not a
+  per-book "keep offline" switch. A switch is only correct if you remember to
+  press it before you lose signal, which is exactly the moment you won't — and
+  the book you want on the train is almost always the book you were reading
+  yesterday. Automatic is wrong less often than a button nobody presses. A pin
+  that protects a specific book stays available as a later addition, and the
+  eviction rule is the only thing it would need to change.
+- **Offline you can read, mark and bookmark. You cannot delete.** Highlights and
+  bookmarks are *additive* — two devices each adding one means you end up with
+  both, which is not a conflict but the correct answer arriving by itself. That
+  removes the hard case for free and leaves exactly one single-valued field.
+- **Reading position: the most recent write wins, not the furthest.** `at` is
+  already an ISO timestamp on `ReadingPosition`, so no schema change. Furthest-
+  wins reads better on paper and is wrong in practice: deliberately going back
+  to re-read chapter two would be undone by a stale laptop, forever, with no way
+  to make it stop.
+- **A delete needs a signal.** It is the one action with no honest automatic
+  merge — a delete on one device racing an edit on another can only be resolved
+  by asking, and a reading app should not have a conflict UI. Refusing the
+  action offline costs a reader almost nothing and removes the entire class.
+  — 2026-08-10

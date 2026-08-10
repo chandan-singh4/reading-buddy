@@ -80,7 +80,7 @@ function reasonFrom(error: unknown): string {
  * "Philosophy" folders. So folders are matched **by name**, and a book's
  * `folderIds` are rewritten through this map on the way over.
  */
-async function copyFolders(from: Repository, to: Repository): Promise<Map<string, string>> {
+export async function copyFolders(from: Repository, to: Repository): Promise<Map<string, string>> {
   const mapping = new Map<string, string>()
   const source = await from.listFolders()
   if (source.length === 0) return mapping
@@ -121,7 +121,7 @@ function withMappedFolders(meta: BookMeta, folders: Map<string, string>): BookMe
  * Postgres literally, by foreign key. Then the heavy parts, then the reader's
  * own additions, which are the cheapest to lose and the cheapest to redo.
  */
-async function copyBook(
+export async function copyBook(
   from: Repository,
   to: Repository,
   meta: BookMeta,

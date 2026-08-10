@@ -9,6 +9,7 @@
  */
 
 import { activeBackend } from './backend.ts'
+import { createCachedRepository } from './cloud/cached.ts'
 import { createCloudRepository } from './cloud/index.ts'
 import { repository as deviceRepository, type Repository } from './repository.ts'
 
@@ -48,7 +49,11 @@ export { repository as deviceRepository } from './repository.ts'
  * The app-wide repository — the device's or the cloud's, chosen at load.
  *
  * The cloud one is built only when it has been chosen, so a reader on the local
- * library never opens a Supabase connection.
+ * library never opens a Supabase connection — and it is wrapped in the offline
+ * copy (WP-58), which is why nothing else in the app has to know whether the
+ * words on screen came over the network or off the disk.
  */
 export const repository: Repository =
-  activeBackend() === 'cloud' ? createCloudRepository() : deviceRepository
+  activeBackend() === 'cloud'
+    ? createCachedRepository(createCloudRepository())
+    : deviceRepository
