@@ -9,11 +9,12 @@
 --      decide what you may take out. Without them a public key is a public
 --      library.
 --
---   2. **`sources` and `assets` hold a pointer, not the bytes.** The original
---      file and the pictures live in Cloudflare R2; these tables keep the key,
---      the size and the media type so that "how much is this costing me?" and
---      "which books can be updated?" stay one cheap query, exactly as they were
---      when `size` was denormalised onto the Dexie row.
+--   2. **`sources`, `assets` and `sections` hold a pointer, not the bytes.** The
+--      original file, the pictures and the text itself all live in Cloudflare
+--      R2; these tables keep the key, the size and the media type so that "how
+--      much is this costing me?" and "which books can be updated?" stay one
+--      cheap query, exactly as they were when `size` was denormalised onto the
+--      Dexie row.
 --
 --   3. **`books.ready`.** IndexedDB gave `saveParsedBook` a real transaction
 --      spanning four tables. Over HTTP a large book's sections have to be sent
@@ -70,9 +71,15 @@ create index if not exists books_folder_ids_idx
 -- Manifest, chapter index, sections
 --
 -- The nested arrays stay JSONB. They are always read whole and never queried
--- into — a manifest's chapter list and a section's paragraphs are single values
--- as far as this app is concerned, and shredding them into rows would buy
--- nothing but joins on the hot path.
+-- into — a manifest's chapter list is a single value as far as this app is
+-- concerned, and shredding it into rows would buy nothing but joins on the hot
+-- path.
+--
+-- A section's *paragraphs* used to be JSONB here too, and are not any more:
+-- they were by far the largest thing in the database and the app never queried
+-- into them either, which makes them bytes rather than data. They live in R2
+-- now, one object per chapter, and `sections.r2_key` is the address. See
+-- `0003_text_to_r2.sql`.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.manifests (
@@ -94,15 +101,18 @@ create table if not exists public.chapters (
   primary key (book_id, chapter)
 );
 
+-- `r2_key` is the chapter object this section's words are in, so many rows here
+-- share one key. A section with no address for its text is a page that cannot
+-- be read, hence `not null` rather than leaving every caller to check.
 create table if not exists public.sections (
-  book_id    text not null references public.books (id) on delete cascade,
-  path       text not null,
-  user_id    uuid not null default auth.uid()
-               references auth.users (id) on delete cascade,
-  chapter    integer not null,
-  section    integer not null,
-  title      text,
-  paragraphs jsonb not null default '[]'::jsonb,
+  book_id text not null references public.books (id) on delete cascade,
+  path    text not null,
+  user_id uuid not null default auth.uid()
+            references auth.users (id) on delete cascade,
+  chapter integer not null,
+  section integer not null,
+  title   text,
+  r2_key  text not null,
   primary key (book_id, path)
 );
 

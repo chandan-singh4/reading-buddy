@@ -8,6 +8,7 @@
  * ```
  * users/<userId>/books/<bookId>/source/<filename>
  * users/<userId>/books/<bookId>/assets/<archive path>
+ * users/<userId>/books/<bookId>/text/<parse token>/<chapter>.json
  * ```
  *
  * **The `users/<userId>/` prefix is load-bearing, not decoration.** The signing
@@ -88,4 +89,46 @@ export function assetKey(
   const safe = safePath(path)
   if (safe === undefined) return undefined
   return `${bookPrefix(userId, bookId)}assets/${safe}`
+}
+
+/**
+ * The key for one chapter's text — every paragraph of every section in it, as
+ * one JSON object.
+ *
+ * ## Why a chapter and not a section
+ *
+ * A page turn fetches one object either way, and over a phone connection the
+ * cost of that fetch is almost entirely the round trip: 30 KB and 2 KB arrive
+ * within a few milliseconds of each other. So the grain is chosen for the two
+ * operations where the count actually shows.
+ *
+ * - **In-book search** reads the whole book. Per chapter that is twenty
+ *   requests; per section it is three hundred, which a browser serialises six
+ *   at a time into a visible wait.
+ * - **Import** uploads twenty objects instead of three hundred, on the
+ *   connection least able to bear either.
+ *
+ * ## Why a parse token sits in the middle
+ *
+ * So that writing a book's text never overwrites the text it currently has.
+ * Each parse invents a token and writes to keys nothing else points at; the
+ * `sections` rows are swapped over to the new keys in one transaction, and only
+ * then do the old objects go. That is what keeps `replaceParsedBook`'s promise
+ * — a failed re-parse leaves the old book exactly as it was — now that the
+ * paragraphs are no longer inside the transaction that swaps them.
+ *
+ * A deterministic key would make that impossible: the first upload of chapter 1
+ * would land on top of the text the reader is currently reading.
+ */
+export function chapterTextKey(
+  userId: string,
+  bookId: string,
+  parseToken: string,
+  chapter: number,
+): string {
+  // The token is ours (a uuid), but it arrives here as a plain string and this
+  // module is the boundary that decides what a key may contain. Flattened the
+  // same way a filename is, so nothing can nest or traverse out of the book.
+  const safe = (safePath(parseToken) ?? 'text').replace(/\//g, '_')
+  return `${bookPrefix(userId, bookId)}text/${safe}/${chapter}.json`
 }

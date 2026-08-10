@@ -29,9 +29,16 @@
  *    exactly as it was. So that one pays for a single atomic call and fails
  *    cleanly if the book is enormous.
  *
- * 3. **Blobs live elsewhere.** `sources` and `assets` keep a key; the bytes are
- *    in R2. Deletion is therefore two steps, and the order matters — see
- *    `deleteBooks`.
+ * 3. **Blobs live elsewhere — including the text.** `sources`, `assets` *and*
+ *    `sections` keep a key; the bytes are in R2. Deletion is therefore two
+ *    steps, and the order matters — see `deleteBooks`.
+ *
+ *    Postgres holds what the app queries: reading order, section titles, how
+ *    many there are. It does not hold a single paragraph. One R2 object carries
+ *    a whole chapter's prose, so a page turn is one row plus one object, and a
+ *    600-page book costs the database tens of kilobytes rather than most of a
+ *    megabyte. See `keys.ts` for why the grain is a chapter and what the parse
+ *    token in the key is for.
  *
  * ## What this does not do
  *
@@ -66,19 +73,24 @@ import type {
 } from '../db.ts'
 import type { BookAsset, ParsedBook, Repository } from '../repository.ts'
 import { CloudError, cloudClient, requireUserId, unwrap } from './client.ts'
-import { createR2BlobStore, type BlobStore } from './blobs.ts'
-import { assetKey, sourceKey } from './keys.ts'
+import { createR2BlobStore, type BlobEntry, type BlobStore } from './blobs.ts'
+import { assetKey, chapterTextKey, sourceKey } from './keys.ts'
 import {
   bookFromRow,
   bookToRow,
   bookmarkFromRow,
   chapterFromRow,
+  chapterTextOf,
   chunkSections,
   folderFromRow,
   manifestFromRow,
   positionFromRow,
   quoteFromRow,
+  readChapterText,
   sectionFromRow,
+  sectionToPayload,
+  type ChapterText,
+  type SectionPayload,
   type AssetRow,
   type BookRow,
   type BookmarkRow,
@@ -120,6 +132,58 @@ async function readAll<T>(
   }
 }
 
+/** Everything one parse of a book's text turns into: objects, rows, and keys. */
+interface TextPlan {
+  /** One object per chapter, ready to upload. */
+  uploads: BlobEntry[]
+  /** One row per section, each pointing at its chapter's object. */
+  payloads: SectionPayload[]
+  /** Just the keys, for cleaning up when a write doesn't land. */
+  keys: string[]
+}
+
+/**
+ * Turn a parsed book's sections into the objects and rows they will become.
+ *
+ * Grouped by chapter, in one pass, preserving the order the parser produced —
+ * a chapter's object is written in reading order, which matters not at all to
+ * the app (it looks sections up by path) and a great deal to anyone who ever
+ * has to open one of these files to see what went wrong.
+ *
+ * Pure but for `Blob`: no network, no clock, no ids invented here. The parse
+ * token is passed in so the caller owns the one decision that has to be made
+ * once per parse rather than once per chapter.
+ */
+function planText(
+  userId: string,
+  bookId: BookId,
+  sections: readonly Section[],
+  parseToken: string,
+): TextPlan {
+  const byChapter = new Map<number, Section[]>()
+  for (const section of sections) {
+    const group = byChapter.get(section.chapter)
+    if (group) group.push(section)
+    else byChapter.set(section.chapter, [section])
+  }
+
+  const uploads: BlobEntry[] = []
+  const payloads: SectionPayload[] = []
+
+  for (const [chapter, group] of byChapter) {
+    const key = chapterTextKey(userId, bookId, parseToken, chapter)
+    uploads.push({
+      key,
+      // The media type is what makes these readable in the Cloudflare console
+      // rather than downloads — worth the eleven characters.
+      blob: new Blob([JSON.stringify(chapterTextOf(group))], { type: 'application/json' }),
+    })
+    for (const section of group) payloads.push(sectionToPayload(section, key))
+  }
+
+  return { uploads, payloads, keys: uploads.map((upload) => upload.key) }
+}
+
 export interface CloudRepositoryOptions {
   /** Injectable for tests. Defaults to the real R2 store. */
   blobs?: BlobStore
@@ -138,12 +202,29 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
 
   const db = () => cloudClient()
 
+  /**
+   * The distinct objects a book's text currently lives in.
+   *
+   * Distinct because a chapter's object is pointed at by every section in it,
+   * and asking R2 to delete the same key forty times is forty signed URLs for
+   * one deletion.
+   */
+  async function textKeysFor(bookIds: readonly BookId[]): Promise<string[]> {
+    if (bookIds.length === 0) return []
+    const rows = await readAll<{ r2_key: string }>(
+      (from, to) =>
+        db().from('sections').select('r2_key').in('book_id', [...bookIds]).range(from, to),
+      'find the book’s text',
+    )
+    return [...new Set(rows.map((row) => row.r2_key))]
+  }
+
   /** Every r2 key belonging to these books — read before the rows go. */
   async function blobKeysFor(bookIds: readonly BookId[]): Promise<string[]> {
     if (bookIds.length === 0) return []
     const ids = [...bookIds]
 
-    const [sources, assets] = await Promise.all([
+    const [sources, assets, text] = await Promise.all([
       readAll<{ r2_key: string }>(
         (from, to) => db().from('sources').select('r2_key').in('book_id', ids).range(from, to),
         'find the kept files',
@@ -152,14 +233,52 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
         (from, to) => db().from('assets').select('r2_key').in('book_id', ids).range(from, to),
         'find the pictures',
       ),
+      textKeysFor(ids),
     ])
 
-    return [...sources, ...assets].map((row) => row.r2_key)
+    return [...sources.map((row) => row.r2_key), ...assets.map((row) => row.r2_key), ...text]
   }
 
-  /** Sections, in whatever batches fit a request. Used by import and by re-save. */
+  /** One chapter's text, or an empty chapter if the object isn't readable. */
+  async function chapterTextAt(key: string): Promise<ChapterText> {
+    const blob = await blobs.get(key)
+    if (!blob) return {}
+    try {
+      return readChapterText(JSON.parse(await blob.text()))
+    } catch {
+      // Truncated or not JSON at all. Treated as absent rather than thrown:
+      // every caller here already has to handle a section whose words didn't
+      // arrive, and there is nothing extra a parse error tells the reader.
+      return {}
+    }
+  }
+
+  /**
+   * Write a book's text: objects first, then the rows that point at them, then
+   * the objects nothing points at any more.
+   *
+   * The same order as `saveAssets`, for the same reason. Uploading first means
+   * a failure leaves objects nobody references — a fraction of a penny, and the
+   * next parse's sweep collects them. Writing the rows first would mean a
+   * failure leaves rows pointing at text that does not exist, which is a book
+   * that opens and then has nothing on the page.
+   */
   async function writeSections(bookId: BookId, sections: readonly Section[]): Promise<void> {
-    for (const chunk of chunkSections(sections)) {
+    const userId = await requireUserId()
+    const plan = planText(userId, bookId, sections, newId())
+    const previous = await textKeysFor([bookId])
+
+    await writePlan(bookId, plan)
+
+    const kept = new Set(plan.keys)
+    await blobs.remove(previous.filter((key) => !kept.has(key)))
+  }
+
+  /** The upload-then-rows half of the above, shared with a first-time import. */
+  async function writePlan(bookId: BookId, plan: TextPlan): Promise<void> {
+    await blobs.putMany(plan.uploads)
+
+    for (const chunk of chunkSections(plan.payloads)) {
       unwrap(
         await db().rpc('rb_save_sections', { p_book_id: bookId, p_sections: chunk }),
         'save the book’s text',
@@ -310,8 +429,9 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
      * the next attempt at the same file sweeps it up (`rb_save_book_start`).
      */
     async saveParsedBook(book: ParsedBook): Promise<void> {
-      await requireUserId()
+      const userId = await requireUserId()
       const { meta, manifest, chapters, sections } = book
+      const plan = planText(userId, meta.id, sections, newId())
 
       unwrap(
         await db().rpc('rb_save_book_start', {
@@ -323,7 +443,7 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
       )
 
       try {
-        await writeSections(meta.id, sections)
+        await writePlan(meta.id, plan)
         unwrap(
           await db().rpc('rb_save_book_finish', { p_book_id: meta.id }),
           'finish saving the book',
@@ -332,6 +452,11 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
         // Leave nothing behind. Guarded server-side on `ready = false`, so this
         // can never remove a book that had already finished.
         await db().rpc('rb_save_book_abort', { p_book_id: meta.id })
+        // The rows have gone; the objects must follow, or a failed import is
+        // paid for in the bucket for ever with nothing left pointing at it.
+        // Safe to name them outright — this parse invented its own token, so
+        // these keys belong to this attempt and to nothing else.
+        await blobs.remove(plan.keys)
         throw cause
       }
     },
@@ -344,20 +469,43 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
      * *and* contain text before anything is written, so a failure leaves the old
      * book exactly as it was. Splitting it across requests would break that the
      * moment the old sections were deleted.
+     *
+     * The text going to R2 does not weaken that, because of the parse token in
+     * every key. The new chapters are uploaded to addresses **nothing points
+     * at**, so until the transaction below runs they are invisible and the old
+     * book is still whole. The transaction swaps every row to the new keys at
+     * once, and only then are the old objects released. Fail at any point
+     * before it and the reader still has exactly what they had.
+     *
+     * It also made the request this has to fit in far smaller: what crosses the
+     * wire now is one short row per section, not a book's worth of prose.
      */
     async replaceParsedBook(book: ParsedBook): Promise<void> {
-      await requireUserId()
+      const userId = await requireUserId()
       const { meta, manifest, chapters, sections } = book
+      const plan = planText(userId, meta.id, sections, newId())
+      const previous = await textKeysFor([meta.id])
 
-      unwrap(
-        await db().rpc('rb_replace_parsed_book', {
-          p_book: meta,
-          p_manifest: manifest,
-          p_chapters: chapters,
-          p_sections: sections,
-        }),
-        'update the book',
-      )
+      await blobs.putMany(plan.uploads)
+
+      try {
+        unwrap(
+          await db().rpc('rb_replace_parsed_book', {
+            p_book: meta,
+            p_manifest: manifest,
+            p_chapters: chapters,
+            p_sections: plan.payloads,
+          }),
+          'update the book',
+        )
+      } catch (cause) {
+        // Nothing references the new objects, and now nothing ever will.
+        await blobs.remove(plan.keys)
+        throw cause
+      }
+
+      const kept = new Set(plan.keys)
+      await blobs.remove(previous.filter((key) => !kept.has(key)))
     },
 
     // --- Pictures ------------------------------------------------------------
@@ -574,6 +722,20 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
       await writeSections(bookId, sections)
     },
 
+    /**
+     * One page: the row that says where its words are, then the words.
+     *
+     * Two round trips where there used to be one, and the second is the reason
+     * `getMany` batches — a chapter's object serves every section in it, so the
+     * next dozen page turns are the same key.
+     *
+     * **A section whose text didn't arrive throws rather than returning empty.**
+     * Every other failure in this file already reaches the reader as a
+     * `CloudError`, so callers handle it; a section with no paragraphs would
+     * instead render as a blank page that looks like the book's own doing. A
+     * missing picture can fall back to its caption. Missing words cannot fall
+     * back to anything, and saying so is the only honest option.
+     */
     async getSection(bookId: BookId, path: SectionPath): Promise<StoredSection | undefined> {
       const row = unwrap(
         await db()
@@ -584,7 +746,15 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
           .maybeSingle(),
         'load the page',
       ) as SectionRow | null
-      return row ? sectionFromRow(row) : undefined
+      if (!row) return undefined
+
+      const paragraphs = (await chapterTextAt(row.r2_key))[row.path]
+      if (!paragraphs) {
+        throw new CloudError(
+          'Couldn’t load the words on this page. Check your connection and try again.',
+        )
+      }
+      return sectionFromRow(row, paragraphs)
     },
 
     async getSectionByAnchor(bookId: BookId, anchor: string): Promise<StoredSection | undefined> {
@@ -616,7 +786,25 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
             .range(from, to),
         'search this book',
       )
-      return rows.map(sectionFromRow)
+
+      // One fetch per chapter, not per section — a few dozen objects for a book
+      // of a few hundred sections, signed in a couple of round trips and read
+      // six at a time.
+      const byKey = await blobs.getMany([...new Set(rows.map((row) => row.r2_key))])
+
+      const texts = new Map<string, ChapterText>()
+      for (const [key, blob] of byKey) {
+        try {
+          texts.set(key, readChapterText(JSON.parse(await blob.text())))
+        } catch {
+          texts.set(key, {})
+        }
+      }
+
+      // Unlike `getSection`, a chapter that didn't arrive is survivable here:
+      // this feeds search, and a book that finds nothing in one chapter is far
+      // better than a search that refuses to run at all.
+      return rows.map((row) => sectionFromRow(row, texts.get(row.r2_key)?.[row.path] ?? []))
     },
 
     async countSections(bookId: BookId): Promise<number> {

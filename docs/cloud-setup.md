@@ -61,6 +61,19 @@ Have ready:
    file, paste it in, and click **Run**. You should see *Success. No rows
    returned.*
 3. New query again. Do the same with `supabase/migrations/0002_functions.sql`.
+4. New query again. Do the same with `supabase/migrations/0003_text_to_r2.sql`.
+
+> **Run all three, in order, even on a brand-new project.** `0002` still writes
+> a book's words into the database; `0003` is what teaches it to write them to
+> Cloudflare instead and keep only the address. Stopping after `0002` leaves an
+> app that fails on the first import.
+>
+> **If you already have books in the cloud, `0003` deletes them.** Text that was
+> never uploaded to Cloudflare has no address to point at, so those rows can't
+> be converted — only re-imported, which takes a few seconds per book. **Nothing
+> on your phone or laptop is touched:** the device library is a separate store
+> that this SQL cannot reach. Only books imported while the *cloud* backend was
+> selected are affected.
 
 To check it worked, click **Table Editor** in the sidebar — you should see ten
 tables: `books`, `manifests`, `chapters`, `sections`, `positions`, `sources`,

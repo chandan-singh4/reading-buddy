@@ -69,6 +69,18 @@ export interface BlobStore {
  */
 const UPLOAD_CONCURRENCY = 4
 
+/**
+ * The same limit for reads, and it earns its place for the same reason uploads
+ * do. A page's pictures are a handful, but in-book search now asks for every
+ * chapter's text at once — twenty-odd objects, which unbounded would open
+ * twenty-odd connections from a phone for the browser to queue anyway.
+ *
+ * Six rather than four: reads are smaller and the browser's own per-host cap is
+ * around here, so this keeps the pipe full without pretending to more
+ * parallelism than exists.
+ */
+const READ_CONCURRENCY = 6
+
 /** Run a job over each item, never more than `limit` at a time. */
 async function pooled<T>(
   items: readonly T[],
@@ -171,21 +183,20 @@ export function createR2BlobStore(): BlobStore {
 
       const urls = await signAll('get', keys)
 
-      // In parallel: these are independent reads of one page's worth of
-      // pictures, and doing them one after another is the whole latency budget
-      // of a page turn spent in series.
-      await Promise.all(
-        keys.map(async (key, index) => {
-          const url = urls[index]
-          if (!url) return
-          const response = await fetch(url)
-          // A missing object is a fact, not a failure — a book parsed before
-          // pictures were stored has rows pointing at nothing, and the reading
-          // screen already falls back to the caption.
-          if (!response.ok) return
-          found.set(key, await response.blob())
-        }),
-      )
+      // Concurrent, because these are independent reads of one page's worth of
+      // pictures and doing them in series spends the whole latency budget of a
+      // page turn — but pooled, because a search asks for a whole book.
+      await pooled(keys, READ_CONCURRENCY, async (key, index) => {
+        const url = urls[index]
+        if (!url) return
+        const response = await fetch(url)
+        // A missing object is a fact, not a failure — a book parsed before
+        // pictures were stored has rows pointing at nothing, and the reading
+        // screen already falls back to the caption. Callers that cannot survive
+        // an absence (a section's text) check for it themselves.
+        if (!response.ok) return
+        found.set(key, await response.blob())
+      })
 
       return found
     },

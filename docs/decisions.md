@@ -790,3 +790,43 @@ sign-in screen.
   update is accepted, which widens that window. The recovery is Unregister +
   delete Cache storage, and it is now written down in `cloud-setup.md`;
   the rewrite above at least means the fallback lands on a real page. — 2026-08-09
+
+### Settled 2026-08-10 (the words move to R2)
+
+- **Postgres holds pointers; Cloudflare holds bytes — for the text too.**
+  Measured on a real import (Jung, *Man and His Symbols*), `sections` was 584 kB
+  of the 700 kB that one book cost the database. The app never queries *into*
+  those paragraphs — it fetches a section whole and renders it — which makes
+  them bytes, not data. They now live in R2 and `sections.r2_key` is the
+  address. Per book: ~700 kB → ~200 kB, so the 500 MB free tier goes from about
+  650 books to about 2,500. That is 3.5×, not the 100× it first looks like: the
+  rows themselves stay, and reading order, titles and counts are still queried.
+  The reason to do it now rather than at book 200 is that the migration deletes
+  cloud books, and deleting one is cheaper than deleting two hundred.
+- **One object per chapter, not per section.** A page turn is a single GET
+  either way and latency dominates, so the grain is chosen by the *other* two
+  paths: in-book search drops from ~300 requests to ~20, and an import from
+  ~300 uploads to ~20. The object is keyed by section path, never by position —
+  a re-parse that divides a chapter differently would otherwise shift every
+  index and hand the reader another section's words under this one's name.
+- **The key carries a per-parse token.** `…/text/<parse token>/<chapter>.json`.
+  This is what preserves `replaceParsedBook`'s promise that a failed re-parse
+  leaves the old book exactly as it was: new chapters are uploaded to addresses
+  no row mentions, one transaction swaps every row onto them, and only then are
+  the old objects released. Overwriting the old keys in place would mean a
+  crash mid-upload leaves rows pointing at half a book.
+- **Bytes before rows, everywhere.** Same rule `saveAssets` already followed. A
+  crash between the two leaves orphaned objects — a few kilobytes nobody
+  references — rather than rows pointing at nothing, which is a book that opens
+  and won't turn. Orphans are swept on the next successful write.
+- **A missing chapter object throws in `getSection` and is survivable in
+  `listSections`.** Reading is the promise: a blank page rendered as though it
+  were the book is worse than an error a reader can act on, so the reader gets
+  *"Couldn't load the words on this page"* — a `CloudError`, which every caller
+  already handles. Search is best-effort by nature, so it skips what it can't
+  fetch and still searches the rest.
+- **Accepted cost: one extra hop on the first read of a chapter,** roughly
+  +150 ms. The objection that "text has no fallback" was weak and was dropped:
+  the cloud backend has never had an offline copy, so a dropped signal already
+  stopped the reading. This trades a little latency for a database that stays
+  slim for years. — 2026-08-10

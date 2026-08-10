@@ -27,6 +27,14 @@ export type { CloudUser } from './client.ts'
 export { createR2BlobStore } from './blobs.ts'
 export type { BlobEntry, BlobStore } from './blobs.ts'
 
-export { assetKey, bookPrefix, safePath, sourceKey, userPrefix } from './keys.ts'
+export {
+  assetKey,
+  bookPrefix,
+  chapterTextKey,
+  safePath,
+  sourceKey,
+  userPrefix,
+} from './keys.ts'
 
-export { MAX_CHUNK_BYTES, chunkSections } from './rows.ts'
+export { MAX_CHUNK_BYTES, chapterTextOf, chunkSections, readChapterText } from './rows.ts'
+export type { ChapterText, SectionPayload } from './rows.ts'

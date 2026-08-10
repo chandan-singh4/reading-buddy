@@ -91,13 +91,30 @@ export interface ChapterRow {
   sections: ChapterIndexEntry[]
 }
 
+/**
+ * A section, minus its words.
+ *
+ * `r2_key` where `paragraphs` used to be: the text of a whole chapter lives in
+ * one R2 object and every section of that chapter points at it. What stays here
+ * is what the app *queries* — reading order, the section's own title, how many
+ * there are — and none of that ever needed the prose to answer it.
+ */
 export interface SectionRow {
   book_id: string
   path: string
   chapter: number
   section: number
   title: string | null
-  paragraphs: Paragraph[]
+  r2_key: string
+}
+
+/** A section on its way to `rb_save_sections`, which reads camelCase JSON. */
+export interface SectionPayload {
+  path: string
+  chapter: number
+  section: number
+  title: string | null
+  r2Key: string
 }
 
 export interface PositionRow {
@@ -241,16 +258,71 @@ export function chapterFromRow(row: ChapterRow): StoredChapterIndex {
   }
 }
 
-export function sectionFromRow(row: SectionRow): StoredSection {
+/**
+ * A section row plus the paragraphs fetched for it, back into the shape the
+ * reader has always been handed.
+ *
+ * The words arrive separately now — the caller has already read the chapter's
+ * object out of R2 — but nothing downstream is allowed to notice, which is why
+ * this still returns a `StoredSection` identical to the Dexie one.
+ */
+export function sectionFromRow(row: SectionRow, paragraphs: Paragraph[]): StoredSection {
   const section: StoredSection = {
     bookId: row.book_id as BookId,
     chapter: row.chapter,
     section: row.section,
     path: row.path as SectionPath,
-    paragraphs: row.paragraphs ?? [],
+    paragraphs,
   }
   if (row.title !== null) section.title = row.title
   return section
+}
+
+export function sectionToPayload(section: Section, r2Key: string): SectionPayload {
+  return {
+    path: section.path,
+    chapter: section.chapter,
+    section: section.section,
+    title: orNull(section.title),
+    r2Key,
+  }
+}
+
+// --- One chapter's text, as it sits in R2 ------------------------------------
+
+/**
+ * What a chapter's object contains: each section's path against its paragraphs.
+ *
+ * An object keyed by path rather than an array, for one reason — a reader
+ * turning to section 4 should not have to trust that it is the fourth element.
+ * Paths are the app's identity for a section everywhere else, and a chapter
+ * re-parsed into a different number of sections would silently shift an array.
+ */
+export type ChapterText = Record<string, Paragraph[]>
+
+export function chapterTextOf(sections: readonly Section[]): ChapterText {
+  const text: ChapterText = {}
+  for (const section of sections) text[section.path] = section.paragraphs
+  return text
+}
+
+/**
+ * Read a chapter object back, defensively.
+ *
+ * Parsing is deliberately total: this is the one place where bytes that left
+ * the app's control come back into it, and a single malformed object should
+ * cost the section it belongs to rather than the whole book. Anything that
+ * isn't an array of paragraphs is dropped, and the caller sees a section with
+ * no words — which `getSection` reports and `listSections` skips over.
+ */
+export function readChapterText(value: unknown): ChapterText {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+
+  const text: ChapterText = {}
+  for (const [path, paragraphs] of Object.entries(value as Record<string, unknown>)) {
+    if (Array.isArray(paragraphs)) text[path] = paragraphs as Paragraph[]
+  }
+  return text
 }
 
 // --- Position ----------------------------------------------------------------
@@ -297,13 +369,17 @@ export function bookmarkFromRow(row: BookmarkRow): StoredBookmark {
 // --- Chunking ----------------------------------------------------------------
 
 /**
- * How much section JSON to put in one request. A 600-page book runs to a few
- * megabytes of paragraphs, and sending it as one body is a single point of
- * failure on exactly the connection least able to bear it — a phone, on mobile
- * data, at the end of a long import.
+ * How much section JSON to put in one request.
  *
- * A megabyte is well inside every limit in the path and small enough that a
- * retry is cheap.
+ * Far less load-bearing than it was. This used to carry every paragraph of a
+ * 600-page book — several megabytes, split across a dozen requests, each one a
+ * chance for a phone on mobile data to lose the import. Now that the words go
+ * to R2, a whole book's worth of these rows is tens of kilobytes and almost
+ * every book fits in a single call.
+ *
+ * Kept anyway, because "almost every" is not "every": a heavily subdivided
+ * reference work can still run to thousands of sections, and the limit costs
+ * nothing on the books that never reach it.
  */
 export const MAX_CHUNK_BYTES = 1_000_000
 
@@ -311,20 +387,15 @@ export const MAX_CHUNK_BYTES = 1_000_000
  * Split sections into request-sized batches, measured by their actual JSON
  * length rather than by counting rows.
  *
- * Counting would be the obvious thing and it is wrong here: sections are wildly
- * uneven. A chapter opening is two lines and a dense middle section is forty
- * paragraphs, so "fifty sections" is somewhere between 20 KB and 4 MB depending
- * on where in the book you are.
- *
  * A single section larger than the limit still goes on its own — there is
  * nothing smaller to split it into, and refusing would lose the book.
  */
 export function chunkSections(
-  sections: readonly Section[],
+  sections: readonly SectionPayload[],
   maxBytes: number = MAX_CHUNK_BYTES,
-): Section[][] {
-  const chunks: Section[][] = []
-  let current: Section[] = []
+): SectionPayload[][] {
+  const chunks: SectionPayload[][] = []
+  let current: SectionPayload[] = []
   let bytes = 0
 
   for (const section of sections) {

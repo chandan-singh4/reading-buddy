@@ -4,13 +4,17 @@ import type { Anchor, BookId, BookMeta, Section, SectionPath } from '../../struc
 import {
   bookFromRow,
   bookToRow,
+  chapterTextOf,
   chunkSections,
   folderFromRow,
   isoFrom,
   positionFromRow,
   quoteFromRow,
+  readChapterText,
   sectionFromRow,
+  sectionToPayload,
   type BookRow,
+  type SectionPayload,
 } from './rows.ts'
 
 /** A row with every optional column null — the state most books are in. */
@@ -156,43 +160,133 @@ describe('bookToRow', () => {
 
 describe('sectionFromRow', () => {
   it('omits a title the source never gave', () => {
-    const section = sectionFromRow({
-      book_id: 'b',
-      path: 'ch01/s01',
-      chapter: 1,
-      section: 1,
-      title: null,
-      paragraphs: [],
-    })
+    const section = sectionFromRow(
+      {
+        book_id: 'b',
+        path: 'ch01/s01',
+        chapter: 1,
+        section: 1,
+        title: null,
+        r2_key: 'users/u/books/b/text/tok/1.json',
+      },
+      [],
+    )
     expect('title' in section).toBe(false)
   })
 
-  it('survives a null paragraph list rather than throwing', () => {
-    const section = sectionFromRow({
-      book_id: 'b',
+  it('joins the row to the words fetched separately', () => {
+    const paragraph = { anchor: '[ch01-s01-p001]' as Anchor, text: 'Once.', kind: 'prose' as const }
+    const section = sectionFromRow(
+      {
+        book_id: 'b',
+        path: 'ch01/s01',
+        chapter: 1,
+        section: 1,
+        title: 'Opening',
+        r2_key: 'users/u/books/b/text/tok/1.json',
+      },
+      [paragraph],
+    )
+    // The key is the repository's business. What comes out is the same shape
+    // IndexedDB hands back, with no trace of where the words came from.
+    expect(section).toEqual({
+      bookId: 'b',
+      chapter: 1,
+      section: 1,
+      path: 'ch01/s01',
+      title: 'Opening',
+      paragraphs: [paragraph],
+    })
+  })
+})
+
+describe('chapterTextOf / readChapterText', () => {
+  const paragraph = (text: string) => ({
+    anchor: `[ch01-s01-p001]` as Anchor,
+    text,
+    kind: 'prose' as const,
+  })
+
+  function section(index: number, text: string): Section {
+    return {
+      chapter: 1,
+      section: index,
+      path: `ch01/s0${index}` as SectionPath,
+      paragraphs: [paragraph(text)],
+    }
+  }
+
+  it('survives the round trip through JSON unchanged', () => {
+    const sections = [section(1, 'First.'), section(2, 'Second.')]
+    const parsed = readChapterText(JSON.parse(JSON.stringify(chapterTextOf(sections))))
+    expect(parsed['ch01/s01']).toEqual([paragraph('First.')])
+    expect(parsed['ch01/s02']).toEqual([paragraph('Second.')])
+  })
+
+  it('keys by path rather than by position', () => {
+    // The reason this is an object and not an array: a re-parse that divides a
+    // chapter into a different number of sections would silently shift every
+    // index, handing the reader another section's words under this one's name.
+    expect(Object.keys(chapterTextOf([section(2, 'Second.')]))).toEqual(['ch01/s02'])
+  })
+
+  it('drops a malformed entry without losing the rest of the chapter', () => {
+    const parsed = readChapterText({ 'ch01/s01': [paragraph('Kept.')], 'ch01/s02': 'not an array' })
+    expect(parsed['ch01/s01']).toEqual([paragraph('Kept.')])
+    expect('ch01/s02' in parsed).toBe(false)
+  })
+
+  it.each([
+    ['null', null],
+    ['an array', [1, 2, 3]],
+    ['a string', 'nonsense'],
+    ['a number', 7],
+  ])('reads %s as an empty chapter rather than throwing', (_label, value) => {
+    expect(readChapterText(value)).toEqual({})
+  })
+})
+
+describe('sectionToPayload', () => {
+  it('sends the pointer and no words at all', () => {
+    const payload = sectionToPayload(
+      {
+        chapter: 1,
+        section: 1,
+        path: 'ch01/s01' as SectionPath,
+        title: 'Opening',
+        paragraphs: [{ anchor: '[ch01-s01-p001]' as Anchor, text: 'Once.', kind: 'prose' }],
+      },
+      'users/u/books/b/text/tok/1.json',
+    )
+    expect(payload).toEqual({
       path: 'ch01/s01',
       chapter: 1,
       section: 1,
       title: 'Opening',
-      paragraphs: null as unknown as [],
+      r2Key: 'users/u/books/b/text/tok/1.json',
     })
-    expect(section.paragraphs).toEqual([])
+    expect('paragraphs' in payload).toBe(false)
+  })
+
+  it('writes an absent title back as null', () => {
+    const payload = sectionToPayload(
+      { chapter: 1, section: 1, path: 'ch01/s01' as SectionPath, paragraphs: [] },
+      'k',
+    )
+    expect(payload.title).toBeNull()
   })
 })
 
 describe('chunkSections', () => {
-  function section(chapter: number, index: number, words: number): Section {
+  // What travels now is the pointer, not the prose, so the title is the only
+  // field left that can vary in size — which is why it stands in for bulk here.
+  function section(chapter: number, index: number, size: number): SectionPayload {
     return {
       chapter,
       section: index,
-      path: `ch${chapter}/s${index}` as SectionPath,
-      paragraphs: [
-        {
-          anchor: `[ch0${chapter}-s0${index}-p001]` as Anchor,
-          text: 'x'.repeat(words),
-          kind: 'prose',
-        },
-      ],
+      path: `ch${chapter}/s${index}`,
+      title: 'x'.repeat(size),
+      r2Key: `users/u/books/b/text/tok/${chapter}.json`,
     }
   }
 
