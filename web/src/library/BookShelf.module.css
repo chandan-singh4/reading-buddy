@@ -41,6 +41,22 @@
   background-color: var(--color-surface-raised);
 }
 
+/*
+  A book that is on the shelf but can't be opened until there is a signal.
+
+  Dimmed rather than hidden or moved: the row keeps its place, so the shelf a
+  reader knows stays the shelf they know, and coming back into signal changes
+  the colour of a row rather than re-ordering the library under their thumb.
+
+  0.45 is far enough from 1 to read as "not now" at arm's length in daylight,
+  and not so far that the title becomes unreadable — the reader still wants to
+  see what they own. The cursor and the missing link do the rest.
+*/
+.cardAway .hit {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* The whole card is the tap target — a link normally, a button while
    selecting. Both are reset to look like neither. */
 .hit {
@@ -120,11 +136,23 @@
 }
 
 .badge,
-.badgeMuted {
+.badgeMuted,
+.badgeAway {
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
   background-color: var(--color-surface-raised);
   white-space: nowrap;
+}
+
+/* Deliberately *not* dimmed with the rest of the card: it is the one thing on a
+   greyed-out row the reader needs to be able to read, since it is the only part
+   that explains the other parts. `opacity` on the card would take it too, so the
+   card dims its contents and this is lifted back out. */
+.badgeAway {
+  opacity: 1;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  background: none;
 }
 
 .badgeMuted {

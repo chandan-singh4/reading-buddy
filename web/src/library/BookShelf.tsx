@@ -36,6 +36,11 @@ export interface BookShelfProps {
   covers: ReadonlyMap<BookId, string>
   /** Ticked books, or `null` when not selecting at all. */
   selected: ReadonlySet<BookId> | null
+  /**
+   * Books on the shelf that can't be opened right now — offline, the ones never
+   * read before the signal went. Empty in every other situation.
+   */
+  unavailable?: ReadonlySet<BookId>
   onLongPress: (id: BookId) => void
   onToggle: (id: BookId) => void
   /** Remembers which book was opened, so coming back lands on it. */
@@ -49,6 +54,7 @@ export function BookShelf({
   folders,
   covers,
   selected,
+  unavailable,
   onLongPress,
   onToggle,
   onOpen,
@@ -66,6 +72,7 @@ export function BookShelf({
           // and the badges are where that shows.
           bookFolders={foldersOf(book, folders)}
           cover={covers.get(book.id)}
+          away={unavailable?.has(book.id) ?? false}
           selecting={selected !== null}
           ticked={selected?.has(book.id) ?? false}
           onLongPress={() => onLongPress(book.id)}
@@ -83,6 +90,8 @@ interface BookCardProps {
   progress: BookProgress
   bookFolders: readonly StoredFolder[]
   cover: string | undefined
+  /** Listed, but not readable until there is a signal. */
+  away: boolean
   selecting: boolean
   ticked: boolean
   onLongPress: () => void
@@ -96,6 +105,7 @@ function BookCard({
   progress,
   bookFolders,
   cover,
+  away,
   selecting,
   ticked,
   onLongPress,
@@ -108,8 +118,23 @@ function BookCard({
     <div className={styles.text}>
       <span className={styles.cardTitle}>{book.title}</span>
       {book.author && <span className={styles.author}>{book.author}</span>}
-      <Badges book={book} progress={progress} bookFolders={bookFolders} view={view} />
+      <Badges
+        book={book}
+        progress={progress}
+        bookFolders={bookFolders}
+        view={view}
+        away={away}
+      />
     </div>
+  )
+
+  const inside = (
+    <>
+      <span className={styles.media}>
+        <Cover title={book.title} src={cover} />
+      </span>
+      {facts}
+    </>
   )
 
   return (
@@ -119,6 +144,7 @@ function BookCard({
         styles.card,
         view === 'grid' ? styles.cardGrid : styles.cardList,
         ticked ? styles.cardTicked : '',
+        away ? styles.cardAway : '',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -136,17 +162,21 @@ function BookCard({
           aria-pressed={ticked}
           onClick={onToggle}
         >
-          <span className={styles.media}>
-            <Cover title={book.title} src={cover} />
-          </span>
-          {facts}
+          {inside}
         </button>
+      ) : away ? (
+        /*
+          Not a link, because there is nothing at the other end: the book's own
+          screen reads a manifest the copy hasn't got. A link that lands on an
+          error is a worse answer than a row that plainly isn't a door — the
+          badge below says why, and the book comes back with the signal.
+        */
+        <span className={styles.hit} aria-disabled="true">
+          {inside}
+        </span>
       ) : (
         <Link to={`/book/${book.id}`} className={styles.hit} onClick={onOpen}>
-          <span className={styles.media}>
-            <Cover title={book.title} src={cover} />
-          </span>
-          {facts}
+          {inside}
         </Link>
       )}
 
@@ -176,17 +206,24 @@ function Badges({
   progress,
   bookFolders,
   view,
+  away,
 }: {
   book: BookMeta
   progress: BookProgress
   bookFolders: readonly StoredFolder[]
   view: ViewMode
+  away: boolean
 }) {
   const shelf = shelfOf(book)
   const shelfLabel = SHELF_OPTIONS.find((option) => option.value === shelf)?.singular
 
   return (
     <span className={styles.badges}>
+      {/* First, and in words rather than only in colour: the dimming alone is
+          the sort of thing a reader reads as "finished" or as a rendering bug.
+          "Needs a signal" says both what is wrong and that it is temporary. */}
+      {away && <span className={styles.badgeAway}>Needs a signal</span>}
+
       {progress.status === 'finished' ? (
         <span className={styles.finished}>✓ Finished</span>
       ) : progress.percent !== undefined ? (

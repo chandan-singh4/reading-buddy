@@ -90,6 +90,10 @@ export default function Library() {
   )
   const [books, setBooks] = useState<BookMeta[]>(() => readLibraryMemory()?.books ?? [])
   const [folders, setFolders] = useState<StoredFolder[]>(() => readLibraryMemory()?.folders ?? [])
+  /** Listed but not openable — only ever non-empty when the signal is gone. */
+  const [unavailable, setUnavailable] = useState<ReadonlySet<BookId>>(
+    () => readLibraryMemory()?.unavailable ?? new Set(),
+  )
 
   const [importing, setImporting] = useState<ImportState>({ status: 'idle' })
   const [updating, setUpdating] = useState<UpdateState>({ status: 'idle' })
@@ -192,6 +196,7 @@ export default function Library() {
     setWithSource(memory.sources)
     setProgress(memory.progress)
     setFolders(memory.folders)
+    setUnavailable(memory.unavailable)
     setState({ status: 'ready' })
   }
 
@@ -604,6 +609,7 @@ export default function Library() {
           folders={folderMap}
           covers={covers}
           selected={selected}
+          unavailable={unavailable}
           onLongPress={startSelecting}
           onToggle={toggleSelected}
           onOpen={rememberRow}

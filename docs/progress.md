@@ -16,15 +16,18 @@ Get that loop working before building any breadth.
 ### In flight
 - **Nothing.** The cloud arc is finished. Sign-in works, the 32 books were
   copied up, and a cloud book now both **reads and writes** with no signal.
-  Everything is merged and pushed; build green, **967 tests**.
-- **WP-58 is closed.** The write queue landed 2026-08-10 — see below. **Still
-  unverified on the actual phone with Wi-Fi off**, which is the only test that
-  has ever found a fault in this waypoint. Worth doing: bookmark something in
-  aeroplane mode, close the app, reopen it, then turn the signal back on.
-- **Two small product questions waiting on the reader, both non-blocking.**
-  (a) Offline, the shelf shows only the books it can actually open — the
-  alternative is to show all 33 with the unavailable ones greyed out,
-  Spotify-style. (b) Two design-hook findings never triaged: the side-stripe in
+  Everything is merged and pushed; build green, **976 tests**.
+- **WP-58 is closed, and the write queue is now verified on the phone.**
+  2026-08-10: the reader bookmarked a page with no signal, force-quit the app,
+  reopened it still offline, and the bookmark was there. That was the one test
+  that had ever found a fault in this waypoint, and it passed.
+- **The greyed-out offline shelf shipped the same day** — see below. It is the
+  half that is **still unverified on the phone**: the storage rules have tests,
+  but nobody has yet *seen* a dimmed row. Check it with Wi-Fi off: all 33 books
+  listed, the ones never opened dimmed and un-tappable with a "Needs a signal"
+  badge, and Home showing only what it can actually open.
+- **One product question waiting on the reader, non-blocking.**
+  Two design-hook findings never triaged: the side-stripe in
   `pages/page.module.css` (L114, L134 — **pre-existing, not written by a recent
   session**) and the width animation in `pages/LibraryCopy.module.css` (L46 —
   written 2026-08-10). Keep, change, or silence the rule.
@@ -35,6 +38,28 @@ Get that loop working before building any breadth.
   the likely answer was always a stale cached build.
 
 ### Recently done
+- **The offline shelf lists every book, greying the ones it can't open** —
+  2026-08-10, the reader's call after seeing 1 book of 33 with Wi-Fi off.
+  Nothing was lost and it did not look that way, which was the whole problem.
+  - **The listing is remembered separately from the books** (`cloud/shelf.ts`):
+    titles and authors for all 33 are a few kilobytes, where the books are
+    megabytes — which is exactly why the listing can be kept for everything when
+    the books cannot. In memory *and* `localStorage`: the second is what
+    survives a relaunch, the first is what works where `localStorage` doesn't
+    (private mode, the test runner) and is why the tests can see it at all.
+  - **"Can this be opened?" is answered by what happened, not by
+    `navigator.onLine`** — the wrapper records whether the last shelf came from
+    the cloud or the copy, because `onLine === true` is what a captive portal
+    reports. `unavailableBooks()` in `storage/index.ts` is the one thing a
+    screen may know about the copy, since it is the one thing a reader can see.
+  - **Home filters instead of greying.** Its job is "pick up where you left
+    off"; four dimmed tiles that all refuse to open is a worse front door than a
+    shorter, true one. The full shelf is one tap away.
+  - **A three-run-flaky test was fixed at the root**: `readAndCache` waited for
+    the copied *sections*, but the copy writes pictures, the source file and the
+    marks after them, so tests were cutting the signal mid-copy. `copyInFlight`
+    now exposes the real "is it done?".
+  - Gates: **976 tests**, typecheck and build green.
 - **WP-58 step 5 · The offline write queue** — 2026-08-10. Bookmarks, saved
   passages and page turns now survive a tunnel: applied to the offline copy so
   the reader sees them immediately, recorded in `cloud/outbox.ts`, sent when

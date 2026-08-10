@@ -46,6 +46,7 @@
 import type { Anchor, BookId, BookMeta, Manifest, SectionPath } from '../../structure/index.ts'
 import {
   cacheRepository,
+  cachedBookIds,
   evictLeastRecent,
   evictOverflow,
   forgetCachedBooks,
@@ -65,6 +66,7 @@ import type { Repository } from '../repository.ts'
 import { copyBook, copyFolders } from '../transfer.ts'
 import { CloudError } from './client.ts'
 import { knownOffline, looksOffline } from './offline.ts'
+import { forgetFromShelf, rememberShelf, rememberedShelf } from './shelf.ts'
 import {
   drainOutbox,
   enqueue,
@@ -81,6 +83,41 @@ export { knownOffline, looksOffline } from './offline.ts'
 
 /** Books whose copy is being made right now, so a page turn doesn't start a second. */
 const filling = new Set<BookId>()
+
+/**
+ * Whether the last shelf the app drew came from the copy rather than the cloud.
+ *
+ * Recorded rather than re-derived, because the honest question is "did that read
+ * actually reach the cloud?" and `navigator.onLine` cannot answer it — `true`
+ * only means there is an interface, which is what a captive portal reports. The
+ * read either got through or it didn't, and this is that fact.
+ */
+let servedFromCopy = false
+
+/**
+ * Which books the reader can open right now, or `null` when that is all of them.
+ *
+ * `null` rather than "every id" so the caller can tell "everything is available"
+ * from "nothing is" without knowing the shelf — and so the device-library
+ * backend, which is never in this position, costs nothing to ask.
+ */
+export async function openableOffline(
+  cache: Repository = cacheRepository,
+): Promise<ReadonlySet<string> | null> {
+  if (!servedFromCopy) return null
+  try {
+    return await cachedBookIds(cache)
+  } catch {
+    // The copy is unreadable, which is not a reason to grey the shelf out —
+    // better to let every row be tapped and fail honestly one at a time.
+    return null
+  }
+}
+
+/** Exported for the tests, which need each case to start with no history. */
+export function forgetShelfSource(): void {
+  servedFromCopy = false
+}
 
 /**
  * Start keeping this book offline, if it isn't already. Never awaited.
@@ -243,10 +280,33 @@ export function createCachedRepository(
 
     // --- The shelf ---------------------------------------------------------
 
+    /**
+     * The shelf, which is the one read where the copy is not enough.
+     *
+     * Everywhere else in this file the fallback is complete: the copy either has
+     * the section or the reader wasn't going to get it anyway. Here it is a
+     * *subset* by design — the copy holds only opened books — so answering from
+     * it alone told the reader their library had shrunk to one book. So the
+     * listing is remembered separately, in full, and that is what a lost signal
+     * falls back to. Which of those rows can actually be opened is a different
+     * question, asked by `openableOffline` below.
+     */
     async listBooks(): Promise<BookMeta[]> {
       return readThrough(
-        () => cloud.listBooks(),
-        () => cache.listBooks(),
+        async () => {
+          const books = await cloud.listBooks()
+          rememberShelf(books)
+          servedFromCopy = false
+          return books
+        },
+        async () => {
+          servedFromCopy = true
+          const remembered = rememberedShelf()
+          // No remembered listing means this reader has never once loaded the
+          // shelf with a signal. The copy is then the honest answer, and the
+          // greying below correctly greys nothing.
+          return remembered ?? (await cache.listBooks())
+        },
       )
     },
 
@@ -533,12 +593,28 @@ export function createCachedRepository(
         throw error
       }
       await mirror(() => forgetQueued(bookIds, outbox))
+      // And out of the remembered listing, or the next offline shelf would show
+      // a greyed-out row for a book that no longer exists anywhere.
+      forgetFromShelf(bookIds)
     },
 
     async deleteBook(bookId: BookId): Promise<void> {
       await this.deleteBooks([bookId])
     },
   }
+}
+
+/**
+ * Whether a book's offline copy is still being made. For the tests.
+ *
+ * They need it because the copy is started and never awaited, and it writes in
+ * order — sections, then pictures, then the source file, then the position and
+ * marks. Waiting for any one of those is waiting for the middle of it, which is
+ * how a test came to cut the signal half way through a copy and fail once in
+ * every few runs.
+ */
+export function copyInFlight(bookId: BookId): boolean {
+  return filling.has(bookId)
 }
 
 /** Exported for the tests, which need a clean slate between cases. */

@@ -35,7 +35,7 @@
 
 import type { BookProgress } from '../library/status.ts'
 import { progressMap } from '../library/status.ts'
-import { repository, type StoredFolder } from '../storage/index.ts'
+import { repository, unavailableBooks, type StoredFolder } from '../storage/index.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 
 export interface LibraryMemory {
@@ -43,6 +43,8 @@ export interface LibraryMemory {
   sources: Set<BookId>
   progress: ReadonlyMap<BookId, BookProgress>
   folders: StoredFolder[]
+  /** Books listed but not openable — empty unless the shelf came from the copy. */
+  unavailable: ReadonlySet<BookId>
 }
 
 let remembered: LibraryMemory | null = null
@@ -76,7 +78,12 @@ export async function loadLibrary(): Promise<LibraryMemory> {
     repository.listPositions(),
     repository.listFolders(),
   ])
-  return { books, sources, progress: progressMap(positions), folders }
+  // Fifth and deliberately *after* the round rather than in it: it is a question
+  // about the books that just arrived, and `unavailableBooks` is local-only and
+  // documented never to throw — this must not be a fifth way for the group to
+  // fail and blank the shelf.
+  const unavailable = await unavailableBooks(books)
+  return { books, sources, progress: progressMap(positions), folders, unavailable }
 }
 
 /**

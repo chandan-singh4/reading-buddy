@@ -8,7 +8,7 @@ import { warmLibrary } from '../app/libraryMemory.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
 import { loadCovers, useCovers, warmCovers } from '../app/useCovers.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
-import { repository } from '../storage/index.ts'
+import { repository, unavailableBooks } from '../storage/index.ts'
 import styles from './Home.module.css'
 
 type LoadState =
@@ -103,8 +103,19 @@ export default function Home() {
     const cold = readShelfMemory() === null
 
     Promise.all([repository.listBooks(), repository.listPositions()])
-      .then(async ([books, positions]) => {
+      .then(async ([listed, positions]) => {
         if (cancelled) return
+
+        /*
+         * Offline, the shelf listing includes books this device cannot open —
+         * that is the point of it, and the library screen shows them greyed out.
+         * Home is the exception: its whole job is "pick up where you left off",
+         * and a front door offering four books that all refuse to open is a
+         * worse answer than a shorter, true one. So here they are left out
+         * rather than dimmed, and the full collection is one tap away.
+         */
+        const away = await unavailableBooks(listed)
+        const books = away.size === 0 ? listed : listed.filter((book) => !away.has(book.id))
         const shelves = shelvesOf(books, positions)
 
         /*

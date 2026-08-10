@@ -23,7 +23,15 @@ import type {
 import { CloudError } from './client.ts'
 import { createDb, type ReadingBuddyDB } from '../db.ts'
 import { createRepository, type ParsedBook, type Repository } from '../repository.ts'
-import { createCachedRepository, forgetFillsInFlight, looksOffline } from './cached.ts'
+import {
+  copyInFlight,
+  createCachedRepository,
+  forgetFillsInFlight,
+  forgetShelfSource,
+  looksOffline,
+  openableOffline,
+} from './cached.ts'
+import { forgetShelfListing } from './shelf.ts'
 import {
   createOutboxDb,
   drainOutbox,
@@ -56,6 +64,10 @@ beforeEach(() => {
   repository = createCachedRepository(cloud, cache, outbox)
   forgetFillsInFlight()
   forgetDrainInFlight()
+  // Both live outside the wrapper — one in `localStorage`, one at module scope —
+  // so a fresh wrapper is not a fresh slate and each case must say so.
+  forgetShelfListing()
+  forgetShelfSource()
 })
 
 afterEach(async () => {
@@ -171,6 +183,11 @@ async function readAndCache(id: string): Promise<void> {
   await repository.getSection(bookId(id), path(1, 1))
   await until(async () => Boolean(await cache.getBook(bookId(id))))
   await until(async () => (await cache.listSections(bookId(id))).length === 3)
+  // And then for the *whole* copy, not just the words. The pictures, the source
+  // file, the position and the marks are all written after the sections, so a
+  // test that cut the signal here was racing a copy that was still running —
+  // which it lost, rarely, and only under the load of the full suite.
+  await until(async () => !copyInFlight(bookId(id)))
 }
 
 // --- Telling a lost signal from a real answer --------------------------------
@@ -254,6 +271,71 @@ describe('when the signal is gone', () => {
     expect((await repository.getManifest(bookId('a')))?.title).toBe('Book a')
     expect(await repository.listChapterIndexes(bookId('a'))).toHaveLength(2)
     expect(await repository.countSections(bookId('a'))).toBe(3)
+  })
+
+  it('still lists every book, not only the ones it can open', async () => {
+    // The reader's own case: 33 books signed in, one of them ever opened.
+    await inTheCloud('a')
+    await inTheCloud('b')
+    await inTheCloud('c')
+    await readAndCache('a')
+    // The shelf has to have been seen with a signal at least once — that is the
+    // moment the listing is remembered.
+    await repository.listBooks()
+
+    signal.up = false
+
+    // Sorted, because the shelf's own order is the shelf's business — what this
+    // test is about is that none of the three went missing.
+    const titles = (await repository.listBooks()).map((book) => book.title).sort()
+    expect(titles).toEqual(['Book a', 'Book b', 'Book c'])
+  })
+
+  it('says which of them can actually be opened', async () => {
+    await inTheCloud('a')
+    await inTheCloud('b')
+    await readAndCache('a')
+    await repository.listBooks()
+
+    signal.up = false
+    await repository.listBooks()
+
+    const openable = await openableOffline(cache)
+    expect(openable && [...openable]).toEqual(['a'])
+  })
+
+  it('greys out nothing while the shelf is coming from the cloud', async () => {
+    await inTheCloud('a')
+    await inTheCloud('b')
+    await readAndCache('a')
+
+    await repository.listBooks()
+
+    // `null` is "every book is openable" — the state the app is in almost all
+    // of the time, and the one the library screen must not have to reason about.
+    expect(await openableOffline(cache)).toBeNull()
+  })
+
+  it('falls back to the copy when the shelf was never seen with a signal', async () => {
+    await inTheCloud('a')
+    await inTheCloud('b')
+    await readAndCache('a')
+
+    signal.up = false
+
+    // Nothing remembered, so the honest answer is the old one: what it can open.
+    expect((await repository.listBooks()).map((book) => book.title)).toEqual(['Book a'])
+  })
+
+  it('drops a deleted book from the remembered shelf', async () => {
+    await inTheCloud('a')
+    await inTheCloud('b')
+    await repository.listBooks()
+
+    await repository.deleteBook(bookId('b'))
+    signal.up = false
+
+    expect((await repository.listBooks()).map((book) => book.id)).toEqual(['a'])
   })
 
   it('finds the section an anchor points into', async () => {

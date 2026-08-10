@@ -8,8 +8,9 @@
  * `backend.ts` for why the switch takes a page reload.
  */
 
+import type { BookId, BookMeta } from '../structure/index.ts'
 import { activeBackend } from './backend.ts'
-import { createCachedRepository } from './cloud/cached.ts'
+import { createCachedRepository, openableOffline } from './cloud/cached.ts'
 import { createCloudRepository } from './cloud/index.ts'
 import { repository as deviceRepository, type Repository } from './repository.ts'
 
@@ -57,3 +58,32 @@ export const repository: Repository =
   activeBackend() === 'cloud'
     ? createCachedRepository(createCloudRepository())
     : deviceRepository
+
+/**
+ * Books the shelf is showing that cannot actually be opened right now.
+ *
+ * The one place a screen is allowed to know that the library it is drawing came
+ * from an offline copy — because it is the one thing a reader can see. With no
+ * signal the shelf lists every book (`cloud/shelf.ts`), but only the ones read
+ * before the signal went are readable, and a row that looks tappable and isn't
+ * is worse than a row that says so.
+ *
+ * Always empty on the device library and always empty online, so the caller can
+ * ask unconditionally. **Never throws**: it is one of the reads the library
+ * screen bundles into a `Promise.all`, and a `Promise.all` fails as a group —
+ * the exact fault that once blanked this screen.
+ */
+export async function unavailableBooks(
+  books: readonly BookMeta[],
+): Promise<ReadonlySet<BookId>> {
+  try {
+    if (activeBackend() !== 'cloud') return EMPTY
+    const openable = await openableOffline()
+    if (!openable) return EMPTY
+    return new Set(books.filter((book) => !openable.has(book.id)).map((book) => book.id))
+  } catch {
+    return EMPTY
+  }
+}
+
+const EMPTY: ReadonlySet<BookId> = new Set()

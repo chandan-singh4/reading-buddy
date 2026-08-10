@@ -36,12 +36,27 @@ What the queue turned out to need beyond the settled decisions:
 whole WP-55 round, still unseen on a phone) is the oldest debt; WP-43 and the
 tutor loop WP-17→20 are the next build work.
 
-### Two answers owed by the reader, both cheap and neither blocking
+**The offline shelf was answered and built on 2026-08-10.** The reader chose
+"show all 33, grey out what can't be opened". Worth knowing before touching it
+again:
 
-1. **Offline, the shelf shows only the books it can open.** The alternative is
-   all 33 with the unavailable ones greyed out, Spotify-style. Working as
-   designed either way; this is a taste question, not a bug.
-2. **Two design-hook findings, never triaged.** The side-stripe in
+- The offline copy holds only *opened* books, and that stays — a shelf that
+  downloads 32 books because it was scrolled past is a bug paid for in data. So
+  the **listing** is remembered separately (`storage/cloud/shelf.ts`) and is
+  what a lost signal falls back to.
+- **Availability is derived from what actually happened**, not from
+  `navigator.onLine`: `cached.ts` records whether the last shelf came from the
+  cloud, since `onLine === true` is what a captive portal reports.
+- `unavailableBooks()` in `storage/index.ts` is deliberately the *only* crack in
+  "screens never learn there is a cache" — justified because it is the one
+  thing about the cache a reader can see. It never throws, because the library
+  screen's opening reads are a `Promise.all`.
+- **Home filters rather than greys**, on purpose. See the comment there.
+- **Not yet seen on a phone.** The rules have tests; the dimmed row does not.
+
+### One answer owed by the reader, cheap and non-blocking
+
+1. **Two design-hook findings, never triaged.** The side-stripe in
    `pages/page.module.css` (L114, L134 — **pre-existing**) and the width
    animation in `pages/LibraryCopy.module.css` (L46 — added 2026-08-10). Keep,
    change, or silence the rule.
