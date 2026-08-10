@@ -488,12 +488,23 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
      *
      * Called repeatedly while reading, so it stays a single-row `put` with no
      * transaction and no read-before-write.
+     *
+     * `at` defaults to now and is passed in by exactly one caller: the offline
+     * write queue, replaying a page turn made in a tunnel. It has to be the
+     * moment the reader turned the page rather than the moment the signal came
+     * back, or "most recent write wins" would mean "most recently reconnected
+     * wins" and a stale queue would beat a laptop read made since.
      */
-    async savePosition(bookId: BookId, anchor: Anchor, percent?: number): Promise<void> {
+    async savePosition(
+      bookId: BookId,
+      anchor: Anchor,
+      percent?: number,
+      at: string = new Date().toISOString(),
+    ): Promise<void> {
       await database.positions.put({
         bookId,
         anchor,
-        at: new Date().toISOString(),
+        at,
         ...(percent === undefined ? {} : { percent }),
       })
     },
@@ -689,14 +700,22 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
 
     // --- Quotes ----------------------------------------------------------
 
-    /** Save a favorite passage, typed in from the detail page (WP-48). */
-    async addQuote(bookId: BookId, text: string): Promise<void> {
-      await database.quotes.put({
+    /**
+     * Save a favorite passage, typed in from the detail page (WP-48).
+     *
+     * Returns the row, exactly as `addBookmark` does and for the same reason:
+     * the id is invented in here, and the offline write queue needs to know
+     * which row it just made so a later "delete that one" can name it.
+     */
+    async addQuote(bookId: BookId, text: string): Promise<StoredQuote> {
+      const quote: StoredQuote = {
         bookId,
         id: crypto.randomUUID(),
         text,
         addedAt: new Date().toISOString(),
-      })
+      }
+      await database.quotes.put(quote)
+      return quote
     },
 
     /** Newest first — how the detail page lists them. */

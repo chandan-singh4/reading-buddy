@@ -24,10 +24,18 @@ import { CloudError } from './client.ts'
 import { createDb, type ReadingBuddyDB } from '../db.ts'
 import { createRepository, type ParsedBook, type Repository } from '../repository.ts'
 import { createCachedRepository, forgetFillsInFlight, looksOffline } from './cached.ts'
+import {
+  createOutboxDb,
+  drainOutbox,
+  forgetDrainInFlight,
+  pendingWrites,
+  type OutboxDB,
+} from './outbox.ts'
 
 let dbCounter = 0
 let cloudDb: ReadingBuddyDB
 let cacheDb: ReadingBuddyDB
+let outbox: OutboxDB
 /** The far side, unwrapped — what the test uses to set the world up. */
 let origin: Repository
 let cache: Repository
@@ -40,17 +48,19 @@ beforeEach(() => {
   dbCounter += 1
   cloudDb = createDb(`cached-cloud-${dbCounter}`)
   cacheDb = createDb(`cached-cache-${dbCounter}`)
+  outbox = createOutboxDb(`cached-outbox-${dbCounter}`)
   origin = createRepository(cloudDb)
   cache = createRepository(cacheDb)
   signal = { up: true }
   cloud = withSignal(origin, signal)
-  repository = createCachedRepository(cloud, cache)
+  repository = createCachedRepository(cloud, cache, outbox)
   forgetFillsInFlight()
+  forgetDrainInFlight()
 })
 
 afterEach(async () => {
   vi.unstubAllGlobals()
-  await Promise.all([cloudDb.delete(), cacheDb.delete()])
+  await Promise.all([cloudDb.delete(), cacheDb.delete(), outbox.delete()])
 })
 
 // --- Standing in for the network --------------------------------------------
@@ -483,29 +493,198 @@ describe('keeping a book offline', () => {
   })
 })
 
-// --- What offline still cannot do -------------------------------------------
+// --- Writing with no signal --------------------------------------------------
 
-describe('writing still needs a signal', () => {
-  it('refuses rather than pretending a bookmark was saved', async () => {
+describe('writing with no signal', () => {
+  it('keeps a bookmark, a passage and a page turn, and shows them straight away', async () => {
     await inTheCloud('a')
     await readAndCache('a')
 
     signal.up = false
 
-    await expect(repository.addBookmark(bookId('a'), anchor(1, 1), 'On the train')).rejects.toThrow(
-      'Couldn’t reach your library',
-    )
-    await expect(repository.savePosition(bookId('a'), anchor(1, 2), 20)).rejects.toThrow(
-      'Couldn’t reach your library',
-    )
+    await repository.addBookmark(bookId('a'), anchor(1, 1), 'On the train')
+    await repository.addQuote(bookId('a'), 'A line worth keeping.')
+    await repository.savePosition(bookId('a'), anchor(2, 1), 40)
+
+    // Read back through the wrapper, still offline — this is the reader looking
+    // at the screen a second after the tap.
+    expect((await repository.listBookmarks(bookId('a')))[0]?.label).toBe('On the train')
+    expect((await repository.listQuotes(bookId('a')))[0]?.text).toBe('A line worth keeping.')
+    expect((await repository.getPosition(bookId('a')))?.percent).toBe(40)
   })
 
-  it('refuses to delete a book', async () => {
+  it('survives the app being closed and reopened, still offline', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    await repository.addBookmark(bookId('a'), anchor(1, 1), 'On the train')
+
+    // A fresh wrapper over the same two databases is what a relaunch is.
+    const reopened = createCachedRepository(cloud, cache, outbox)
+
+    expect((await reopened.listBookmarks(bookId('a')))[0]?.label).toBe('On the train')
+    expect(await pendingWrites(outbox)).toHaveLength(1)
+  })
+
+  it('records the moment the page was turned, not the moment the signal returned', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    await repository.savePosition(bookId('a'), anchor(2, 1), 40)
+    const queuedAt = (await repository.getPosition(bookId('a')))?.at
+
+    signal.up = true
+    await drainOutbox(origin, outbox)
+
+    expect((await origin.getPosition(bookId('a')))?.at).toBe(queuedAt)
+  })
+
+  it('keeps only the newest page turn, not one per few seconds', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    await repository.savePosition(bookId('a'), anchor(1, 1), 10)
+    await repository.savePosition(bookId('a'), anchor(1, 2), 20)
+    await repository.savePosition(bookId('a'), anchor(2, 1), 30)
+
+    const queued = await pendingWrites(outbox)
+    expect(queued).toHaveLength(1)
+    expect(queued[0]).toMatchObject({ kind: 'savePosition', percent: 30 })
+  })
+
+  it('un-marks a page it marked in the same tunnel, and sends nothing at all', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    const bookmark = await repository.addBookmark(bookId('a'), anchor(1, 1), 'On the train')
+    await repository.deleteBookmark(bookId('a'), bookmark.id)
+
+    expect(await repository.listBookmarks(bookId('a'))).toEqual([])
+    expect(await pendingWrites(outbox)).toEqual([])
+  })
+})
+
+// --- Catching up -------------------------------------------------------------
+
+describe('when the signal comes back', () => {
+  it('sends what was queued, without the reader doing anything', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    await repository.addBookmark(bookId('a'), anchor(1, 1), 'On the train')
+    await repository.savePosition(bookId('a'), anchor(2, 1), 40)
+
+    signal.up = true
+    // Any successful write is evidence the signal is back, and drains the rest.
+    await repository.addQuote(bookId('a'), 'Back above ground.')
+    await until(async () => (await pendingWrites(outbox)).length === 0)
+
+    expect((await origin.listBookmarks(bookId('a')))[0]?.label).toBe('On the train')
+    expect((await origin.getPosition(bookId('a')))?.percent).toBe(40)
+  })
+
+  it('un-marks the right row after the bookmark has already synced', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    const bookmark = await repository.addBookmark(bookId('a'), anchor(1, 1), 'On the train')
+
+    // The far side mints its own id when it takes the bookmark, exactly as
+    // Supabase does — so the row now has a different name from the local one.
+    signal.up = true
+    await drainOutbox(origin, outbox)
+    const cloudId = (await origin.listBookmarks(bookId('a')))[0]!.id
+    expect(cloudId).not.toBe(bookmark.id)
+
+    // Back in a tunnel, the reader taps the ribbon again.
+    signal.up = false
+    await repository.deleteBookmark(bookId('a'), bookmark.id)
+    signal.up = true
+    await drainOutbox(origin, outbox)
+
+    expect(await origin.listBookmarks(bookId('a'))).toEqual([])
+  })
+
+  it('drops a write the cloud refuses instead of retrying it for ever', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    await repository.addBookmark(bookId('a'), anchor(1, 1), 'On the train')
+
+    const refusing: Repository = {
+      ...origin,
+      async addBookmark(): Promise<never> {
+        throw new CloudError('That book is no longer in your library.')
+      },
+    }
+    const result = await drainOutbox(refusing, outbox)
+
+    expect(result).toMatchObject({ sent: 0, dropped: 1, stopped: false })
+    expect(await pendingWrites(outbox)).toEqual([])
+  })
+
+  it('keeps everything left when the signal goes again part-way through', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    await repository.addBookmark(bookId('a'), anchor(1, 1), 'First')
+    await repository.addBookmark(bookId('a'), anchor(1, 2), 'Second')
+
+    let calls = 0
+    const flaky: Repository = {
+      ...origin,
+      async addBookmark(id, at, label) {
+        calls += 1
+        if (calls > 1) {
+          throw new CloudError('Couldn’t reach your library.', {
+            cause: new TypeError('Failed to fetch'),
+          })
+        }
+        return origin.addBookmark(id, at, label)
+      },
+    }
+    const result = await drainOutbox(flaky, outbox)
+
+    expect(result).toMatchObject({ sent: 1, stopped: true })
+    expect(await pendingWrites(outbox)).toHaveLength(1)
+    expect((await origin.listBookmarks(bookId('a')))[0]?.label).toBe('First')
+  })
+})
+
+// --- What offline still cannot do -------------------------------------------
+
+describe('deleting still needs a signal', () => {
+  it('refuses, in words about books rather than about the network', async () => {
     await inTheCloud('a')
     await readAndCache('a')
 
     signal.up = false
 
-    await expect(repository.deleteBook(bookId('a'))).rejects.toThrow('Couldn’t reach your library')
+    await expect(repository.deleteBook(bookId('a'))).rejects.toThrow(
+      'You need a connection to delete a book',
+    )
+    // And the book is still there to go on reading.
+    expect((await repository.listBooks()).map((book) => book.title)).toEqual(['Book a'])
+  })
+
+  it('forgets writes queued for a book once it really is deleted', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    signal.up = false
+    await repository.addBookmark(bookId('a'), anchor(1, 1), 'On the train')
+
+    signal.up = true
+    await repository.deleteBook(bookId('a'))
+
+    expect(await pendingWrites(outbox)).toEqual([])
   })
 })

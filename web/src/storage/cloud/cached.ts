@@ -28,16 +28,22 @@
  * trustworthy enough to skip the network, and `true` is not trustworthy enough
  * to skip the copy. The `catch` below is what covers the second case.
  *
- * ## What is *not* here
+ * ## Writing, which is the mirror of the same rule
  *
- * Writing offline. Position, highlights and bookmarks still go straight to the
- * cloud and still fail when it is unreachable — the queue that fixes that is
- * the next step of WP-58. This is deliberate rather than unfinished: a
- * bookmark that appears to save and is then lost is worse than one that says it
- * couldn't.
+ * **Try the cloud. If the failure looks like a lost signal, write it to the copy
+ * and put it in the outbox.** The reader sees the bookmark straight away because
+ * the copy is what they are reading from anyway, and `outbox.ts` tells the cloud
+ * when there is a signal to tell it with.
+ *
+ * Three writes go through that path — position, bookmarks, saved passages —
+ * because those three merge with another device's without anyone being asked.
+ * **Deleting a book still refuses**, and says why: a delete racing an edit
+ * elsewhere can only be resolved by asking, and a reading app should not have a
+ * conflict UI. Importing, re-parsing and renaming a folder still need the source
+ * of truth by definition, and still fail as they always did.
  */
 
-import type { BookId, BookMeta, Manifest, SectionPath } from '../../structure/index.ts'
+import type { Anchor, BookId, BookMeta, Manifest, SectionPath } from '../../structure/index.ts'
 import {
   cacheRepository,
   evictLeastRecent,
@@ -57,59 +63,21 @@ import type {
 } from '../db.ts'
 import type { Repository } from '../repository.ts'
 import { copyBook, copyFolders } from '../transfer.ts'
+import { CloudError } from './client.ts'
+import { knownOffline, looksOffline } from './offline.ts'
+import {
+  drainOutbox,
+  enqueue,
+  forgetQueued,
+  outboxDb,
+  pendingCount,
+  type OutboxDB,
+} from './outbox.ts'
 
-/**
- * The wordings browsers use for "there is no network", one per engine.
- *
- * Safari's is `Load failed`, which is both the vaguest and the one that matters
- * most here — it is what an iPhone says, and an iPhone on a train is the entire
- * reason this waypoint exists.
- */
-const OFFLINE_HINTS = [
-  'failed to fetch',
-  'networkerror',
-  'network request failed',
-  'load failed',
-  'the internet connection appears to be offline',
-]
-
-/**
- * Whether this failure is a missing network rather than a real answer.
- *
- * The distinction is load-bearing. A lost signal should fall back to the copy;
- * a book that was deleted on another device, or a row the security policy
- * refuses, must surface — falling back there would resurrect deleted books from
- * the cache and never stop.
- *
- * `CloudError` keeps the original in `cause`, so the chain is walked rather
- * than just the top message. Five links is far more than any real chain and
- * stops a cyclic `cause` from hanging the reader.
- */
-export function looksOffline(error: unknown): boolean {
-  let current: unknown = error
-  for (let depth = 0; current && depth < 5; depth += 1) {
-    // What `fetch` itself throws with nothing to connect to.
-    if (current instanceof TypeError) return true
-    const message = (current as { message?: unknown }).message
-    if (typeof message === 'string') {
-      const lower = message.toLowerCase()
-      if (OFFLINE_HINTS.some((hint) => lower.includes(hint))) return true
-    }
-    current = (current as { cause?: unknown }).cause
-  }
-  return false
-}
-
-/**
- * Whether the browser has already told us there is no connection.
- *
- * Guarded for the tests and for anything running outside a browser, where there
- * is no `navigator` — absent means "don't know", which correctly falls through
- * to asking the network.
- */
-export function knownOffline(): boolean {
-  return typeof navigator !== 'undefined' && navigator.onLine === false
-}
+// Both were first written here and are still imported from here by their tests
+// and by `outbox.ts`'s callers. They live in `offline.ts` only so that this file
+// and the queue can share them without importing each other.
+export { knownOffline, looksOffline } from './offline.ts'
 
 /** Books whose copy is being made right now, so a page turn doesn't start a second. */
 const filling = new Set<BookId>()
@@ -187,6 +155,7 @@ async function dropPartial(cache: Repository, bookId: BookId): Promise<void> {
 export function createCachedRepository(
   cloud: Repository,
   cache: Repository = cacheRepository,
+  outbox: OutboxDB = outboxDb,
 ): Repository {
   async function readThrough<T>(
     fromCloud: () => Promise<T>,
@@ -201,6 +170,72 @@ export function createCachedRepository(
       if (!looksOffline(error)) throw error
       return await fromCache()
     }
+  }
+
+  /**
+   * The write rule, and the exact mirror of `readThrough`.
+   *
+   * The order inside `offline` matters and is the same order the read side uses
+   * for its own priorities: **queue first, then show.** Recording the write is
+   * what makes it true; showing it in the copy is what makes it visible. If the
+   * queue itself can't be written the reader is told, because a bookmark that
+   * looks saved and is then lost is worse than one that says it couldn't be.
+   */
+  async function writeThrough<T>(
+    toCloud: () => Promise<T>,
+    offline: () => Promise<T>,
+  ): Promise<T> {
+    if (knownOffline()) return offline()
+    try {
+      const result = await toCloud()
+      // A write that got through is the best evidence there is that the signal
+      // is back — better than the `online` event, which fires for a joined
+      // network that cannot reach anything.
+      void drainQuietly()
+      return result
+    } catch (error) {
+      if (!looksOffline(error)) throw error
+      return offline()
+    }
+  }
+
+  /**
+   * Apply a write to the copy so the reader can see it. Never fatal: the write
+   * is already recorded, and a copy that couldn't take it is a copy that will be
+   * rebuilt from the cloud anyway.
+   */
+  async function mirror(apply: () => Promise<unknown>): Promise<void> {
+    try {
+      await apply()
+    } catch {
+      // See above. The cloud is still going to hear about this.
+    }
+  }
+
+  async function drainQuietly(): Promise<void> {
+    try {
+      if ((await pendingCount(outbox)) === 0) return
+      await drainOutbox(cloud, outbox)
+    } catch {
+      // Draining is housekeeping. A reader who is reading successfully must
+      // never see an error about it; the next trigger tries again.
+    }
+  }
+
+  // Two triggers, because neither is sufficient alone. `online` catches the
+  // reader walking out of the tunnel with the app open, which is the case this
+  // whole waypoint is about; the opening drain catches the app being started
+  // fresh with a queue left over from yesterday.
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => void drainQuietly())
+  }
+  void drainQuietly()
+
+  /** Refusing a delete, in the reader's words rather than the network's. */
+  function noDeleteOffline(): never {
+    throw new CloudError(
+      'You need a connection to delete a book. Everything else you do offline is saved and sent when you’re back.',
+    )
   }
 
   return {
@@ -374,6 +409,134 @@ export function createCachedRepository(
         () => cloud.listBookmarks(bookId),
         () => cache.listBookmarks(bookId),
       )
+    },
+
+    // --- What the reader adds, with or without a signal ---------------------
+
+    /**
+     * Where reading stopped. The one write that happens by itself, constantly,
+     * which is why the queue keeps only the newest per book rather than an
+     * hour's worth of increasingly stale versions of one fact.
+     */
+    async savePosition(
+      bookId: BookId,
+      anchor: Anchor,
+      percent?: number,
+      at: string = new Date().toISOString(),
+    ): Promise<void> {
+      return writeThrough(
+        () => cloud.savePosition(bookId, anchor, percent, at),
+        async () => {
+          await enqueue({ kind: 'savePosition', bookId, anchor, percent, at }, outbox)
+          await mirror(() => cache.savePosition(bookId, anchor, percent, at))
+        },
+      )
+    },
+
+    /**
+     * Mark a place, signal or no signal.
+     *
+     * Offline the *copy* mints the id, and that is deliberate rather than
+     * incidental: the reader is reading from the copy, so the row they can see
+     * and the row the queue names have to be the same row, or tapping the ribbon
+     * again would fail to un-mark the page it just marked. The cloud's own id
+     * arrives when the queue drains, and everything still queued is repointed at
+     * it then — see `outbox.ts`.
+     */
+    async addBookmark(bookId: BookId, anchor: Anchor, label: string): Promise<StoredBookmark> {
+      return writeThrough(
+        () => cloud.addBookmark(bookId, anchor, label),
+        async () => {
+          const bookmark = await cache
+            .addBookmark(bookId, anchor, label)
+            .catch((): StoredBookmark => ({
+              // The book isn't in the copy, or the copy is full. The bookmark is
+              // still real and still going to the cloud; it just has nowhere
+              // local to be listed from until it gets there.
+              bookId,
+              id: crypto.randomUUID(),
+              anchor,
+              label,
+              addedAt: new Date().toISOString(),
+            }))
+          await enqueue({ kind: 'addBookmark', bookId, id: bookmark.id, anchor, label }, outbox)
+          return bookmark
+        },
+      )
+    },
+
+    async deleteBookmark(bookId: BookId, id: string): Promise<void> {
+      return writeThrough(
+        () => cloud.deleteBookmark(bookId, id),
+        async () => {
+          await enqueue({ kind: 'deleteBookmark', bookId, id }, outbox)
+          await mirror(() => cache.deleteBookmark(bookId, id))
+        },
+      )
+    },
+
+    async renameBookmark(bookId: BookId, id: string, label: string): Promise<void> {
+      return writeThrough(
+        () => cloud.renameBookmark(bookId, id, label),
+        async () => {
+          await enqueue({ kind: 'renameBookmark', bookId, id, label }, outbox)
+          await mirror(() => cache.renameBookmark(bookId, id, label))
+        },
+      )
+    },
+
+    /** A saved passage. Additive, like a bookmark, so it queues the same way. */
+    async addQuote(bookId: BookId, text: string): Promise<StoredQuote> {
+      return writeThrough(
+        () => cloud.addQuote(bookId, text),
+        async () => {
+          const quote = await cache.addQuote(bookId, text).catch((): StoredQuote => ({
+            bookId,
+            id: crypto.randomUUID(),
+            text,
+            addedAt: new Date().toISOString(),
+          }))
+          await enqueue({ kind: 'addQuote', bookId, id: quote.id, text }, outbox)
+          return quote
+        },
+      )
+    },
+
+    async deleteQuote(bookId: BookId, id: string): Promise<void> {
+      return writeThrough(
+        () => cloud.deleteQuote(bookId, id),
+        async () => {
+          await enqueue({ kind: 'deleteQuote', bookId, id }, outbox)
+          await mirror(() => cache.deleteQuote(bookId, id))
+        },
+      )
+    },
+
+    // --- What still needs a signal ------------------------------------------
+
+    /**
+     * Deleting a book is the one action with no honest automatic merge, so it
+     * refuses rather than queues — and says so in words about books rather than
+     * about the network, because "couldn't reach your library" invites the
+     * reader to try again in a minute at something that will never work offline.
+     *
+     * On success the book's queued writes go too. A bookmark waiting to be sent
+     * to a book that has just been deleted would drain into a rejection, be
+     * dropped, and cost a round trip to learn nothing.
+     */
+    async deleteBooks(bookIds: readonly BookId[]): Promise<void> {
+      if (knownOffline()) noDeleteOffline()
+      try {
+        await cloud.deleteBooks(bookIds)
+      } catch (error) {
+        if (looksOffline(error)) noDeleteOffline()
+        throw error
+      }
+      await mirror(() => forgetQueued(bookIds, outbox))
+    },
+
+    async deleteBook(bookId: BookId): Promise<void> {
+      await this.deleteBooks([bookId])
     },
   }
 }

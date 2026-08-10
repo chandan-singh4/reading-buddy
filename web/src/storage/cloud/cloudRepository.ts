@@ -837,12 +837,22 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
 
     // --- Where you stopped reading ---------------------------------------
 
-    async savePosition(bookId: BookId, anchor: Anchor, percent?: number): Promise<void> {
+    /**
+     * `at` defaults to now; the offline write queue passes the moment the page
+     * was actually turned, so a replayed tunnel doesn't outrank a newer write
+     * made on another device while this one had no signal.
+     */
+    async savePosition(
+      bookId: BookId,
+      anchor: Anchor,
+      percent?: number,
+      at: string = now().toISOString(),
+    ): Promise<void> {
       unwrap(
         await db().from('positions').upsert({
           book_id: bookId,
           anchor,
-          at: now().toISOString(),
+          at,
           percent: percent ?? null,
         }),
         'remember your place',
@@ -969,16 +979,22 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
 
     // --- Quotes ----------------------------------------------------------
 
-    async addQuote(bookId: BookId, text: string): Promise<void> {
-      unwrap(
-        await db().from('quotes').insert({
-          book_id: bookId,
-          id: newId(),
-          text,
-          added_at: now().toISOString(),
-        }),
+    /** Returns the row it made — see the Dexie version for why. */
+    async addQuote(bookId: BookId, text: string): Promise<StoredQuote> {
+      const row = unwrap(
+        await db()
+          .from('quotes')
+          .insert({
+            book_id: bookId,
+            id: newId(),
+            text,
+            added_at: now().toISOString(),
+          })
+          .select()
+          .single(),
         'save that passage',
-      )
+      ) as QuoteRow
+      return quoteFromRow(row)
     },
 
     async listQuotes(bookId: BookId): Promise<StoredQuote[]> {

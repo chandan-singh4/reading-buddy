@@ -8,66 +8,33 @@
 
 ---
 
-## Task — WP-58 step 5: the offline write queue
+## No task in flight — WP-58 is closed
 
-**Reading a cloud book with no signal works. Writing still needs one.** Position,
-highlights and bookmarks go straight to the cloud and fail honestly when it is
-unreachable. This task makes those three survive a tunnel.
+**WP-58 finished on 2026-08-10.** Reading *and* writing a cloud book now survive
+a tunnel. The write queue is `web/src/storage/cloud/outbox.ts`, its own tiny
+database (`reading-buddy-outbox`), drained on the `online` event, at launch, and
+after any write that gets through.
 
-**Every design question is already answered** — see the WP-58 block in
-`decisions.md`, settled 2026-08-10. Do not re-open them:
+What the queue turned out to need beyond the settled decisions:
 
-| Question | Settled answer |
-|---|---|
-| Two devices both add a highlight | **Both survive.** Highlights and bookmarks are *additive* — that is not a conflict, it is the right answer arriving by itself. |
-| Two devices disagree on position | **Most recent write wins**, on `at`, which is already an ISO timestamp. Not furthest — that would undo a deliberate re-read forever. |
-| Delete offline | **Refused.** The one action with no honest automatic merge, and a reading app should not have a conflict UI. |
+- **Its own database, not a table in the cache.** The cache is the one store in
+  the app that is safe to delete at any moment; a queued bookmark is the one
+  thing here that isn't. Different lifetimes, different databases.
+- **A durable local→cloud id map, not a one-shot rewrite.** `addBookmark` and
+  `addQuote` mint their id server-side, so a bookmark made offline keeps the
+  *copy's* id for as long as that copy lives — a delete queued tomorrow still
+  names it. Rewriting what happened to be queued at drain time was the first
+  attempt and a test caught it.
+- **Two small interface additions**, both to make a settled rule actually true:
+  `savePosition(…, at?)` so a replayed page turn carries the moment it happened
+  rather than the moment the signal returned, and `addQuote → Promise<StoredQuote>`
+  so the id is knowable, exactly as `addBookmark` already was.
+- **A delete of something still queued cancels the add**, so a ribbon tapped
+  twice in one tunnel sends nothing at all.
 
-### Definition of done
-
-1. A bookmark, a highlight and a page turn made with the Wi-Fi off are still
-   there after the app is closed and reopened — **still offline.**
-2. Turning the network back on drains the queue to the cloud without the reader
-   doing anything, and a second device sees them.
-3. A queued write that the cloud *rejects* (not a lost signal — a row RLS
-   refuses, a book deleted elsewhere) is dropped from the queue and does not
-   retry for ever. Distinguishing the two is `looksOffline` in
-   `cloud/cached.ts`, which already exists and is tested.
-4. Deleting a book with no signal still refuses, with a message that says why.
-5. Gates: typecheck, full suite, `npm run build`.
-
-### The shape that is already there
-
-- `cached.ts` overrides ~19 **read** methods and spreads the rest through. The
-  queue is the same trick on the **write** side — wrap, don't rewrite.
-- `cache.ts` is a full `Repository` over a second Dexie database, so an offline
-  write can be applied to the copy immediately (so the reader sees it) *and*
-  recorded for later.
-- **Where the queue itself lives is the one open call.** A Dexie table in the
-  *cache* database is free — that schema is disposable, so unlike the device
-  library it can gain a table with no migration cost. That is probably the
-  answer; it was not settled because the queue was deferred.
-
-### Files in scope
-
-- `web/src/storage/cloud/cached.ts` — **start here.** The wrapper, `looksOffline`,
-  `knownOffline`, `readThrough`, and the header explaining what is deliberately
-  absent.
-- `web/src/storage/cache.ts` — the second database, the LRU bookkeeping, `looksFull`.
-- `web/src/storage/cloud/cached.test.ts` + `cache.test.ts` — the patterns to
-  copy: two real Dexie databases and a `Proxy` that fakes a lost signal.
-- `web/src/storage/repository.ts` — the `Repository` interface. The write methods
-  to wrap (`savePosition`, `addQuote`, `addBookmark`, `removeBookmark`, …) are
-  named here.
-- `web/src/storage/cloud/cloudRepository.ts` — what those writes do today.
-- `docs/decisions.md` — the WP-58 block. **Read the seven bullets before writing
-  anything.**
-
-### Out of scope
-
-The tutor loop (WP-17→20), WP-43, WP-25. Any change to the eviction rule or the
-twenty-book cap. A "keep this book offline" pin — deliberately not built, and
-`decisions.md` says why.
+**Pick the next task from `progress.md` → "Next up".** The reader's eye (the
+whole WP-55 round, still unseen on a phone) is the oldest debt; WP-43 and the
+tutor loop WP-17→20 are the next build work.
 
 ### Two answers owed by the reader, both cheap and neither blocking
 

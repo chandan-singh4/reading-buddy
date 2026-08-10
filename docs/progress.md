@@ -14,16 +14,13 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **The cloud is on, live, and holding the reader's library.** Sign-in works,
-  the 32 books were copied up, and reading a cloud book with no signal works —
-  tested on the phone with Wi-Fi off. Nothing is half-built: everything is
-  merged and pushed (`39773be`); build green, **943 tests**.
-- **WP-58 is four-fifths done. The remaining fifth is the write queue.**
-  Reading offline works. *Writing* offline does not: position, highlights and
-  bookmarks still go straight to the cloud and still fail honestly without a
-  signal. The conflict rules that queue needs are already settled in
-  `decisions.md` (additive merges, newest-timestamp for position, deletes need
-  a signal) — **the decision is done, only the code is left.**
+- **Nothing.** The cloud arc is finished. Sign-in works, the 32 books were
+  copied up, and a cloud book now both **reads and writes** with no signal.
+  Everything is merged and pushed; build green, **967 tests**.
+- **WP-58 is closed.** The write queue landed 2026-08-10 — see below. **Still
+  unverified on the actual phone with Wi-Fi off**, which is the only test that
+  has ever found a fault in this waypoint. Worth doing: bookmark something in
+  aeroplane mode, close the app, reopen it, then turn the signal back on.
 - **Two small product questions waiting on the reader, both non-blocking.**
   (a) Offline, the shelf shows only the books it can actually open — the
   alternative is to show all 33 with the unavailable ones greyed out,
@@ -38,6 +35,33 @@ Get that loop working before building any breadth.
   the likely answer was always a stale cached build.
 
 ### Recently done
+- **WP-58 step 5 · The offline write queue** — 2026-08-10. Bookmarks, saved
+  passages and page turns now survive a tunnel: applied to the offline copy so
+  the reader sees them immediately, recorded in `cloud/outbox.ts`, sent when
+  there is a signal (the `online` event, launch, or any write that gets through).
+  - **The queue is its own database, `reading-buddy-outbox`.** The obvious home
+    was a table in the cache — and the cache is the one store in the app that is
+    *safe to delete at any moment*, while a queued bookmark is the one thing here
+    that exists nowhere else. Different lifetimes, different databases.
+  - **The id map has to be durable, and a test is what proved it.** The cloud
+    mints its own ids, so a bookmark made offline keeps the *copy's* id for as
+    long as that copy lives — a delete queued a week later still names it.
+    Rewriting whatever happened to be queued at drain time was the first attempt
+    and it was wrong within one reconnect.
+  - **`looksOffline` now decides whether a queued write is kept or dropped.** A
+    refusal from a reachable cloud (RLS, a book deleted elsewhere) is dropped —
+    a queue that retries the impossible never empties. A lost signal *stops* the
+    drain rather than skipping ahead, because the order is part of the meaning.
+  - **A page turn replaces the pending one.** Position is written every few
+    seconds; an hour offline would otherwise be hundreds of rows saying
+    increasingly stale versions of one fact.
+  - **Two interface additions, each making a settled rule actually true.**
+    `savePosition(…, at?)` carries the moment the page was turned, so a replayed
+    tunnel can't outrank a newer write from a laptop; `addQuote` returns its row
+    like `addBookmark` always did, so the id is knowable.
+  - **Deleting a book still refuses** — now in words about books rather than
+    about the network, and a successful delete drops that book's queued writes.
+  - Gates: **967 tests** (24 new), typecheck, build.
 - **WP-58 · Cloud books readable with no signal** — 2026-08-10, merged to `main`
   (`5476ac6`, `23e3787`, `39773be`). **Started with a decision, not an editor**:
   the waypoint said it owed a conflict rule before it owed any code.
@@ -175,14 +199,9 @@ type is imported.
   worker problem. Don't raise it again.
 
 ### Next up
-**The cloud arc is finished except for one piece.** See `active-task.md`. Then
-back to the reader's order, set 2026-08-02: make it a proper reading app first,
-then AI.
-- **First: WP-58 step 5, the offline write queue.** The last thing standing
-  between "reads on a train" and "works on a train". Every rule it needs is
-  already settled in `decisions.md` — this is a coding task with no design
-  questions left, which is rare and worth spending while it lasts.
-- **Then, waiting on the reader's eye.** (a) Does the launch screen read as the
+**The cloud arc is finished.** Back to the reader's order, set 2026-08-02: make
+it a proper reading app first, then AI.
+- **First, waiting on the reader's eye.** (a) Does the launch screen read as the
   app arriving or as a toll gate — 557 ms is a healthy number, but whether it
   *feels* right is not a measurement. (b) Does 85% look like too much shrink? It
   clears both bars with room, so there is budget to raise it toward 90%.
