@@ -31,6 +31,9 @@ export type { BookAsset, ParsedBook, Repository } from './repository.ts'
 export { BACKEND_KEY, activeBackend, chooseBackend, resolveBackend } from './backend.ts'
 export type { Backend } from './backend.ts'
 
+export { copyLibrary, countBooksToCopy } from './transfer.ts'
+export type { CopyFailure, CopyOptions, CopyProgress, CopyResult } from './transfer.ts'
+
 /**
  * The library on this device, whichever backend is switched on.
  *

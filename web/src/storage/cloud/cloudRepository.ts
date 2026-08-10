@@ -584,6 +584,21 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
       return found
     },
 
+    /**
+     * Which pictures this book has. Rows only — not one byte leaves R2.
+     *
+     * Paged, because a heavily illustrated book runs past PostgREST's default
+     * limit: *Man and His Symbols* alone has 141 plates.
+     */
+    async listAssetPaths(bookId: BookId): Promise<string[]> {
+      const rows = await readAll<{ path: string }>(
+        (from, to) =>
+          db().from('assets').select('path').eq('book_id', bookId).range(from, to),
+        'find the book’s pictures',
+      )
+      return rows.map((row) => row.path)
+    },
+
     // --- The original file -------------------------------------------------
 
     async saveSource(bookId: BookId, file: Blob, filename: string): Promise<void> {

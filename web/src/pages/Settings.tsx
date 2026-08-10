@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 
 import { useSession } from '../auth/useSession.ts'
 import { isCloudConfigured, signOut } from '../storage/cloud/index.ts'
-import { activeBackend, chooseBackend, deviceRepository, type Backend } from '../storage/index.ts'
+import {
+  activeBackend,
+  chooseBackend,
+  deviceRepository,
+  repository,
+  type Backend,
+} from '../storage/index.ts'
+import LibraryCopy from './LibraryCopy.tsx'
 import styles from './page.module.css'
 import local from './Settings.module.css'
 
@@ -59,6 +66,14 @@ export default function Settings() {
         </p>
       </section>
 
+      {/* A copy needs both libraries open at once, and the cloud one needs a
+          session — which makes this the only moment we have both. `repository`
+          *is* the cloud one while the cloud is switched on, so no second
+          connection is opened just to draw this. */}
+      {backend === 'cloud' && session.status === 'signed-in' ? (
+        <LibraryCopy device={deviceRepository} cloud={repository} />
+      ) : null}
+
       {backend === 'cloud' && session.status === 'signed-in' ? (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Account</h2>
@@ -86,7 +101,7 @@ export default function Settings() {
             <li>Appearance — day/night and reading type size (WP-14)</li>
             <li>Read-aloud voice (WP-16)</li>
             <li>Cost and usage (WP-27)</li>
-            <li>An offline copy of the cloud library</li>
+            <li>An offline copy of the cloud library (WP-58)</li>
           </ul>
         </div>
       </section>

@@ -324,6 +324,20 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       return found
     },
 
+    /**
+     * Which pictures this book has — the paths only, never the bytes.
+     *
+     * The counterpart `getAssets` deliberately lacks: it makes the caller name
+     * what it wants, which is right for the reading screen and useless to
+     * anything that has to move a whole book. Copying a library needs to ask
+     * "what is here?" before it can ask for any of it, and pulling every blob
+     * just to learn their names would be the largest read in the app.
+     */
+    async listAssetPaths(bookId: BookId): Promise<string[]> {
+      const rows = await database.assets.where('bookId').equals(bookId).toArray()
+      return rows.map((row) => row.path)
+    },
+
     // --- The original file -------------------------------------------------
 
     /**
