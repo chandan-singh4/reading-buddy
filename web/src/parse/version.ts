@@ -73,5 +73,15 @@
  *   first page. Books parsed under 1–8 that missed on the metadata rules have
  *   no cover asset stored at all and show a coloured placeholder until this
  *   update runs.
+ * - **10** — the rest of the book's own Dublin Core record is read: its ISBN,
+ *   publisher, publication date, language, blurb and subject headings. The
+ *   parser had been taking the title and the author from that record and
+ *   walking past everything else. Unlike most stamps this one changes no word
+ *   of the text — but it is the one case where a re-parse is the *only* way to
+ *   get the data, because it exists solely in the original file and can be
+ *   derived from nothing already stored. The ISBN in particular is what makes
+ *   a catalogue lookup an exact fetch rather than a title search, which
+ *   confidently returns the wrong edition. Books parsed under 1–9 carry none
+ *   of these six fields.
  */
-export const PARSER_VERSION = 9
+export const PARSER_VERSION = 10
