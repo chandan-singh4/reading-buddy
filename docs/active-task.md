@@ -75,25 +75,25 @@ again:
 
 ---
 
-## Second thread — the reader's eye, still unspent
+## The reader's eye — spent and signed off, 2026-08-10
 
-Untouched this session and still the real next task once the cloud is up. **The
-whole WP-55 round remains unseen on a phone**, and the live question from
-2026-08-09 was never answered:
+**WP-55 is closed on taste as well as on code.** The launch tempo, the 85% page
+scale, the gestures, the new three-token tempo and the library's list and grid
+were all carried open for days and have now been used and called good. The "I
+don't see the logo" report closes with them: it was a stale cached build, as
+suspected all along, which is also what earned the update panel its safety net.
 
-- **Did taking the update bring the logo back?** The likely answer is an older
-  cached build, not a broken splash — the splash was the last of eleven commits,
-  and `registerType: 'prompt'` means an installed app never updates itself.
-  **Don't debug `splash.ts` or `index.html` until a current build is confirmed**;
-  the splash is measured present at ~557 ms and removed from the DOM after.
-- **Then, only what a browser cannot answer.** Does 557 ms read as arriving or
-  as a toll gate? Does 85% look like too much shrink (there is budget to 90%)?
-  Gestures — swipe, the 500 ms / 10 px long press — **verified on the phone or
-  not at all**. The new three-token tempo. The library's list and grid, still
-  never reacted to.
-- **Run Library → Update** to pull covers forward to `PARSER_VERSION` 9.
+Kept because they are facts, not open questions:
 
-### Files in scope for that thread
+- **557 ms** is the measured splash; **85%** is the page scale under a raised
+  toolbar, clearing both bars with budget to 90% if it is ever raised.
+- **Gestures are verifiable on a phone or not at all.** A synthetic click is not
+  a finger. That stays true of any *future* change to swipe or the 500 ms / 10 px
+  long press — it is a rule about how to test, not an outstanding question.
+- If the splash ever needs debugging again, **confirm a current build first.**
+  `registerType: 'prompt'` means an installed app never updates itself.
+
+### Files in scope, if that area is touched again
 - `web/index.html` — the splash markup, inline CSS, pre-paint theme script,
   watchdog. **Start here**; its notes say why each piece can't live in the
   bundle.
@@ -106,32 +106,44 @@ whole WP-55 round remains unseen on a phone**, and the live question from
 
 ---
 
-## Still unseen from earlier rounds
+## Open only on someone else's input
 
-- **The library's *looks*.** Grid card proportions, the progress bar in list
-  view, whether the floating "+" clears the last book. Every round since
-  2026-08-06 has been the reader reporting something broken; not one has been
-  them saying how it reads.
-- **Did the covers come back?** The fix is in the *parser*, so it reaches a book
-  already on the shelf only when **Library → Update** is run. If *Beyond
-  Mindfulness in Plain English* still shows a placeholder afterwards, **ask for
-  the epub before diagnosing** — all four cover rules are unit-tested.
+Not waiting on the reader's taste — waiting on a file or a chore.
+
+- **Run Library → Update** to pull covers forward to `PARSER_VERSION` 9. If
+  *Beyond Mindfulness in Plain English* still shows a placeholder afterwards,
+  **ask for the epub before diagnosing** — all four cover rules are unit-tested.
 - **Long contents entries cut off at the right edge** (2026-08-05, `bbeb6b8`).
   Measured fixed in headless Chrome; the reader's exact line was never
   reproduced. The book is Nestor, *Breath*, not in the repo. **Ask for the file
   rather than guessing again.**
-- **Home has all four shelves now, and they never disappear.** Finished is one
-  of them (settled 2026-08-10, no longer an open question), and an empty shelf
-  keeps its heading, its plank and one quiet line in the gap — a shelf that came
-  and went with its contents moved everything below it whenever a book was
-  finished. The empty line is one modest height on *every* shelf including the
-  hero: holding a hero-sized hole open at the top of the screen would push the
-  rest below the fold in order to say nothing at all.
-- **The blank line between paragraphs is gone**, replaced by a first-line indent.
-  One line in `blocks.module.css` to restore.
-- **Subtitle cutting is a guess** and will occasionally take a real title too
-  far. The manual rename on the detail page is the way back.
 - **A garbled-diacritics report is open**, waiting on the reader's actual file.
+  A title-page was missing accented letters and a word-space; traced to the
+  source epub's own SVG `<title>` markup, since nothing in `web/src/parse/`
+  strips non-ASCII. Unconfirmed without the file.
+
+---
+
+## Settled — do not reopen without the reader asking
+
+These were carried as questions for days and are answered. They are written down
+so a future session recognises them as decisions rather than loose ends.
+
+- **Home has all four shelves and they never disappear.** Finished is one of
+  them. An empty shelf keeps its heading, its plank and one quiet line in the
+  gap — a shelf that came and went with its contents moved everything below it
+  whenever a book was finished. The empty line is one modest height on *every*
+  shelf including the hero: holding a hero-sized hole open at the top of the
+  screen would push the rest below the fold in order to say nothing at all.
+- **A blank line between paragraphs, or a first-line indent?** The indent won.
+  It is authentic book setting and denser than what came before, the reader was
+  offered both, and it has been read on a phone since. One line in
+  `blocks.module.css` if it is ever reversed.
+- **Subtitle cutting stays**, knowing it is a guess that will occasionally take
+  a real title too far. The manual rename on the detail page is the way back —
+  that is the whole reason it exists.
+- **The accent side-stripe is a wash now**, not a stripe. `--color-accent-wash`
+  in `styles/theme.css`, mixed from `--color-accent` so all seven themes get it.
 
 ---
 

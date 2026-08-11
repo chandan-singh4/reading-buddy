@@ -21,21 +21,18 @@ Get that loop working before building any breadth.
   2026-08-10: the reader bookmarked a page with no signal, force-quit the app,
   reopened it still offline, and the bookmark was there. That was the one test
   that had ever found a fault in this waypoint, and it passed.
-- **The greyed-out offline shelf shipped the same day** — see below. It is the
-  half that is **still unverified on the phone**: the storage rules have tests,
-  but nobody has yet *seen* a dimmed row. Check it with Wi-Fi off: all 33 books
-  listed, the ones never opened dimmed and un-tappable with a "Needs a signal"
-  badge, and Home showing only what it can actually open.
-- **One product question waiting on the reader, non-blocking.**
-  Two design-hook findings never triaged: the side-stripe in
-  `pages/page.module.css` (L114, L134 — **pre-existing, not written by a recent
-  session**) and the width animation in `pages/LibraryCopy.module.css` (L46 —
-  written 2026-08-10). Keep, change, or silence the rule.
-- **Still unseen from WP-55, and now the oldest debt here:** whether 557 ms
-  reads as arriving or as a toll gate, whether 85% looks like too much shrink,
-  and every gesture (swipe, the 500 ms / 10 px long press). A synthetic click is
-  not a finger. The "I don't see the logo" report was never closed out either —
-  the likely answer was always a stale cached build.
+- **Nothing is waiting on the reader. The queue is empty as of 2026-08-10** —
+  the first time it has been, and worth not quietly refilling.
+  - **The greyed-out offline shelf was seen and approved on the phone**, along
+    with the four shelves that now hold their place when empty.
+  - **The design-hook findings are triaged.** The side-stripe was softened to a
+    wash on the reader's call (`--color-accent-wash`); the `LibraryCopy` "width
+    animation" was closed as a false positive — that rule animates a transform.
+  - **WP-55 is signed off.** The launch tempo (557 ms), the 85% page scale and
+    the gestures were all carried unseen for two days and have now been used and
+    called good. The 85% has budget to 90% if it is ever raised again, and the
+    "I don't see the logo" report closes with it — a stale cached build, as
+    suspected, which is also why the update panel got its safety net.
 
 ### Recently done
 - **The offline shelf lists every book, greying the ones it can't open** —
@@ -226,14 +223,14 @@ type is imported.
 ### Next up
 **The cloud arc is finished.** Back to the reader's order, set 2026-08-02: make
 it a proper reading app first, then AI.
-- **First, waiting on the reader's eye.** (a) Does the launch screen read as the
-  app arriving or as a toll gate — 557 ms is a healthy number, but whether it
-  *feels* right is not a measurement. (b) Does 85% look like too much shrink? It
-  clears both bars with room, so there is budget to raise it toward 90%.
-  (c) Gestures: swipe between screens, the 500 ms / 10 px long press, whether
-  swiping fights scrolling — **the only area still verified on the phone or not
-  at all.** (d) The new tempo. (e) The library's list and grid, still never
-  reacted to. (f) Run **Update** to pull covers forward to `PARSER_VERSION` 9.
+- **The reader's eye is no longer the blocker — signed off 2026-08-10.** The
+  launch tempo, the 85% page scale, the gestures, the library's list and grid
+  were all carried open for days and are now called good. Left as facts rather
+  than questions: 557 ms is the measured splash, 85% clears both bars with
+  budget to 90%, and **gestures are still verifiable on a phone or not at all** —
+  a synthetic click is not a finger, so that stays true of any future change to
+  them. One chore survives, unrelated to taste: run **Library → Update** to pull
+  covers forward to `PARSER_VERSION` 9.
 - **Cheap follow-ons the redesign made cheap**, if the reader wants them:
   favourites (a boolean, one filter clause, one chip) and renaming/deleting a
   folder from the filter sheet — `repository.renameFolder` and `deleteFolder`
