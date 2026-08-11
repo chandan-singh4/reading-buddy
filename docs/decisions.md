@@ -891,3 +891,54 @@ sign-in screen.
   three good answers and showed *"Couldn't open your library"*. `Promise.all`
   fails as a group, which makes "is this a reading call?" the wrong question.
   — 2026-08-10
+
+## The day a book was finished, and the shape of Stats
+
+- **`finishedAt` is written once and never moved.** "Finished" was already
+  derivable from a 100% position, but a position's `at` is the *last page turn*,
+  so opening a finished book months later to check a quote silently changes the
+  day it was finished. Harmless on a shelf; in a yearly total it is a lie that
+  carries a book out of one year and into the next. Same rule
+  `titleOverridden` and `shelfOverridden` already set: once a fact is
+  established, no later automatic pass overwrites it. Re-reading a book does not
+  clear it, because it did not un-finish it. — 2026-08-10
+- **Finishing is kept out of `savePosition`, and guarded in the WHERE clause.**
+  `savePosition` runs on every paragraph and is a bare single-row put with no
+  read-before-write; a write-once field has to look before it writes. On the
+  cloud the guard is `.is('finished_at', null)` inside the update rather than a
+  read-then-write, so two devices finishing the same book settle it in Postgres
+  with the *first* date winning. — 2026-08-10
+- **`backfillFinishedAt` runs at boot and replaces an outbox entry.** It dates
+  the books finished before the field existed, from the position's own `at` —
+  the best evidence there is. It is also the recovery path for a book finished
+  in a tunnel: the page turn to 100% is queued like any other write, so the fact
+  arrives even when the date doesn't, and the next launch turns it back into
+  one. That is why finishing needs no queue entry of its own. — 2026-08-10
+- **Pages read needs no reading log.** The reader's own simplification, and it
+  cut a planned append-only reading-events table out of the design entirely:
+  a finished book means its whole page count was read, so a year's total is a
+  sum over finished books × the print edition's page count from Google Books.
+  A part-read book is shown as an approximation (percent × page count) rather
+  than tracked. — 2026-08-10
+- **Catalogue metadata comes through `api/`, never a `VITE_` variable.** A
+  `VITE_`-prefixed value is compiled into every visitor's JavaScript. The same
+  rule that keeps the Anthropic key server-side applies to the Google Books key,
+  and to anything added later. — 2026-08-10
+
+## Two small ones the reader chose
+
+- **A wash, not a stripe.** The boxes that want noticing use
+  `--color-accent-wash`, one token mixed from `--color-accent` with
+  `color-mix`. Custom properties are substituted at *use* time, so a single
+  `:root` line follows all seven themes instead of seven hard-coded colours —
+  and it stops reading as a side-tab, which the design hook was right about.
+  — 2026-08-10
+- **A shelf holds its place when it is empty.** All four of Home's shelves —
+  Current Reading, Up Next, Unread, Finished — are always drawn, with a heading,
+  a plank and one quiet line in the gap. A shelf that vanishes makes the page
+  jump around as books move between states, and gives no hint that the category
+  exists. — 2026-08-10
+- **The update panel assumes its own signal may never arrive.** Taking an update
+  waits on `controllerchange`, which can simply not fire; the panel now shows a
+  busy state so it never looks dead, refuses a second tap, and reloads on a
+  4-second timer regardless. — 2026-08-10

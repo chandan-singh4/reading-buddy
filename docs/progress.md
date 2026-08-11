@@ -14,13 +14,15 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing.** The cloud arc is finished. Sign-in works, the 32 books were
-  copied up, and a cloud book now both **reads and writes** with no signal.
-  Everything is merged and pushed; build green, **976 tests**.
-- **WP-58 is closed, and the write queue is now verified on the phone.**
-  2026-08-10: the reader bookmarked a page with no signal, force-quit the app,
-  reopened it still offline, and the bookmark was there. That was the one test
-  that had ever found a fault in this waypoint, and it passed.
+- **Nothing mid-edit.** Everything below is merged and pushed; build green,
+  **984 tests**.
+- **One chore the app cannot do for itself: apply
+  `supabase/migrations/0003_finished_at.sql`.** Until it runs, finishing a book
+  on the cloud backend errors — harmlessly, it is caught, and the boot backfill
+  picks it up afterwards — but no finish date is stored.
+- **The next arc is agreed and written up in `active-task.md`:** ISBN from the
+  file → Google Books → Stats. Step 1 of that arc (`finishedAt`) is already
+  shipped; step 2 needs no API at all.
 - **Nothing is waiting on the reader. The queue is empty as of 2026-08-10** —
   the first time it has been, and worth not quietly refilling.
   - **The greyed-out offline shelf was seen and approved on the phone**, along
@@ -35,6 +37,31 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The day a book was finished is now remembered** — 2026-08-10 (`4f9175c`).
+  Groundwork for Stats. "Finished" was already derivable from a 100% position,
+  but only as a *fact*, never as a *date*: a position's `at` is the last page
+  turn, so opening a finished book months later to check a quote moved the day
+  it was finished — harmless on a shelf, a lie in a yearly total.
+  `BookMeta.finishedAt` follows the rule `titleOverridden` already set: written
+  once, never overwritten. **Kept out of `savePosition`** (that runs every
+  paragraph and is a bare single-row put); on the cloud the guard is
+  `.is('finished_at', null)` in the *where* clause, so two devices finishing the
+  same book settle it in Postgres with the first date winning.
+  `backfillFinishedAt` at boot earns its place twice — it dates the books
+  finished before the field existed, and it is the recovery path for a book
+  finished in a tunnel (the 100% page turn is queued like any other write), which
+  is why finishing needs no outbox entry of its own.
+  **Owes one manual step: `supabase/migrations/0003_finished_at.sql`.**
+- **Four smaller pieces the reader asked for, all tested on the phone** —
+  2026-08-10. All four shelves hold their place on Home when empty, with a
+  heading, a plank and one quiet line in the gap (`64d77cb`). The update panel no
+  longer looks dead while it works — a busy state, and a 4-second reload safety
+  net for the `controllerchange` event that may never arrive (`2cb9b86`). The
+  accent side-stripe on the boxes that want noticing became a soft wash
+  (`ca878b7`) via one new token, `--color-accent-wash`, mixed from
+  `--color-accent` — custom properties are substituted at *use* time, so a single
+  `:root` line follows all seven themes. And every carried-open question in the
+  docs was closed (`4dff543`).
 - **The offline shelf lists every book, greying the ones it can't open** —
   2026-08-10, the reader's call after seeing 1 book of 33 with Wi-Fi off.
   Nothing was lost and it did not look that way, which was the whole problem.
@@ -133,80 +160,14 @@ Get that loop working before building any breadth.
   chapter and keeps the database slim for years. This is also what made WP-58
   cheap: **every read of a book's bytes now goes through one fetch**, which is
   the single place a cache belongs.
-- **The first live setup, and the three faults it found** — 2026-08-09, merged
-  to `main` (`4b1066c`, `1fd0c62`). All three were found by walking the reader
-  through `cloud-setup.md` step by step. **Every one of them was invisible until
-  a real person hit it**, and every one was a message that named the wrong thing.
-  - **Opening `/settings` directly gave Vercel's own `404: NOT_FOUND`.** Only
-    `/` is a real file; every other path is drawn by the app, so the server has
-    to hand back `index.html`. There was no `vercel.json` — Vercel's Vite preset
-    does not add one. **It stayed hidden for weeks because the service worker's
-    `navigateFallback` answers the same question**, so it only appears where
-    there is no worker yet, or just after clearing one.
-  - **`/api/` and `/assets/` are excluded from that rewrite, for opposite
-    reasons.** `/api/` must reach the function; `/assets/` must be allowed to
-    **fail**, or a missing hashed bundle comes back as HTML served where a
-    script was expected.
-  - **A stale service worker can outlive the files it names.** An old cached
-    `index.html` asks for `assets/index-<old-hash>.js`, a later deploy has
-    deleted it, and the page paints nothing at all — no error, because the code
-    that would show one never loaded. Recovery (Unregister + delete Cache
-    storage, **never** *Clear site data*, which wipes the books) is now a row in
-    `cloud-setup.md`.
-  - **Every sign-in failure said "check the address and try again."** The
-    address was never once the problem. `signInFailureMessage` now always
-    surfaces Supabase's own reason and names the three that really happen — the
-    email allowance, sign-ups closed before the first sign-in, and a rejected
-    address. The 429 above took a DevTools session to find; it now says so on
-    the screen.
-  - **The R2 CORS policy in the guide allowed only `GET` and `PUT`.** Deleting
-    a book sends a `DELETE` straight to R2, and blob removal is best-effort by
-    contract — so the book would vanish, no error would show, and the files
-    would stay on the bill forever. The example origin was also a
-    plausible-looking guess rather than a placeholder.
-  - Gates: **863 tests** (12 new, all on the two pure helpers), typecheck,
-    build.
-- **The cloud backend can now be switched on · sign-in and the library toggle**
-  — 2026-08-09. The reader has 32 books on the device, which is the constraint
-  the whole design answers.
-  - **Switching backends moves nothing.** It changes *which library you are
-    looking at*, so the device's 32 books survive any amount of flipping back
-    and forth. That is the only reason it is safe to offer the toggle before
-    there is any way to copy books between the two — and Settings shows a count
-    under the option you're *not* on, so an empty cloud shelf reads as
-    reversible rather than as loss.
-  - **The choice is read once at load and applied by reloading the page.**
-    ~30 modules import `repository` as a plain value and several cache what it
-    returned (covers, shelf memory, library memory, position). Swapping the
-    object underneath all of that would need an invalidation path per cache; a
-    reload costs ~300 ms and cannot be half-applied. `storage/backend.ts`.
-  - **`storage/index.ts` is still the only switch** — `activeBackend() ===
-    'cloud' ? createCloudRepository() : deviceRepository`. Every other call site
-    is unchanged and unaware there is a choice, which is what the `Repository`
-    type was for.
-  - **A build with no Supabase keys falls back to the device library** even if
-    `cloud` is remembered, so a fork or a preview deploy can't strand someone on
-    a sign-in screen it can never satisfy. `resolveBackend` is pure and tested.
-  - **The sign-in screen always offers the way back to the device library.**
-    Without that button, turning the cloud on before the accounts exist locks
-    the reader out of books that are sitting in the browser underneath the
-    screen. Two of the five sign-in tests are about that button alone.
-  - **Three session states, not a boolean.** Supabase reads its stored session
-    asynchronously, so a boolean starts `false` and flashes the sign-in form at
-    a signed-in reader on every launch. `loading` paints the page background
-    instead — the splash is gone by then, so `null` would be a white flash.
-  - Cost: the Supabase client is now a static import, so the main bundle moved
-    **449.5 → 470.5 kB** (151.3 kB gzipped). Deliberate — a dynamic import would
-    make `repository` async at all ~30 call sites.
-  - Gates: **851 tests** (13 new), typecheck, build. **Still untested against a
-    real database** — the SQL and the round trip have never run.
-- **Older rounds — WP-53, WP-54, WP-55 and the first cloud write-up — dropped
+- **Older rounds — WP-53, WP-54, WP-55, the first cloud write-up, the sign-in
+  toggle and the first live setup — dropped
   from here to keep this file short.** Each has a full entry in `docs/backlog.md`
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (943), `npm run typecheck`, `npm run build` — all passing
-as of 2026-08-10. Main bundle 482.9 kB, precache 34 entries / 1109.0 KiB. Every
+**Gates:** `npm test` (984, 54 files), `npm run typecheck`, `npm run build` — all
+passing as of 2026-08-10. Precache 34 entries / 1116.6 KiB. Every
 parser stays behind a dynamic `import()`, so pdf.js (434 kB) and mammoth
 (500 kB) remain in their own chunks and are fetched only when a file of that
 type is imported.
@@ -221,8 +182,22 @@ type is imported.
   worker problem. Don't raise it again.
 
 ### Next up
-**The cloud arc is finished.** Back to the reader's order, set 2026-08-02: make
-it a proper reading app first, then AI.
+**Google Books metadata, then the Stats tab** — the arc the reader chose on
+2026-08-10, written out step by step in `active-task.md`. Import reads only
+**title and author** today; everything Stats wants (page count, categories,
+average rating) comes from a catalogue.
+1. `finishedAt` — **done** (`4f9175c`).
+2. **ISBN and publisher out of the EPUB's own OPF** (`dc:identifier`,
+   `dc:publisher`). No network, no key — the parser simply ignores fields that
+   are already in the file. This is the lookup key for step 3.
+3. **The Google Books lookup, through `api/`** — never a `VITE_` variable, which
+   would compile the key into every visitor's JavaScript.
+4. **Stats.** Pages read = finished books × the print edition's page count — the
+   reader's own simplification, and the reason there is no reading-events log.
+   A part-read book shows an approximation: percent × page count.
+
+**Then back to the reader's order, set 2026-08-02:** a proper reading app first,
+then AI.
 - **The reader's eye is no longer the blocker — signed off 2026-08-10.** The
   launch tempo, the 85% page scale, the gestures, the library's list and grid
   were all carried open for days and are now called good. Left as facts rather

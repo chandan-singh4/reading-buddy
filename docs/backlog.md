@@ -347,13 +347,16 @@
   expensive half and the bytes are already sitting there. **Needs a real
   progress screen** — 32 books is minutes, not seconds, and a silent spinner
   over a multi-minute upload is indistinguishable from a hang · *after 56*
-- [~] **WP-58 Keep cloud books readable offline** — **reading works offline as of
-  2026-08-10** (`5476ac6`, `23e3787`, `39773be`): the conflict decision is
-  settled in `decisions.md`, `storage/cache.ts` is a second database filled by
-  WP-57's copier, `cloud/cached.ts` falls back to it on a lost-signal failure,
-  and at most 20 books are kept, least recently read dropped first. **What's
-  left is the write queue** — position, highlights and bookmarks still need a
-  signal and still fail honestly without one. Original framing: today the toggle is a choice
+- [x] **WP-58 Keep cloud books readable offline** — **closed 2026-08-10.**
+  Reading offline landed first (`5476ac6`, `23e3787`, `39773be`): the conflict
+  decision is settled in `decisions.md`, `storage/cache.ts` is a second database
+  filled by WP-57's copier, `cloud/cached.ts` falls back to it on a lost-signal
+  failure, and at most 20 books are kept, least recently read dropped first.
+  **The write queue then closed it** (`50b3f94`, `cloud/outbox.ts`) and was
+  verified on the phone: a bookmark made with no signal survived a force-quit.
+  The shelf listing is kept for *every* book (`cloud/shelf.ts`), so an offline
+  library shows all 33 with the unopenable ones greyed rather than 1 of 33.
+  Original framing: today the toggle is a choice
   between "works on a train" and "follows me to my laptop", and WP-57 does not
   fix that: it copies once, it doesn't keep two libraries honest. The cloud
   stays the source of truth; books you have opened get kept on the device and
@@ -363,6 +366,22 @@
   is not the cache, it is deciding what happens when a bookmark is made offline
   and the same book is read elsewhere — so this waypoint owes a decision on
   conflict before it owes any code · *after 56, better after 57*
+- [~] **WP-59 Book metadata from Google Books, and the Stats tab** — added
+  2026-08-10, the reader's call. Import reads only **title and author** today;
+  everything a Stats screen wants — page count, categories, average rating —
+  comes from a catalogue, not from the file. Four steps: (1) **`finishedAt`** —
+  *done* (`4f9175c`), the day a book was finished, written once and never moved,
+  because a position's `at` is the last page turn and would silently carry a book
+  out of one year into the next; (2) **ISBN and publisher out of the EPUB's own
+  OPF** (`dc:identifier`, `dc:publisher`) — no network, no key, the parser simply
+  ignores fields already sitting in the file, and this is the lookup key;
+  (3) **the Google Books lookup through `api/`** — never a `VITE_` variable,
+  which would compile the key into every visitor's JavaScript; (4) **Stats**:
+  genres read, pages read this year, the reader's rating against the average.
+  **Pages read = finished books × the print edition's page count** — the
+  reader's own simplification, and the reason there is deliberately no
+  reading-events log. A part-read book shows an approximation, percent × page
+  count · *after 11; step 1 done, step 2 needs no API at all*
 - [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*

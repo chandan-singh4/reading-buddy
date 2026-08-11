@@ -8,105 +8,44 @@
 
 ---
 
-## No task in flight — WP-58 is closed
+## Next task — WP-59 step 2: ISBN and publisher out of the file
 
-**WP-58 finished on 2026-08-10.** Reading *and* writing a cloud book now survive
-a tunnel. The write queue is `web/src/storage/cloud/outbox.ts`, its own tiny
-database (`reading-buddy-outbox`), drained on the `online` event, at launch, and
-after any write that gets through.
+**Goal.** The epub parser reads only `title` and `creator` out of the OPF and
+walks straight past `dc:identifier` and `dc:publisher` — which most epubs carry.
+Read them, store them on `BookMeta`, and the catalogue lookup in step 3 becomes
+*exact* instead of a title search that confidently returns the wrong edition, an
+audiobook, or a study guide.
 
-What the queue turned out to need beyond the settled decisions:
+**Done when:**
+- `dc:identifier` is read, ISBN-13 preferred over ISBN-10, the `urn:isbn:` and
+  `isbn:` prefixes and any hyphens stripped, and a non-ISBN identifier (a UUID,
+  a publisher's internal id — very common) is **ignored rather than stored**.
+- `dc:publisher` is stored when present, absent when not — no empty strings, the
+  same "absent, not null" rule the rest of `BookMeta` follows.
+- Both are optional fields on `BookMeta`, mapped in the cloud row helpers, with a
+  migration adding the two columns.
+- **No network, no key, no API in this step.** Existing books get them on the
+  next re-parse; do *not* bump `PARSER_VERSION` for this alone unless the reader
+  asks — it forces a re-parse of 33 books to gain two strings.
+- Tests, typecheck, build green.
 
-- **Its own database, not a table in the cache.** The cache is the one store in
-  the app that is safe to delete at any moment; a queued bookmark is the one
-  thing here that isn't. Different lifetimes, different databases.
-- **A durable local→cloud id map, not a one-shot rewrite.** `addBookmark` and
-  `addQuote` mint their id server-side, so a bookmark made offline keeps the
-  *copy's* id for as long as that copy lives — a delete queued tomorrow still
-  names it. Rewriting what happened to be queued at drain time was the first
-  attempt and a test caught it.
-- **Two small interface additions**, both to make a settled rule actually true:
-  `savePosition(…, at?)` so a replayed page turn carries the moment it happened
-  rather than the moment the signal returned, and `addQuote → Promise<StoredQuote>`
-  so the id is knowable, exactly as `addBookmark` already was.
-- **A delete of something still queued cancels the add**, so a ribbon tapped
-  twice in one tunnel sends nothing at all.
+### Files in scope
+- `web/src/parse/epub.ts` — the OPF read. **Start here**; the `title`/`creator`
+  lookup is the pattern to follow.
+- `web/src/structure/types.ts` — `BookMeta`; add beside `finishedAt`.
+- `web/src/storage/cloud/rows.ts` + `rows.test.ts` — the row mapping and the
+  `bareRow` fixture (every new optional column must be added there or the test
+  file stops typechecking).
+- `supabase/migrations/` — a new numbered file; `0003_finished_at.sql` is the
+  shape to copy.
+- Whatever epub test fixture already exists next to `epub.ts` — reuse it, don't
+  add a book to the repo.
 
-**Pick the next task from `progress.md` → "Next up".** The reader's eye (the
-whole WP-55 round, still unseen on a phone) is the oldest debt; WP-43 and the
-tutor loop WP-17→20 are the next build work.
-
-**The offline shelf was answered and built on 2026-08-10.** The reader chose
-"show all 33, grey out what can't be opened". Worth knowing before touching it
-again:
-
-- The offline copy holds only *opened* books, and that stays — a shelf that
-  downloads 32 books because it was scrolled past is a bug paid for in data. So
-  the **listing** is remembered separately (`storage/cloud/shelf.ts`) and is
-  what a lost signal falls back to.
-- **Availability is derived from what actually happened**, not from
-  `navigator.onLine`: `cached.ts` records whether the last shelf came from the
-  cloud, since `onLine === true` is what a captive portal reports.
-- `unavailableBooks()` in `storage/index.ts` is deliberately the *only* crack in
-  "screens never learn there is a cache" — justified because it is the one
-  thing about the cache a reader can see. It never throws, because the library
-  screen's opening reads are a `Promise.all`.
-- **Home filters rather than greys**, on purpose. See the comment there.
-- **Not yet seen on a phone.** The rules have tests; the dimmed row does not.
-
-### Nothing owed by the reader — all triaged 2026-08-10
-
-- **The side-stripe is gone, softened on the reader's call.** The 3px accent
-  `border-left` on the error boxes and the "these books can be improved" banner
-  is now a faint wash of the accent across the whole box, via the new
-  `--color-accent-wash` token in `styles/theme.css`. The token is **mixed from
-  `--color-accent` rather than written out**, so all seven themes get it for
-  free — a custom property is substituted where it is *used*, so it picks up
-  whichever accent is in force.
-- **The `LibraryCopy.module.css` L46 "width animation" was a false positive**
-  and is closed. That rule animates a `transform`, on purpose and with a comment
-  saying why; the hook matched the word `width` sitting near a transition.
-- **`registerType: 'prompt'` needs its own safety net.** Taking an update is two
-  steps — tell the waiting worker to take over, reload once it *has* — and a
-  phone proved the second can simply not arrive, leaving a panel that had done
-  its job looking dead. `app/updates.ts` now reloads itself after 4s if the
-  event never comes, and `UpdatePrompt.tsx` shows a busy state so a working
-  button and a broken one no longer look identical.
+Out of scope: the Google Books call, any UI, and Stats.
 
 ---
 
-## The reader's eye — spent and signed off, 2026-08-10
-
-**WP-55 is closed on taste as well as on code.** The launch tempo, the 85% page
-scale, the gestures, the new three-token tempo and the library's list and grid
-were all carried open for days and have now been used and called good. The "I
-don't see the logo" report closes with them: it was a stale cached build, as
-suspected all along, which is also what earned the update panel its safety net.
-
-Kept because they are facts, not open questions:
-
-- **557 ms** is the measured splash; **85%** is the page scale under a raised
-  toolbar, clearing both bars with budget to 90% if it is ever raised.
-- **Gestures are verifiable on a phone or not at all.** A synthetic click is not
-  a finger. That stays true of any *future* change to swipe or the 500 ms / 10 px
-  long press — it is a rule about how to test, not an outstanding question.
-- If the splash ever needs debugging again, **confirm a current build first.**
-  `registerType: 'prompt'` means an installed app never updates itself.
-
-### Files in scope, if that area is touched again
-- `web/index.html` — the splash markup, inline CSS, pre-paint theme script,
-  watchdog. **Start here**; its notes say why each piece can't live in the
-  bundle.
-- `web/src/app/splash.ts` — `MIN_VISIBLE`, `FADE_MS`.
-- `web/src/styles/theme.css` + `styles/motionTokens.test.ts` — the tempo.
-- `web/src/pages/Reader.tsx` + `.module.css` — the scale-for-toolbar, and
-  **`dismissTopLayer`**.
-- `web/scripts/make-icons.mjs` — the mark. Also hand-inlined in `index.html` and
-  `web/public/favicon.svg` — **change one, change all three.**
-
----
-
-## Next arc — Google Books metadata, then Stats
+## The arc this belongs to — Google Books metadata, then Stats
 
 Agreed with the reader 2026-08-10. **`finishedAt` is built and shipped**; the
 rest is planned, not started.
@@ -156,6 +95,10 @@ Known and accepted about the page maths:
 
 Not waiting on the reader's taste — waiting on a file or a chore.
 
+- **Apply `supabase/migrations/0003_finished_at.sql` in the Supabase SQL
+  editor.** Until it runs, finishing a book on the cloud backend errors — caught,
+  so nothing breaks — and no finish date is stored. The boot backfill fills them
+  in afterwards from the 100% positions, so nothing is lost by the delay.
 - **Run Library → Update** to pull covers forward to `PARSER_VERSION` 9. If
   *Beyond Mindfulness in Plain English* still shows a placeholder afterwards,
   **ask for the epub before diagnosing** — all four cover rules are unit-tested.
@@ -190,6 +133,19 @@ so a future session recognises them as decisions rather than loose ends.
   that is the whole reason it exists.
 - **The accent side-stripe is a wash now**, not a stripe. `--color-accent-wash`
   in `styles/theme.css`, mixed from `--color-accent` so all seven themes get it.
+- **WP-55 is closed on taste as well as code** — the launch tempo, the 85% page
+  scale and the gestures were all used and called good on 2026-08-10. **557 ms**
+  is the measured splash; 85% clears both bars with budget to 90%. If that area
+  is ever touched again the files are `web/index.html` (splash markup, inline
+  CSS, pre-paint theme script — start there, its notes say why each piece can't
+  live in the bundle), `app/splash.ts`, `styles/theme.css` +
+  `styles/motionTokens.test.ts`, `pages/Reader.tsx` + `.module.css`, and
+  `web/scripts/make-icons.mjs` (the mark is hand-inlined in `index.html` and
+  `web/public/favicon.svg` too — **change one, change all three**).
+- **The offline shelf is built and approved.** The copy holds only *opened*
+  books, and that stays; the **listing** is remembered separately
+  (`storage/cloud/shelf.ts`) so a lost signal shows all 33 with the unopenable
+  ones greyed. Home filters rather than greys, on purpose.
 
 ---
 
