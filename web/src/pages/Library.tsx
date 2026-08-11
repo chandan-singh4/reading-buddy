@@ -183,9 +183,15 @@ export default function Library() {
    * Every path that writes to the books table comes through here, which is why
    * the invalidation lives at this one door rather than at each of them.
    */
-  async function reload(changed = false) {
+  async function reload(changed: boolean | readonly BookId[] = false) {
     if (changed) {
-      forgetCovers()
+      // Only the books that actually changed, when the caller knows which. A
+      // bare `forgetCovers()` empties the device's cover store for the whole
+      // shelf, so updating one book made the other thirty-one fetch their art
+      // from R2 again — thirty-one placeholders, then thirty-one images landing
+      // one at a time. The shelf memory below stays global: row positions all
+      // move when any one book does.
+      forgetCovers(Array.isArray(changed) ? changed : undefined)
       forgetShelfMemory()
       forgetLibraryMemory()
     }
@@ -247,7 +253,10 @@ export default function Library() {
     })
 
     setUpdating({ status: 'done', outcomes })
-    await reload(true).catch((error: unknown) => failed(error))
+    // Only the books that came back updated: a re-parse decides afresh which
+    // image is the cover, so theirs must go — and nobody else's.
+    const rebuilt = outcomes.filter((one) => one.status === 'updated').map((one) => one.bookId)
+    await reload(rebuilt).catch((error: unknown) => failed(error))
   }
 
   /**
@@ -271,7 +280,11 @@ export default function Library() {
     })
 
     setImporting({ status: 'done', outcomes })
-    await reload(true).catch((error: unknown) => failed(error))
+    // A book that has just arrived has no cover cached under its id yet, so
+    // this is usually an empty list — which is the point. Importing one book
+    // should not cost the shelf every other book's art.
+    const arrived = outcomes.filter((one) => one.status === 'imported').map((one) => one.meta.id)
+    await reload(arrived).catch((error: unknown) => failed(error))
   }
 
   async function onDrop(event: React.DragEvent) {
@@ -341,7 +354,9 @@ export default function Library() {
     try {
       await work(chosen)
       if (!keepSelection) setSelected(null)
-      await reload(true)
+      // The ticked books are exactly the ones that changed, whatever the action
+      // was — deleted, retyped, filed. Nobody else's cover is affected.
+      await reload(chosen)
     } catch (error: unknown) {
       failed(error, prefix)
     }
