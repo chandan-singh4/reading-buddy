@@ -146,9 +146,210 @@ function firstByLocalName(root: Document | Element, name: string): Element | nul
   return byLocalName(root, name)[0] ?? null
 }
 
+// --- The Dublin Core record ---------------------------------------------------
+
+/**
+ * What the package file says about the book, beyond its title and author.
+ *
+ * All of this has been sitting in every epub the reader has ever imported. It
+ * is read here rather than fetched from a catalogue because it is free, offline
+ * and *authoritative* — this is the publisher's own record of their own
+ * edition, where a title search against a catalogue is a guess that can land on
+ * an audiobook or a study guide.
+ */
+interface FileMetadata {
+  isbn?: string
+  publisher?: string
+  published?: string
+  language?: string
+  description?: string
+  subjects?: string[]
+}
+
+/** An attribute that may or may not carry its namespace prefix in the source. */
+function attr(element: Element, name: string): string | null {
+  return element.getAttribute(name) ?? element.getAttribute(`opf:${name}`)
+}
+
+function textOf(element: Element | null | undefined): string | undefined {
+  const text = element?.textContent?.trim()
+  return text || undefined
+}
+
+/**
+ * ISBN-13 first, ISBN-10 second, and nothing else at all.
+ *
+ * `dc:identifier` is the one metadata element an epub is *required* to have, so
+ * every book has at least one — and a large share of them are a UUID, a Calibre
+ * id, or a publisher's internal reference. Storing one of those as an ISBN
+ * would mean the lookup that follows returns a confident answer about a
+ * different book, which is the one failure mode worth spending code to avoid.
+ *
+ * So the test is the actual ISBN checksum rather than a shape match. A UUID
+ * fails on shape anyway; a 13-digit internal reference is exactly the case that
+ * shape alone would wave through.
+ */
+function readIsbn(metadata: Document | Element): string | undefined {
+  let ten: string | undefined
+
+  for (const element of byLocalName(metadata, 'identifier')) {
+    const raw = element.textContent?.trim()
+    if (!raw) continue
+
+    // `urn:isbn:978-0-…`, `ISBN:978…`, `978-0-…` — and hyphens and spaces
+    // anywhere, because the grouping is presentational and publishers differ.
+    const digits = raw.replace(/^\s*(urn:)?isbn:?/i, '').replace(/[\s-]/g, '')
+
+    // 13 wins outright: it names the edition unambiguously, and an ISBN-10 is
+    // just an older, shorter spelling of one of them.
+    if (isIsbn13(digits)) return digits
+    if (ten === undefined && isIsbn10(digits)) ten = digits.toUpperCase()
+  }
+
+  return ten
+}
+
+/** Modulo-10 with alternating weights 1 and 3, over a 978/979 EAN. */
+function isIsbn13(value: string): boolean {
+  if (!/^97[89]\d{10}$/.test(value)) return false
+
+  let sum = 0
+  for (let i = 0; i < 13; i += 1) sum += Number(value[i]) * (i % 2 === 0 ? 1 : 3)
+  return sum % 10 === 0
+}
+
+/** Modulo-11 with descending weights, where a remainder of 10 is written `X`. */
+function isIsbn10(value: string): boolean {
+  if (!/^\d{9}[\dXx]$/.test(value)) return false
+
+  let sum = 0
+  for (let i = 0; i < 9; i += 1) sum += Number(value[i]) * (10 - i)
+  const last = value[9].toUpperCase()
+  sum += last === 'X' ? 10 : Number(last)
+  return sum % 11 === 0
+}
+
+/**
+ * The publication date, to whatever precision the file gives — and only the
+ * publication one.
+ *
+ * EPUB 2 puts several dates in `dc:date` and tells them apart with
+ * `opf:event`: `publication`, `creation`, `modification`. EPUB 3 dropped the
+ * attribute, keeps `dc:date` for publication alone, and moved "last modified"
+ * to a `dcterms:modified` meta. So a bare `dc:date` is a publication date in
+ * EPUB 3 and *might* be a modification date in EPUB 2 — which is why an
+ * explicitly labelled one is preferred and an explicitly non-publication one is
+ * skipped rather than used as a fallback. A file's last save date on the shelf
+ * as "published 2024" would be wrong about a book from 1954.
+ */
+function readPublished(metadata: Document | Element): string | undefined {
+  let unlabelled: string | undefined
+
+  for (const element of byLocalName(metadata, 'date')) {
+    const event = attr(element, 'event')?.toLowerCase()
+    if (event && event !== 'publication') continue
+
+    const date = datePartOf(element.textContent)
+    if (!date) continue
+    if (event === 'publication') return date
+    unlabelled ??= date
+  }
+
+  return unlabelled
+}
+
+/**
+ * `2019`, `2019-03` or `2019-03-14` — the leading date of whatever was written.
+ *
+ * Kept at the file's own precision rather than widened to a full timestamp: a
+ * publisher who said "2019" did not say January, and inventing the month and
+ * the day would make the record say something the book never claimed.
+ */
+function datePartOf(value: string | null | undefined): string | undefined {
+  const match = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?/.exec((value ?? '').trim())
+  if (!match) return undefined
+
+  const [, year, month, day] = match
+  if (month === undefined) return year
+  if (Number(month) < 1 || Number(month) > 12) return year
+  if (day === undefined) return `${year}-${month}`
+  if (Number(day) < 1 || Number(day) > 31) return `${year}-${month}`
+  return `${year}-${month}-${day}`
+}
+
+/** How much blurb is worth keeping. Long enough for a jacket, short of an essay. */
+const MAX_DESCRIPTION = 2000
+
+/**
+ * The blurb as plain text.
+ *
+ * `dc:description` is specified as text but is very often escaped HTML — a
+ * publisher pasting their marketing copy in, `<p>` tags and all. Those are
+ * stripped rather than rendered: this string goes on the detail page as a
+ * sentence or two, and it arrived from a file, so treating it as markup would
+ * be both wrong-looking and the one place in the app where a book's own bytes
+ * could reach the DOM as elements.
+ */
+function readDescription(metadata: Document | Element): string | undefined {
+  const raw = textOf(firstByLocalName(metadata, 'description'))
+  if (!raw) return undefined
+
+  const text = raw
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!text) return undefined
+
+  return text.length > MAX_DESCRIPTION ? `${text.slice(0, MAX_DESCRIPTION).trimEnd()}…` : text
+}
+
+/** Enough for a BISAC set and a few strays; past this it is a keyword dump. */
+const MAX_SUBJECTS = 16
+
+/** Every `dc:subject`, in file order, without the duplicates that casing hides. */
+function readSubjects(metadata: Document | Element): string[] | undefined {
+  const seen = new Set<string>()
+  const subjects: string[] = []
+
+  for (const element of byLocalName(metadata, 'subject')) {
+    const text = textOf(element)
+    if (!text) continue
+
+    const key = text.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    subjects.push(text)
+    if (subjects.length === MAX_SUBJECTS) break
+  }
+
+  return subjects.length > 0 ? subjects : undefined
+}
+
+/** The fields the file actually supplied, with the empty ones left out entirely. */
+function defined(source: FileMetadata): FileMetadata {
+  const found: Record<string, unknown> = {}
+  for (const key of ['isbn', 'publisher', 'published', 'language', 'description', 'subjects'] as const) {
+    const value = source[key]
+    if (value !== undefined) found[key] = value
+  }
+  return found as FileMetadata
+}
+
+function readFileMetadata(metadata: Document | Element): FileMetadata {
+  return {
+    isbn: readIsbn(metadata),
+    publisher: textOf(firstByLocalName(metadata, 'publisher')),
+    published: readPublished(metadata),
+    language: textOf(firstByLocalName(metadata, 'language'))?.toLowerCase(),
+    description: readDescription(metadata),
+    subjects: readSubjects(metadata),
+  }
+}
+
 // --- The package file --------------------------------------------------------
 
-interface Spine {
+interface Spine extends FileMetadata {
   /** Archive paths of the content documents, in reading order. */
   documents: string[]
   title?: string
@@ -220,6 +421,7 @@ function readSpine(archive: Archive, packagePath: string): Spine {
   const metadata = firstByLocalName(doc, 'metadata') ?? doc
   const author = firstByLocalName(metadata, 'creator')?.textContent?.trim() || undefined
   return {
+    ...readFileMetadata(metadata),
     documents,
     title: cleanTitle(firstByLocalName(metadata, 'title')?.textContent, author),
     author,
@@ -591,6 +793,11 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
 
   const book = assembleBook(blocks, {
     ...meta,
+    // Only the keys the file actually filled. Spreading `FileMetadata` whole
+    // would write `isbn: undefined` onto the book for every epub without one,
+    // and "the key is there, holding nothing" is precisely what the storage
+    // layer works to avoid — see the note on absent-not-null in `rows.ts`.
+    ...defined(spine),
     source: 'epub',
     title: spine.title || meta.title || 'Untitled',
     author: meta.author ?? spine.author,

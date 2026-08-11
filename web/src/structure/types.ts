@@ -114,6 +114,66 @@ export interface BookMeta {
    * the words don't.
    */
   textSignature?: string
+  /*
+   * --- What the file already said about itself ------------------------------
+   *
+   * An epub's package file carries a Dublin Core record, and the parser read
+   * two lines of it — `dc:title` and `dc:creator` — then walked past the rest.
+   * The six fields below are the rest, and they cost nothing: no network, no
+   * key, no guessing. The book has been telling us all along.
+   *
+   * `isbn` is the load-bearing one. It turns the catalogue lookup that follows
+   * into an *exact* fetch rather than a title search, which confidently returns
+   * the wrong edition, an audiobook, or a study guide.
+   *
+   * All six are absent rather than empty when the file doesn't say — the same
+   * rule the rest of this interface follows, and the reason the cloud row
+   * helpers go to the trouble of omitting keys rather than nulling them.
+   *
+   * They are also absent on every book imported before this existed. Nothing
+   * backfills them, because unlike `finishedAt` they cannot be derived from
+   * anything already stored — only from the original file, via the shelf's
+   * Update button.
+   */
+  /**
+   * ISBN-13 where the file offers one, ISBN-10 otherwise, digits only.
+   *
+   * `dc:identifier` is *required* in an epub and is very often not an ISBN at
+   * all: a UUID, a Calibre id, a publisher's internal reference. Those are
+   * ignored rather than stored, because a lookup key that is silently wrong is
+   * worse than no key — it returns a confident answer about a different book.
+   * The check is the real ISBN checksum, not a shape match.
+   */
+  isbn?: string
+  /** `dc:publisher`, verbatim. */
+  publisher?: string
+  /**
+   * When the edition was published: `2019`, `2019-03` or `2019-03-14`.
+   *
+   * Deliberately not a full ISO timestamp. Most epubs give a year and nothing
+   * more, and widening that to `2019-01-01T00:00:00Z` would invent a day and a
+   * month the file never claimed. Stored as written, to whatever precision the
+   * publisher offered.
+   *
+   * Not to be confused with `importedAt` (when *you* got it) or `finishedAt`
+   * (when you read it) — this one belongs to the book, not to the reader.
+   */
+  published?: string
+  /** `dc:language` as a BCP-47 tag, lowercased: `en`, `en-gb`, `de`. */
+  language?: string
+  /** The publisher's blurb, tags stripped and whitespace collapsed. */
+  description?: string
+  /**
+   * The publisher's own subject headings — usually BISAC ("Science / Life
+   * Sciences / Marine Biology"), sometimes free text.
+   *
+   * **Not the same thing as `subject` above**, and the near-collision is worth
+   * reading twice. `subject` is the app's single domain tag for the tutor,
+   * assigned by classification and overridable by the reader. This is a *list*,
+   * belongs to the publisher, and is never edited. Stats will want both: these
+   * are finer than the coarse categories a catalogue returns, and they are free.
+   */
+  subjects?: string[]
   /**
    * Which build of the parser produced this book's text.
    *

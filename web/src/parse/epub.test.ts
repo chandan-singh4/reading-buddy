@@ -40,7 +40,7 @@ interface EpubSpec {
 function makeEpub(spec: EpubSpec): Uint8Array {
   const opf = `<?xml version="1.0"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
-  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
     ${spec.metadata ?? '<dc:title>Package Title</dc:title><dc:creator>A. Writer</dc:creator>'}
   </metadata>
   <manifest>${spec.manifest}</manifest>
@@ -604,5 +604,147 @@ describe('parseEpub — cover image', () => {
 
     const book = await parseEpub(epub, meta())
     expect((book.assets ?? []).some((asset) => asset.path === COVER_ASSET_PATH)).toBe(false)
+  })
+})
+
+describe('parseEpub — the Dublin Core record', () => {
+  /** A one-chapter book whose only interesting part is its metadata block. */
+  async function withMetadata(metadata: string) {
+    const epub = makeEpub({
+      metadata: `<dc:title>A Book</dc:title><dc:creator>A. Writer</dc:creator>${metadata}`,
+      manifest: '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      files: { 'OEBPS/ch1.xhtml': chapterDoc('<h1>One</h1><p>Prose.</p>') },
+    })
+    return parseEpub(epub, meta())
+  }
+
+  it('reads the publisher, the language and the date', async () => {
+    const book = await withMetadata(
+      '<dc:publisher>Penguin</dc:publisher>' +
+        '<dc:language>en-GB</dc:language>' +
+        '<dc:date>2019-03-14</dc:date>',
+    )
+
+    expect(book.meta.publisher).toBe('Penguin')
+    expect(book.meta.language).toBe('en-gb')
+    expect(book.meta.published).toBe('2019-03-14')
+  })
+
+  it('keeps a date at the precision the file gave it', async () => {
+    // A publisher who said "2019" did not say January. Widening it would make
+    // the record claim something the book never did.
+    expect((await withMetadata('<dc:date>2019</dc:date>')).meta.published).toBe('2019')
+    expect((await withMetadata('<dc:date>2019-03</dc:date>')).meta.published).toBe('2019-03')
+  })
+
+  it('prefers the date labelled as the publication', async () => {
+    const book = await withMetadata(
+      '<dc:date opf:event="modification">2024-01-01</dc:date>' +
+        '<dc:date opf:event="publication">1954-07-29</dc:date>',
+    )
+
+    expect(book.meta.published).toBe('1954-07-29')
+  })
+
+  it('never mistakes a last-saved date for a publication date', async () => {
+    // The EPUB 2 trap: a conversion tool's save date, on the shelf as
+    // "published 2024", for a book from 1954.
+    const book = await withMetadata('<dc:date opf:event="modification">2024-01-01</dc:date>')
+
+    expect('published' in book.meta).toBe(false)
+  })
+
+  it('collects the publisher subject headings, in order and without repeats', async () => {
+    const book = await withMetadata(
+      '<dc:subject>Science / Life Sciences</dc:subject>' +
+        '<dc:subject>Nature</dc:subject>' +
+        '<dc:subject>nature</dc:subject>',
+    )
+
+    expect(book.meta.subjects).toEqual(['Science / Life Sciences', 'Nature'])
+  })
+
+  it('takes the blurb as text, never as markup', async () => {
+    const book = await withMetadata(
+      '<dc:description>&lt;p&gt;A voyage into&lt;/p&gt; &lt;b&gt;the future&lt;/b&gt;.</dc:description>',
+    )
+
+    expect(book.meta.description).toBe('A voyage into the future .')
+  })
+
+  it('leaves out what the file does not say', async () => {
+    // Absent, not empty — the rule the whole of `BookMeta` follows.
+    const book = await withMetadata('')
+
+    for (const key of ['isbn', 'publisher', 'published', 'language', 'description', 'subjects']) {
+      expect(key in book.meta).toBe(false)
+    }
+  })
+})
+
+describe('parseEpub — the ISBN', () => {
+  async function isbnOf(identifiers: string) {
+    const epub = makeEpub({
+      metadata: `<dc:title>A Book</dc:title>${identifiers}`,
+      manifest: '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+      spine: '<itemref idref="c1"/>',
+      files: { 'OEBPS/ch1.xhtml': chapterDoc('<h1>One</h1><p>Prose.</p>') },
+    })
+    const book = await parseEpub(epub, meta())
+    return book.meta.isbn
+  }
+
+  it('reads a plain ISBN-13', async () => {
+    expect(await isbnOf('<dc:identifier>9780241988770</dc:identifier>')).toBe('9780241988770')
+  })
+
+  it('strips the urn prefix and the hyphens', async () => {
+    // The grouping is presentational and every publisher does it differently.
+    expect(await isbnOf('<dc:identifier>urn:isbn:978-0-241-98877-0</dc:identifier>')).toBe(
+      '9780241988770',
+    )
+    expect(await isbnOf('<dc:identifier>ISBN:978 0 241 98877 0</dc:identifier>')).toBe(
+      '9780241988770',
+    )
+  })
+
+  it('takes an ISBN-10 when that is all there is, X and all', async () => {
+    expect(await isbnOf('<dc:identifier>0-306-40615-2</dc:identifier>')).toBe('0306406152')
+    expect(await isbnOf('<dc:identifier>043942089X</dc:identifier>')).toBe('043942089X')
+  })
+
+  it('prefers the 13 when the file offers both', async () => {
+    const isbn = await isbnOf(
+      '<dc:identifier>0306406152</dc:identifier>' +
+        '<dc:identifier>urn:isbn:9780241988770</dc:identifier>',
+    )
+
+    expect(isbn).toBe('9780241988770')
+  })
+
+  it('ignores a UUID, which is what most epubs actually carry', async () => {
+    expect(
+      await isbnOf('<dc:identifier>urn:uuid:2b1c8d3e-0d3a-4f2a-9c1f-0d5f7a1b2c3d</dc:identifier>'),
+    ).toBeUndefined()
+  })
+
+  it('ignores a publisher id that merely looks the right length', async () => {
+    // The case a shape match waves straight through, and the reason the real
+    // checksum is worth the ten lines: a wrong ISBN means the lookup returns a
+    // confident answer about a different book.
+    expect(await isbnOf('<dc:identifier>9780241988771</dc:identifier>')).toBeUndefined()
+    expect(await isbnOf('<dc:identifier>1234567890123</dc:identifier>')).toBeUndefined()
+    expect(await isbnOf('<dc:identifier>0306406153</dc:identifier>')).toBeUndefined()
+  })
+
+  it('finds the ISBN among a pile of other identifiers', async () => {
+    const isbn = await isbnOf(
+      '<dc:identifier id="uuid">urn:uuid:2b1c8d3e-0d3a-4f2a-9c1f-0d5f7a1b2c3d</dc:identifier>' +
+        '<dc:identifier>calibre:1428</dc:identifier>' +
+        '<dc:identifier opf:scheme="ISBN">9780241988770</dc:identifier>',
+    )
+
+    expect(isbn).toBe('9780241988770')
   })
 })

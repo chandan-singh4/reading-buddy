@@ -69,6 +69,12 @@ export interface BookRow {
   folder_ids: string[] | null
   content_hash: string | null
   text_signature: string | null
+  isbn: string | null
+  publisher: string | null
+  published: string | null
+  language: string | null
+  description: string | null
+  subjects: string[] | null
   parser_version: number | null
   imported_at: string
   finished_at: string | null
@@ -200,6 +206,14 @@ export function bookFromRow(row: BookRow): BookMeta {
   if (row.folder_ids !== null && row.folder_ids.length > 0) meta.folderIds = row.folder_ids
   if (row.content_hash !== null) meta.contentHash = row.content_hash
   if (row.text_signature !== null) meta.textSignature = row.text_signature
+  if (row.isbn !== null) meta.isbn = row.isbn
+  if (row.publisher !== null) meta.publisher = row.publisher
+  if (row.published !== null) meta.published = row.published
+  if (row.language !== null) meta.language = row.language
+  if (row.description !== null) meta.description = row.description
+  // Absent, not empty — the same rule `folderIds` follows just above, and for
+  // the same reason: a book with no subjects has no key at all in IndexedDB.
+  if (row.subjects !== null && row.subjects.length > 0) meta.subjects = row.subjects
   if (row.parser_version !== null) meta.parserVersion = row.parser_version
   if (row.finished_at !== null) meta.finishedAt = isoFrom(row.finished_at)
   if (row.rating !== null) meta.rating = row.rating
@@ -231,6 +245,12 @@ export function bookToRow(meta: BookMeta): BookRow {
     folder_ids: meta.folderIds && meta.folderIds.length > 0 ? meta.folderIds : null,
     content_hash: orNull(meta.contentHash),
     text_signature: orNull(meta.textSignature),
+    isbn: orNull(meta.isbn),
+    publisher: orNull(meta.publisher),
+    published: orNull(meta.published),
+    language: orNull(meta.language),
+    description: orNull(meta.description),
+    subjects: meta.subjects && meta.subjects.length > 0 ? meta.subjects : null,
     parser_version: orNull(meta.parserVersion),
     imported_at: meta.importedAt,
     finished_at: orNull(meta.finishedAt),

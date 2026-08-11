@@ -32,6 +32,12 @@ function bareRow(overrides: Partial<BookRow> = {}): BookRow {
     folder_ids: null,
     content_hash: null,
     text_signature: null,
+    isbn: null,
+    publisher: null,
+    published: null,
+    language: null,
+    description: null,
+    subjects: null,
     parser_version: null,
     imported_at: '2026-08-09T10:00:00+00:00',
     finished_at: null,
@@ -87,6 +93,43 @@ describe('null is not the same as absent', () => {
       titleCleanVersion: 2,
       typeOverridden: false,
     })
+  })
+
+  it('carries what the book file said about itself, both ways', () => {
+    const row = bareRow({
+      isbn: '9780241988770',
+      publisher: 'Penguin',
+      published: '2019',
+      language: 'en-gb',
+      description: 'A voyage into the future of animal communication.',
+      subjects: ['Science / Life Sciences', 'Nature'],
+    })
+
+    const book = bookFromRow(row)
+
+    expect(book).toMatchObject({
+      isbn: '9780241988770',
+      publisher: 'Penguin',
+      published: '2019',
+      language: 'en-gb',
+      description: 'A voyage into the future of animal communication.',
+      subjects: ['Science / Life Sciences', 'Nature'],
+    })
+    expect(bookToRow(book)).toMatchObject({
+      isbn: '9780241988770',
+      publisher: 'Penguin',
+      published: '2019',
+      language: 'en-gb',
+      description: 'A voyage into the future of animal communication.',
+      subjects: ['Science / Life Sciences', 'Nature'],
+    })
+  })
+
+  // The same rule `folderIds` follows: a book with no subject headings has no
+  // key at all in IndexedDB, so it must have no key here either.
+  it('treats an empty subject list as no subjects', () => {
+    expect('subjects' in bookFromRow(bareRow({ subjects: [] }))).toBe(false)
+    expect(bookToRow({ ...bookFromRow(bareRow()), subjects: [] }).subjects).toBeNull()
   })
 
   // `folderIds: []` and no `folderIds` mean the same thing to the library, but
