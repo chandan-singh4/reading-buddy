@@ -1,9 +1,15 @@
 /* Shared page furniture. Component-specific styling lives with its component. */
 
+/* Every tab's page heading, matched to Home's greeting: same size, same weight,
+   same accent colour. A heading that is black on one tab and accent on another
+   reads as two different apps. `--color-accent` follows the chosen theme, so one
+   line here keeps all seven in agreement. */
 .title {
   font-size: var(--text-2xl);
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--color-accent);
 }
 
 .lede {
