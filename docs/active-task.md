@@ -54,12 +54,24 @@ again:
 - **Home filters rather than greys**, on purpose. See the comment there.
 - **Not yet seen on a phone.** The rules have tests; the dimmed row does not.
 
-### One answer owed by the reader, cheap and non-blocking
+### Nothing owed by the reader — all triaged 2026-08-10
 
-1. **Two design-hook findings, never triaged.** The side-stripe in
-   `pages/page.module.css` (L114, L134 — **pre-existing**) and the width
-   animation in `pages/LibraryCopy.module.css` (L46 — added 2026-08-10). Keep,
-   change, or silence the rule.
+- **The side-stripe is gone, softened on the reader's call.** The 3px accent
+  `border-left` on the error boxes and the "these books can be improved" banner
+  is now a faint wash of the accent across the whole box, via the new
+  `--color-accent-wash` token in `styles/theme.css`. The token is **mixed from
+  `--color-accent` rather than written out**, so all seven themes get it for
+  free — a custom property is substituted where it is *used*, so it picks up
+  whichever accent is in force.
+- **The `LibraryCopy.module.css` L46 "width animation" was a false positive**
+  and is closed. That rule animates a `transform`, on purpose and with a comment
+  saying why; the hook matched the word `width` sitting near a transition.
+- **`registerType: 'prompt'` needs its own safety net.** Taking an update is two
+  steps — tell the waiting worker to take over, reload once it *has* — and a
+  phone proved the second can simply not arrive, leaving a panel that had done
+  its job looking dead. `app/updates.ts` now reloads itself after 4s if the
+  event never comes, and `UpdatePrompt.tsx` shows a busy state so a working
+  button and a broken one no longer look identical.
 
 ---
 
@@ -108,9 +120,13 @@ whole WP-55 round remains unseen on a phone**, and the live question from
   Measured fixed in headless Chrome; the reader's exact line was never
   reproduced. The book is Nestor, *Breath*, not in the repo. **Ask for the file
   rather than guessing again.**
-- **Finished is deliberately not a shelf on Home.** The reader asked for three;
-  their reference had four. Putting it back is a `<Shelf>` block in `Home.tsx`
-  plus `shelves.finished` in the cover list. They were told — wait for their call.
+- **Home has all four shelves now, and they never disappear.** Finished is one
+  of them (settled 2026-08-10, no longer an open question), and an empty shelf
+  keeps its heading, its plank and one quiet line in the gap — a shelf that came
+  and went with its contents moved everything below it whenever a book was
+  finished. The empty line is one modest height on *every* shelf including the
+  hero: holding a hero-sized hole open at the top of the screen would push the
+  rest below the fold in order to say nothing at all.
 - **The blank line between paragraphs is gone**, replaced by a first-line indent.
   One line in `blocks.module.css` to restore.
 - **Subtitle cutting is a guess** and will occasionally take a real title too

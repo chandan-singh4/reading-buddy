@@ -398,7 +398,7 @@
 .error {
   padding: var(--space-4);
   border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-wash);
   border-radius: var(--radius-sm);
 }
 

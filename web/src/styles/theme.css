@@ -21,6 +21,17 @@
   --color-accent-contrast: #ffffff;
   --color-focus: #3b6ea5;
 
+  /*
+   * A whisper of the accent, for a box that wants noticing without shouting —
+   * the error boxes and the "these books can be improved" banner.
+   *
+   * Deliberately mixed from `--color-accent` rather than written out, so it
+   * follows every theme without each of the seven having to remember it. A
+   * custom property is substituted where it is *used*, so this picks up
+   * whichever accent is in force on that element.
+   */
+  --color-accent-wash: color-mix(in srgb, var(--color-accent) 8%, transparent);
+
   /* Spacing — a 4px scale keeps rhythm consistent across screens */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
