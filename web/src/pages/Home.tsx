@@ -224,8 +224,21 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
 
   return (
     <>
-      {shelves.currentlyReading && (
-        <Shelf title="Current Reading">
+      {/*
+        All four shelves are drawn whether or not they have anything on them.
+
+        They used to appear and disappear with their contents, which meant
+        finishing a book could remove one shelf and add another, and everything
+        below it moved. The screen is a bookshelf: a shelf with nothing on it is
+        still a shelf, and keeping it there makes the front door a fixed place
+        where each thing is always in the same spot.
+
+        An empty one is never bare, though — see `Shelf`. A heading over a gap
+        over a plank reads as something that failed to load, which is the exact
+        impression this screen has spent several rounds removing.
+      */}
+      <Shelf title="Current Reading" empty={!shelves.currentlyReading} note="Open a book to begin.">
+        {shelves.currentlyReading && (
           <div className={styles.heroCard}>
             <BookTile
               entry={shelves.currentlyReading}
@@ -233,38 +246,37 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
               large
             />
           </div>
-        </Shelf>
-      )}
+        )}
+      </Shelf>
 
-      {shelves.upNext.length > 0 && (
-        <Shelf title="Up Next">
-          <div className={styles.row}>
-            {shelves.upNext.map((entry) => (
-              <BookTile key={entry.book.id} entry={entry} coverSrc={covers.get(entry.book.id)} />
-            ))}
-          </div>
-        </Shelf>
-      )}
+      <Shelf title="Up Next" empty={shelves.upNext.length === 0} note="Nothing lined up yet.">
+        <div className={styles.row}>
+          {shelves.upNext.map((entry) => (
+            <BookTile key={entry.book.id} entry={entry} coverSrc={covers.get(entry.book.id)} />
+          ))}
+        </div>
+      </Shelf>
 
-      {shelves.unread.length > 0 && (
-        <Shelf title="Unread" viewAllTo="/library">
-          <div className={styles.row}>
-            {shelves.unread.map((book) => (
-              <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
-            ))}
-          </div>
-        </Shelf>
-      )}
+      <Shelf
+        title="Unread"
+        viewAllTo="/library"
+        empty={shelves.unread.length === 0}
+        note="Nothing waiting to be started."
+      >
+        <div className={styles.row}>
+          {shelves.unread.map((book) => (
+            <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
+          ))}
+        </div>
+      </Shelf>
 
-      {shelves.finished.length > 0 && (
-        <Shelf title="Finished">
-          <div className={styles.row}>
-            {shelves.finished.map((book) => (
-              <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
-            ))}
-          </div>
-        </Shelf>
-      )}
+      <Shelf title="Finished" empty={shelves.finished.length === 0} note="Nothing finished yet.">
+        <div className={styles.row}>
+          {shelves.finished.map((book) => (
+            <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
+          ))}
+        </div>
+      </Shelf>
     </>
   )
 }
@@ -278,10 +290,16 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
 function Shelf({
   title,
   viewAllTo,
+  empty = false,
+  note,
   children,
 }: {
   title: string
   viewAllTo?: string
+  /** Whether this shelf has nothing on it — draw the plank and say so. */
+  empty?: boolean
+  /** The quiet line to stand in the gap. Each shelf says its own thing. */
+  note?: string
   children: React.ReactNode
 }) {
   return (
@@ -295,7 +313,14 @@ function Shelf({
         )}
       </div>
 
-      {children}
+      {/*
+        The note takes the covers' place rather than sitting beside them, and it
+        is one modest line high for every shelf — including Current Reading,
+        whose hero tile is several times that. Holding a hero-sized hole open at
+        the top of the screen would push everything else below the fold to say
+        nothing at all.
+      */}
+      {empty ? <p className={styles.shelfEmpty}>{note}</p> : children}
 
       <div className={styles.plank} aria-hidden="true" />
     </section>

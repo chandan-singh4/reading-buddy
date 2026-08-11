@@ -241,6 +241,30 @@ describe('coming back to Home', () => {
   })
 })
 
+describe('the shelves themselves', () => {
+  it('keeps every shelf on the page, with a line in the gap where a shelf is empty', async () => {
+    // The shelves used to appear and disappear with their contents, so finishing
+    // a book rearranged the whole screen under the reader's thumb. Both fixtures
+    // are unread and unopened, which leaves three of the four shelves with
+    // nothing in them — and all four still have to be there.
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Breath')).toBeDefined()
+
+    for (const title of ['Current Reading', 'Up Next', 'Unread', 'Finished']) {
+      expect(shown().getByRole('heading', { name: title })).toBeDefined()
+    }
+    expect(shown().getByText('Open a book to begin.')).toBeDefined()
+    expect(shown().getByText('Nothing lined up yet.')).toBeDefined()
+    expect(shown().getByText('Nothing finished yet.')).toBeDefined()
+    // The one shelf that does have books says nothing in place of them.
+    expect(shown().queryByText('Nothing waiting to be started.')).toBeNull()
+  })
+})
+
 describe('opening the app', () => {
   /*
    * The launch case, which every other test here starts past.

@@ -116,6 +116,23 @@
   display: none;
 }
 
+/*
+  What stands on a shelf with nothing on it.
+
+  Quiet on purpose: muted, ordinary weight, no border or panel of its own. It is
+  there to explain a gap, not to compete with the shelves that do have books —
+  a bright "empty" card on four shelves at once would make a new reader's home
+  screen look like a list of errors.
+
+  The bottom padding matches `.row`'s so the plank sits at the same height
+  whether the shelf is full or empty, which is the whole point of keeping it.
+*/
+.shelfEmpty {
+  padding-bottom: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
 /* Cover first, then whatever text there is. `1fr` on the second row is what
    keeps the covers level: the text takes the space left over rather than the
    cover being pushed around by how long a title happens to be.
