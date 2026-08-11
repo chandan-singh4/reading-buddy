@@ -25,6 +25,13 @@ type LoadState =
  * this is never reached — it is here so that a slow or damaged store degrades
  * to the old behaviour (placeholders, then art) instead of holding the app on
  * an empty screen. Short enough to pass for part of the launch.
+ *
+ * That "few milliseconds" was only true of the device library for a while. On
+ * the cloud backend the read went to Supabase and then R2, comfortably past this
+ * cap, so the timeout fired on every launch and the reader met the placeholders
+ * it exists to avoid. `app/coverStore.ts` is what made the sentence true again:
+ * covers are read from the device first, and this is once more a safety net
+ * rather than the normal path.
  */
 const COVER_WAIT_MS = 900
 

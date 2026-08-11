@@ -49,11 +49,27 @@
  * paying a flash on every navigation. It is bounded rather than avoided: the
  * cache holds the most recently used `LIMIT` covers and revokes anything older,
  * so a library of thousands still only ever pins a shelf's worth.
+ *
+ * ## And the launch, which no in-memory cache can reach
+ *
+ * Everything above is about a *session*. A closed app takes its `Map` with it,
+ * so the first paint of the next one had no covers and had to read them all
+ * again — and on the cloud backend that read is Supabase and then R2, over
+ * whatever signal the phone has. Home waits `COVER_WAIT_MS` for it and then
+ * gives up, which is why the shelf showed coloured placeholder letters
+ * resolving into artwork on every single launch.
+ *
+ * So the blobs are kept on the device now, in `coverStore.ts`, and consulted
+ * **before** the repository rather than as a fallback behind it. Cover art is
+ * the one thing in this app that is safe to show without asking: it changes only
+ * when a book is re-imported or re-parsed, and every one of those paths already
+ * calls `forgetCovers`, which is what invalidates it.
  */
 import { useEffect, useState } from 'react'
 
 import type { BookId } from '../structure/index.ts'
 import { COVER_ASSET_PATH, repository } from '../storage/index.ts'
+import { dropStoredCovers, readStoredCovers, storeCover } from './coverStore.ts'
 
 /**
  * How many covers stay resident. Comfortably more than a screen holds, so
@@ -122,6 +138,14 @@ export function forgetCovers(bookIds?: readonly BookId[]): void {
     covers.delete(bookId)
     uncovered.delete(bookId)
   }
+
+  // The device's copy goes with it. This is the *only* invalidation point the
+  // cover store has — see the note at the top of `coverStore.ts` — so a caller
+  // that forgets in memory and not on disk would leave the old art to come back
+  // at the next launch, which is the exact failure this function exists to stop.
+  // Passing `bookIds` straight through: a bare call means "all of them" in both
+  // places, and the in-memory ids above are not the full set on disk.
+  void dropStoredCovers(bookIds)
 }
 
 /**
@@ -184,26 +208,71 @@ async function predecode(url: string): Promise<void> {
   }
 }
 
-async function fetchInto(bookId: BookId): Promise<void> {
-  // Re-checked at the moment of fetching: a screen may have fetched this one
+/** Take a blob into the in-memory cache and get it decoded, ready to paint. */
+async function adopt(bookId: BookId, blob: Blob): Promise<void> {
+  // Re-checked at the moment of adopting: a screen may have resolved this one
   // while we waited, and a second object URL for the same blob is both a leak
   // and — if it reached an `<img>` — a flash of its own.
+  if (covers.has(bookId)) return
+  const url = URL.createObjectURL(blob)
+  remember(bookId, url)
+  await predecode(url)
+}
+
+async function fetchInto(bookId: BookId): Promise<void> {
   if (covers.has(bookId) || uncovered.has(bookId)) return
   try {
     const assets = await repository.getAssets(bookId, [COVER_ASSET_PATH])
-    const blob = assets.get(COVER_ASSET_PATH)
+    const blob = assets.get(COVER_ASSET_PATH) ?? null
+
+    // Kept on the device before it is even painted, so this is the last time
+    // this book's cover costs a network read. Not awaited: the write is for the
+    // *next* launch, and the shelf waiting on it would defeat the point.
+    void storeCover(bookId, blob)
+
     if (!blob) {
       uncovered.add(bookId)
       return
     }
-    if (covers.has(bookId)) return
-    const url = URL.createObjectURL(blob)
-    remember(bookId, url)
-    await predecode(url)
+    await adopt(bookId, blob)
   } catch {
     // A cover that can't be read is a placeholder, which is a complete and
     // working outcome. Nothing here is worth surfacing.
   }
+}
+
+/**
+ * Fill the in-memory cache for these books — from the device first, and only
+ * then from wherever the books actually live.
+ *
+ * **The device is asked first, not second.** The obvious shape is a fallback:
+ * try the real read, drop to the copy when it fails. That is right for a
+ * *book*, where being one edit behind matters, and wrong for cover art, which
+ * changes only when the book is re-imported and is invalidated explicitly when
+ * it is. Read-through would mean every launch waits on Supabase and R2 to be
+ * handed back the same bytes already sitting in IndexedDB — around a second of
+ * placeholder letters on the front door, every single time, for no new
+ * information.
+ */
+async function resolve(wanted: readonly BookId[]): Promise<void> {
+  const stored = await readStoredCovers(wanted)
+
+  const missing: BookId[] = []
+  const adopting: Promise<void>[] = []
+
+  for (const bookId of wanted) {
+    // Another screen may have resolved these while the read above was running.
+    if (covers.has(bookId) || uncovered.has(bookId)) continue
+
+    const blob = stored.get(bookId)
+    // Absent from the map is "never looked up"; present and `null` is "known to
+    // have no cover". Only the first is worth a fetch.
+    if (blob === undefined) missing.push(bookId)
+    else if (blob === null) uncovered.add(bookId)
+    else adopting.push(adopt(bookId, blob))
+  }
+
+  await Promise.all([...adopting, ...missing.map(fetchInto)])
 }
 
 /**
@@ -225,7 +294,7 @@ export async function loadCovers(bookIds: readonly BookId[]): Promise<void> {
     .slice(0, LIMIT)
   if (wanted.length === 0) return
 
-  await Promise.all(wanted.map(fetchInto))
+  await resolve(wanted)
 }
 
 export function warmCovers(bookIds: readonly BookId[]): void {
@@ -237,7 +306,7 @@ export function warmCovers(bookIds: readonly BookId[]): void {
   if (wanted.length === 0) return
 
   const run = () => {
-    void Promise.all(wanted.map(fetchInto))
+    void resolve(wanted)
   }
 
   // After the screen that triggered this has finished painting. `requestIdleCallback`
@@ -290,7 +359,7 @@ export function useCovers(bookIds: readonly BookId[]): ReadonlyMap<BookId, strin
     // The same read, and the same decode, the warm path does — a cover that
     // arrives here has to be paintable, not merely fetched, or the tile shows a
     // placeholder for the frames the decode takes.
-    void Promise.all(wanted.map(fetchInto)).then(() => {
+    void resolve(wanted).then(() => {
       // Nothing to undo if this screen has gone: the URLs belong to the cache
       // now, not to this component, and the next screen to want them will find
       // them already made. That is the point.
