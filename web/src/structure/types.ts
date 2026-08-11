@@ -132,6 +132,25 @@ export interface BookMeta {
   /** ISO 8601. */
   importedAt: string
   /**
+   * ISO 8601 — the day the book was finished, written **once and never again.**
+   *
+   * "Finished" is otherwise derived: a position row that reached 100%. That is
+   * enough to file a book on the Finished shelf, where only the fact matters,
+   * but not to say *when* — a position's `at` is the last page turn, so opening
+   * a finished book months later to check a quote silently moves the day it was
+   * finished. Harmless on a shelf; a lie in a yearly total, and the kind that
+   * moves a book from one year into the next.
+   *
+   * So it follows the rule `titleOverridden` and `shelfOverridden` already set:
+   * once a fact is established, no later automatic pass may overwrite it.
+   * Re-reading a book does not clear this, because it did not un-finish it.
+   *
+   * Absent on every book finished before this existed — `backfillFinishedAt`
+   * fills those from the position's own date, which is the best evidence there
+   * is and is exactly right for a book not opened since.
+   */
+  finishedAt?: string
+  /**
    * The reader's own 1–5 verdict on the whole book, set from the detail page
    * (WP-47). Absent until rated — there is no default of "unrated is zero
    * stars", so this must stay optional rather than defaulting to `0`.

@@ -494,6 +494,31 @@ export function createCachedRepository(
     },
 
     /**
+     * Finishing a book, signal or no signal.
+     *
+     * The one write here that does **not** need a queue entry of its own, and
+     * the reason is worth keeping: the fact is recoverable from evidence that
+     * *is* queued. A page turn to 100% goes into the outbox like any other, so
+     * a finish made in a tunnel arrives as a position, and the next launch's
+     * `backfillFinishedAt` turns it back into a date. Offline, writing to the
+     * copy is enough to keep this device honest until then.
+     */
+    async markFinished(bookId: BookId, at: string = new Date().toISOString()): Promise<void> {
+      return writeThrough(
+        () => cloud.markFinished(bookId, at),
+        () => mirror(() => cache.markFinished(bookId, at)),
+      )
+    },
+
+    /** @see `cloudRepository.backfillFinishedAt` — a no-op with no signal. */
+    async backfillFinishedAt(): Promise<number> {
+      return readThrough(
+        () => cloud.backfillFinishedAt(),
+        () => cache.backfillFinishedAt(),
+      )
+    },
+
+    /**
      * Mark a place, signal or no signal.
      *
      * Offline the *copy* mints the id, and that is deliberate rather than

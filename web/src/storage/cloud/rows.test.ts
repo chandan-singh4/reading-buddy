@@ -34,6 +34,7 @@ function bareRow(overrides: Partial<BookRow> = {}): BookRow {
     text_signature: null,
     parser_version: null,
     imported_at: '2026-08-09T10:00:00+00:00',
+    finished_at: null,
     rating: null,
     notes: null,
     title_overridden: null,

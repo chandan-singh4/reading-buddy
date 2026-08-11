@@ -106,6 +106,52 @@ Kept because they are facts, not open questions:
 
 ---
 
+## Next arc — Google Books metadata, then Stats
+
+Agreed with the reader 2026-08-10. **`finishedAt` is built and shipped**; the
+rest is planned, not started.
+
+The reader's insight, which cut a whole feature out of the plan: **pages read
+does not need a reading log.** Finished books × the print edition's page count,
+summed. Ten books at 200 pages is 2,000 pages, and it works retroactively
+because "finished" was already derivable. An earlier proposal here for an
+append-only reading-events log was over-engineering and is dropped.
+
+1. **`finishedAt` — done.** Written once, never moved. See the note in
+   `structure/types.ts`. `backfillFinishedAt` at boot dates the books finished
+   before the field existed, from the position's own `at`, and doubles as the
+   recovery path for a book finished with no signal.
+2. **ISBN + publisher from the file.** Free, offline, exact. The epub parser
+   reads only `title` and `creator` out of the OPF today and walks past
+   `dc:identifier` — most epubs carry an ISBN right there. This is what makes
+   the lookup exact instead of a guess.
+3. **Google Books lookup.** By ISBN, with title+author only as a fallback — a
+   title search confidently returns the wrong edition, an audiobook, or a study
+   guide. **The key goes through `api/`, never a `VITE_` variable.** Must
+   degrade offline and cache its answer on the book.
+4. **Stats.** Genres read, pages this year, the reader's rating against the
+   average.
+
+Known and accepted about the page maths:
+
+- **Page counts are a convention, not a measurement.** These books have no
+  pages — text flows into columns, so the count changes with type size, which
+  is why bookmarks anchor to a paragraph. `percent × printedPageCount` is
+  meaningful to a human even though nothing ever rendered "page 412". Say so
+  before someone "fixes" it.
+- **Part-read books count in proportion**, the reader's call: show
+  "*n* pages read out of *m*" from the percent already stored, so a book put
+  down at 60% is not worth nothing.
+- **All the pages land on the finish date.** A book read December→February
+  drops into February. Yearly totals are honest; a *monthly* chart would be
+  spiky and slightly fictional.
+- **Books Google can't match contribute zero.** Stats must say "3 books
+  uncounted" rather than quietly under-reporting.
+- **Google's categories are coarse** ("Body, Mind & Spirit"). The app's own
+  `type` and `subject` are finer; the good answer probably blends them.
+
+---
+
 ## Open only on someone else's input
 
 Not waiting on the reader's taste — waiting on a file or a chore.

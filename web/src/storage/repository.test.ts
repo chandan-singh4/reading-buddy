@@ -119,6 +119,67 @@ describe('books', () => {
   })
 })
 
+describe('finishing a book', () => {
+  const anchor = formatAnchor({ chapter: 1, section: 1, paragraph: 1 })
+
+  it('writes the finish date once and never moves it again', async () => {
+    // The whole reason this field exists. A position's `at` is the last page
+    // turn, so opening a finished book months later to check a quote would
+    // otherwise redate it — harmless on a shelf, a lie in a yearly total.
+    await repo.saveBook(makeBook('a'))
+    await repo.markFinished(bookId('a'), '2026-03-04T10:00:00.000Z')
+    await repo.markFinished(bookId('a'), '2026-11-30T10:00:00.000Z')
+
+    expect((await repo.getBook(bookId('a')))?.finishedAt).toBe('2026-03-04T10:00:00.000Z')
+  })
+
+  it('leaves the rest of the book alone', async () => {
+    await repo.saveBook(makeBook('a', { rating: 5 }))
+    await repo.markFinished(bookId('a'), '2026-03-04T10:00:00.000Z')
+
+    const book = await repo.getBook(bookId('a'))
+    expect(book?.rating).toBe(5)
+    expect(book?.title).toBe(makeBook('a').title)
+  })
+
+  it('does nothing for a book that was never saved', async () => {
+    await expect(repo.markFinished(bookId('missing'))).resolves.toBeUndefined()
+  })
+
+  it('backfills a date from the position of a book finished before dates were kept', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.savePosition(bookId('a'), anchor, 100, '2026-02-02T10:00:00.000Z')
+
+    expect(await repo.backfillFinishedAt()).toBe(1)
+    expect((await repo.getBook(bookId('a')))?.finishedAt).toBe('2026-02-02T10:00:00.000Z')
+  })
+
+  it('leaves an unfinished book without a date', async () => {
+    await repo.saveBook(makeBook('a'))
+    await repo.savePosition(bookId('a'), anchor, 60, '2026-02-02T10:00:00.000Z')
+
+    expect(await repo.backfillFinishedAt()).toBe(0)
+    expect((await repo.getBook(bookId('a')))?.finishedAt).toBeUndefined()
+  })
+
+  it('never overwrites a date it already has', async () => {
+    // The backfill runs at every launch, and a reopened book's position keeps
+    // moving. If this pass could overwrite, the date would drift for as long as
+    // the reader kept dipping back into the book.
+    await repo.saveBook(makeBook('a'))
+    await repo.markFinished(bookId('a'), '2026-02-02T10:00:00.000Z')
+    await repo.savePosition(bookId('a'), anchor, 100, '2026-09-09T10:00:00.000Z')
+
+    expect(await repo.backfillFinishedAt()).toBe(0)
+    expect((await repo.getBook(bookId('a')))?.finishedAt).toBe('2026-02-02T10:00:00.000Z')
+  })
+
+  it('survives a position whose book is gone', async () => {
+    await repo.savePosition(bookId('ghost'), anchor, 100, '2026-02-02T10:00:00.000Z')
+    await expect(repo.backfillFinishedAt()).resolves.toBe(0)
+  })
+})
+
 describe('rateBook', () => {
   it('sets a rating on an existing book without touching the rest of it', async () => {
     await repo.saveBook(makeBook('a'))

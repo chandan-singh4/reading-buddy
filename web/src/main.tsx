@@ -45,6 +45,13 @@ async function boot(container: HTMLElement): Promise<void> {
     // worth refusing to open the app over.
   }
 
+  // Deliberately *not* awaited, unlike `healTitles` above. Nothing on the first
+  // screen reads a finish date — it is for Stats, which is not built yet — so
+  // making the launch wait on it would buy nothing and cost a network round
+  // trip on the cloud backend. It also catches the book finished with no
+  // signal, whose position reached the queue but whose date never did.
+  void repository.backfillFinishedAt().catch(() => {})
+
   createRoot(container).render(
     <StrictMode>
       <App />

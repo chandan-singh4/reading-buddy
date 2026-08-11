@@ -1345,6 +1345,15 @@ export default function Reader() {
         // Losing a place is a small loss; interrupting reading to report it
         // would be a larger one. The next paragraph tries again anyway.
       })
+
+      // The end of the book, which is a different kind of fact from where the
+      // reader is: it happens once and it is dated. `markFinished` ignores a
+      // book that already has a date, so reaching the last page again on a
+      // re-read changes nothing. Failure is survivable too — the position that
+      // proves it is queued, and the next launch backfills from that.
+      if (percent === 100) {
+        void repository.markFinished(id).catch(() => {})
+      }
     }, SAVE_AFTER_MS)
 
     return () => {

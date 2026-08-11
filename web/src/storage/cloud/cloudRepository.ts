@@ -355,6 +355,54 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
       return changed
     },
 
+    /**
+     * Mark a book finished, once.
+     *
+     * `is('finished_at', null)` is the whole safeguard, and it is deliberately
+     * in the *where* clause rather than in a read-then-write: two devices that
+     * both finish the same book race, and Postgres settling it means the first
+     * date wins rather than the last one to reach the server.
+     */
+    async markFinished(id: BookId, at: string = new Date().toISOString()): Promise<void> {
+      unwrap(
+        await db()
+          .from('books')
+          .update({ finished_at: at })
+          .eq('id', id)
+          .is('finished_at', null),
+        'record that you finished the book',
+      )
+    },
+
+    /**
+     * Give a finish date to books finished before dates were kept.
+     *
+     * The device backend's twin, and the same reasoning: a position at 100%
+     * means finished, and its `at` is the best evidence of when. One update per
+     * book, which is fine because it is a handful of rows once — every row it
+     * touches stops matching the filter.
+     */
+    async backfillFinishedAt(): Promise<number> {
+      const done = await readAll<{ book_id: string; at: string }>(
+        (from, to) =>
+          db().from('positions').select('book_id, at').eq('percent', 100).range(from, to),
+        'catch up on finished books',
+      )
+      if (done.length === 0) return 0
+
+      let filled = 0
+      for (const row of done) {
+        const { error, count } = await db()
+          .from('books')
+          .update({ finished_at: row.at }, { count: 'exact' })
+          .eq('id', row.book_id)
+          .is('finished_at', null)
+        if (error) throw error
+        filled += count ?? 0
+      }
+      return filled
+    },
+
     async setNotes(id: BookId, notes: string | undefined): Promise<void> {
       unwrap(
         await db().from('books').update({ notes: notes || null }).eq('id', id),

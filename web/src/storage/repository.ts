@@ -179,6 +179,54 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
     },
 
     /** Set or clear (`undefined`) a book's free-text reflections (WP-49). */
+    /**
+     * Mark a book finished, once.
+     *
+     * Deliberately not part of `savePosition`. That runs on every paragraph and
+     * is a single-row `put` with no read-before-write, and it must stay that
+     * way; this needs to look before it writes, and only ever fires on the one
+     * page turn that crosses the end.
+     *
+     * A no-op if a date is already stored — that is the whole point. Finishing
+     * a book is not something that can happen twice, and the second answer is
+     * always the worse one.
+     */
+    async markFinished(id: BookId, at: string = new Date().toISOString()): Promise<void> {
+      const book = await database.books.get(id)
+      if (!book || book.finishedAt) return
+      await database.books.put({ ...book, finishedAt: at })
+    },
+
+    /**
+     * Give a finish date to books that were finished before dates were kept.
+     *
+     * The evidence is the position row: 100% means finished, and its `at` is
+     * the last page turn — which for a book not opened since *is* the day it
+     * was finished. Not perfect for one reopened in the meantime, and there is
+     * no better evidence anywhere; a date that is right for most of the shelf
+     * beats an empty year.
+     *
+     * Runs at boot, costs one pass over positions and one over the books it
+     * actually needs to change, and stamps what it touches — so the second boot
+     * finds nothing to do. Also the recovery path for a book finished with no
+     * signal: the write may not have landed, and this notices next launch.
+     */
+    async backfillFinishedAt(): Promise<number> {
+      const done = await database.positions.filter((p) => p.percent === 100).toArray()
+      if (done.length === 0) return 0
+
+      const books = await database.books.bulkGet(done.map((p) => p.bookId))
+      const rewritten: BookMeta[] = []
+      for (const [index, book] of books.entries()) {
+        if (!book || book.finishedAt) continue
+        const at = done[index]?.at
+        if (at) rewritten.push({ ...book, finishedAt: at })
+      }
+
+      if (rewritten.length > 0) await database.books.bulkPut(rewritten)
+      return rewritten.length
+    },
+
     async setNotes(id: BookId, notes: string | undefined): Promise<void> {
       const book = await database.books.get(id)
       if (!book) return

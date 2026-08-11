@@ -71,6 +71,7 @@ export interface BookRow {
   text_signature: string | null
   parser_version: number | null
   imported_at: string
+  finished_at: string | null
   rating: number | null
   notes: string | null
   title_overridden: boolean | null
@@ -200,6 +201,7 @@ export function bookFromRow(row: BookRow): BookMeta {
   if (row.content_hash !== null) meta.contentHash = row.content_hash
   if (row.text_signature !== null) meta.textSignature = row.text_signature
   if (row.parser_version !== null) meta.parserVersion = row.parser_version
+  if (row.finished_at !== null) meta.finishedAt = isoFrom(row.finished_at)
   if (row.rating !== null) meta.rating = row.rating
   if (row.notes !== null) meta.notes = row.notes
   if (row.title_overridden !== null) meta.titleOverridden = row.title_overridden
@@ -231,6 +233,7 @@ export function bookToRow(meta: BookMeta): BookRow {
     text_signature: orNull(meta.textSignature),
     parser_version: orNull(meta.parserVersion),
     imported_at: meta.importedAt,
+    finished_at: orNull(meta.finishedAt),
     rating: orNull(meta.rating),
     notes: orNull(meta.notes),
     title_overridden: orNull(meta.titleOverridden),
