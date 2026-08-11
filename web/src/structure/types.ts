@@ -240,6 +240,24 @@ export interface BookMeta {
   titleCleanVersion?: number
 }
 
+/**
+ * The fields that belong to the *file*, not to the reader.
+ *
+ * A re-parse deliberately keeps the existing `BookMeta` and throws the parser's
+ * away, so that a cleverer parse can never overrule a title the reader fixed or
+ * a shelf they chose. These six are the exception, and the list exists so the
+ * exception is stated in one place: they are the publisher's record, the reader
+ * never edits them, and re-reading the file is the *only* way to obtain them.
+ */
+export const FILE_METADATA_KEYS = [
+  'isbn',
+  'publisher',
+  'published',
+  'language',
+  'description',
+  'subjects',
+] as const satisfies readonly (keyof BookMeta)[]
+
 // --- Manifest ---------------------------------------------------------------
 
 /**

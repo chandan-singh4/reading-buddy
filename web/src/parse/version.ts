@@ -83,5 +83,13 @@
  *   a catalogue lookup an exact fetch rather than a title search, which
  *   confidently returns the wrong edition. Books parsed under 1–9 carry none
  *   of these six fields.
+ * - **11** — 10 again, because 10 didn't land. The re-parse read all six
+ *   fields and then discarded them along with the rest of the parser's meta —
+ *   the rule that stops a re-parse overruling a title the reader corrected,
+ *   applied to fields the reader never touches and the file alone can supply.
+ *   Every book updated under 10 gained nothing, and needs asking again. The
+ *   author is now read properly in the same pass: every `dc:creator` the file
+ *   credits rather than only the first, skipping the ones labelled as
+ *   illustrator or translator.
  */
-export const PARSER_VERSION = 10
+export const PARSER_VERSION = 11

@@ -23,6 +23,7 @@
 
 import { unzipSync, strFromU8 } from 'fflate'
 
+import { cleanAuthor } from './cleanAuthor.ts'
 import { cleanTitle } from './cleanTitle.ts'
 
 import { COVER_ASSET_PATH, type BookAsset, type ParsedBook } from '../storage/index.ts'
@@ -347,6 +348,30 @@ function readFileMetadata(metadata: Document | Element): FileMetadata {
   }
 }
 
+/**
+ * Everyone the file credits as having written the book.
+ *
+ * There can be several `dc:creator` elements and only the first was being read,
+ * which quietly dropped the second author of every co-written book. Where the
+ * file labels a role, only authors are taken: `opf:role` uses MARC codes, and
+ * `ill` is the illustrator, `trn` the translator, `edt` the editor. An unlabelled
+ * creator is treated as an author, which is what an unlabelled one nearly always
+ * is — most files carry no roles at all.
+ *
+ * `cleanAuthor` has the last word on what survives. See its own note for why a
+ * field this permissive needs one.
+ */
+function readAuthor(metadata: Document | Element): string | undefined {
+  const credited: string[] = []
+  for (const element of byLocalName(metadata, 'creator')) {
+    const role = attr(element, 'role')?.trim().toLowerCase()
+    if (role && role !== 'aut') continue
+    const name = element.textContent?.trim()
+    if (name) credited.push(name)
+  }
+  return cleanAuthor(credited.join('; '))
+}
+
 // --- The package file --------------------------------------------------------
 
 interface Spine extends FileMetadata {
@@ -419,7 +444,7 @@ function readSpine(archive: Archive, packagePath: string): Spine {
   }
 
   const metadata = firstByLocalName(doc, 'metadata') ?? doc
-  const author = firstByLocalName(metadata, 'creator')?.textContent?.trim() || undefined
+  const author = readAuthor(metadata)
   return {
     ...readFileMetadata(metadata),
     documents,

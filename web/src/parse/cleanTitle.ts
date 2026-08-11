@@ -50,8 +50,15 @@
  *       full of titles ending in a lone "(" was how round 2 came back. Volume
  *       markers join the bracket list, and `With` may open a subtitle when
  *       what follows it is long enough to be one.
+ *   4 — the *author* is cleaned too, by `cleanAuthor.ts`: a stray trailing
+ *       separator, a `Unknown` placeholder, a title sitting in the author's
+ *       place, and catalogue order flipped back to reading order. The stamp is
+ *       shared rather than given a twin of its own, because it answers one
+ *       question — "have this book's metadata strings been through the current
+ *       rules?" — and a second column would double the bookkeeping to heal two
+ *       fields in the same pass over the same rows.
  */
-export const TITLE_CLEAN_VERSION = 3
+export const TITLE_CLEAN_VERSION = 4
 
 export function cleanTitle(
   raw: string | null | undefined,

@@ -15,6 +15,7 @@ import type { ParsedBook, Repository } from '../storage/index.ts'
 import { repository as defaultRepository } from '../storage/index.ts'
 import { PARSER_VERSION } from '../parse/version.ts'
 import type { BookId, BookMeta, SourceFormat } from '../structure/index.ts'
+import { FILE_METADATA_KEYS } from '../structure/index.ts'
 import { shelfFor } from './shelf.ts'
 
 // --- Failure ----------------------------------------------------------------
@@ -410,6 +411,28 @@ export async function importBook(file: File, options: ImportOptions = {}): Promi
   return toSave.meta
 }
 
+/**
+ * The publisher's own fields out of a fresh parse, and nothing else.
+ *
+ * A re-parse keeps the *existing* meta and discards the parser's, so that a
+ * later, cleverer parse can never overrule a title the reader corrected. That
+ * rule is right for everything the reader can touch and wrong for these six:
+ * they exist only in the file, so discarding them means a re-parse reads them
+ * and then throws them away — which is exactly what happened to the first run
+ * of updates after `PARSER_VERSION` 10.
+ *
+ * Absent keys stay absent: an epub with no ISBN must not gain `isbn: undefined`,
+ * and a book that had one must not lose it to a parse that found none.
+ */
+function fileMetadataOf(parsed: BookMeta): Partial<BookMeta> {
+  const found: Record<string, unknown> = {}
+  for (const key of FILE_METADATA_KEYS) {
+    const value = parsed[key]
+    if (value !== undefined) found[key] = value
+  }
+  return found as Partial<BookMeta>
+}
+
 // --- Re-parsing an existing book ----------------------------------------------
 
 /**
@@ -499,6 +522,7 @@ export async function reparseBook(
     ...parsed,
     meta: {
       ...meta,
+      ...fileMetadataOf(parsed.meta),
       ...(textSignature === undefined ? {} : { textSignature }),
     },
   }

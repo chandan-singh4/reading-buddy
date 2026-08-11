@@ -60,6 +60,7 @@ import type {
   Shelf,
 } from '../../structure/index.ts'
 import { countWordsIn, sectionPathOf } from '../../structure/index.ts'
+import { cleanAuthor } from '../../parse/cleanAuthor.ts'
 import { cleanTitle, TITLE_CLEAN_VERSION } from '../../parse/cleanTitle.ts'
 import { isSystemFolder } from '../../library/systemFolders.ts'
 import type {
@@ -338,15 +339,18 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
         if (book.titleOverridden) continue
         if (book.titleCleanVersion === TITLE_CLEAN_VERSION) continue
 
-        const cleaned = cleanTitle(book.title, book.author)
+        const author = cleanAuthor(book.author) ?? null
+        const cleaned = cleanTitle(book.title, author ?? undefined)
         // A book with a bad name is findable; a book with no name is lost on the
-        // shelf — so a rule that would cut the whole string away is ignored.
+        // shelf — so a rule that would cut the whole string away is ignored. An
+        // *author* has no such problem: the shelf shows a book without one every
+        // day, so a placeholder is written back as null rather than kept.
         const title = cleaned && cleaned !== book.title ? cleaned : row.title
-        if (title !== row.title) changed += 1
+        if (title !== row.title || author !== row.author) changed += 1
 
-        // Stamped whether or not the title changed, so this is a no-op on every
+        // Stamped whether or not anything changed, so this is a no-op on every
         // boot after the first.
-        rewritten.push({ ...row, title, title_clean_version: TITLE_CLEAN_VERSION })
+        rewritten.push({ ...row, title, author, title_clean_version: TITLE_CLEAN_VERSION })
       }
 
       if (rewritten.length > 0) {

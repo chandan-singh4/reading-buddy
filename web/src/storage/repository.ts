@@ -19,6 +19,7 @@ import type {
   Shelf,
 } from '../structure/index.ts'
 import { countWordsIn, sectionPathOf } from '../structure/index.ts'
+import { cleanAuthor } from '../parse/cleanAuthor.ts'
 import { cleanTitle, TITLE_CLEAN_VERSION } from '../parse/cleanTitle.ts'
 import { isSystemFolder } from '../library/systemFolders.ts'
 import {
@@ -163,15 +164,19 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
         if (book.titleOverridden) continue
         if (book.titleCleanVersion === TITLE_CLEAN_VERSION) continue
 
-        const cleaned = cleanTitle(book.title, book.author)
+        const author = cleanAuthor(book.author)
+        const cleaned = cleanTitle(book.title, author)
         const keepsMeaning = cleaned && cleaned !== book.title
-        if (keepsMeaning) changed += 1
+        if (keepsMeaning || author !== book.author) changed += 1
 
-        rewritten.push({
-          ...book,
-          title: keepsMeaning ? cleaned : book.title,
-          titleCleanVersion: TITLE_CLEAN_VERSION,
-        })
+        const healed: BookMeta = { ...book, titleCleanVersion: TITLE_CLEAN_VERSION }
+        if (keepsMeaning) healed.title = cleaned
+        // Absent, not empty. An author that turned out to be `Unknown` has to
+        // leave the row rather than sit in it as a blank string — every other
+        // reader of `BookMeta` tests for the key, not for its contents.
+        if (author === undefined) delete healed.author
+        else healed.author = author
+        rewritten.push(healed)
       }
 
       if (rewritten.length > 0) await database.books.bulkPut(rewritten)

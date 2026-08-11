@@ -25,6 +25,8 @@ export type {
   SourceFormat,
 } from './types.ts'
 
+export { FILE_METADATA_KEYS } from './types.ts'
+
 export { WORDS_PER_PAGE, countWords, countWordsIn, pagesIn } from './words.ts'
 
 export {

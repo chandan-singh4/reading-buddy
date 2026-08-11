@@ -789,6 +789,31 @@ describe('healing titles already on the shelf', () => {
     expect(await repo.healTitles()).toBe(1)
     expect(await repo.healTitles()).toBe(0)
   })
+
+  // The same pass, over the other string. An author needs no source file and no
+  // re-parse either — see `parse/cleanAuthor.ts`.
+  it('cleans the author in the same sweep', async () => {
+    await db.books.put(makeBook('a', { title: 'Breath', author: 'James Nestor;' }))
+
+    expect(await repo.healTitles()).toBe(1)
+    expect((await db.books.get(bookId('a')))!.author).toBe('James Nestor')
+  })
+
+  it('takes a placeholder author off the book entirely', async () => {
+    await db.books.put(makeBook('a', { title: 'Breath', author: 'Unknown' }))
+
+    await repo.healTitles()
+
+    // Absent, not blank: the shelf tests for the key.
+    expect('author' in (await db.books.get(bookId('a')))!).toBe(false)
+  })
+
+  it('leaves a book that was already right alone', async () => {
+    await db.books.put(makeBook('a', { title: 'Breath', author: 'James Nestor' }))
+
+    expect(await repo.healTitles()).toBe(0)
+    expect((await db.books.get(bookId('a')))!.author).toBe('James Nestor')
+  })
 })
 
 /**

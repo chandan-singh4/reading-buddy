@@ -707,6 +707,52 @@ describe('re-parsing a book already on the shelf', () => {
     expect((await repo.getPosition(meta.id))?.anchor).toBe('[ch01-s01-p001]')
   })
 
+  // The exception to the rule above, and the bug that shipped without it: the
+  // reader updated all 32 books to gain the Dublin Core fields, the parse read
+  // them correctly, and every one was thrown away with the rest of the parser's
+  // meta. These six exist *only* in the file, so a re-parse is the one chance to
+  // collect them.
+  it('takes the fields that only the file can supply', async () => {
+    const { parsers } = stubParsers()
+    const meta = await importBook(fileOf('a.md'), { repository: repo, parsers })
+    await repo.saveBook({ ...meta, parserVersion: 1 })
+
+    const knowing: ParserTable = {
+      ...parsers,
+      md: async (_data, m) => ({
+        ...oneParagraphBook(m),
+        meta: {
+          ...oneParagraphBook(m).meta,
+          isbn: '9780241988770',
+          publisher: 'Penguin',
+          subjects: ['Nature'],
+          // The parser must not be able to smuggle a title past the update.
+          title: 'A Title The Reader Did Not Choose',
+        },
+      }),
+    }
+
+    const updated = await reparseBook(meta.id, { repository: repo, parsers: knowing })
+
+    expect(updated.isbn).toBe('9780241988770')
+    expect(updated.publisher).toBe('Penguin')
+    expect(updated.subjects).toEqual(['Nature'])
+    expect(updated.title).toBe(meta.title)
+    expect((await repo.getBook(meta.id))?.isbn).toBe('9780241988770')
+  })
+
+  it('never writes an empty field over one the book already had', async () => {
+    const { parsers } = stubParsers()
+    const meta = await importBook(fileOf('a.md'), { repository: repo, parsers })
+    await repo.saveBook({ ...meta, parserVersion: 1, isbn: '9780241988770' })
+
+    // A parse that finds no ISBN says nothing about the ISBN, which is not the
+    // same as saying the book hasn't got one.
+    const updated = await reparseBook(meta.id, { repository: repo, parsers })
+
+    expect(updated.isbn).toBe('9780241988770')
+  })
+
   it('explains itself when the file was never kept', async () => {
     const { parsers } = stubParsers()
     const meta = await importBook(fileOf('a.md'), { repository: repo, parsers })
