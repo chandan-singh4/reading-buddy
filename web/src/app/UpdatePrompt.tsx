@@ -20,6 +20,10 @@ import styles from './UpdatePrompt.module.css'
 export function UpdatePrompt() {
   const [ready, setReady] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  // Taking the update is not instant, and until now the panel said nothing
+  // about that: it sat there unchanged while the swap ran, which a reader on a
+  // phone read as a button that had not worked, and tapped again.
+  const [taking, setTaking] = useState(false)
   const confirm = useRef<HTMLButtonElement>(null)
 
   useEffect(() => onUpdateReady(() => setReady(true)), [])
@@ -37,11 +41,11 @@ export function UpdatePrompt() {
   useEffect(() => {
     if (!showing) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setDismissed(true)
+      if (event.key === 'Escape' && !taking) setDismissed(true)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [showing])
+  }, [showing, taking])
 
   if (!showing) return null
 
@@ -53,7 +57,10 @@ export function UpdatePrompt() {
       aria-labelledby="update-title"
       // Tapping the blur defers too — the same answer as Escape and "Later",
       // so every way out of the panel means the same thing.
-      onClick={() => setDismissed(true)}
+      // …but not once the update is being taken. Dismissing then would leave
+      // the reader on a page about to reload out from under them, with nothing
+      // on screen to explain it.
+      onClick={() => !taking && setDismissed(true)}
     >
       <div
         className={styles.panel}
@@ -70,8 +77,9 @@ export function UpdatePrompt() {
         </h2>
 
         <p className={styles.body}>
-          A fresh version of Reading Buddy is ready. It takes a moment, and
-          you&rsquo;ll come back to exactly the page you&rsquo;re on.
+          {taking
+            ? 'Fetching it now. The app will restart on its own in a moment.'
+            : 'A fresh version of Reading Buddy is ready. It takes a moment, and you’ll come back to exactly the page you’re on.'}
         </p>
 
         <div className={styles.actions}>
@@ -79,13 +87,21 @@ export function UpdatePrompt() {
             ref={confirm}
             type="button"
             className={styles.primary}
-            onClick={() => applyUpdate()}
+            // Disabled rather than merely ignored, so the panel *looks* busy
+            // instead of looking unresponsive. Same reason the wording changes.
+            disabled={taking}
+            onClick={() => {
+              setTaking(true)
+              applyUpdate()
+            }}
           >
-            Update now
+            {taking ? 'Updating…' : 'Update now'}
           </button>
-          <button type="button" className={styles.secondary} onClick={() => setDismissed(true)}>
-            Later
-          </button>
+          {!taking && (
+            <button type="button" className={styles.secondary} onClick={() => setDismissed(true)}>
+              Later
+            </button>
+          )}
         </div>
       </div>
     </div>

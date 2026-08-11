@@ -60,6 +60,19 @@ export function onUpdateReady(listener: OnUpdateReady): () => void {
   return () => listeners.delete(listener)
 }
 
+/**
+ * How long to wait for the swap to reload the page before doing it ourselves.
+ *
+ * Taking an update is not one step but two: the waiting worker is told to take
+ * over, and the page reloads once it *has*. The second step is a browser event,
+ * and a phone reported it never arriving — leaving a panel that had already done
+ * its job sitting there looking broken, however many times it was tapped.
+ *
+ * Long enough that the normal path always wins the race, short enough that a
+ * reader is not left staring at a dead button.
+ */
+const RELOAD_BY_MS = 4000
+
 /** Take the waiting build. Does nothing if none is waiting. */
 export function applyUpdate(): void {
   apply?.()
@@ -75,10 +88,20 @@ export function watchForUpdates(): void {
     // installed and waiting; nothing changes until `applyUpdate` runs.
     onNeedRefresh() {
       apply = () => {
+        // Once only. Tapping again cannot help — the worker has already been
+        // told — and a reader watching a panel that looks stuck will certainly
+        // tap again.
+        apply = null
+
         // `true` tells the waiting worker to take over, which reloads the page.
         // Landing back on the same paragraph is WP-15's doing — without saved
         // positions this would throw the reader back to chapter one.
         void updateSW(true)
+
+        // The safety net. If the takeover reloaded us, this timer died with the
+        // page and never ran; if it didn't, the reader gets their reload anyway
+        // rather than a panel that no longer does anything.
+        window.setTimeout(() => window.location.reload(), RELOAD_BY_MS)
       }
       for (const listener of listeners) listener()
     },
