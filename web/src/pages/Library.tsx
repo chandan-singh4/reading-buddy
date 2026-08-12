@@ -18,6 +18,7 @@ import {
 } from '../app/libraryMemory.ts'
 import { useOnVisit } from '../app/screenActive.tsx'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
+import { moveBooks } from '../app/shelfTransition.ts'
 import { forgetCovers, useCovers } from '../app/useCovers.ts'
 import { useRowMemory } from '../app/useRowMemory.ts'
 import { AddButton } from '../library/AddButton.tsx'
@@ -179,11 +180,48 @@ export default function Library() {
 
     const memory = await loadLibrary()
     writeLibraryMemory(memory)
-    setBooks(memory.books)
-    setProgress(memory.progress)
-    setFolders(memory.folders)
-    setUnavailable(memory.unavailable)
-    setState({ status: 'ready' })
+
+    const apply = () => {
+      setBooks(memory.books)
+      setProgress(memory.progress)
+      setFolders(memory.folders)
+      setUnavailable(memory.unavailable)
+      setState({ status: 'ready' })
+    }
+
+    /*
+     * Under "Recently opened" — and it is the sort a reader leaves on — closing
+     * a book sends it to the front, and every row it passed shuffles down. The
+     * shelf is one `<ul>` with stable keys, so nothing here remounts and no
+     * cover is re-fetched; React simply moves the row. But it moves it in a
+     * single frame, with nothing joining where it was to where it went, and a
+     * dozen covers all jumping at once is indistinguishable from the page
+     * reloading.
+     *
+     * `moveBooks` makes it a crossing instead — see `app/shelfTransition.ts`,
+     * which handles Home's harder version of the same problem with the same
+     * mechanism.
+     *
+     * The ordering is worked out here, before committing, rather than compared
+     * afterwards: `arrange` is pure and already the single source of truth for
+     * what the shelf shows, so asking it is cheaper and more honest than
+     * guessing from which fields changed. Nothing moved, no crossing — a visit
+     * to this tab that changes nothing must not cost the app 300 ms of frozen
+     * screen.
+     */
+    const next = arrange(memory.books, query, prefs, {
+      progress: memory.progress,
+      folders: new Map(memory.folders.map((folder) => [folder.id, folder])),
+    })
+    // An empty shelf has nothing to move *from*: the first load of a session,
+    // and the one after a search that matched nothing. Crossing from no covers
+    // to some is a 300 ms pause in place of an appearance.
+    const moved =
+      visible.length > 0 &&
+      visible.map((book) => book.id).join() !== next.map((book) => book.id).join()
+
+    if (moved) moveBooks(apply)
+    else apply()
   }
 
   function failed(error: unknown, prefix?: string) {

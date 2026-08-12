@@ -131,7 +131,7 @@ function BookCard({
   const inside = (
     <>
       <span className={styles.media}>
-        <Cover title={book.title} src={cover} />
+        <Cover title={book.title} src={cover} bookId={book.id} />
       </span>
       {facts}
     </>

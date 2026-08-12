@@ -188,15 +188,79 @@
   }
 }
 
+/* --- A book changing shelf ------------------------------------------------ */
+
 /*
- * `routeTransition.tsx` already declines to start a transition under this
- * preference, so these rules should never be reached. They are here as the
- * backstop for the one case it cannot see: the preference being changed *while*
- * a transition is in flight.
+ * The other crossing this app runs, and it is the opposite shape to the one
+ * above: there, the whole screen moves and nothing is singled out; here, nothing
+ * moves *except* the covers that changed place.
+ *
+ * Driven by `app/shelfTransition.ts`, which puts `data-shelf-move` on `<html>`
+ * for the length of it. See that file for what was flashing and why the covers
+ * only wear their `view-transition-name` while this attribute is set.
+ */
+
+/*
+ * The page itself changes instantly, and that is the intended effect.
+ *
+ * The rule at the top of this file turns the browser's root cross-fade off, and
+ * "off" for a `::view-transition-old` means *held at full opacity for the whole
+ * duration* — the outgoing picture would sit over the page and then be whipped
+ * away at the end, which is a hard cut with a delay in front of it. So the old
+ * root is taken to nothing immediately and the new page is live from the first
+ * frame.
+ *
+ * That leaves the badges, titles and percentages to update in one step, which is
+ * right: they are text changing value, not objects changing place. Fading them
+ * would be the animation-covering-a-rendering-problem this set out to avoid.
+ * Only the covers travel, because only the covers actually went anywhere.
+ */
+:root[data-shelf-move]::view-transition-old(root) {
+  animation: none;
+  opacity: 0;
+}
+
+:root[data-shelf-move]::view-transition-new(root) {
+  animation: none;
+  opacity: 1;
+}
+
+/*
+ * How long a cover takes to reach its new shelf.
+ *
+ * A separate rule of its own, not folded in above, because `*` in a
+ * view-transition pseudo-element is newer than the rest of the API: where it
+ * isn't understood the browser drops this one rule and the covers still glide,
+ * just on the UA's own 250 ms. A degraded duration, not a degraded transition.
+ *
+ * `--motion-screen` rather than a number, because a cover crossing the shelf and
+ * a screen crossing the app are the same size of move to the eye, and the two
+ * drifting apart is exactly what the note at the head of this file warns about.
+ */
+:root[data-shelf-move]::view-transition-group(*) {
+  animation-duration: var(--screen-move);
+  animation-timing-function: var(--screen-ease);
+}
+
+/*
+ * `routeTransition.tsx` and `shelfTransition.ts` both already decline to start a
+ * transition under this preference, so these rules should never be reached. They
+ * are here as the backstop for the one case neither can see: the preference
+ * being changed *while* a transition is in flight.
  */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(root),
   ::view-transition-new(root) {
+    animation: none !important;
+  }
+
+  /*
+   * Its own rule, not a third line in the list above. An unrecognised selector
+   * invalidates the *entire* rule it appears in, so on a browser that doesn't
+   * know `*` here, sharing would take the two root backstops down with it —
+   * turning a safety net into the thing it was protecting against.
+   */
+  ::view-transition-group(*) {
     animation: none !important;
   }
 }

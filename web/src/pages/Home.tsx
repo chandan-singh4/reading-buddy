@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
@@ -6,6 +6,7 @@ import { useOnVisit } from '../app/screenActive.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
 import { warmLibrary } from '../app/libraryMemory.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
+import { moveBooks } from '../app/shelfTransition.ts'
 import { loadCovers, useCovers, warmCovers } from '../app/useCovers.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 import { repository, unavailableBooks } from '../storage/index.ts'
@@ -98,6 +99,23 @@ export default function Home() {
   })
   const greeting = useMemo(() => greetingFor(new Date().getHours()), [])
 
+  /**
+   * Which books were on which shelf, in what order, at the last paint.
+   *
+   * Only here to answer one question: did this re-read actually move anything?
+   * Coming back from a book you merely looked at moves nothing, and starting a
+   * crossing to animate nothing would make the whole app pause for 300 ms on
+   * every visit to Home — a cost paid for a picture identical to the one already
+   * on screen.
+   *
+   * Seeded from the state this component mounted with, which is the shelf the
+   * reader is looking at right now: the *first* re-read after coming out of a
+   * book is precisely the one that moves something, and it must not be missed.
+   */
+  const arrangement = useRef(
+    state.status === 'ready' ? shelfBookIds(state.shelves).join() : '',
+  )
+
   // On arrival rather than on mount. The screen is kept alive between visits now
   // (`app/screenActive.tsx`), so mounting happens once and is no longer the same
   // thing as the reader coming back — but the shelf still has to notice a book
@@ -149,8 +167,29 @@ export default function Home() {
           if (cancelled) return
         }
 
-        writeShelfMemory({ shelves, total: books.length })
-        setState({ status: 'ready', shelves, total: books.length })
+        /*
+         * A book read and closed has changed shelf — out of Unread and into
+         * Current Reading — and the two are different parents in the tree
+         * below, so React has no choice but to destroy its cover and build
+         * another. `moveBooks` is what makes that invisible: the browser
+         * photographs the cover on the shelf it was on and animates the picture
+         * into its new place, remount and all. See `app/shelfTransition.ts`.
+         *
+         * Only when something genuinely moved, and a plain update otherwise.
+         */
+        const next = shelfBookIds(shelves).join()
+        // An empty string means nothing was on screen to move from — the first
+        // paint of a session. Crossing from no shelf to a shelf is a pause where
+        // an appearance should be.
+        const moved = arrangement.current !== '' && arrangement.current !== next
+        arrangement.current = next
+
+        const apply = () => {
+          writeShelfMemory({ shelves, total: books.length })
+          setState({ status: 'ready', shelves, total: books.length })
+        }
+        if (moved) moveBooks(apply)
+        else apply()
 
         // Every book, not just the ones on these three shelves. Home is the only
         // screen that reads the whole list, so this is the one place that knows
@@ -351,7 +390,7 @@ function BookTile({
             already reaches this book by keyboard/screen reader, so this one
             steps out of the tab order rather than announcing it twice. */}
         <Link to={`/book/${book.id}`} className={styles.tileMedia} aria-hidden="true" tabIndex={-1}>
-          <Cover title={book.title} src={coverSrc} />
+          <Cover title={book.title} src={coverSrc} bookId={book.id} />
         </Link>
         <Link
           to={`/book/${book.id}/info`}

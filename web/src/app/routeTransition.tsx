@@ -125,12 +125,42 @@ interface Transitions {
   startViewTransition?: (callback: () => void) => { finished: Promise<void> }
 }
 
-function canTransition(): boolean {
+export function canTransition(): boolean {
   if (typeof document === 'undefined') return false
   if (typeof (document as Document & Transitions).startViewTransition !== 'function') return false
   // The same preference `index.css` honours globally. A cross-fade between two
   // screens is exactly the kind of movement it is asking not to see.
   return !(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
+}
+
+/**
+ * The crossing that is running right now, if one is.
+ *
+ * Only one view transition can exist at a time: starting a second one abandons
+ * the first, mid-animation. Opening or closing a book is a whole-screen crossing
+ * and it is *always* followed a few milliseconds later by the shelf re-reading
+ * itself — which, since a book you just read has changed shelf, wants a crossing
+ * of its own (`shelfTransition.ts`). Two crossings racing is how the book-close
+ * animation ends up truncated, and how the shelf's rearrangement ends up
+ * happening invisibly behind a snapshot and then appearing all at once when the
+ * snapshot is removed. Which is the flash, one layer along.
+ *
+ * So the shelf waits its turn rather than interrupting.
+ */
+let routeMove: Promise<void> | null = null
+
+/**
+ * Run `work` once no route crossing is in flight — immediately when none is.
+ *
+ * Deliberately not a queue: a second caller while one is already waiting simply
+ * waits on the same promise, because they are all waiting on the same thing.
+ */
+export function afterRouteMove(work: () => void): void {
+  if (routeMove === null) {
+    work()
+    return
+  }
+  void routeMove.then(work, work)
 }
 
 /**
@@ -195,11 +225,14 @@ export function RouteTransition({ children }: { children: React.ReactNode }) {
       document.documentElement.removeAttribute(DIRECTION_ATTRIBUTE)
       document.documentElement.style.removeProperty(ORIGIN_X)
       document.documentElement.style.removeProperty(ORIGIN_Y)
+      routeMove = null
     }
     // Cleared on failure as well as success. A transition can be abandoned — a
     // second navigation on top of it, a tab going to the background — and a
     // stale direction left on `<html>` would lean the *next* move the wrong way.
-    transition.finished.then(done, done)
+    // The same is true of the gate above: a crossing that never finishes must
+    // not lock the shelf out of ever animating again.
+    routeMove = transition.finished.then(done, done)
   }, [live, shown])
 
   return <ViewLocation.Provider value={shown}>{children}</ViewLocation.Provider>
