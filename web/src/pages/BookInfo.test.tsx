@@ -7,6 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { PARSER_VERSION } from '../parse/version.ts'
 import { repository, type ParsedBook } from '../storage/index.ts'
 import { chapterPath, formatAnchor, sectionPath, type BookId } from '../structure/index.ts'
 import BookInfo from './BookInfo.tsx'
@@ -159,6 +160,40 @@ describe('BookInfo', () => {
       expect((await repository.listQuotes(BOOK_ID)).map((q) => q.text)).toEqual([
         'A line worth keeping.',
       ])
+    })
+  })
+
+  /*
+   * The whole-shelf update lives at launch now. This page is where a book that
+   * the sweep left behind gets a second chance — and, when there is no second
+   * chance to offer, where it says so instead of showing a button that does
+   * nothing.
+   */
+  describe('a book an older parser made', () => {
+    it('offers to re-read it when the original file is still kept', async () => {
+      await repository.saveParsedBook(bookOf({ parserVersion: 0 }))
+      await repository.saveSource(BOOK_ID, new Blob(['epub bytes']), 'wisdom.epub')
+      openInfo()
+
+      expect(await screen.findByText('This book can be improved')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Update this book' })).toBeTruthy()
+    })
+
+    it('says why there is nothing to press when the file is gone', async () => {
+      await repository.saveParsedBook(bookOf({ parserVersion: 0 }))
+      openInfo()
+
+      expect(await screen.findByText('This book can be improved')).toBeTruthy()
+      expect(screen.getByText(/import the file again/)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'Update this book' })).toBeNull()
+    })
+
+    it('says nothing at all about a book that is already current', async () => {
+      await repository.saveParsedBook(bookOf({ parserVersion: PARSER_VERSION }))
+      openInfo()
+
+      await screen.findByText('The Fundamental Wisdom')
+      expect(screen.queryByText('This book can be improved')).toBeNull()
     })
   })
 

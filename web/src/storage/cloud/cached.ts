@@ -43,7 +43,13 @@
  * of truth by definition, and still fail as they always did.
  */
 
-import type { Anchor, BookId, BookMeta, Manifest, SectionPath } from '../../structure/index.ts'
+import type {
+  Anchor,
+  BookId,
+  BookMeta,
+  Manifest,
+  SectionPath,
+} from '../../structure/index.ts'
 import {
   cacheRepository,
   cachedBookIds,
@@ -62,7 +68,7 @@ import type {
   StoredSection,
   StoredSource,
 } from '../db.ts'
-import type { Repository } from '../repository.ts'
+import type { ParsedBook, Repository } from '../repository.ts'
 import { copyBook, copyFolders } from '../transfer.ts'
 import { CloudError } from './client.ts'
 import { knownOffline, looksOffline } from './offline.ts'
@@ -83,6 +89,36 @@ export { knownOffline, looksOffline } from './offline.ts'
 
 /** Books whose copy is being made right now, so a page turn doesn't start a second. */
 const filling = new Set<BookId>()
+
+/**
+ * Books whose copy has been checked against the cloud since the app started.
+ *
+ * The check costs one row read, and it is what makes reading from the copy
+ * *safe* rather than merely fast — see `sameParse`. Once per book per session is
+ * the right frequency: a re-parse elsewhere between two page turns of the same
+ * book is not a case worth a network round trip on every turn.
+ */
+const checked = new Set<BookId>()
+
+/** Exported for the tests, which need each case to start with no history. */
+export function forgetCopyChecks(): void {
+  checked.clear()
+}
+
+/**
+ * Whether the copy holds the same words the cloud does.
+ *
+ * A book's text is a snapshot: for one parse of one file it never changes,
+ * which is the whole reason the copy can be trusted ahead of the network. What
+ * *does* change it is a re-parse — a new parser version, or the same version
+ * over a different file — and both of those are stamped on the book. So the
+ * stamps are the question, and nothing else needs comparing.
+ */
+function sameParse(copy: BookMeta, cloudMeta: BookMeta): boolean {
+  return (
+    copy.parserVersion === cloudMeta.parserVersion && copy.textSignature === cloudMeta.textSignature
+  )
+}
 
 /**
  * Whether the last shelf the app drew came from the copy rather than the cloud.
@@ -139,10 +175,27 @@ function keepOffline(cloud: Repository, cache: Repository, bookId: BookId): void
       // only on the first one. Otherwise the book you read every day would
       // still look, to the cache, like the oldest thing in it.
       touchCachedBook(bookId)
-      if (await cache.getBook(bookId)) return
+
+      const copy = await cache.getBook(bookId)
+      // Already copied, and already confirmed current this session. This is the
+      // common case by far — every page turn after the first.
+      if (copy && checked.has(bookId)) return
 
       const meta = await cloud.getBook(bookId)
       if (!meta) return
+      checked.add(bookId)
+
+      if (copy) {
+        // The copy used to be kept forever once made, on the reasoning that a
+        // book's words never change. They don't — but a *re-parse* replaces
+        // them, and the copy then went on serving the old text with nothing to
+        // say it was old. Harmless while the copy was only a fallback for lost
+        // signal; not harmless now that it is read first.
+        if (sameParse(copy, meta)) return
+        await cache.deleteBooks([bookId])
+        forgetCachedBooks([bookId])
+      }
+
       // Folders first, or the book lands loose on the offline shelf.
       const folders = await copyFolders(cloud, cache)
       await copyBook(cloud, cache, meta, folders)
@@ -207,6 +260,41 @@ export function createCachedRepository(
       if (!looksOffline(error)) throw error
       return await fromCache()
     }
+  }
+
+  /**
+   * The rule for a book's own words: **ask the copy first, and only ask the
+   * cloud if the copy hasn't got it.**
+   *
+   * The opposite of `readThrough`, and deliberately so. That rule is right for
+   * anything that another device can change — a bookmark, a rating, where you
+   * got to — where the cloud is the truth and the copy is a consolation prize
+   * for having no signal. It is wrong for the text. A book's words are fixed at
+   * the moment it is parsed; a section already sitting on the device cannot be
+   * out of date except by a re-parse, and `keepOffline` handles that by throwing
+   * the copy away rather than by re-fetching every page of it.
+   *
+   * Getting this backwards is what made every book say "Loading…" on open with
+   * the whole book already on the phone: the reader waited on a round trip to
+   * R2 for words that were three milliseconds away.
+   *
+   * Nothing here is a *correctness* fallback — a miss means the copy is partial
+   * or not yet made, so the cloud answers and `keepOffline` fills the gap in the
+   * background. An empty answer counts as a miss for the same reason: a
+   * half-copied book has real sections and empty lists, and an empty list is
+   * indistinguishable from "this book has no chapters".
+   */
+  async function wordsFirst<T>(
+    fromCache: () => Promise<T>,
+    fromCloud: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      const local = await fromCache()
+      if (local !== undefined && !(Array.isArray(local) && local.length === 0)) return local
+    } catch {
+      // An unreadable copy is not a reason to fail a read the cloud can serve.
+    }
+    return readThrough(fromCloud, fromCache)
   }
 
   /**
@@ -368,16 +456,16 @@ export function createCachedRepository(
     // --- The book ----------------------------------------------------------
 
     async getManifest(bookId: BookId): Promise<Manifest | undefined> {
-      return readThrough(
-        () => cloud.getManifest(bookId),
+      return wordsFirst(
         () => cache.getManifest(bookId),
+        () => cloud.getManifest(bookId),
       )
     },
 
     async listChapterIndexes(bookId: BookId): Promise<StoredChapterIndex[]> {
-      return readThrough(
-        () => cloud.listChapterIndexes(bookId),
+      return wordsFirst(
         () => cache.listChapterIndexes(bookId),
+        () => cloud.listChapterIndexes(bookId),
       )
     },
 
@@ -385,9 +473,9 @@ export function createCachedRepository(
       bookId: BookId,
       chapter: number,
     ): Promise<StoredChapterIndex | undefined> {
-      return readThrough(
-        () => cloud.getChapterIndex(bookId, chapter),
+      return wordsFirst(
         () => cache.getChapterIndex(bookId, chapter),
+        () => cloud.getChapterIndex(bookId, chapter),
       )
     },
 
@@ -398,9 +486,9 @@ export function createCachedRepository(
       path: SectionPath,
     ): Promise<StoredSection | undefined> {
       keepOffline(cloud, cache, bookId)
-      return readThrough(
-        () => cloud.getSection(bookId, path),
+      return wordsFirst(
         () => cache.getSection(bookId, path),
+        () => cloud.getSection(bookId, path),
       )
     },
 
@@ -409,24 +497,26 @@ export function createCachedRepository(
       anchor: string,
     ): Promise<StoredSection | undefined> {
       keepOffline(cloud, cache, bookId)
-      return readThrough(
-        () => cloud.getSectionByAnchor(bookId, anchor),
+      return wordsFirst(
         () => cache.getSectionByAnchor(bookId, anchor),
+        () => cloud.getSectionByAnchor(bookId, anchor),
       )
     },
 
     async listSections(bookId: BookId): Promise<StoredSection[]> {
-      return readThrough(
-        () => cloud.listSections(bookId),
+      return wordsFirst(
         () => cache.listSections(bookId),
+        () => cloud.listSections(bookId),
       )
     },
 
+    // Zero counts as a miss, per `wordsFirst`. A book with no sections at all
+    // is not a book, so there is no honest answer being suppressed here.
     async countSections(bookId: BookId): Promise<number> {
-      return readThrough(
+      return wordsFirst(
+        async () => (await cache.countSections(bookId)) || undefined,
         () => cloud.countSections(bookId),
-        () => cache.countSections(bookId),
-      )
+      ).then((count) => count ?? 0)
     },
 
     // --- The pictures ------------------------------------------------------
@@ -625,6 +715,30 @@ export function createCachedRepository(
 
     async deleteBook(bookId: BookId): Promise<void> {
       await this.deleteBooks([bookId])
+    },
+
+    /**
+     * A re-parse replaces every word of a book, so the copy on this device is
+     * now the old book, and reading is served from that copy first. Throw it
+     * away here rather than waiting for `keepOffline` to notice: it only checks
+     * once per session, and it has already checked this one — the reader would
+     * go straight from the update into the text they just replaced.
+     *
+     * After the cloud write, never before. A re-parse that fails must leave the
+     * reader with the book they had.
+     */
+    async replaceParsedBook(book: ParsedBook): Promise<void> {
+      await cloud.replaceParsedBook(book)
+      const bookId = book.meta.id
+      checked.delete(bookId)
+      try {
+        await cache.deleteBooks([bookId])
+        forgetCachedBooks([bookId])
+      } catch {
+        // The copy is a convenience, and a re-parse that worked must not report
+        // a failure. Worst case the stale copy survives until the app restarts,
+        // when `keepOffline` compares the stamps and replaces it.
+      }
     },
   }
 }

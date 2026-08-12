@@ -254,7 +254,9 @@ function Badges({
         </span>
       ))}
 
-      {/* So the "N books can be improved" banner's number has faces. */}
+      {/* The update itself is offered at launch, for the whole shelf at once.
+          This marks the ones a sweep left behind — tap "ⓘ" and the book's own
+          page says why and offers to do just that one. */}
       {isOutOfDate(book) && <span className={styles.badgeMuted}>can be improved</span>}
     </span>
   )

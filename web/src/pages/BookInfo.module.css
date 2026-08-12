@@ -248,6 +248,35 @@
   color: var(--color-text-muted);
 }
 
+/* Outlined rather than filled: "Start reading" below is the one thing this
+   page is for, and a second solid accent block would compete with it. */
+.updateButton {
+  justify-self: start;
+  padding: var(--space-2) var(--space-4);
+  background: none;
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.updateButton:disabled {
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+/* The same wash the error boxes elsewhere use — noticing without shouting.
+   There is no red in this palette on purpose: a book that failed to update is
+   still a book that reads perfectly well. */
+.updateFailed {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-accent-wash);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
 .readButton {
   justify-self: stretch;
   text-align: center;

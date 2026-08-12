@@ -26,6 +26,7 @@ import { createRepository, type ParsedBook, type Repository } from '../repositor
 import {
   copyInFlight,
   createCachedRepository,
+  forgetCopyChecks,
   forgetFillsInFlight,
   forgetShelfSource,
   looksOffline,
@@ -68,6 +69,7 @@ beforeEach(() => {
   // so a fresh wrapper is not a fresh slate and each case must say so.
   forgetShelfListing()
   forgetShelfSource()
+  forgetCopyChecks()
 })
 
 afterEach(async () => {
@@ -497,6 +499,28 @@ describe('a real error is not a lost signal', () => {
     const refusing = createCachedRepository(
       {
         ...origin,
+        async getBook() {
+          throw new CloudError('That book is no longer in your library.')
+        },
+      },
+      cache,
+    )
+
+    await expect(refusing.getBook(bookId('a'))).rejects.toThrow('no longer in your library')
+  })
+
+  /*
+   * The words are read from the copy first, so a refusal from the cloud is
+   * usually never heard at all — which is the point. It still has to be heard
+   * when the copy hasn't got the answer, or a book missing from both would
+   * report itself as simply absent rather than as a refusal with a reason.
+   */
+  it('lets the error through for a book the copy has never held', async () => {
+    await inTheCloud('a')
+
+    const refusing = createCachedRepository(
+      {
+        ...origin,
         async getManifest() {
           throw new CloudError('That book is no longer in your library.')
         },
@@ -505,6 +529,105 @@ describe('a real error is not a lost signal', () => {
     )
 
     await expect(refusing.getManifest(bookId('a'))).rejects.toThrow('no longer in your library')
+  })
+})
+
+// --- The words come from the copy first --------------------------------------
+
+/*
+ * The reverse of every rule above, and only for a book's own text. Each case is
+ * written so that the copy and the cloud hold *different* words — that is the
+ * only way to prove which one actually answered.
+ */
+describe('reading the words', () => {
+  /** Replace the book in the cloud, keeping its id. */
+  async function rewriteInCloud(
+    id: string,
+    text: string,
+    overrides: Partial<BookMeta> = {},
+  ): Promise<void> {
+    const book = makeParsedBook(id, overrides)
+    await origin.replaceParsedBook({
+      ...book,
+      sections: [makeSection(1, 1, text), makeSection(1, 2, 'Second section.')],
+    })
+  }
+
+  it('answers from the copy without waiting for the network', async () => {
+    await inTheCloud('a')
+    await readAndCache('a')
+
+    // Same parse, different words: nothing in the app can produce this, which
+    // is exactly why it is a clean probe of where the answer came from.
+    await origin.replaceParsedBook({
+      ...makeParsedBook('a'),
+      sections: [makeSection(1, 1, 'Words only the cloud has.')],
+    })
+
+    const section = await repository.getSection(bookId('a'), path(1, 1))
+    expect(section?.paragraphs[0]?.text).toBe('First section.')
+  })
+
+  it('asks the cloud for a book the copy has never held', async () => {
+    await inTheCloud('a')
+
+    const section = await repository.getSection(bookId('a'), path(1, 1))
+    expect(section?.paragraphs[0]?.text).toBe('First section.')
+  })
+
+  it('asks the cloud for a section the copy is missing', async () => {
+    await inTheCloud('a')
+    await cache.saveBook(makeBook('a'))
+
+    // A book row and nothing else — what a copy interrupted halfway looks like.
+    const section = await repository.getSection(bookId('a'), path(2, 1))
+    expect(section?.paragraphs[0]?.text).toBe('Third section.')
+  })
+
+  it('replaces a copy the cloud has re-parsed since', async () => {
+    await inTheCloud('a', { parserVersion: 1 })
+    await readAndCache('a')
+    forgetCopyChecks()
+
+    await rewriteInCloud('a', 'The re-read words.', { parserVersion: 2 })
+
+    // The first read still comes from the copy — the check that notices runs
+    // behind it, because the alternative is making every page turn wait on the
+    // network to be told nothing has changed.
+    await repository.getSection(bookId('a'), path(1, 1))
+    await until(async () => (await cache.getBook(bookId('a')))?.parserVersion === 2)
+
+    const section = await repository.getSection(bookId('a'), path(1, 1))
+    expect(section?.paragraphs[0]?.text).toBe('The re-read words.')
+  })
+
+  it('leaves a copy alone when the parse behind it has not moved', async () => {
+    await inTheCloud('a', { parserVersion: 1 })
+    await readAndCache('a')
+    forgetCopyChecks()
+
+    await repository.getSection(bookId('a'), path(1, 1))
+    await until(async () => !copyInFlight(bookId('a')))
+
+    expect((await cache.getSection(bookId('a'), path(1, 1)))?.paragraphs[0]?.text).toBe(
+      'First section.',
+    )
+  })
+
+  it('throws the copy away when this device re-parses the book', async () => {
+    await inTheCloud('a', { parserVersion: 1 })
+    await readAndCache('a')
+
+    await repository.replaceParsedBook({
+      ...makeParsedBook('a', { parserVersion: 2 }),
+      sections: [makeSection(1, 1, 'The re-read words.')],
+    })
+
+    // Gone rather than rewritten: the next read fetches it fresh, which is one
+    // path instead of two and cannot leave old sections behind new ones.
+    expect(await cache.getBook(bookId('a'))).toBeUndefined()
+    const section = await repository.getSection(bookId('a'), path(1, 1))
+    expect(section?.paragraphs[0]?.text).toBe('The re-read words.')
   })
 })
 

@@ -4,7 +4,8 @@ import { Link, useParams } from 'react-router'
 import { Cover } from '../app/Cover.tsx'
 import { forgetLibraryMemory } from '../app/libraryMemory.ts'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
-import { useCovers } from '../app/useCovers.ts'
+import { forgetCovers, useCovers } from '../app/useCovers.ts'
+import { isOutOfDate, reparseBooks } from '../import/index.ts'
 import { repository, type StoredQuote } from '../storage/index.ts'
 import type { ReadingPosition } from '../storage/db.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
@@ -24,6 +25,13 @@ const FORMAT_LABELS: Readonly<Record<BookMeta['source'], string>> = {
 }
 
 const STARS = [1, 2, 3, 4, 5] as const
+
+/** Re-reading this one book from the file it was imported from. */
+type UpdateState =
+  | { status: 'idle' }
+  | { status: 'busy' }
+  | { status: 'done' }
+  | { status: 'failed'; message: string }
 
 function readingStatus(position: ReadingPosition | undefined): string {
   if (!position) return 'Not started'
@@ -51,16 +59,23 @@ export default function BookInfo() {
   const id = bookId as BookId
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [quotes, setQuotes] = useState<StoredQuote[]>([])
+  const [updating, setUpdating] = useState<UpdateState>({ status: 'idle' })
+  /** Whether the file this book came from is still kept — see `updateThis`. */
+  const [hasSource, setHasSource] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([repository.getBook(id), repository.getPosition(id), repository.listQuotes(id)]).then(
-      ([book, position, savedQuotes]) => {
-        if (cancelled) return
-        setState(book ? { status: 'ready', book, position } : { status: 'missing' })
-        setQuotes(savedQuotes)
-      },
-    )
+    Promise.all([
+      repository.getBook(id),
+      repository.getPosition(id),
+      repository.listQuotes(id),
+      repository.booksWithSource(),
+    ]).then(([book, position, savedQuotes, withSource]) => {
+      if (cancelled) return
+      setState(book ? { status: 'ready', book, position } : { status: 'missing' })
+      setQuotes(savedQuotes)
+      setHasSource(withSource.has(id))
+    })
     return () => {
       cancelled = true
     }
@@ -84,6 +99,37 @@ export default function BookInfo() {
     forgetShelfMemory()
     forgetLibraryMemory()
     await repository.renameBook(id, title)
+  }
+
+  /**
+   * Re-read this one book from the file it was imported from.
+   *
+   * The panel at launch does the whole shelf in one sweep, which is the right
+   * shape for "everything is behind at once". This is for the leftovers: a book
+   * the sweep couldn't manage, whose failure the reader can now see a reason
+   * for and retry on its own — a shelf-wide button gives neither. The badge on
+   * the tile says "can be improved" and this is what it means.
+   */
+  async function updateThis() {
+    if (state.status !== 'ready') return
+    setUpdating({ status: 'busy' })
+
+    const [outcome] = await reparseBooks([state.book])
+    if (!outcome || outcome.status === 'failed') {
+      setUpdating({ status: 'failed', message: outcome?.message ?? 'Nothing happened.' })
+      return
+    }
+
+    // A re-parse picks its cover afresh, so this book's stored art is stale —
+    // and only this book's. The two shelf memories hold the old title and
+    // position for it as well.
+    forgetCovers([id])
+    forgetShelfMemory()
+    forgetLibraryMemory()
+
+    const book = await repository.getBook(id)
+    if (book) setState({ ...state, book })
+    setUpdating({ status: 'done' })
   }
 
   async function saveNotes(notes: string) {
@@ -153,6 +199,47 @@ export default function BookInfo() {
           </div>
         )}
       </dl>
+
+      {isOutOfDate(book) && updating.status !== 'done' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>This book can be improved</h2>
+          <p className={styles.pending}>
+            It was read by an older version of Reading Buddy.{' '}
+            {hasSource
+              ? 'Re-reading it from the original file improves its links, pictures and chapter breaks. Your place in it is kept.'
+              : 'It was imported before Reading Buddy kept the original file, so it can’t be updated in place — remove it from the Library and import the file again.'}
+          </p>
+
+          {hasSource && (
+            <button
+              type="button"
+              className={styles.updateButton}
+              disabled={updating.status === 'busy'}
+              onClick={() => {
+                void updateThis()
+              }}
+            >
+              {updating.status === 'busy' ? 'Updating…' : 'Update this book'}
+            </button>
+          )}
+
+          {/* The reason, not just the fact. A book that fails the shelf-wide
+              sweep silently is a book with no way forward — the message is
+              usually the difference between "try again" and "re-import it". */}
+          {updating.status === 'failed' && (
+            <p className={styles.updateFailed} role="status">
+              It couldn’t be updated — {updating.message}. The book itself is unchanged and still
+              reads exactly as before.
+            </p>
+          )}
+        </section>
+      )}
+
+      {updating.status === 'done' && (
+        <p className={styles.pending} role="status">
+          Updated. This book has been re-read with the current version.
+        </p>
+      )}
 
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Your rating</h2>

@@ -121,25 +121,9 @@
   border-radius: var(--radius-sm);
 }
 
-/* --- "These books can be improved" ---------------------------------------- */
-
-/*
- * Deliberately not styled as an error. Nothing is broken: the books read
- * perfectly well, they were simply made by an older parser. It sits above the
- * shelf because it is about the whole shelf, and it goes away entirely once
- * there is nothing left to update — a banner that is always there is furniture.
- */
-.update {
-  margin-top: var(--space-4);
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  border: 1px solid var(--color-border);
-  background: var(--color-accent-wash);
-  border-radius: var(--radius-sm);
-}
+/* The "these books can be improved" banner that used to sit above the shelf is
+   gone — the whole-shelf update is the panel at launch now, and a single
+   leftover book is offered its own button on its info page. */
 
 /* Selecting, searching and the per-row controls all moved into
    `src/library/` with the redesign — the selection bar, the tick, the search
