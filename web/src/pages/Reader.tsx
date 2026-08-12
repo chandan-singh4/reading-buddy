@@ -55,6 +55,7 @@ import {
   type Strip,
   type Touch,
 } from '../reader/index.ts'
+import { noteReading } from '../app/shelvesAhead.ts'
 import { repository, type StoredBookmark } from '../storage/index.ts'
 import { tryParseAnchor } from '../structure/index.ts'
 import type {
@@ -1341,7 +1342,7 @@ export default function Reader() {
     const percent = pages?.percent
 
     const timer = window.setTimeout(() => {
-      void repository.savePosition(id, anchorHere, percent).catch(() => {
+      const saved = repository.savePosition(id, anchorHere, percent).catch(() => {
         // Losing a place is a small loss; interrupting reading to report it
         // would be a larger one. The next paragraph tries again anyway.
       })
@@ -1351,9 +1352,18 @@ export default function Reader() {
       // book that already has a date, so reaching the last page again on a
       // re-read changes nothing. Failure is survivable too — the position that
       // proves it is queued, and the next launch backfills from that.
-      if (percent === 100) {
-        void repository.markFinished(id).catch(() => {})
-      }
+      const dated =
+        percent === 100 ? repository.markFinished(id).catch(() => {}) : Promise.resolve()
+
+      // This write is what moves the book to another shelf — out of Unread and
+      // into Current Reading, or on to Finished. Told now, while there is still
+      // a book on screen, the shelves rearrange themselves out of sight and the
+      // reader closes the book onto a shelf that is simply already right. See
+      // `app/shelvesAhead.ts`; both promises are settled first so the rebuild
+      // reads the facts this save just wrote, not the ones before it.
+      void Promise.all([saved, dated]).then(() => {
+        noteReading(id, percent)
+      })
     }, SAVE_AFTER_MS)
 
     return () => {
