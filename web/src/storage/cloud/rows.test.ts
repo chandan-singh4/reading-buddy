@@ -173,6 +173,22 @@ describe('timestamps', () => {
   })
 })
 
+describe('positionFromRow', () => {
+  const bare = { book_id: 'b', anchor: '[ch01-s01-p001]', at: '2026-08-09T10:00:00Z' }
+
+  it('carries the offset past the paragraph back', () => {
+    expect(positionFromRow({ ...bare, percent: 100, within: 8 }).within).toBe(8)
+  })
+
+  it('treats a row from a project without the column as no offset', () => {
+    // `0006_position_within.sql` may not have been run yet, in which case the
+    // key is absent rather than null — and absent has to mean the same thing,
+    // which is the start of the paragraph, which is the old behaviour.
+    expect(positionFromRow({ ...bare, percent: 100 }).within).toBeUndefined()
+    expect(positionFromRow({ ...bare, percent: 100, within: null }).within).toBeUndefined()
+  })
+})
+
 describe('bookToRow', () => {
   it('round-trips a book without losing or inventing a field', () => {
     const row = bareRow({ author: 'James Nestor', folder_ids: ['f1'], rating: 5 })

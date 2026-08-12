@@ -54,6 +54,20 @@ export interface ReadingPosition {
    * rather than guessing.
    */
   percent?: number
+  /**
+   * How many pages past the start of `anchor` the reader actually was.
+   *
+   * The anchor names the paragraph the visible page *begins in*, which is the
+   * right thing to write down and the wrong thing to reopen on: a paragraph
+   * long enough to run over several columns starts pages earlier than the one
+   * being read. Without this, finishing a book and reopening it landed eight
+   * pages short of the end — every time, because the last page of a book is
+   * usually deep inside its longest closing paragraph.
+   *
+   * `undefined` on a position saved before this existed, which is treated as
+   * zero: the old behaviour, for a place that has no better answer stored.
+   */
+  within?: number
 }
 
 /**

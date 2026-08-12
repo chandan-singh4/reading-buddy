@@ -129,6 +129,15 @@ export interface PositionRow {
   anchor: string
   at: string
   percent: number | null
+  /**
+   * Pages past the start of `anchor` — see `ReadingPosition.within`.
+   *
+   * Optional, unlike every other column here, and deliberately: this one was
+   * added by a later migration, so a row selected from a project that hasn't
+   * run `0006_position_within.sql` yet arrives without the key at all rather
+   * than with a null in it.
+   */
+  within?: number | null
 }
 
 export interface SourceRow {
@@ -357,6 +366,11 @@ export function positionFromRow(row: PositionRow): ReadingPosition {
     at: isoFrom(row.at),
   }
   if (row.percent !== null) position.percent = row.percent
+  // `?? null` rather than a plain null check: a row read from a project whose
+  // migration hasn't been run yet has no such key at all, and `undefined` here
+  // has to mean the same thing as null — no offset recorded, start of the
+  // paragraph, which is what every reader of this field already falls back to.
+  if ((row.within ?? null) !== null) position.within = row.within as number
   return position
 }
 

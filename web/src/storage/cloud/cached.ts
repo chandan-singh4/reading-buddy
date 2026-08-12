@@ -599,12 +599,13 @@ export function createCachedRepository(
       anchor: Anchor,
       percent?: number,
       at: string = new Date().toISOString(),
+      within?: number,
     ): Promise<void> {
       return writeThrough(
-        () => cloud.savePosition(bookId, anchor, percent, at),
+        () => cloud.savePosition(bookId, anchor, percent, at, within),
         async () => {
-          await enqueue({ kind: 'savePosition', bookId, anchor, percent, at }, outbox)
-          await mirror(() => cache.savePosition(bookId, anchor, percent, at))
+          await enqueue({ kind: 'savePosition', bookId, anchor, percent, at, within }, outbox)
+          await mirror(() => cache.savePosition(bookId, anchor, percent, at, within))
         },
       )
     },

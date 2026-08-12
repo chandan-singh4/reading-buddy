@@ -553,12 +553,16 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       anchor: Anchor,
       percent?: number,
       at: string = new Date().toISOString(),
+      within?: number,
     ): Promise<void> {
       await database.positions.put({
         bookId,
         anchor,
         at,
         ...(percent === undefined ? {} : { percent }),
+        // Zero is the default everywhere it is read, so storing it would be a
+        // column of noughts describing nothing.
+        ...(within === undefined || within <= 0 ? {} : { within }),
       })
     },
 

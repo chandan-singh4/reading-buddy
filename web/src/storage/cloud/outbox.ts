@@ -67,7 +67,14 @@ export const OUTBOX_DB_NAME = 'reading-buddy-outbox'
  * queued is a kind that can be sent.
  */
 export type QueuedWrite =
-  | { kind: 'savePosition'; bookId: BookId; anchor: Anchor; percent?: number; at: string }
+  | {
+      kind: 'savePosition'
+      bookId: BookId
+      anchor: Anchor
+      percent?: number
+      at: string
+      within?: number
+    }
   | { kind: 'addBookmark'; bookId: BookId; id: string; anchor: Anchor; label: string }
   | { kind: 'deleteBookmark'; bookId: BookId; id: string }
   | { kind: 'renameBookmark'; bookId: BookId; id: string; label: string }
@@ -249,7 +256,13 @@ async function send(cloud: Repository, entry: QueuedEntry, db: OutboxDB): Promis
       // the signal came back — otherwise an hour in a tunnel would beat a laptop
       // write made since, and "most recent write wins" would quietly mean "most
       // recently *reconnected* wins".
-      await cloud.savePosition(entry.bookId, entry.anchor, entry.percent, entry.at)
+      await cloud.savePosition(
+        entry.bookId,
+        entry.anchor,
+        entry.percent,
+        entry.at,
+        entry.within,
+      )
       return
     case 'addBookmark': {
       const row = await cloud.addBookmark(entry.bookId, entry.anchor, entry.label)

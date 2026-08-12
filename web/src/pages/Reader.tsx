@@ -381,6 +381,16 @@ export default function Reader() {
   const [anchorHere, setAnchorHere] = useState<Anchor | undefined>(undefined)
 
   /**
+   * How many pages past the start of `anchorHere` the reader is.
+   *
+   * State rather than a ref, deliberately: the write below is debounced on its
+   * dependencies, and moving through a paragraph that runs over many columns
+   * has to count as movement. See `ReadingPosition.within` for why the offset
+   * is kept at all.
+   */
+  const [withinHere, setWithinHere] = useState(0)
+
+  /**
    * Every place the reader has marked in this book (WP-14).
    *
    * Held in state and edited in place after each write rather than re-read from
@@ -1069,6 +1079,12 @@ export default function Reader() {
         const place = saved ? placeOf(saved.anchor, frame.manifest) : undefined
         if (place && saved) {
           pendingAnchor.current = place.anchor
+          // The offset only means anything against the paragraph it was
+          // measured on. `placeOf` may hand back a *different* anchor when the
+          // saved one no longer exists — a book re-imported by a parser that
+          // divides it differently — and carrying "eight pages in" over to
+          // some other paragraph would turn a near miss into a wild one.
+          pendingWithin.current = place.anchor === saved.anchor ? (saved.within ?? 0) : 0
           setHere(place.here)
           setResumed(!isFresh(saved.at))
         }
@@ -1091,6 +1107,7 @@ export default function Reader() {
     setRestored(false)
     setResumed(false)
     pendingAnchor.current = undefined
+    pendingWithin.current = 0
   }, [id])
 
   /**
@@ -1301,14 +1318,17 @@ export default function Reader() {
         // paragraph or two ahead of where the reader is looking, and coming
         // back scrolls to it and lands them past where they left.
         let found: Anchor | undefined
+        let foundColumn = 1
         let after: Anchor | undefined
         for (const anchor of anchors) {
           const node = document.getElementById(elementIdOf(anchor))
           if (!node) continue
 
           const column = columnOf(node, element)
-          if (column <= showing) found = anchor
-          else {
+          if (column <= showing) {
+            found = anchor
+            foundColumn = column
+          } else {
             after = anchor
             break
           }
@@ -1317,12 +1337,29 @@ export default function Reader() {
         // every paragraph begins later, which is what a section's opening page
         // looks like before anything has been laid out.
         const settled = found ?? after
-        if (settled) setAnchorHere(settled)
+        if (settled) {
+          setAnchorHere(settled)
+          // The other half of the answer, and it has to be recorded here or not
+          // at all: this is the only place that knows both which column is
+          // showing and which column the named paragraph began on.
+          //
+          // It is also what makes a long paragraph save at all. The write below
+          // is debounced on `anchorHere`, so before this existed, scrolling
+          // forty pages through one unbroken closing paragraph changed nothing
+          // the effect could see and nothing was written down — the place
+          // stayed wherever the paragraph was first entered.
+          setWithinHere(found ? Math.max(0, showing - foundColumn) : 0)
+        }
         return
       }
 
       const found = anchorOnScreen(anchors)
-      if (found) setAnchorHere(found)
+      if (found) {
+        setAnchorHere(found)
+        // No columns to be offset within — this is the vertical fallback, used
+        // while a section is still being laid out and under jsdom.
+        setWithinHere(0)
+      }
     }
 
     const onScroll = () => {
@@ -1364,10 +1401,21 @@ export default function Reader() {
     const percent = pages?.percent
 
     const timer = window.setTimeout(() => {
-      const saved = repository.savePosition(id, anchorHere, percent).catch(() => {
-        // Losing a place is a small loss; interrupting reading to report it
-        // would be a larger one. The next paragraph tries again anyway.
-      })
+      // `withinHere` is the other half of the place: `anchorHere` is the
+      // paragraph the visible page *begins in* — deliberate, see the long note
+      // in the scroll listener — and a paragraph running over several columns
+      // starts pages before the one being read. Reopening on its first column
+      // is pages short, most visibly at the end of a book, where the last page
+      // sits deep inside a long closing paragraph.
+      //
+      // `undefined` for `at` takes the default, which is now — only the offline
+      // queue ever passes a time of its own.
+      const saved = repository
+        .savePosition(id, anchorHere, percent, undefined, withinHere)
+        .catch(() => {
+          // Losing a place is a small loss; interrupting reading to report it
+          // would be a larger one. The next paragraph tries again anyway.
+        })
 
       // The end of the book, which is a different kind of fact from where the
       // reader is: it happens once and it is dated. `markFinished` ignores a
@@ -1391,7 +1439,7 @@ export default function Reader() {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [id, restored, anchorHere, pages?.percent])
+  }, [id, restored, anchorHere, withinHere, pages?.percent])
 
   /*
    * ## Bookmarks (WP-14)

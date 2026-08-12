@@ -899,6 +899,7 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
       anchor: Anchor,
       percent?: number,
       at: string = now().toISOString(),
+      within?: number,
     ): Promise<void> {
       unwrap(
         await db().from('positions').upsert({
@@ -906,6 +907,7 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
           anchor,
           at,
           percent: percent ?? null,
+          within: within ?? null,
         }),
         'remember your place',
       )

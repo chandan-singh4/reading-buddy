@@ -169,7 +169,9 @@ export async function copyBook(
     from.listQuotes(id),
     from.listBookmarks(id),
   ])
-  if (position) await to.savePosition(id, position.anchor, position.percent)
+  if (position) {
+    await to.savePosition(id, position.anchor, position.percent, position.at, position.within)
+  }
   for (const quote of quotes) await to.addQuote(id, quote.text)
   for (const bookmark of bookmarks) await to.addBookmark(id, bookmark.anchor, bookmark.label)
 }

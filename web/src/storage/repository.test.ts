@@ -454,6 +454,24 @@ describe('where you stopped reading', () => {
     expect(await repo.listPositions()).toHaveLength(1)
   })
 
+  it('remembers how far past the paragraph the reader was', async () => {
+    // The anchor names the paragraph the page *begins in*, so a long paragraph
+    // starts pages before the one being read. Without this number, reopening
+    // lands on its first column — the bug that put a finished book back at 614
+    // of 622, every single time.
+    await repo.savePosition(bookId('a'), anchor, 100, undefined, 8)
+
+    expect((await repo.getPosition(bookId('a')))?.within).toBe(8)
+  })
+
+  it('stores no offset for a page that starts its own paragraph', async () => {
+    // Which is most of them. Zero is what every reader of this field falls back
+    // to, so writing it down would be a column of noughts describing nothing.
+    await repo.savePosition(bookId('a'), anchor, 40, undefined, 0)
+
+    expect((await repo.getPosition(bookId('a')))?.within).toBeUndefined()
+  })
+
   it('has no place for a book never opened', async () => {
     expect(await repo.getPosition(bookId('ghost'))).toBeUndefined()
   })
