@@ -521,20 +521,46 @@ export function createCachedRepository(
 
     // --- The pictures ------------------------------------------------------
 
+    /**
+     * A book's pictures, on the same rule as its words — and with more riding
+     * on it, because a plate is a hundred times the bytes of the paragraph next
+     * to it. Asking R2 for an image already on the phone is the difference
+     * between a figure that is simply *there* and one the reader watches arrive.
+     *
+     * Merged rather than all-or-nothing, which is the one way this differs from
+     * `wordsFirst`. A screen asks for every picture on it at once, and a copy
+     * still filling in the background will have some of them. Falling back
+     * wholesale would re-fetch the ones already here to collect the ones that
+     * aren't; this asks the cloud only for what is genuinely missing.
+     */
     async getAssets(
       bookId: BookId,
       paths: readonly string[],
     ): Promise<Map<string, Blob>> {
-      return readThrough(
-        () => cloud.getAssets(bookId, paths),
-        () => cache.getAssets(bookId, paths),
+      const found = new Map<string, Blob>()
+      try {
+        for (const [path, blob] of await cache.getAssets(bookId, paths)) found.set(path, blob)
+      } catch {
+        // An unreadable copy is not a reason to fail a read the cloud can serve.
+      }
+
+      const missing = paths.filter((path) => !found.has(path))
+      if (missing.length === 0) return found
+
+      // Absent from the cloud too is a real answer — a figure the parse never
+      // extracted — so this is not retried and not treated as a failure.
+      const fetched = await readThrough(
+        () => cloud.getAssets(bookId, missing),
+        () => cache.getAssets(bookId, missing),
       )
+      for (const [path, blob] of fetched) found.set(path, blob)
+      return found
     },
 
     async listAssetPaths(bookId: BookId): Promise<string[]> {
-      return readThrough(
-        () => cloud.listAssetPaths(bookId),
+      return wordsFirst(
         () => cache.listAssetPaths(bookId),
+        () => cloud.listAssetPaths(bookId),
       )
     },
 

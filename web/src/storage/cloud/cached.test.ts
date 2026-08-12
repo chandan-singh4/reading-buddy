@@ -614,6 +614,37 @@ describe('reading the words', () => {
     )
   })
 
+  /*
+   * A plate is a hundred times the bytes of the paragraph beside it, so this is
+   * where the rule pays best — and the one place it merges rather than choosing,
+   * because a screen asks for all its pictures at once and a copy still filling
+   * will have some of them.
+   */
+  it('takes the pictures the copy has and asks only for the rest', async () => {
+    await inTheCloud('a')
+    await origin.saveAssets(bookId('a'), [
+      { path: 'images/one.png', data: new Blob(['cloud one']) },
+      { path: 'images/two.png', data: new Blob(['cloud two']) },
+    ])
+    await cache.saveBook(makeBook('a'))
+    await cache.saveAssets(bookId('a'), [{ path: 'images/one.png', data: new Blob(['copy one']) }])
+
+    const assets = await repository.getAssets(bookId('a'), ['images/one.png', 'images/two.png'])
+
+    expect(await assets.get('images/one.png')?.text()).toBe('copy one')
+    expect(await assets.get('images/two.png')?.text()).toBe('cloud two')
+  })
+
+  it('still finds the pictures when nothing has been copied yet', async () => {
+    await inTheCloud('a')
+    await origin.saveAssets(bookId('a'), [
+      { path: 'images/one.png', data: new Blob(['cloud one']) },
+    ])
+
+    const assets = await repository.getAssets(bookId('a'), ['images/one.png'])
+    expect(await assets.get('images/one.png')?.text()).toBe('cloud one')
+  })
+
   it('throws the copy away when this device re-parses the book', async () => {
     await inTheCloud('a', { parserVersion: 1 })
     await readAndCache('a')
