@@ -91,5 +91,13 @@
  *   author is now read properly in the same pass: every `dc:creator` the file
  *   credits rather than only the first, skipping the ones labelled as
  *   illustrator or translator.
+ * - **12** — 10 and 11 again, for the same six fields, because there was a
+ *   second wall behind the first. The client was sending the fields correctly
+ *   under 11; `rb_upsert_book` — which lists its columns by hand — had never
+ *   been taught their names, so Postgres read the jsonb it was given and
+ *   silently dropped those six keys on every import and all 32 updates. No
+ *   error, nothing in a log, just nulls. Migration `0005` fixes the function;
+ *   this bump is what asks the books one more time, since 11 already stamped
+ *   them as current on the way past.
  */
-export const PARSER_VERSION = 11
+export const PARSER_VERSION = 12

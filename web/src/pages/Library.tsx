@@ -4,12 +4,8 @@ import {
   dropHasDirectory,
   filesFromDrop,
   importBooks,
-  isOutOfDate,
-  reparseBooks,
   type BatchProgress,
   type ImportOutcome,
-  type ReparseOutcome,
-  type ReparseProgress,
 } from '../import/index.ts'
 import type { BookId, BookMeta, Shelf } from '../structure/index.ts'
 import { repository, type StoredFolder } from '../storage/index.ts'
@@ -57,12 +53,6 @@ const STAGE_LABEL: Record<BatchProgress['stage'], string> = {
   saving: 'Saving',
 }
 
-/** Re-reading books from the files they were imported from. */
-type UpdateState =
-  | { status: 'idle' }
-  | { status: 'busy'; progress: ReparseProgress }
-  | { status: 'done'; outcomes: ReparseOutcome[] }
-
 /**
  * The library: every book the reader owns, as a list or a grid, with the search,
  * filters and sorting that make a shelf of two hundred navigable.
@@ -96,7 +86,6 @@ export default function Library() {
   )
 
   const [importing, setImporting] = useState<ImportState>({ status: 'idle' })
-  const [updating, setUpdating] = useState<UpdateState>({ status: 'idle' })
   const [dragging, setDragging] = useState(false)
 
   /** What has been typed into the search. Empty means "show everything". */
@@ -123,14 +112,6 @@ export default function Library() {
 
   /** The "name your folder" prompt, when it is showing. */
   const [naming, setNaming] = useState<null | { forSelected: boolean }>(null)
-
-  /**
-   * Which books still have the file they were imported from — asked once for
-   * the whole shelf, and answered without touching a single blob.
-   */
-  const [withSource, setWithSource] = useState<Set<BookId>>(
-    () => readLibraryMemory()?.sources ?? new Set(),
-  )
 
   /** How far into each book the reader has got, and when they last opened it. */
   const [progress, setProgress] = useState<LibraryContext['progress']>(
@@ -199,7 +180,6 @@ export default function Library() {
     const memory = await loadLibrary()
     writeLibraryMemory(memory)
     setBooks(memory.books)
-    setWithSource(memory.sources)
     setProgress(memory.progress)
     setFolders(memory.folders)
     setUnavailable(memory.unavailable)
@@ -227,37 +207,15 @@ export default function Library() {
     }
   })
 
-  const busy =
-    importing.status === 'busy' || importing.status === 'scanning' || updating.status === 'busy'
+  const busy = importing.status === 'busy' || importing.status === 'scanning'
 
-  /** Books an improved parser could do better with — see `parse/version.ts`. */
-  const outdated = books.filter(isOutOfDate)
-  const updatable = outdated.filter((book) => withSource.has(book.id))
-  const stranded = outdated.length - updatable.length
-
-  /**
-   * Bring every book that can be updated up to the current parser. The books
-   * keep their identity throughout — same id, same shelf, same place in the
-   * list, same reading position.
+  /*
+   * Books behind the current parser used to be announced here too, on a card
+   * with an "Update N books" button of its own. It has moved to the panel at
+   * launch (`app/UpdatePrompt.tsx`), which already asks about the app itself.
+   * Two updates in two places read as the first one not having worked — a
+   * reader who had just said yes then found this tab insisting on 32 books.
    */
-  async function runUpdate() {
-    if (updatable.length === 0) return
-
-    setUpdating({
-      status: 'busy',
-      progress: { index: 1, total: updatable.length, title: updatable[0]!.title, stage: 'reading' },
-    })
-
-    const outcomes = await reparseBooks(updatable, {
-      onProgress: (progress) => setUpdating({ status: 'busy', progress }),
-    })
-
-    setUpdating({ status: 'done', outcomes })
-    // Only the books that came back updated: a re-parse decides afresh which
-    // image is the cover, so theirs must go — and nobody else's.
-    const rebuilt = outcomes.filter((one) => one.status === 'updated').map((one) => one.bookId)
-    await reload(rebuilt).catch((error: unknown) => failed(error))
-  }
 
   /**
    * `fromFolder` decides whether an unreadable file is worth reporting: a
@@ -518,64 +476,6 @@ export default function Library() {
 
       {importing.status === 'done' && <ImportReport outcomes={importing.outcomes} />}
 
-      {/*
-        A parsed book is a snapshot, so improving the parser does nothing for
-        books already on the shelf and says nothing about itself — the reader
-        sees the old behaviour and reasonably concludes the fix didn't work.
-        This is the shelf telling them, and offering the one tap that fixes it.
-      */}
-      {state.status === 'ready' && outdated.length > 0 && (
-        <div className={styles.update}>
-          <p className={styles.emptyTitle}>
-            {outdated.length === 1
-              ? 'One book can be improved'
-              : `${outdated.length} books can be improved`}
-          </p>
-          <p className={styles.pending}>
-            {outdated.length === 1 ? 'It was' : 'They were'} read by an older version of Reading
-            Buddy. Updating re-reads {outdated.length === 1 ? 'it' : 'them'} from the original file
-            — links, figures and chapter breaks all improve. Your place in{' '}
-            {outdated.length === 1 ? 'the book' : 'each book'} is kept.
-          </p>
-
-          {updatable.length > 0 && (
-            <button
-              type="button"
-              className={styles.importButton}
-              disabled={busy}
-              onClick={() => {
-                void runUpdate()
-              }}
-            >
-              {updating.status === 'busy'
-                ? 'Updating…'
-                : `Update ${updatable.length} ${updatable.length === 1 ? 'book' : 'books'}`}
-            </button>
-          )}
-
-          {/* Said plainly rather than left as a button that quietly does
-              nothing for some rows: these predate the kept file, so the long
-              way round is genuinely the only way. */}
-          {stranded > 0 && (
-            <p className={styles.pending}>
-              {stranded === 1 ? 'One of them was' : `${stranded} of them were`} imported before
-              Reading Buddy kept the original file, so {stranded === 1 ? 'it' : 'they'} can’t be
-              updated in place — remove {stranded === 1 ? 'it' : 'them'} and import the{' '}
-              {stranded === 1 ? 'file' : 'files'} again. That is the last time this will be needed.
-            </p>
-          )}
-
-          {updating.status === 'busy' && (
-            <p className={styles.pending} role="status">
-              {STAGE_LABEL[updating.progress.stage]} “{updating.progress.title}” —{' '}
-              {updating.progress.index} of {updating.progress.total}.
-            </p>
-          )}
-        </div>
-      )}
-
-      {updating.status === 'done' && <UpdateReport outcomes={updating.outcomes} />}
-
       {state.status === 'loading' && <p className={styles.pending}>Loading…</p>}
 
       {state.status === 'failed' && (
@@ -726,43 +626,6 @@ function NameFolder({
       </form>
     </div>
     </Portal>
-  )
-}
-
-/**
- * What happened to each book that was re-read.
- *
- * Named rather than counted where something went wrong: "one book couldn't be
- * updated" is not actionable, and the book that failed is still sitting on the
- * shelf reading exactly as it did before — which is the one saving grace worth
- * stating out loud.
- */
-function UpdateReport({ outcomes }: { outcomes: ReparseOutcome[] }) {
-  const updated = outcomes.filter((outcome) => outcome.status === 'updated')
-  const failed = outcomes.filter((outcome) => outcome.status === 'failed')
-
-  return (
-    <div className={failed.length > 0 ? styles.error : undefined} role="status">
-      <p>
-        {updated.length > 0
-          ? `Updated ${updated.length} ${updated.length === 1 ? 'book' : 'books'}.`
-          : 'No books were updated.'}
-        {failed.length > 0 &&
-          ` ${failed.length} couldn’t be — ${
-            failed.length === 1 ? 'it is' : 'they are'
-          } unchanged and still readable:`}
-      </p>
-
-      {failed.length > 0 && (
-        <ul className={styles.failureList}>
-          {failed.map((outcome) => (
-            <li key={outcome.bookId} className={styles.pending}>
-              <strong>{outcome.title}</strong> — {outcome.message}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   )
 }
 
