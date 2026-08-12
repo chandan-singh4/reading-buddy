@@ -55,7 +55,7 @@ import {
   type Strip,
   type Touch,
 } from '../reader/index.ts'
-import { noteReading } from '../app/shelvesAhead.ts'
+import { knownBook, noteReading } from '../app/shelvesAhead.ts'
 import { repository, type StoredBookmark } from '../storage/index.ts'
 import { tryParseAnchor } from '../structure/index.ts'
 import type {
@@ -67,6 +67,7 @@ import type {
   Section,
   SectionPath,
 } from '../structure/index.ts'
+import { Opening } from './Opening.tsx'
 import styles from './Reader.module.css'
 
 /** The book and its manifest — loaded once, then never again while reading. */
@@ -283,6 +284,27 @@ export default function Reader() {
     previous?: SectionRef
     next?: SectionRef
   }>({})
+
+  /*
+   * Whose book the two states above are describing.
+   *
+   * The route is `/book/:bookId`, so following one book with another changes a
+   * parameter rather than the screen: React keeps this component, and `frame`
+   * and `page` go on holding the *previous* book's answer until the reads for
+   * the new one come back. For a fraction of a second the reader is looking at
+   * a page of the book they just left — or, worse, at "That book isn't in your
+   * library" about a book that is.
+   *
+   * Cleared here, during the render that first sees the new id, rather than in
+   * an effect. An effect runs after paint, which is one frame too late to stop
+   * the wrong thing being painted — and that frame is the whole bug.
+   */
+  const [describing, setDescribing] = useState(id)
+  if (describing !== id) {
+    setDescribing(id)
+    setFrame({ status: 'loading' })
+    setPage({ status: 'loading' })
+  }
 
   /**
    * The pictures for the section on screen, and only that section.
@@ -1621,7 +1643,46 @@ export default function Reader() {
         </Link>
       )}
 
-      {frame.status === 'loading' && <p className={styles.note}>Opening…</p>}
+      {/*
+        No "Opening…" any more. The two waits that word covered — the manifest,
+        then the section — are both behind the cover below, and a line of text
+        that appears and is replaced by another line of text is the flicker this
+        screen keeps being reported for. What is left here is the silence Home
+        already uses for the same moment.
+      */}
+
+      {/*
+        The cover, held over everything until there is a page underneath.
+
+        `book` prefers the loaded copy and falls back to what the shelves
+        already knew, so the cover is drawn on this screen's *first* frame
+        rather than after the first read returns — the read is exactly what the
+        cover is standing in front of. See `app/shelvesAhead.ts`.
+      */}
+      {id && (
+        <Opening
+          /*
+            Keyed, so a different book gets a fresh cover.
+
+            The route is `/book/:bookId` and React Router keeps the same
+            `Reader` element across a change of parameter — which means this
+            component is *not* remounted when one book is followed by another.
+            Its whole state is a clock that starts on mount and a phase that
+            only ever moves forwards, so without the key the second book opens
+            onto a cover that has already finished leaving: no cover at all, and
+            worse, none ever again for the life of the screen.
+          */
+          key={id}
+          id={id}
+          book={frame.status === 'ready' ? frame.book : knownBook(id)}
+          ready={page.status === 'ready'}
+          abandon={
+            frame.status === 'missing' ||
+            frame.status === 'failed' ||
+            page.status === 'failed'
+          }
+        />
+      )}
 
       {frame.status === 'missing' && (
         <p className={styles.note} role="alert">

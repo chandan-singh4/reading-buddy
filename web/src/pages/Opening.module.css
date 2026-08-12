@@ -1,0 +1,118 @@
+/*
+ * The cover a book opens on. See `Opening.tsx` for why it exists at all; this
+ * file is only about what it looks like and how it leaves.
+ */
+
+.opening {
+  /*
+   * `fixed`, not `absolute`. `.reader` is `position: relative` and its padding
+   * makes room for the safe areas, so an absolute child would sit inside those
+   * insets and leave a strip of page showing along the top and bottom edges —
+   * which is the seam this is here to prevent, arriving by the back door.
+   */
+  position: fixed;
+  inset: 0;
+  /* Above the page (0), the ribbon (9) and the reading overlay (10). While the
+     cover is up, nothing behind it is meant to be reachable or visible. */
+  z-index: 20;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /*
+   * Opaque, and the same colour the page will be — including under the reading
+   * themes, which set `--color-bg` on the whole document. Two things depend on
+   * this: nothing behind it shows through while it is up, and the fade below
+   * has nothing to reveal but a page of the identical colour.
+   */
+  background: var(--color-bg);
+}
+
+.plate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  /*
+   * Sized against the *viewport*, not the column. The reading column is
+   * narrowed by the reader's own width setting, and a cover that changed size
+   * with a text preference would be one more thing that moves between openings.
+   */
+  width: min(52vw, 15rem);
+}
+
+/*
+ * The cover, wrapped rather than styled directly.
+ *
+ * `Cover` fills the width it is given, so the wrapper is what sets the size —
+ * and it also means the shadow and radius that make a cover read as an object
+ * stay `Cover`'s business, in one place, rather than being re-stated per screen.
+ */
+.art {
+  width: 100%;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-reading);
+  font-size: var(--text-base);
+  /* Centred and allowed two lines. A long title truncated to an ellipsis on the
+     screen whose whole job is "this is the book you asked for" would undo the
+     point of showing it. */
+  text-align: center;
+  color: var(--color-text);
+}
+
+.author {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/*
+ * Leaving.
+ *
+ * Only the cover moves, and only downwards in opacity — the page beneath is
+ * opaque from its first frame and never fades up. See the note in `Opening.tsx`
+ * about which layer is allowed to be transparent, and `styles/transitions.css`
+ * for the same rule stated where it was first learned.
+ *
+ * The 1.5% lift is what stops this reading as a light being switched off. It is
+ * the cover pulling back out of the way, which is the same gesture as opening
+ * the book, continued.
+ */
+.leaving {
+  animation: coverParts var(--motion-screen, 300ms) var(--ease-emphasis, ease) both;
+  /* Nothing behind it should take a tap during the fade — the page is arriving
+     and a tap landing on the last frame of a cover turns an unread page. */
+  pointer-events: none;
+}
+
+@keyframes coverParts {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+}
+
+/*
+ * Reduced motion: gone, not lingering.
+ *
+ * `1ms` rather than `none`, so there is a definite end to the rule rather than
+ * an absent one. `Opening.tsx` matches this by treating the preference as a
+ * zero-length fade and removing the cover at once, so nothing waits out a
+ * duration it cannot see — the two have to agree, and the comment in `fadeMs`
+ * is the other half of this one.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .leaving {
+    animation-duration: 1ms;
+  }
+}

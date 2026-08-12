@@ -39,11 +39,11 @@
  */
 
 import { shelvesOf } from './homeShelves.ts'
-import { writeLibraryMemory } from './libraryMemory.ts'
-import { writeShelfMemory } from './shelfMemory.ts'
+import { readLibraryMemory, writeLibraryMemory } from './libraryMemory.ts'
+import { readShelfMemory, writeShelfMemory } from './shelfMemory.ts'
 import { progressMap } from '../library/status.ts'
 import { repository, unavailableBooks } from '../storage/index.ts'
-import type { BookId } from '../structure/index.ts'
+import type { BookId, BookMeta } from '../structure/index.ts'
 
 /**
  * One round of reads, feeding both memories.
@@ -107,6 +107,39 @@ export function noteReading(bookId: BookId, percent: number | undefined): void {
     // `moveBooks` makes the correction they then compute a glide rather than a
     // flash. This is an optimisation, and it degrades to the old behaviour.
   })
+}
+
+/**
+ * What is already known about a book, without asking the store.
+ *
+ * The reading screen needs a title and an id on its *first* frame, to draw the
+ * cover it opens on (`pages/Opening.tsx`) — and `repository.getBook` is a
+ * promise, so anything waiting on it has already missed that frame. These two
+ * memories were filled before the book was tapped and hold every book the
+ * reader owns, so the answer is sitting in the page already.
+ *
+ * `undefined` is a fine answer and the screen is built for it: a deep link into
+ * a book on a cold start reaches nothing here, and the opening cover is drawn
+ * blank for the moment before the real one loads.
+ */
+export function knownBook(id: BookId): BookMeta | undefined {
+  const library = readLibraryMemory()
+  const listed = library?.books.find((book) => book.id === id)
+  if (listed) return listed
+
+  // Home's memory is the narrower of the two — four shelves, and Unread capped
+  // at ten — so it is the fallback rather than the first look. It is filled in
+  // the one case the library's is not: a reader who opened the app and went
+  // straight into a book before the library warm had finished.
+  const shelf = readShelfMemory()
+  if (!shelf) return undefined
+  const onShelves = [
+    ...(shelf.shelves.currentlyReading ? [shelf.shelves.currentlyReading.book] : []),
+    ...shelf.shelves.upNext.map((entry) => entry.book),
+    ...shelf.shelves.unread,
+    ...shelf.shelves.finished,
+  ]
+  return onShelves.find((book) => book.id === id)
 }
 
 /** Forget what was last seen. Tests only — the flag is module-level. */
