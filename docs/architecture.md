@@ -142,7 +142,7 @@ web/src/
 | `manifests` | `bookId` | one `Manifest` per book | v1 |
 | `chapters` | `[bookId+chapter]` | one `ChapterIndex` per chapter | v1 |
 | `sections` | `[bookId+path]` | **one row per section** — the retrieval atom | v1 |
-| `positions` | `bookId` | where reading stopped, indexed on `at` | v4 |
+| `positions` | `bookId` | where reading stopped (anchor + `within`, the page offset into it), indexed on `at` | v4 |
 | `sources` | `bookId` | the original file, so a parser fix can be re-applied | v5 |
 | `assets` | `[bookId+path]` | one row per picture, addressed like a section | v6 |
 | `quotes` | `[bookId+id]` | favourite passages | v7 |

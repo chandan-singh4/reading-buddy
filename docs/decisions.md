@@ -942,3 +942,14 @@ sign-in screen.
   waits on `controllerchange`, which can simply not fire; the panel now shows a
   busy state so it never looks dead, refuses a second tap, and reloads on a
   4-second timer regardless. — 2026-08-10
+- **A saved place is a paragraph *and* an offset into it.** The anchor still
+  names the paragraph the visible page begins in — naming the next one is an old
+  bug — so `ReadingPosition.within` carries how many pages past that paragraph's
+  first column the reader was. Without it, a paragraph longer than a column
+  reopens pages early, worst at the end of a book. Absent and null both read as
+  zero, which is the old behaviour and the right answer for a position saved
+  before this or a project that has not run migration `0006`. — 2026-08-12
+- **A book opens onto its cover, not onto a spinner.** The reader's idea, from
+  Google Books: the fraction of a second before the text is ready is held on the
+  cover for 550 ms and faded out, so the wait reads as a book opening rather
+  than as loading. — 2026-08-12

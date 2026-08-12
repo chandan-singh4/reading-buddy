@@ -15,11 +15,16 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **984 tests**.
-- **One chore the app cannot do for itself: apply
-  `supabase/migrations/0003_finished_at.sql`.** Until it runs, finishing a book
-  on the cloud backend errors — harmlessly, it is caught, and the boot backfill
-  picks it up afterwards — but no finish date is stored.
+  **1080 tests across 60 files**, precache 34 entries / 1129.02 KiB
+  (2026-08-12).
+- **Two chores the app cannot do for itself, both Supabase migrations to paste
+  into the SQL editor:**
+  - `supabase/migrations/0003_finished_at.sql`. Until it runs, finishing a book
+    on the cloud backend errors — harmlessly, it is caught, and the boot
+    backfill picks it up afterwards — but no finish date is stored.
+  - `supabase/migrations/0006_position_within.sql`. Until it runs the reopen
+    offset works locally but is dropped on sync — no worse than before it
+    existed, because absent reads as zero.
 - **The next arc is agreed and written up in `active-task.md`:** ISBN from the
   file → Google Books → Stats. Step 1 of that arc (`finishedAt`) is already
   shipped; step 2 needs no API at all.
@@ -37,6 +42,37 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **A book reopens on the page that was left, not the paragraph** — 2026-08-12
+  (`7f6ef3d`). A saved place names the paragraph the visible page *begins in* —
+  right to record, and the comment saying why is still there — but reopening
+  scrolled to where that paragraph *starts*, which for anything longer than a
+  column is pages early. Worst at the end of a book, where the last page sits
+  deep inside a long closing paragraph: a finished book reopened eight pages
+  short, identically, every time. Positions now carry `within`, the page offset
+  past the paragraph's first column, end to end: Dexie, the Supabase row +
+  migration `0006`, the cached wrapper, the outbox and export/import. The
+  reading screen already measured this number for footnote round-trips; it was
+  simply never written down.
+  - **A second fault, visible only in a real browser:** the debounced write was
+    keyed on the *paragraph* changing, so reading forty pages through one
+    unbroken paragraph saved nothing at all. The offset is state now, and in the
+    effect's deps, so that movement is something the write can see.
+  - **Absent and null both read as zero** — the old behaviour, which is right
+    for every position saved before this and for a project that has not run
+    `0006`. Old positions can't heal themselves; they land short once more, then
+    write the real number.
+  - Verified in a browser on a book with one paragraph running 57 columns: the
+    same row lands on page 30 with the offset and page 1 without it. **jsdom
+    cannot prove this — it has no columns.**
+- **A book opens onto its cover, the way a book does** — 2026-08-12 (`dbd1d62`).
+  The reader's idea, from Google Books: the fraction of a second before the text
+  is ready was a loading state, and is now the cover, held 550 ms and then faded
+  out. `pages/Opening.tsx`, keyed on the book id so a second book gets a fresh
+  hold. Reduced motion drops the fade to nothing.
+- **The shelves rearrange while the book is still open** — 2026-08-12
+  (`2b43402`). Coming back from a book no longer showed the old shelf order for
+  a beat; `app/shelvesAhead.ts` seeds the shelf and library memories on the way
+  in.
 - **The day a book was finished is now remembered** — 2026-08-10 (`4f9175c`).
   Groundwork for Stats. "Finished" was already derivable from a 100% position,
   but only as a *fact*, never as a *date*: a position's `at` is the last page
@@ -84,90 +120,14 @@ Get that loop working before building any breadth.
     marks after them, so tests were cutting the signal mid-copy. `copyInFlight`
     now exposes the real "is it done?".
   - Gates: **976 tests**, typecheck and build green.
-- **WP-58 step 5 · The offline write queue** — 2026-08-10. Bookmarks, saved
-  passages and page turns now survive a tunnel: applied to the offline copy so
-  the reader sees them immediately, recorded in `cloud/outbox.ts`, sent when
-  there is a signal (the `online` event, launch, or any write that gets through).
-  - **The queue is its own database, `reading-buddy-outbox`.** The obvious home
-    was a table in the cache — and the cache is the one store in the app that is
-    *safe to delete at any moment*, while a queued bookmark is the one thing here
-    that exists nowhere else. Different lifetimes, different databases.
-  - **The id map has to be durable, and a test is what proved it.** The cloud
-    mints its own ids, so a bookmark made offline keeps the *copy's* id for as
-    long as that copy lives — a delete queued a week later still names it.
-    Rewriting whatever happened to be queued at drain time was the first attempt
-    and it was wrong within one reconnect.
-  - **`looksOffline` now decides whether a queued write is kept or dropped.** A
-    refusal from a reachable cloud (RLS, a book deleted elsewhere) is dropped —
-    a queue that retries the impossible never empties. A lost signal *stops* the
-    drain rather than skipping ahead, because the order is part of the meaning.
-  - **A page turn replaces the pending one.** Position is written every few
-    seconds; an hour offline would otherwise be hundreds of rows saying
-    increasingly stale versions of one fact.
-  - **Two interface additions, each making a settled rule actually true.**
-    `savePosition(…, at?)` carries the moment the page was turned, so a replayed
-    tunnel can't outrank a newer write from a laptop; `addQuote` returns its row
-    like `addBookmark` always did, so the id is knowable.
-  - **Deleting a book still refuses** — now in words about books rather than
-    about the network, and a successful delete drops that book's queued writes.
-  - Gates: **967 tests** (24 new), typecheck, build.
-- **WP-58 · Cloud books readable with no signal** — 2026-08-10, merged to `main`
-  (`5476ac6`, `23e3787`, `39773be`). **Started with a decision, not an editor**:
-  the waypoint said it owed a conflict rule before it owed any code.
-  - **The conflict problem mostly dissolved when named properly.** Highlights
-    and bookmarks are *additive* — two devices each adding one means you end up
-    with both, which is the correct answer arriving by itself, not a conflict.
-    That leaves exactly one single-valued field (position, settled by newest
-    timestamp) and one action with no honest automatic merge (delete, which now
-    needs a signal). Full reasoning in `decisions.md`.
-  - **The cache is a second database, `reading-buddy-cache`** — same schema,
-    different name, invisible on every shelf. Caching into the device library
-    would have been fewer lines and quietly catastrophic: "32 books here" under
-    the unselected option would stop meaning anything.
-  - **This is what WP-57 was secretly for.** Filling the cache is
-    `copyBook(cloud, cache, …)` — the copier written the day before, pointed at
-    a different target, because it was written against `Repository` and never
-    learns direction.
-  - **Caching fires on `getSection`, not on `getManifest`.** The library screen
-    touches every book, and a shelf that quietly downloaded thirty-two books
-    because it was scrolled past is a bug the reader pays for in data.
-  - **Two faults the phone found, both mine, both now rules.** (1) `loadLibrary`
-    fires four reads in one `Promise.all`; three had a fallback and the fourth —
-    a check about the *Update* button — did not, so its failure binned three
-    good answers and the whole screen said *"Couldn't open your library."*
-    **`Promise.all` fails as a group**, so "is this a reading call?" is the
-    wrong question. (2) The code asserted that asking a dead network was free.
-    With Wi-Fi off it is dozens of requests each with its own DNS attempt, and
-    the reader watched the library crawl — `navigator.onLine === false` now
-    short-circuits to the copy.
-  - **A twenty-book ceiling, least recently read dropped first**, with the
-    reading order in `localStorage` rather than a table (the schema is shared
-    with the device library — a migration would run over 32 real books to
-    support a copy that can be thrown away), plus a pressure valve for when the
-    browser refuses a write for want of room.
-  - Gates: **943 tests** (47 new), typecheck, build.
-- **WP-57 · Copy a library between device and cloud** — 2026-08-10, merged to
-  `main` (`7ff0415`, `af3a30c`). The "push my 32 books up" button and its
-  reverse. `storage/transfer.ts` reads through one `Repository` and writes
-  through the other, book by book so a dropped signal costs one book rather than
-  the run, skipping what is already there. **Written against the interface with
-  no notion of direction** — which is the only reason WP-58's cache fill cost
-  nothing the next day. A real progress screen, because 32 books is minutes and
-  a silent spinner over a multi-minute upload is indistinguishable from a hang.
-- **The text moved out of Postgres into R2** — 2026-08-10 (`c31e54a`). Sections
-  are one JSON object per chapter, keyed by book and parse token; the database
-  keeps only the address. Costs one extra hop (~150 ms) on the first read of a
-  chapter and keeps the database slim for years. This is also what made WP-58
-  cheap: **every read of a book's bytes now goes through one fetch**, which is
-  the single place a cache belongs.
 - **Older rounds — WP-53, WP-54, WP-55, the first cloud write-up, the sign-in
   toggle and the first live setup — dropped
   from here to keep this file short.** Each has a full entry in `docs/backlog.md`
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (984, 54 files), `npm run typecheck`, `npm run build` — all
-passing as of 2026-08-10. Precache 34 entries / 1116.6 KiB. Every
+**Gates:** `npm test` (1080, 60 files), `npm run typecheck`, `npm run build` — all
+passing as of 2026-08-12. Precache 34 entries / 1129.02 KiB. Every
 parser stays behind a dynamic `import()`, so pdf.js (434 kB) and mammoth
 (500 kB) remain in their own chunks and are fetched only when a file of that
 type is imported.

@@ -99,6 +99,10 @@ Not waiting on the reader's taste — waiting on a file or a chore.
   editor.** Until it runs, finishing a book on the cloud backend errors — caught,
   so nothing breaks — and no finish date is stored. The boot backfill fills them
   in afterwards from the 100% positions, so nothing is lost by the delay.
+- **Apply `supabase/migrations/0006_position_within.sql` in the Supabase SQL
+  editor.** Until it runs, the reopen offset works on the device but is dropped
+  on sync — no worse than before it existed, since a missing column reads as
+  "no offset".
 - **Run Library → Update** to pull covers forward to `PARSER_VERSION` 9. If
   *Beyond Mindfulness in Plain English* still shows a placeholder afterwards,
   **ask for the epub before diagnosing** — all four cover rules are unit-tested.
@@ -231,4 +235,14 @@ so a future session recognises them as decisions rather than loose ends.
 - **A copy of the strip is a scrolling box.** Hang overlays on the non-scrolling
   wrapper `copyOf` returns.
 - **A page is a column plus its gap.** Use `measure().pageWidth`.
+- **A debounced effect only fires on what is in its deps.** The position write
+  was keyed on the *paragraph*, so reading forty pages through one unbroken
+  paragraph saved nothing at all — invisible in jsdom, which has no columns, and
+  found only by driving a real browser. When state changes continuously but the
+  key does not, the key is wrong.
+- **A hidden preview pane runs no `requestAnimationFrame` and fires no scroll
+  events on a programmatic `scrollLeft`.** `visibilityState` is `hidden`, so rAF
+  callbacks never run and screenshots fail ("not compositing frames"). Shim rAF
+  onto `setTimeout` and dispatch a synthetic `scroll` to test. **Animation
+  timing genuinely cannot be observed there.**
 - **No 3D transform on a shelf tile.**
