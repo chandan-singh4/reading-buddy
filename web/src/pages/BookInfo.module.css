@@ -137,6 +137,18 @@
   font-weight: 600;
 }
 
+/**
+ * The publisher's blurb. Sized down and muted because it is somebody else's
+ * marketing copy sitting on the reader's own page — present for reference, not
+ * competing with the title above it.
+ */
+.blurb {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
 .section {
   display: grid;
   gap: var(--space-2);

@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { dismissSplash } from './app/splash.ts'
+import { backfill, catalogueDeps } from './catalogue/index.ts'
 import { watchForUpdates } from './app/updates.ts'
 import { applyStoredTheme } from './reader/readerSettings.ts'
 import { repository } from './storage/index.ts'
@@ -57,6 +58,23 @@ async function boot(container: HTMLElement): Promise<void> {
       <App />
     </StrictMode>,
   )
+
+  // Fill in publisher, length, genre and covers from Google Books for any book
+  // that has never been asked about.
+  //
+  // After the render and never awaited, because this is the one boot chore that
+  // talks to somebody else's server: a shelf of 32 books is a minute of
+  // background requests, and nothing on the first screen is waiting for it. It
+  // stamps every book it asks about — including the ones the catalogue has no
+  // record of — so the second launch finds nothing to do, and it stops dead on
+  // the first network failure rather than spending a rate limit that is already
+  // the problem. See `catalogue/refresh.ts`.
+  //
+  // What it will *not* do is update the shelf that is already on screen: the
+  // library reads its books once when it mounts. New covers and details appear
+  // on the next navigation, which is the same bargain `backfillFinishedAt`
+  // makes above and is why this isn't allowed to hold up the launch.
+  void backfill(catalogueDeps()).catch(() => {})
 
   // After the render, and inside the same function as the `healTitles()` await
   // above — which is the whole reason the launch screen exists. That await is

@@ -218,6 +218,67 @@ describe('BookInfo', () => {
     })
   })
 
+  describe('what the catalogue said', () => {
+    it('shows the details a lookup filled in', async () => {
+      await repository.saveParsedBook(
+        bookOf({
+          googleVolumeId: 'v1',
+          publisher: 'Oxford University Press',
+          published: '1995',
+          pageCount: 372,
+          genre: 'Non-fiction',
+        }),
+      )
+      openInfo()
+
+      await screen.findByText('The Fundamental Wisdom')
+      expect(screen.getByText('Oxford University Press')).toBeTruthy()
+      expect(screen.getByText('372')).toBeTruthy()
+      expect(screen.getByText('Non-fiction')).toBeTruthy()
+    })
+
+    // An average resting on two votes, shown as a verdict, is a lie of omission.
+    it('never shows an average rating without the count beside it', async () => {
+      await repository.saveParsedBook(bookOf({ averageRating: 4.5, ratingsCount: 2 }))
+      openInfo()
+
+      await screen.findByText('The Fundamental Wisdom')
+      expect(screen.getByText('4.50 out of 5 · 2 ratings')).toBeTruthy()
+    })
+
+    it('leaves the average out entirely when nobody has rated it', async () => {
+      await repository.saveParsedBook(bookOf({ averageRating: 4.5 }))
+      openInfo()
+
+      await screen.findByText('The Fundamental Wisdom')
+      expect(screen.queryByText(/out of 5/)).toBeNull()
+    })
+
+    // The three states have to read differently, because only one of them means
+    // "pressing this again might help".
+    it('says a book has never been looked up', async () => {
+      await repository.saveParsedBook(bookOf())
+      openInfo()
+
+      expect(await screen.findByText('Nothing has been looked up for this book yet.')).toBeTruthy()
+    })
+
+    it('says a book was looked up and genuinely isn’t in the catalogue', async () => {
+      await repository.saveParsedBook(bookOf({ metadataFetchedAt: '2026-08-12T10:00:00.000Z' }))
+      openInfo()
+
+      expect(await screen.findByText('Google Books has no record of this one.')).toBeTruthy()
+    })
+
+    it('offers to ask again', async () => {
+      await repository.saveParsedBook(bookOf())
+      openInfo()
+
+      await screen.findByText('The Fundamental Wisdom')
+      expect(screen.getByRole('button', { name: 'Refresh from Google Books' })).toBeTruthy()
+    })
+  })
+
   it('removes a saved quote', async () => {
     await repository.saveParsedBook(bookOf())
     await repository.addQuote(BOOK_ID, 'Take this one away.')

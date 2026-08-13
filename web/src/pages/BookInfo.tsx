@@ -6,6 +6,7 @@ import { forgetLibraryMemory } from '../app/libraryMemory.ts'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
 import { fullTitle } from '../app/title.ts'
 import { forgetCovers, useCovers } from '../app/useCovers.ts'
+import { catalogueDeps, refreshBook } from '../catalogue/index.ts'
 import { isOutOfDate, reparseBooks } from '../import/index.ts'
 import { repository, type StoredQuote } from '../storage/index.ts'
 import type { ReadingPosition } from '../storage/db.ts'
@@ -32,6 +33,16 @@ type UpdateState =
   | { status: 'idle' }
   | { status: 'busy' }
   | { status: 'done' }
+  | { status: 'failed'; message: string }
+
+/** Asking Google about this one book. */
+type CatalogueState =
+  | { status: 'idle' }
+  | { status: 'busy' }
+  | { status: 'matched' }
+  /** Asked, and genuinely not in the catalogue. A real answer, said as one. */
+  | { status: 'unmatched' }
+  /** Never asked — the network, not the book. Said differently on purpose. */
   | { status: 'failed'; message: string }
 
 function readingStatus(position: ReadingPosition | undefined): string {
@@ -61,6 +72,7 @@ export default function BookInfo() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [quotes, setQuotes] = useState<StoredQuote[]>([])
   const [updating, setUpdating] = useState<UpdateState>({ status: 'idle' })
+  const [catalogue, setCatalogue] = useState<CatalogueState>({ status: 'idle' })
   /** Whether the file this book came from is still kept — see `updateThis`. */
   const [hasSource, setHasSource] = useState(false)
 
@@ -121,6 +133,33 @@ export default function BookInfo() {
     setUpdating({ status: 'done' })
   }
 
+  /**
+   * Ask Google Books about this book again.
+   *
+   * Here rather than only in the launch sweep for the same reason the Update
+   * button is: the sweep handles "everything is behind at once", and this
+   * handles the leftovers — the four or five books it couldn't match, and the
+   * one whose cover came back wrong. It re-asks even for a book already
+   * stamped, because the reader pressing the button *is* the reason to ask.
+   */
+  async function refreshFromCatalogue() {
+    if (state.status !== 'ready') return
+    setCatalogue({ status: 'busy' })
+
+    const outcome = await refreshBook(state.book, catalogueDeps())
+    if (outcome.status === 'failed') {
+      setCatalogue({ status: 'failed', message: outcome.reason })
+      return
+    }
+
+    // A fetched cover lands in the book's assets, so this book's cached art is
+    // stale — and only this book's.
+    forgetCovers([id])
+    const book = await repository.getBook(id)
+    if (book) setState({ ...state, book })
+    setCatalogue({ status: outcome.status })
+  }
+
   async function saveNotes(notes: string) {
     if (state.status !== 'ready') return
     setState({ ...state, book: { ...state.book, notes: notes || undefined } })
@@ -167,6 +206,7 @@ export default function BookInfo() {
           {book.author && <p className={styles.author}>{book.author}</p>}
           <div className={styles.tags}>
             <span className={styles.tag}>{FORMAT_LABELS[book.source]}</span>
+            {book.genre && <span className={styles.tag}>{book.genre}</span>}
             {book.subject && <span className={styles.tag}>{book.subject}</span>}
           </div>
         </div>
@@ -187,7 +227,38 @@ export default function BookInfo() {
             <dd>{dateOf(position.at)}</dd>
           </div>
         )}
+        {book.publisher && (
+          <div className={styles.fact}>
+            <dt>Publisher</dt>
+            <dd>{book.publisher}</dd>
+          </div>
+        )}
+        {book.published && (
+          <div className={styles.fact}>
+            <dt>Published</dt>
+            <dd>{book.published}</dd>
+          </div>
+        )}
+        {book.pageCount !== undefined && (
+          <div className={styles.fact}>
+            <dt>Pages</dt>
+            <dd>{book.pageCount}</dd>
+          </div>
+        )}
+        {/* Never one without the other. Every average in this library rests on
+            one or two votes, and "4.5" alone reads as a verdict. */}
+        {book.averageRating !== undefined && book.ratingsCount !== undefined && (
+          <div className={styles.fact}>
+            <dt>Readers</dt>
+            <dd>
+              {book.averageRating.toFixed(2)} out of 5 · {book.ratingsCount.toLocaleString()}{' '}
+              {book.ratingsCount === 1 ? 'rating' : 'ratings'}
+            </dd>
+          </div>
+        )}
       </dl>
+
+      {book.description && <p className={styles.blurb}>{book.description}</p>}
 
       {isOutOfDate(book) && updating.status !== 'done' && (
         <section className={styles.section}>
@@ -229,6 +300,50 @@ export default function BookInfo() {
           Updated. This book has been re-read with the current version.
         </p>
       )}
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionHeading}>Book details</h2>
+        <p className={styles.pending}>
+          {book.googleVolumeId
+            ? 'Publisher, length and cover came from Google Books.'
+            : book.metadataFetchedAt
+              ? // Said plainly. This book is genuinely not in the catalogue,
+                // which is a fact about Google and not about the book.
+                'Google Books has no record of this one.'
+              : 'Nothing has been looked up for this book yet.'}
+        </p>
+
+        <button
+          type="button"
+          className={styles.updateButton}
+          disabled={catalogue.status === 'busy'}
+          onClick={() => {
+            void refreshFromCatalogue()
+          }}
+        >
+          {catalogue.status === 'busy' ? 'Looking…' : 'Refresh from Google Books'}
+        </button>
+
+        {catalogue.status === 'matched' && (
+          <p className={styles.pending} role="status">
+            Updated from Google Books.
+          </p>
+        )}
+        {catalogue.status === 'unmatched' && (
+          <p className={styles.pending} role="status">
+            Google Books has no record of this one. Nothing about the book has changed.
+          </p>
+        )}
+        {/* Deliberately not the same sentence as "no record". One means the
+            catalogue answered; this means it never did, and the difference is
+            whether pressing the button again is worth anything. */}
+        {catalogue.status === 'failed' && (
+          <p className={styles.updateFailed} role="status">
+            Google Books couldn’t be reached — {catalogue.message}. Nothing was changed; try again
+            later.
+          </p>
+        )}
+      </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Your rating</h2>
