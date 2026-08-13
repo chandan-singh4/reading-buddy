@@ -68,7 +68,7 @@
 import { useEffect, useState } from 'react'
 
 import type { BookId } from '../structure/index.ts'
-import { COVER_ASSET_PATH, repository } from '../storage/index.ts'
+import { COVER_ASSET_PATH, FETCHED_COVER_ASSET_PATH, repository } from '../storage/index.ts'
 import { dropStoredCovers, readStoredCovers, storeCover } from './coverStore.ts'
 
 /**
@@ -222,8 +222,15 @@ async function adopt(bookId: BookId, blob: Blob): Promise<void> {
 async function fetchInto(bookId: BookId): Promise<void> {
   if (covers.has(bookId) || uncovered.has(bookId)) return
   try {
-    const assets = await repository.getAssets(bookId, [COVER_ASSET_PATH])
-    const blob = assets.get(COVER_ASSET_PATH) ?? null
+    const assets = await repository.getAssets(bookId, [
+      COVER_ASSET_PATH,
+      FETCHED_COVER_ASSET_PATH,
+    ])
+    // The book's own cover first, the catalogue's second. The file is the
+    // edition actually held; Google's is the edition it matched, which is
+    // usually the same picture and occasionally a different printing's. Both
+    // beat the coloured letter a book with neither falls back to.
+    const blob = assets.get(COVER_ASSET_PATH) ?? assets.get(FETCHED_COVER_ASSET_PATH) ?? null
 
     // Kept on the device before it is even painted, so this is the last time
     // this book's cover costs a network read. Not awaited: the write is for the

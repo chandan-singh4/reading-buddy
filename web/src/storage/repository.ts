@@ -54,6 +54,21 @@ export interface BookAsset {
  */
 export const COVER_ASSET_PATH = '__cover__'
 
+/**
+ * The same idea for a cover fetched from the catalogue, kept at its own key so
+ * it can never overwrite the one the book itself supplied.
+ *
+ * **Bytes, not a link.** Google's `imageLinks` are URLs into Google's servers,
+ * and a stored URL is a picture that disappears when the link rots and is
+ * missing every time the phone is offline — which is most of the point of this
+ * app. Fetched once and written here, it rides the same upload, cache and
+ * offline paths as every other asset, for free.
+ *
+ * A re-parse rewrites `COVER_ASSET_PATH` and leaves this one alone; the two
+ * sources are independent, and `useCovers` prefers the file's own.
+ */
+export const FETCHED_COVER_ASSET_PATH = '__cover_fetched__'
+
 /** Everything a parser produces for one book, written atomically. */
 export interface ParsedBook {
   meta: BookMeta

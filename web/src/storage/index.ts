@@ -27,7 +27,7 @@ export type {
   StoredSource,
 } from './db.ts'
 
-export { COVER_ASSET_PATH, createRepository } from './repository.ts'
+export { COVER_ASSET_PATH, FETCHED_COVER_ASSET_PATH, createRepository } from './repository.ts'
 export type { BookAsset, ParsedBook, Repository } from './repository.ts'
 
 export { BACKEND_KEY, activeBackend, chooseBackend, resolveBackend } from './backend.ts'

@@ -88,6 +88,10 @@ export interface BookRow {
   google_isbn13: string | null
   google_isbn10: string | null
   page_count: number | null
+  printed_page_count: number | null
+  height_mm: number | null
+  width_mm: number | null
+  thickness_mm: number | null
   genre: string | null
   genre_overridden: boolean | null
   average_rating: number | null
@@ -246,6 +250,10 @@ export function bookFromRow(row: BookRow): BookMeta {
   if (row.google_isbn13 !== null) meta.googleIsbn13 = row.google_isbn13
   if (row.google_isbn10 !== null) meta.googleIsbn10 = row.google_isbn10
   if (row.page_count !== null) meta.pageCount = row.page_count
+  if (row.printed_page_count !== null) meta.printedPageCount = row.printed_page_count
+  if (row.height_mm !== null) meta.heightMm = row.height_mm
+  if (row.width_mm !== null) meta.widthMm = row.width_mm
+  if (row.thickness_mm !== null) meta.thicknessMm = row.thickness_mm
   if (row.genre !== null) meta.genre = row.genre
   if (row.genre_overridden !== null) meta.genreOverridden = row.genre_overridden
   // `numeric` comes back from PostgREST as a JSON number, but a string is legal
@@ -297,6 +305,10 @@ export function bookToRow(meta: BookMeta): BookRow {
     google_isbn13: orNull(meta.googleIsbn13),
     google_isbn10: orNull(meta.googleIsbn10),
     page_count: orNull(meta.pageCount),
+    printed_page_count: orNull(meta.printedPageCount),
+    height_mm: orNull(meta.heightMm),
+    width_mm: orNull(meta.widthMm),
+    thickness_mm: orNull(meta.thicknessMm),
     genre: orNull(meta.genre),
     genre_overridden: orNull(meta.genreOverridden),
     average_rating: orNull(meta.averageRating),

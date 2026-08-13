@@ -6,11 +6,13 @@ import { dropStoredCovers, readStoredCovers, storeCover } from './coverStore.ts'
 import type { BookId } from '../structure/index.ts'
 
 const COVER_PATH = 'cover.png'
+const FETCHED_PATH = 'cover-fetched.png'
 
 const getAssets = vi.fn<(bookId: BookId, paths: readonly string[]) => Promise<Map<string, Blob>>>()
 
 vi.mock('../storage/index.ts', () => ({
   COVER_ASSET_PATH: 'cover.png',
+  FETCHED_COVER_ASSET_PATH: 'cover-fetched.png',
   repository: {
     getAssets: (bookId: BookId, paths: readonly string[]) => getAssets(bookId, paths),
   },
@@ -57,6 +59,30 @@ describe('covers across launches', () => {
     expect(await (await readStoredCovers([id('a')])).get(id('a'))?.text()).toBe('art')
   })
 
+  it('falls back to the catalogue’s cover when the book supplied none', async () => {
+    getAssets.mockResolvedValue(new Map([[FETCHED_PATH, blobOf('google art')]]))
+    const { loadCovers } = await relaunch()
+
+    await loadCovers([id('a')])
+
+    expect(await (await readStoredCovers([id('a')])).get(id('a'))?.text()).toBe('google art')
+  })
+
+  // The file is the edition actually held; Google's is the edition it matched.
+  it('prefers the book’s own cover over the catalogue’s', async () => {
+    getAssets.mockResolvedValue(
+      new Map([
+        [FETCHED_PATH, blobOf('google art')],
+        [COVER_PATH, blobOf('own art')],
+      ]),
+    )
+    const { loadCovers } = await relaunch()
+
+    await loadCovers([id('a')])
+
+    expect(await (await readStoredCovers([id('a')])).get(id('a'))?.text()).toBe('own art')
+  })
+
   it('does not go back to the repository on the next launch', async () => {
     // The whole point. Before this, every launch re-read every cover — which on
     // the cloud backend is Supabase and then R2, and is the second of
@@ -93,7 +119,7 @@ describe('covers across launches', () => {
     await loadCovers([id('known'), id('fresh')])
 
     expect(getAssets).toHaveBeenCalledTimes(1)
-    expect(getAssets).toHaveBeenCalledWith(id('fresh'), [COVER_PATH])
+    expect(getAssets).toHaveBeenCalledWith(id('fresh'), [COVER_PATH, FETCHED_PATH])
   })
 
   it('forgetting a book clears it from the device too', async () => {

@@ -12,6 +12,13 @@
 -- would break the app in the gap between them. The drops go in `0008`, once the
 -- shipped code has stopped reading them.
 --
+-- **The cover is deliberately not here.** Google's `imageLinks` are URLs into
+-- Google's own servers, and a URL in a column is a picture that vanishes when
+-- someone else's link rots and is missing whenever the phone is offline — which
+-- is most of the point of this app. The bytes are fetched once and stored as a
+-- book asset in R2 (`__cover_fetched__`), beside the one the epub supplied, so
+-- the existing upload, cache and offline paths carry it for free.
+--
 -- Everything is nullable and null for every book until the lookup runs. Twelve
 -- of the 32 will keep a null `google_volume_id` even afterwards — five matched
 -- nothing, and Stats is required to say "n books uncounted" rather than quietly
@@ -42,6 +49,27 @@ alter table public.books
   -- and editions disagree by ~10% (Alaska came back 1178 and 1152 and 915).
   -- Say so before someone tries to "fix" it.
   add column if not exists page_count integer,
+
+  -- The same book, counted the other way: `page_count` is the numbered body,
+  -- `printed_page_count` includes the front matter nobody numbers (304 and 306
+  -- for Breath). Kept because it is free and the difference is occasionally the
+  -- interesting part, not because Stats should prefer it — it doesn't fix the
+  -- ~10% disagreement between editions, which is a property of editions.
+  add column if not exists printed_page_count integer,
+
+  -- The physical object, in **millimetres**.
+  --
+  -- Google sends strings with units baked in (`"24.00 cm"`), which is a fine
+  -- thing to display and a useless thing to compute with. Parsing happens once,
+  -- on the way in, so that a shelf drawn to scale is arithmetic rather than
+  -- string-handling — and so a book that reports its size in inches is
+  -- converted at the boundary instead of poisoning a comparison later.
+  --
+  -- Integers: a tenth of a millimetre is far below the precision of a number
+  -- that was rounded to two decimal places in centimetres to begin with.
+  add column if not exists height_mm integer,
+  add column if not exists width_mm integer,
+  add column if not exists thickness_mm integer,
 
   -- The coarse label, kept verbatim: `Fiction`, `Juvenile Fiction`,
   -- `Juvenile Nonfiction`, or `Non-fiction` for everything else.

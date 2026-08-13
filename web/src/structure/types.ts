@@ -227,6 +227,23 @@ export interface BookMeta {
    */
   pageCount?: number
   /**
+   * The same book counted the other way — body pages plus the front matter
+   * nobody numbers (304 and 306 for *Breath*). Kept because it is free; Stats
+   * still totals `pageCount`.
+   */
+  printedPageCount?: number
+  /**
+   * The physical object, in **millimetres**, parsed once on the way in.
+   *
+   * Google sends `"24.00 cm"` — good to print, useless to compute with. Storing
+   * numbers means a shelf drawn to scale is arithmetic, and a book that reports
+   * itself in inches is converted at the boundary rather than silently
+   * out-ranking every other book on the shelf.
+   */
+  heightMm?: number
+  widthMm?: number
+  thicknessMm?: number
+  /**
    * The coarse label, verbatim: `Fiction`, `Juvenile Fiction`,
    * `Juvenile Nonfiction`, or `Non-fiction`.
    *
