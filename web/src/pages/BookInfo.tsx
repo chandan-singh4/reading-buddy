@@ -336,11 +336,14 @@ export default function BookInfo() {
         )}
         {/* Deliberately not the same sentence as "no record". One means the
             catalogue answered; this means it never did, and the difference is
-            whether pressing the button again is worth anything. */}
+            whether pressing the button again is worth anything.
+
+            The reason is a lowercase fragment that finishes this sentence
+            ("…couldn't ask Google Books — you're offline"), so that each cause
+            says what to do rather than quoting a status number twice over. */}
         {catalogue.status === 'failed' && (
           <p className={styles.updateFailed} role="status">
-            Google Books couldn’t be reached — {catalogue.message}. Nothing was changed; try again
-            later.
+            Couldn’t ask Google Books — {catalogue.message}. Nothing about the book was changed.
           </p>
         )}
       </section>

@@ -23,17 +23,52 @@ const BOOKS_URL =
 
 async function post(body: unknown): Promise<Response> {
   const token = await accessToken()
-  const response = await fetch(BOOKS_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
-  })
 
-  if (!response.ok) {
-    if (response.status === 401) throw new CloudError('Your session has expired. Sign in again.')
-    throw new CloudError(`The book catalogue could not be reached (${response.status}).`)
+  let response: Response
+  try {
+    response = await fetch(BOOKS_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    // `fetch` rejects with a bare "Failed to fetch" for every network-level
+    // problem, which on a phone means one thing far more often than not.
+    throw new CloudError('you’re offline')
   }
+
+  if (!response.ok) throw new CloudError(reasonFor(response.status))
   return response
+}
+
+/**
+ * What went wrong, in words that suggest what to do about it.
+ *
+ * Every one of these is shown to the reader on the book's own page, so a bare
+ * status number is a wasted sentence: it tells them something failed, which they
+ * already know from the fact that nothing happened. The useful part is whether
+ * to press the button again, wait a day, sign in, or tell someone the server is
+ * misconfigured — and those are four different answers.
+ */
+function reasonFor(status: number): string {
+  switch (status) {
+    case 401:
+      return 'you’re signed out'
+    case 403:
+    case 429:
+      // Google's free tier is about a thousand requests a day and a book costs
+      // two, so a full backfill of a large shelf can genuinely reach it. It
+      // resets on its own, which is the one thing worth saying.
+      return 'today’s lookup limit is used up — it resets tomorrow'
+    case 404:
+      // Not "no such book": this is the *endpoint* missing, which means the app
+      // is talking to a server that was never given the lookup function.
+      return 'this copy of the app has no lookup service'
+    case 503:
+      return 'the lookup service has no Google Books key'
+    default:
+      return status >= 500 ? 'Google Books is having trouble' : `something went wrong (${status})`
+  }
 }
 
 /** A search result, stripped to the only field worth taking from a stub: its id. */

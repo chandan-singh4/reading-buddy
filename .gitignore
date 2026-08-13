@@ -23,8 +23,13 @@ web/public/sw.js
 web/public/workbox-*.js
 
 # Source material — large binaries / copyrighted. Kept on disk, out of history.
-books/
-research-paper/
+#
+# Anchored with a leading slash, and it matters. A bare `books/` matches a
+# directory of that name at ANY depth, which silently swallowed `api/books/` —
+# the Google Books endpoint committed clean, deployed to nothing, and answered
+# 404. Only the two directories at the repo root are source material.
+/books/
+/research-paper/
 
 # Python scratch
 __pycache__/
