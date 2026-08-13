@@ -34,12 +34,38 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
+
   /*
+   * Roughly what the title and the author take underneath, gaps included. Two
+   * lines of title is the case being budgeted for, since that is what `.title`
+   * allows; a one-line title simply leaves the cover a little more air than it
+   * claimed. It is a constant rather than a measurement on purpose — measuring
+   * it would mean the cover's size depending on the length of the title, so two
+   * books would open at two different sizes.
+   */
+  --plate-text: 6rem;
+
+  /*
+   * As large as the screen allows, which is the point: this screen is the book
+   * being opened, and a stamp-sized cover floating in the middle of a phone
+   * reads as a loading state with a picture on it.
+   *
+   * Three limits, whichever bites first. `92vw` keeps a margin at the sides so
+   * the cover reads as an object on a surface rather than a full-bleed image.
+   * The height term is the real one on a phone: `Cover` is `2 / 3`, so the
+   * width a given height allows is `height × 2 / 3`, and the height available
+   * is the screen less the text below it. `28rem` stops a desktop window
+   * blowing the cover up past any plausible print size.
+   *
    * Sized against the *viewport*, not the column. The reading column is
    * narrowed by the reader's own width setting, and a cover that changed size
    * with a text preference would be one more thing that moves between openings.
+   *
+   * `svh`, not `vh`: on a phone `vh` is the tallest the viewport ever gets, so
+   * with the browser's toolbars showing the cover would be sized for a screen
+   * that isn't there and the author line would sit under the address bar.
    */
-  width: min(52vw, 15rem);
+  width: min(92vw, (100svh - var(--plate-text)) * 2 / 3, 28rem);
 }
 
 /*

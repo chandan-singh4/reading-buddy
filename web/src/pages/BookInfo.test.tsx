@@ -117,6 +117,28 @@ describe('BookInfo', () => {
     })
   })
 
+  it('rates in halves, from the left half of a star', async () => {
+    await repository.saveParsedBook(bookOf())
+    openInfo()
+
+    const overall = within(await screen.findByRole('group', { name: 'Overall' }))
+    fireEvent.click(overall.getByRole('button', { name: '3.5 stars' }))
+
+    await waitFor(async () => {
+      expect((await repository.getBook(BOOK_ID))?.rating).toBe(3.5)
+    })
+
+    // The half is pressed and the whole star it sits in is not — the two
+    // targets inside one glyph have to stay distinguishable, which is the
+    // whole risk of drawing them on top of each other.
+    expect(overall.getByRole('button', { name: '3.5 stars' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+    expect(overall.getByRole('button', { name: '4 stars' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    )
+  })
+
   it('renames a book by hand, for metadata the parser can’t fully clean', async () => {
     await repository.saveParsedBook(bookOf({ title: 'A Book Author, Someone 1234567890 Junk' }))
     openInfo()

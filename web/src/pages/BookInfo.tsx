@@ -271,9 +271,43 @@ export default function BookInfo() {
   )
 }
 
-/** A row of five tap-to-rate stars. Tapping the star that already sets the
-    value clears it — rating a book requires a way to say "actually, no
-    opinion" again. */
+/**
+ * How much of star number `star` is filled, for a rating of `value`.
+ *
+ * A percentage rather than a boolean because that is what half a star *is*
+ * here: the filled glyph is drawn over the empty one and clipped to this
+ * width. See `.starFill` for why it is done that way rather than with a
+ * half-star character.
+ */
+function fillOf(value: number | undefined, star: number): string {
+  if (value === undefined || value <= star - 1) return '0%'
+  if (value >= star) return '100%'
+  return '50%'
+}
+
+/**
+ * A row of five tap-to-rate stars, each half of which is its own target — so
+ * the row reads 0.5 to 5 in halves rather than 1 to 5 in whole numbers.
+ *
+ * Tapping the value that is already set clears it: rating a book requires a way
+ * to say "actually, no opinion" again.
+ *
+ * ## Two buttons per star, one glyph
+ *
+ * The obvious build is a half-star character. There isn't a dependable one —
+ * `⯪` and friends are missing from enough system fonts to render as a box on
+ * somebody's phone, and the fallback is silent. So each star is an outline `☆`
+ * with a filled `★` laid over it and clipped to 0%, 50% or 100% of its width.
+ * That works in any font that has the two characters this already relied on,
+ * and it is the same technique that will draw Google's fractional average
+ * rating when that lands beside this one.
+ *
+ * The buttons are transparent overlays rather than the visible thing, because
+ * half a star is about 20 px wide — too small a target on its own. They are
+ * stretched to the full height of the row to buy back vertically what the
+ * split costs horizontally, which is the same compromise every half-star rater
+ * makes.
+ */
 function StarRow({
   label,
   value,
@@ -283,21 +317,42 @@ function StarRow({
   value: number | undefined
   onChange: (value: number | undefined) => void
 }) {
+  const pick = (next: number) => onChange(value === next ? undefined : next)
+
   return (
     <div className={styles.ratingRow}>
       <span className={styles.ratingLabel}>{label}</span>
       <div className={styles.stars} role="group" aria-label={label}>
         {STARS.map((star) => (
-          <button
-            key={star}
-            type="button"
-            className={styles.star}
-            aria-pressed={value !== undefined && star <= value}
-            aria-label={`${star} star${star === 1 ? '' : 's'}`}
-            onClick={() => onChange(value === star ? undefined : star)}
-          >
-            {value !== undefined && star <= value ? '★' : '☆'}
-          </button>
+          <span key={star} className={styles.star}>
+            <span className={styles.starEmpty} aria-hidden="true">
+              ☆
+            </span>
+            {/* `aria-hidden` on both glyphs: the buttons carry the labels, and
+                a screen reader announcing "star star star" over the top of
+                them would be noise, not information. */}
+            <span
+              className={styles.starFill}
+              style={{ width: fillOf(value, star) }}
+              aria-hidden="true"
+            >
+              ★
+            </span>
+            <button
+              type="button"
+              className={`${styles.starHit} ${styles.starHitHalf}`}
+              aria-pressed={value === star - 0.5}
+              aria-label={`${star - 0.5} stars`}
+              onClick={() => pick(star - 0.5)}
+            />
+            <button
+              type="button"
+              className={`${styles.starHit} ${styles.starHitWhole}`}
+              aria-pressed={value === star}
+              aria-label={`${star} star${star === 1 ? '' : 's'}`}
+              onClick={() => pick(star)}
+            />
+          </span>
         ))}
       </div>
     </div>
