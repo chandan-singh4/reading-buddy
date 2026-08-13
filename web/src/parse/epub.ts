@@ -159,6 +159,7 @@ function firstByLocalName(root: Document | Element, name: string): Element | nul
  * an audiobook or a study guide.
  */
 interface FileMetadata {
+  subtitle?: string
   isbn?: string
   publisher?: string
   published?: string
@@ -304,6 +305,40 @@ function readDescription(metadata: Document | Element): string | undefined {
   return text.length > MAX_DESCRIPTION ? `${text.slice(0, MAX_DESCRIPTION).trimEnd()}…` : text
 }
 
+/**
+ * The subtitle, where the file is explicit about having one.
+ *
+ * An epub may carry several `dc:title` elements, and EPUB 3 says which is which
+ * out of band: the element gets an `id`, and a separate `<meta refines="#id"
+ * property="title-type">subtitle</meta>` labels it. Some EPUB 2 files put the
+ * same word in a `title-type` attribute instead, so both are read.
+ *
+ * Only an explicit label counts. Guessing — "the second `dc:title` is probably
+ * the subtitle" — is how a book acquires a subtitle of "Copyright Page", and a
+ * missing subtitle is a gap the catalogue can fill while a wrong one is a fact
+ * nothing will ever correct.
+ */
+function readSubtitle(metadata: Document | Element): string | undefined {
+  const refinements = new Map<string, string>()
+  for (const meta of byLocalName(metadata, 'meta')) {
+    const refines = meta.getAttribute('refines')
+    const property = meta.getAttribute('property')
+    if (!refines || property !== 'title-type') continue
+    refinements.set(refines.replace(/^#/, ''), (textOf(meta) ?? '').toLowerCase())
+  }
+
+  for (const title of byLocalName(metadata, 'title')) {
+    const id = title.getAttribute('id')
+    const kind = attr(title, 'title-type')?.toLowerCase() ?? (id ? refinements.get(id) : undefined)
+    if (kind !== 'subtitle') continue
+
+    const text = textOf(title)
+    if (text) return text
+  }
+
+  return undefined
+}
+
 /** Enough for a BISAC set and a few strays; past this it is a keyword dump. */
 const MAX_SUBJECTS = 16
 
@@ -330,7 +365,15 @@ function readSubjects(metadata: Document | Element): string[] | undefined {
 /** The fields the file actually supplied, with the empty ones left out entirely. */
 function defined(source: FileMetadata): FileMetadata {
   const found: Record<string, unknown> = {}
-  for (const key of ['isbn', 'publisher', 'published', 'language', 'description', 'subjects'] as const) {
+  for (const key of [
+    'subtitle',
+    'isbn',
+    'publisher',
+    'published',
+    'language',
+    'description',
+    'subjects',
+  ] as const) {
     const value = source[key]
     if (value !== undefined) found[key] = value
   }
@@ -339,6 +382,7 @@ function defined(source: FileMetadata): FileMetadata {
 
 function readFileMetadata(metadata: Document | Element): FileMetadata {
   return {
+    subtitle: readSubtitle(metadata),
     isbn: readIsbn(metadata),
     publisher: textOf(firstByLocalName(metadata, 'publisher')),
     published: readPublished(metadata),

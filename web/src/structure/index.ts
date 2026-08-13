@@ -11,6 +11,7 @@ export type {
   BookId,
   BookMeta,
   BookType,
+  CatalogueSource,
   FigureImage,
   ChapterIndex,
   ChapterIndexEntry,

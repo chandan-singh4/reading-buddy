@@ -42,6 +42,16 @@ export interface AnchorParts {
  */
 export type BookType = 'light-fiction' | 'dense-technical'
 
+/**
+ * How a book was matched in the catalogue.
+ *
+ * Recorded so a wrong answer is diagnosable rather than mysterious: `isbn` is an
+ * identifier and needed no guard, while `strict` and `loose` are searches that
+ * had to pass one — and `loose` is the one to look at first when a book comes
+ * back as somebody else's.
+ */
+export type CatalogueSource = 'isbn' | 'strict' | 'loose'
+
 export type SourceFormat = 'epub' | 'pdf' | 'md' | 'txt' | 'docx'
 
 /**
@@ -175,6 +185,87 @@ export interface BookMeta {
    */
   subjects?: string[]
   /**
+   * The book's subtitle, kept apart from its title.
+   *
+   * From the epub's own `dc:title` refinement where the file marks one, from
+   * the catalogue where it doesn't. Separate from `title` so the app can render
+   * "Title: Subtitle" on purpose, instead of hoping the publisher punctuated it
+   * that way — and so `cleanTitle`'s subtitle-cutting has somewhere to *put*
+   * what it cuts rather than discarding it.
+   */
+  subtitle?: string
+  /*
+   * --- What the catalogue said ----------------------------------------------
+   *
+   * The second source, after the file's own record above. Google Books, keyed
+   * on `isbn` for the 20 books that carry one and matched by a guarded
+   * title+author search for the rest.
+   *
+   * All absent until the lookup runs, and absent forever on a book it could not
+   * match — five of 32, measured. That is a state Stats has to *say* ("n books
+   * uncounted") rather than quietly treat as zero.
+   */
+  /**
+   * The catalogue's own identifier — the strongest join available, and better
+   * than an ISBN for re-fetching because it survives an edition carrying two of
+   * them or none.
+   */
+  googleVolumeId?: string
+  /**
+   * The catalogue's ISBNs, kept **beside** `isbn` rather than over it. The file
+   * records the edition actually held; the catalogue records the one it
+   * matched, and they disagree more often than you would expect.
+   */
+  googleIsbn13?: string
+  googleIsbn10?: string
+  /**
+   * The print edition's length — the one field Stats genuinely needs.
+   *
+   * Only ever correct via the two-hop fetch: the search endpoint returns a stub
+   * with `pageCount` 0, and the real number appears only in `GET /volumes/{id}`.
+   * Measured on *Breath*: 0 from the search, 280 from the volume.
+   */
+  pageCount?: number
+  /**
+   * The coarse label, verbatim: `Fiction`, `Juvenile Fiction`,
+   * `Juvenile Nonfiction`, or `Non-fiction`.
+   *
+   * Derived from *any* category with a Fiction heading, never from the first
+   * one — Google returns categories in no useful order, and led with
+   * `Education / Teaching / …` for a book about respiratory science.
+   */
+  genre?: string
+  /**
+   * True once the reader has set the genre by hand, after which no re-fetch may
+   * overwrite it. The same rule as `shelfOverridden`.
+   *
+   * Worth keeping where `typeOverridden` was not: that one guarded a value
+   * nothing ever assigned, while this guards one that is set for every matched
+   * book and is measurably wrong for a couple — a mountaineering memoir came
+   * back `Fiction`.
+   */
+  genreOverridden?: boolean
+  /**
+   * The public verdict. **Meaningless without `ratingsCount` beside it**, which
+   * is why nothing displays one without the other: every rating in this library
+   * rests on one or two votes.
+   */
+  averageRating?: number
+  ratingsCount?: number
+  /** How the match was made. `isbn` needed no guard; the other two passed one. */
+  metadataSource?: CatalogueSource
+  /**
+   * ISO 8601 — when the catalogue was last asked, successfully or not.
+   *
+   * **This is what stops a network failure being recorded as a fact.** Present
+   * with no `googleVolumeId` means asked and genuinely not found; absent means
+   * never successfully asked. Without it the two are indistinguishable, and one
+   * rate-limited afternoon would permanently mark half the shelf as "not in
+   * Google Books" — which is not hypothetical: an early probe reported exactly
+   * that, and it was an HTTP 429.
+   */
+  metadataFetchedAt?: string
+  /**
    * Which build of the parser produced this book's text.
    *
    * A book keeps whatever parse it got on the day it was imported — forever,
@@ -250,6 +341,10 @@ export interface BookMeta {
  * never edits them, and re-reading the file is the *only* way to obtain them.
  */
 export const FILE_METADATA_KEYS = [
+  // Only ever set when the file *labels* one, so a re-parse of a book whose
+  // subtitle came from the catalogue leaves that catalogue value alone — absent
+  // keys stay absent, and the file's own label wins when there is one.
+  'subtitle',
   'isbn',
   'publisher',
   'published',

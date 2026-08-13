@@ -619,6 +619,41 @@ describe('parseEpub — the Dublin Core record', () => {
     return parseEpub(epub, meta())
   }
 
+  it('reads a subtitle the file labels as one', async () => {
+    const book = await withMetadata(
+      '<dc:title id="sub">The New Science of a Lost Art</dc:title>' +
+        '<meta refines="#sub" property="title-type">subtitle</meta>',
+    )
+
+    expect(book.meta.subtitle).toBe('The New Science of a Lost Art')
+    // The main title is untouched — the subtitle is a second column, not a
+    // replacement, and "A Book: The New Science…" is assembled at display time.
+    expect(book.meta.title).toBe('A Book')
+  })
+
+  it('reads the EPUB 2 spelling of the same label', async () => {
+    const book = await withMetadata('<dc:title opf:title-type="subtitle">A Lost Art</dc:title>')
+
+    expect(book.meta.subtitle).toBe('A Lost Art')
+  })
+
+  // Guessing is how a book ends up subtitled "Copyright Page". A missing
+  // subtitle is a gap the catalogue can fill; a wrong one is never corrected.
+  it('never guesses a subtitle from an unlabelled second title', async () => {
+    const book = await withMetadata('<dc:title>Copyright Page</dc:title>')
+
+    expect('subtitle' in book.meta).toBe(false)
+  })
+
+  it('ignores a title labelled as something other than a subtitle', async () => {
+    const book = await withMetadata(
+      '<dc:title id="t">A BOOK</dc:title>' +
+        '<meta refines="#t" property="title-type">collection</meta>',
+    )
+
+    expect('subtitle' in book.meta).toBe(false)
+  })
+
   it('reads the publisher, the language and the date', async () => {
     const book = await withMetadata(
       '<dc:publisher>Penguin</dc:publisher>' +

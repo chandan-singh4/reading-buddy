@@ -139,21 +139,20 @@ describe('BookInfo', () => {
     )
   })
 
-  it('renames a book by hand, for metadata the parser can’t fully clean', async () => {
-    await repository.saveParsedBook(bookOf({ title: 'A Book Author, Someone 1234567890 Junk' }))
+  it('shows the title and its subtitle as one line', async () => {
+    await repository.saveParsedBook(
+      bookOf({ title: 'Breath', subtitle: 'The New Science of a Lost Art' }),
+    )
     openInfo()
 
-    await screen.findByText('A Book Author, Someone 1234567890 Junk')
-    fireEvent.click(screen.getByRole('button', { name: 'Edit title' }))
+    expect(await screen.findByText('Breath: The New Science of a Lost Art')).toBeTruthy()
+  })
 
-    const input = screen.getByRole('textbox', { name: 'Title' })
-    fireEvent.change(input, { target: { value: 'A Book' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+  it('shows a book with no subtitle under its bare title', async () => {
+    await repository.saveParsedBook(bookOf({ title: 'Alaska' }))
+    openInfo()
 
-    expect(await screen.findByText('A Book')).toBeTruthy()
-    await waitFor(async () => {
-      expect((await repository.getBook(BOOK_ID))?.title).toBe('A Book')
-    })
+    expect(await screen.findByText('Alaska')).toBeTruthy()
   })
 
   it('saves notes on blur', async () => {

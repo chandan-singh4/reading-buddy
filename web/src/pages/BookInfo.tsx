@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router'
 import { Cover } from '../app/Cover.tsx'
 import { forgetLibraryMemory } from '../app/libraryMemory.ts'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
+import { fullTitle } from '../app/title.ts'
 import { forgetCovers, useCovers } from '../app/useCovers.ts'
 import { isOutOfDate, reparseBooks } from '../import/index.ts'
 import { repository, type StoredQuote } from '../storage/index.ts'
@@ -89,18 +90,6 @@ export default function BookInfo() {
     await repository.rateBook(id, value)
   }
 
-  async function rename(title: string) {
-    if (state.status !== 'ready') return
-    setState({ ...state, book: { ...state.book, title } })
-    // Home and the library both show this title, and both remember what they
-    // showed between visits so that returning doesn't visibly reload — see
-    // `shelfMemory.ts` and `libraryMemory.ts`. Without this, a book renamed here
-    // would keep its old name on both until something else cleared them.
-    forgetShelfMemory()
-    forgetLibraryMemory()
-    await repository.renameBook(id, title)
-  }
-
   /**
    * Re-read this one book from the file it was imported from.
    *
@@ -174,7 +163,7 @@ export default function BookInfo() {
           <Cover title={book.title} src={covers.get(id)} />
         </div>
         <div className={styles.heroInfo}>
-          <TitleField title={book.title} onSave={rename} />
+          <h1 className={styles.title}>{fullTitle(book.title, book.subtitle)}</h1>
           {book.author && <p className={styles.author}>{book.author}</p>}
           <div className={styles.tags}>
             <span className={styles.tag}>{FORMAT_LABELS[book.source]}</span>
@@ -359,65 +348,6 @@ function StarRow({
   )
 }
 
-/**
- * The title, with a manual rename a tap away. Some epubs' own metadata
- * mashes a subtitle, the author and a source credit into the title with no
- * punctuation between them (`cleanTitle` in `parse/epub.ts` strips the
- * author/ISBN/hash/credit part automatically, but can't always tell a
- * subtitle from the real title) — this is how a reader fixes what's left,
- * once, by hand.
- */
-function TitleField({
-  title,
-  onSave,
-}: {
-  title: string
-  onSave: (title: string) => Promise<void>
-}) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(title)
-
-  if (!editing) {
-    return (
-      <div className={styles.titleRow}>
-        <h1 className={styles.title}>{title}</h1>
-        <button
-          type="button"
-          className={styles.titleEdit}
-          aria-label="Edit title"
-          onClick={() => {
-            setValue(title)
-            setEditing(true)
-          }}
-        >
-          ✎
-        </button>
-      </div>
-    )
-  }
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    const trimmed = value.trim()
-    if (trimmed) await onSave(trimmed)
-    setEditing(false)
-  }
-
-  return (
-    <form className={styles.titleEditForm} onSubmit={submit}>
-      <input
-        className={styles.titleInput}
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        aria-label="Title"
-        autoFocus
-      />
-      <button type="submit" className={styles.titleSave}>
-        Save
-      </button>
-    </form>
-  )
-}
 
 /** Saved on blur rather than on every keystroke — a reflection is written a
     sentence at a time, not fast enough to need debouncing. */

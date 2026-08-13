@@ -45,6 +45,17 @@ function bareRow(overrides: Partial<BookRow> = {}): BookRow {
     notes: null,
     title_overridden: null,
     title_clean_version: null,
+    subtitle: null,
+    google_volume_id: null,
+    google_isbn13: null,
+    google_isbn10: null,
+    page_count: null,
+    genre: null,
+    genre_overridden: null,
+    average_rating: null,
+    ratings_count: null,
+    metadata_source: null,
+    metadata_fetched_at: null,
     ...overrides,
   }
 }
@@ -123,6 +134,64 @@ describe('null is not the same as absent', () => {
       description: 'A voyage into the future of animal communication.',
       subjects: ['Science / Life Sciences', 'Nature'],
     })
+  })
+
+  it('carries what the catalogue said, both ways', () => {
+    const row = bareRow({
+      subtitle: 'The New Science of a Lost Art',
+      google_volume_id: 'ThnRDwAAQBAJ',
+      google_isbn13: '9780241289129',
+      google_isbn10: '0241289122',
+      page_count: 280,
+      genre: 'Non-fiction',
+      genre_overridden: true,
+      average_rating: 4.5,
+      ratings_count: 2,
+      metadata_source: 'isbn',
+      metadata_fetched_at: '2026-08-12T00:00:00.000Z',
+    })
+
+    const book = bookFromRow(row)
+
+    expect(book).toMatchObject({
+      subtitle: 'The New Science of a Lost Art',
+      googleVolumeId: 'ThnRDwAAQBAJ',
+      googleIsbn13: '9780241289129',
+      googleIsbn10: '0241289122',
+      pageCount: 280,
+      genre: 'Non-fiction',
+      genreOverridden: true,
+      averageRating: 4.5,
+      ratingsCount: 2,
+      metadataSource: 'isbn',
+      metadataFetchedAt: '2026-08-12T00:00:00.000Z',
+    })
+    expect(bookToRow(book)).toMatchObject({
+      subtitle: 'The New Science of a Lost Art',
+      google_volume_id: 'ThnRDwAAQBAJ',
+      page_count: 280,
+      genre: 'Non-fiction',
+      average_rating: 4.5,
+      ratings_count: 2,
+      metadata_source: 'isbn',
+    })
+  })
+
+  // Postgres `numeric` is allowed to arrive as a string, and a string rating
+  // would compare wrong everywhere downstream ('4.5' < '10' is false).
+  it('reads an average rating as a number even when Postgres sends a string', () => {
+    const book = bookFromRow(bareRow({ average_rating: '4.5' as unknown as number }))
+
+    expect(book.averageRating).toBe(4.5)
+  })
+
+  // Asked-and-not-found must stay distinguishable from never-asked, or one
+  // rate-limited afternoon marks half the shelf as absent from the catalogue.
+  it('keeps the fetch timestamp on a book that matched nothing', () => {
+    const book = bookFromRow(bareRow({ metadata_fetched_at: '2026-08-12T00:00:00.000Z' }))
+
+    expect(book.metadataFetchedAt).toBe('2026-08-12T00:00:00.000Z')
+    expect('googleVolumeId' in book).toBe(false)
   })
 
   // The same rule `folderIds` follows: a book with no subject headings has no

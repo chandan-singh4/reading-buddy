@@ -32,6 +32,7 @@ import type {
   BookId,
   BookMeta,
   BookType,
+  CatalogueSource,
   ChapterIndexEntry,
   ChapterPath,
   Manifest,
@@ -82,6 +83,17 @@ export interface BookRow {
   notes: string | null
   title_overridden: boolean | null
   title_clean_version: number | null
+  subtitle: string | null
+  google_volume_id: string | null
+  google_isbn13: string | null
+  google_isbn10: string | null
+  page_count: number | null
+  genre: string | null
+  genre_overridden: boolean | null
+  average_rating: number | null
+  ratings_count: number | null
+  metadata_source: string | null
+  metadata_fetched_at: string | null
 }
 
 export interface ManifestRow {
@@ -229,6 +241,19 @@ export function bookFromRow(row: BookRow): BookMeta {
   if (row.notes !== null) meta.notes = row.notes
   if (row.title_overridden !== null) meta.titleOverridden = row.title_overridden
   if (row.title_clean_version !== null) meta.titleCleanVersion = row.title_clean_version
+  if (row.subtitle !== null) meta.subtitle = row.subtitle
+  if (row.google_volume_id !== null) meta.googleVolumeId = row.google_volume_id
+  if (row.google_isbn13 !== null) meta.googleIsbn13 = row.google_isbn13
+  if (row.google_isbn10 !== null) meta.googleIsbn10 = row.google_isbn10
+  if (row.page_count !== null) meta.pageCount = row.page_count
+  if (row.genre !== null) meta.genre = row.genre
+  if (row.genre_overridden !== null) meta.genreOverridden = row.genre_overridden
+  // `numeric` comes back from PostgREST as a JSON number, but a string is legal
+  // in the wire format and one would poison every comparison downstream.
+  if (row.average_rating !== null) meta.averageRating = Number(row.average_rating)
+  if (row.ratings_count !== null) meta.ratingsCount = row.ratings_count
+  if (row.metadata_source !== null) meta.metadataSource = row.metadata_source as CatalogueSource
+  if (row.metadata_fetched_at !== null) meta.metadataFetchedAt = isoFrom(row.metadata_fetched_at)
 
   return meta
 }
@@ -267,6 +292,17 @@ export function bookToRow(meta: BookMeta): BookRow {
     notes: orNull(meta.notes),
     title_overridden: orNull(meta.titleOverridden),
     title_clean_version: orNull(meta.titleCleanVersion),
+    subtitle: orNull(meta.subtitle),
+    google_volume_id: orNull(meta.googleVolumeId),
+    google_isbn13: orNull(meta.googleIsbn13),
+    google_isbn10: orNull(meta.googleIsbn10),
+    page_count: orNull(meta.pageCount),
+    genre: orNull(meta.genre),
+    genre_overridden: orNull(meta.genreOverridden),
+    average_rating: orNull(meta.averageRating),
+    ratings_count: orNull(meta.ratingsCount),
+    metadata_source: orNull(meta.metadataSource),
+    metadata_fetched_at: orNull(meta.metadataFetchedAt),
   }
 }
 
