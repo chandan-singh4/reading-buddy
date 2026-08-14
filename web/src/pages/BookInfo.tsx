@@ -244,7 +244,26 @@ export default function BookInfo() {
       <Link to={`/book/${id}`} className={styles.readButton}>
         {startLabel}
       </Link>
-      <p className={styles.progress}>{readingStatus(position)}</p>
+      {/* The status and the bar together, directly under the button they
+          describe. The bar used to live down beside the stars, which put the
+          same percentage in two places on one screen — and the wrong one of
+          them next to the reader's own rating, which has nothing to do with
+          how far through they are. */}
+      <div className={styles.progressBlock}>
+        <p className={styles.progress}>{readingStatus(position)}</p>
+        {position?.percent !== undefined && (
+          <div
+            className={styles.progressTrack}
+            role="progressbar"
+            aria-label="Reading progress"
+            aria-valuenow={position.percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div className={styles.progressFill} style={{ width: `${position.percent}%` }} />
+          </div>
+        )}
+      </div>
 
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>About this book</h2>
@@ -389,27 +408,6 @@ export default function BookInfo() {
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Your rating</h2>
         <StarRow label="Overall" value={book.rating} onChange={rate} />
-
-        {/* The bar, not the number, is the point: "68%" is a fact and a
-            three-quarters-full bar is a feeling, and this is the page where
-            the reader decides whether to pick the book back up. */}
-        {position?.percent !== undefined && (
-          <div className={styles.progressBlock}>
-            <p className={styles.progressLabel}>
-              Reading progress: <strong>{position.percent}%</strong>
-            </p>
-            <div
-              className={styles.progressTrack}
-              role="progressbar"
-              aria-label="Reading progress"
-              aria-valuenow={position.percent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <div className={styles.progressFill} style={{ width: `${position.percent}%` }} />
-            </div>
-          </div>
-        )}
       </section>
 
       <section className={styles.section}>

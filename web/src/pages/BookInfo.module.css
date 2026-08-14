@@ -158,10 +158,16 @@
 }
 
 /* Under the button, not above it: the button is the decision, this is the
-   footnote confirming where pressing it lands. */
-.progress {
+   footnote confirming where pressing it lands. Pulled tight to the button so
+   the two read as one control rather than two stacked things. */
+.progressBlock {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
   margin-top: calc(-1 * var(--space-2));
-  text-align: center;
+}
+
+.progress {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
@@ -415,20 +421,11 @@
   padding: var(--space-2) 0;
 }
 
-.progressBlock {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: center;
-}
-
-.progressLabel {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
+/* Slim, and inset from the button above it — a hairline under the label rather
+   than a second slab competing with the one thing this page is for. */
 .progressTrack {
-  width: 100%;
-  height: 0.5rem;
+  width: calc(100% - 2 * var(--space-5));
+  height: 0.3rem;
   border-radius: 999px;
   background: var(--color-surface-raised);
   overflow: hidden;
