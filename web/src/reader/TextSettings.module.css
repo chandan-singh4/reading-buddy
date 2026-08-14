@@ -357,21 +357,30 @@
   align-self: center;
   width: 148px;
   aspect-ratio: 3 / 4;
-  padding: 10% var(--preview-gutter, 14%);
+  padding: 10% 6%;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  transition: padding 140ms ease;
 }
 
+/*
+ * The gutter is drawn by squeezing the *type*, not by padding the page.
+ *
+ * Padding was the obvious way to write this and the wrong way to animate it:
+ * changing padding on every frame of a drag re-lays-out the box each time,
+ * which is the one thing a control being dragged cannot afford. `scaleX` on the
+ * column of lines is composited instead — no layout, same picture, since a
+ * narrower column inside a fixed page *is* a wider margin. The page itself
+ * keeps the narrowest gutter as its floor, and each step scales in from there.
+ */
 .page[data-width='narrow'] {
-  --preview-gutter: 6%;
+  --ink-width: 1;
 }
 .page[data-width='normal'] {
-  --preview-gutter: 16%;
+  --ink-width: 0.89;
 }
 .page[data-width='wide'] {
-  --preview-gutter: 26%;
+  --ink-width: 0.78;
 }
 
 .pageInk {
@@ -379,6 +388,14 @@
   height: 100%;
   flex-direction: column;
   justify-content: space-between;
+  transform: scaleX(var(--ink-width, 0.89));
+  transition: transform 140ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pageInk {
+    transition: none;
+  }
 }
 
 .pageLine {
