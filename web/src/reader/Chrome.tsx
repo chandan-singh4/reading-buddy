@@ -31,15 +31,8 @@ import { progressOf, type Pages } from './progress.ts'
 import { MIN_QUERY, type SearchOutcome } from './search.ts'
 import type { SectionRef } from './navigation.ts'
 import type { Anchor, Manifest } from '../structure/index.ts'
-import {
-  MAX_TEXT_STEP,
-  MIN_TEXT_STEP,
-  READING_FONTS,
-  THEMES,
-  type Margins,
-  type ReaderSettings,
-  type Spacing,
-} from './readerSettings.ts'
+import type { ReaderSettings } from './readerSettings.ts'
+import { TextSettings } from './TextSettings.tsx'
 import styles from './Chrome.module.css'
 
 /**
@@ -158,24 +151,6 @@ function chapterNameOf(manifest: Manifest, chapter: number): string {
 
 /** What the three-dot menu opens, in the order it lists them. */
 const MENU_PANELS: SheetTab[] = ['contents', 'bookmarks', 'notes']
-
-// Themes and faces come from `readerSettings.ts`, which is also what validates
-// a stored setting. Keeping a second copy here is how the tab ends up offering
-// a theme the settings file will refuse to save.
-const THEME_OPTIONS = THEMES
-const FONT_OPTIONS = READING_FONTS
-
-const SPACING_OPTIONS: { id: Spacing; label: string }[] = [
-  { id: 'compact', label: 'Compact' },
-  { id: 'normal', label: 'Normal' },
-  { id: 'relaxed', label: 'Relaxed' },
-]
-
-const MARGIN_OPTIONS: { id: Margins; label: string }[] = [
-  { id: 'narrow', label: 'Narrow' },
-  { id: 'normal', label: 'Normal' },
-  { id: 'wide', label: 'Wide' },
-]
 
 export function Chrome({
   bookTitle,
@@ -527,106 +502,15 @@ export function Chrome({
             </div>
           )}
 
+          {/*
+            The whole of Aa lives in its own component now — see
+            `TextSettings.tsx`. It is the one panel with behaviour of its own
+            (tabs, and the fade while a slider is dragged), and leaving it
+            inline was what made this file's sheet a hundred lines of form.
+          */}
           {sheetTab === 'aa' && (
             <div className={styles.sheetPanel}>
-              <div className={styles.settingRow}>
-                <span className={styles.settingLabel}>Theme</span>
-                <div className={styles.settingOptions} role="group" aria-label="Theme">
-                  {THEME_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={styles.settingButton}
-                      aria-pressed={settings.theme === option.value}
-                      onClick={() => onSettingsChange({ theme: option.value })}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className={styles.settingRow}>
-                <span className={styles.settingLabel}>Font</span>
-                <div className={styles.settingOptions} role="group" aria-label="Reading font">
-                  {FONT_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      /* Each option is set in its own face — see
-                         `.fontButton` in the stylesheet. */
-                      className={`${styles.settingButton} ${styles.fontButton}`}
-                      data-face={option.value}
-                      aria-pressed={settings.font === option.value}
-                      onClick={() => onSettingsChange({ font: option.value })}
-                    >
-                      <span className={styles.fontName}>{option.label}</span>
-                      {option.note && <span className={styles.fontNote}>{option.note}</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className={styles.settingRow}>
-                <span className={styles.settingLabel}>Text size</span>
-                <div className={styles.stepper}>
-                  <button
-                    type="button"
-                    className={styles.stepperButton}
-                    aria-label="Smaller text"
-                    disabled={settings.textStep <= MIN_TEXT_STEP}
-                    onClick={() => onSettingsChange({ textStep: settings.textStep - 1 })}
-                  >
-                    A−
-                  </button>
-                  <span className={styles.stepperValue} aria-live="polite">
-                    {settings.textStep}
-                  </span>
-                  <button
-                    type="button"
-                    className={styles.stepperButton}
-                    aria-label="Larger text"
-                    disabled={settings.textStep >= MAX_TEXT_STEP}
-                    onClick={() => onSettingsChange({ textStep: settings.textStep + 1 })}
-                  >
-                    A+
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.settingRow}>
-                <span className={styles.settingLabel}>Line spacing</span>
-                <div className={styles.settingOptions} role="group" aria-label="Line spacing">
-                  {SPACING_OPTIONS.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={styles.settingButton}
-                      aria-pressed={settings.spacing === option.id}
-                      onClick={() => onSettingsChange({ spacing: option.id })}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className={styles.settingRow}>
-                <span className={styles.settingLabel}>Margins</span>
-                <div className={styles.settingOptions} role="group" aria-label="Margins">
-                  {MARGIN_OPTIONS.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={styles.settingButton}
-                      aria-pressed={settings.margins === option.id}
-                      onClick={() => onSettingsChange({ margins: option.id })}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <TextSettings settings={settings} onSettingsChange={onSettingsChange} />
             </div>
           )}
         </div>

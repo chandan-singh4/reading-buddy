@@ -1,0 +1,366 @@
+/*
+ * The Aa panel. See `TextSettings.tsx` for why it is shaped like this.
+ *
+ * Two conventions run through the file:
+ *
+ * - Anything that can be *shown* rather than *named* is shown — a face is set
+ *   in itself, a theme is painted in its own colours, a margin is drawn as a
+ *   page. The words are labels underneath, not the control.
+ * - `[data-dimmed]` is how a row steps aside while another row is being
+ *   dragged. It fades and stops taking taps, but stays in the layout: removing
+ *   it would make the panel jump to a new height mid-drag, which is a much
+ *   louder thing to happen than the setting being changed.
+ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/*
+ * The value, floating over the book while a slider moves.
+ *
+ * Fixed to the screen rather than placed in the panel, because by the time it
+ * appears the panel is fading out — a readout inside it would fade too, and the
+ * one moment a number is worth showing is the moment it is changing.
+ */
+.readout {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-raised);
+  pointer-events: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.tab {
+  flex: 1;
+  min-height: 38px;
+  padding: 0 var(--space-2);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 3px);
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--color-text);
+  font-weight: 600;
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transition: opacity 120ms ease;
+}
+
+.row[data-dimmed='true'],
+.tabs[data-dimmed='true'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rowLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ---- Fonts ---------------------------------------------------------- */
+
+.faces {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--space-2);
+}
+
+.face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-2);
+  font-family: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.face[aria-pressed='true'] {
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.faceSpecimen {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+/* `currentColor` faded, not a fixed grey: the tile is the accent when chosen. */
+.faceName {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  opacity: 0.7;
+}
+
+/* The faces themselves are declared once in `theme.css`. */
+.face[data-face='serif'] .faceSpecimen {
+  font-family: var(--face-serif);
+}
+.face[data-face='serif-alt'] .faceSpecimen {
+  font-family: var(--face-serif-alt);
+}
+.face[data-face='sans'] .faceSpecimen {
+  font-family: var(--face-sans);
+}
+.face[data-face='literata'] .faceSpecimen {
+  font-family: var(--face-literata);
+}
+.face[data-face='garamond'] .faceSpecimen {
+  font-family: var(--face-garamond);
+}
+.face[data-face='lora'] .faceSpecimen {
+  font-family: var(--face-lora);
+}
+.face[data-face='inter'] .faceSpecimen {
+  font-family: var(--face-inter);
+}
+.face[data-face='atkinson'] .faceSpecimen {
+  font-family: var(--face-atkinson);
+}
+.face[data-face='dyslexic'] .faceSpecimen {
+  font-family: var(--face-dyslexic);
+}
+
+/* ---- Sliders -------------------------------------------------------- */
+
+.slide {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.slider {
+  flex: 1;
+  min-width: 0;
+  /* A slider is dragged, and a drag that starts on it must not also scroll the
+     sheet or turn a page underneath. */
+  touch-action: none;
+  accent-color: var(--color-accent);
+}
+
+.slideEnd {
+  flex: none;
+  width: 1.5rem;
+  text-align: center;
+  font-family: var(--face-serif);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.slideEndBig {
+  font-size: 1.35rem;
+}
+
+/*
+ * The ends of the spacing slider, drawn as what they do: three rules stacked
+ * close together on one side and far apart on the other.
+ */
+.lines {
+  flex: none;
+  width: 1.5rem;
+  height: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background:
+    linear-gradient(var(--color-text-muted), var(--color-text-muted)) top / 100% 1px no-repeat,
+    linear-gradient(var(--color-text-muted), var(--color-text-muted)) center / 100% 1px no-repeat,
+    linear-gradient(var(--color-text-muted), var(--color-text-muted)) bottom / 100% 1px no-repeat;
+  opacity: 0.8;
+}
+
+.lines[data-lines='tight'] {
+  height: 0.5rem;
+}
+
+/* ---- Themes as colour ------------------------------------------------ */
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: var(--space-3);
+}
+
+.swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+/*
+ * The colour itself. Painted with literal hex rather than the theme tokens on
+ * purpose: a swatch has to show the theme it *offers*, and the tokens are
+ * whatever theme is currently on. They are the page and ink values from
+ * `theme.css` — if one is edited there, edit its swatch here too.
+ */
+.swatchChip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  font-family: var(--face-serif);
+  font-size: var(--text-base);
+  background: var(--swatch-page);
+  color: var(--swatch-ink);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.swatch[aria-pressed='true'] .swatchChip {
+  box-shadow:
+    inset 0 0 0 1px var(--color-border),
+    0 0 0 2px var(--color-accent);
+}
+
+.swatch[aria-pressed='true'] .swatchName {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.swatchName {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+/* Auto follows the phone, so it is shown as both at once. */
+.swatch[data-swatch='auto'] .swatchChip {
+  background: linear-gradient(135deg, #fbfaf8 0 50%, #14130f 50% 100%);
+  color: #7a7a72;
+}
+.swatch[data-swatch='light'] {
+  --swatch-page: #fbfaf8;
+  --swatch-ink: #1a1815;
+}
+.swatch[data-swatch='dark'] {
+  --swatch-page: #14130f;
+  --swatch-ink: #ece7df;
+}
+.swatch[data-swatch='dim'] {
+  --swatch-page: #22262b;
+  --swatch-ink: #d6dbe1;
+}
+.swatch[data-swatch='sepia'] {
+  --swatch-page: #f2e8d3;
+  --swatch-ink: #3b2f20;
+}
+.swatch[data-swatch='slate'] {
+  --swatch-page: #eef1f4;
+  --swatch-ink: #1f262d;
+}
+.swatch[data-swatch='forest'] {
+  --swatch-page: #141d18;
+  --swatch-ink: #dfe8e0;
+}
+.swatch[data-swatch='contrast'] {
+  --swatch-page: #ffffff;
+  --swatch-ink: #000000;
+}
+
+/* ---- Margins, drawn -------------------------------------------------- */
+
+/*
+ * A page, at a page's proportions, with the chosen gutter either side. The
+ * numbers are percentages of the preview rather than the real `rem` gutters:
+ * the preview is a fifth of the width of a phone, so copying the real values
+ * would draw a hairline margin at every setting and show nothing.
+ */
+.page {
+  align-self: center;
+  width: 148px;
+  aspect-ratio: 3 / 4;
+  padding: 10% var(--preview-gutter, 14%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: padding 140ms ease;
+}
+
+.page[data-width='narrow'] {
+  --preview-gutter: 6%;
+}
+.page[data-width='normal'] {
+  --preview-gutter: 16%;
+}
+.page[data-width='wide'] {
+  --preview-gutter: 26%;
+}
+
+.pageInk {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.pageLine {
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-text-muted);
+  opacity: 0.45;
+}
+
+/* The last line of a paragraph is short, which is what makes this read as text
+   rather than as a barcode. */
+.pageLine:last-child {
+  width: 62%;
+}

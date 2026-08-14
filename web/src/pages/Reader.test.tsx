@@ -474,7 +474,7 @@ describe('the top bar and its menu', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Text and display' }))
 
-    expect(sheet('Text and display').getByRole('button', { name: 'Larger text' })).toBeTruthy()
+    expect(sheet('Text and display').getByRole('slider', { name: 'Text size' })).toBeTruthy()
   })
 
   // The menu is a dropdown, and a dropdown that can only be closed by choosing
