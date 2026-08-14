@@ -99,5 +99,16 @@
  *   error, nothing in a log, just nulls. Migration `0005` fixes the function;
  *   this bump is what asks the books one more time, since 11 already stamped
  *   them as current on the way past.
+ * - **13** — the running heads a print edition left in the text are recognised
+ *   as furniture and dropped. "Introduction | 7" and "6 | You Are the One
+ *   You've Been Waiting For" are what sits in the margin of a paper page; a
+ *   conversion from print, or from a PDF of print, brings them down into the
+ *   prose, where they land between two halves of a sentence every few hundred
+ *   words. Nothing in the markup says what they are — see `runningHead.ts` for
+ *   the shape they are recognised by, and for why the rule refuses to touch a
+ *   dash. Books parsed under 1–12 keep them, and this is a case where a
+ *   re-parse is the only remedy: the lines are ordinary paragraphs in the
+ *   stored text, indistinguishable after the fact from the ones the author
+ *   wrote.
  */
-export const PARSER_VERSION = 12
+export const PARSER_VERSION = 13

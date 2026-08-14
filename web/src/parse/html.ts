@@ -22,6 +22,7 @@
 import type { ParsedBook } from '../storage/index.ts'
 import type { BookMeta, FigureImage } from '../structure/index.ts'
 import { assembleBook, type Block, type ContentBlock, type RawLink } from './assemble.ts'
+import { isRunningHead } from './runningHead.ts'
 
 /** Presentational or non-prose — never contributes text to a book. */
 const SKIP = new Set([
@@ -595,7 +596,27 @@ export function htmlToBlocks(html: string): Block[] {
   }
 
   walk(doc.body)
-  return blocks
+
+  /*
+   * The running heads a print edition left in the text — "Introduction | 7".
+   * Re-kinded here, at the end of the walk, rather than dropped: `furniture` is
+   * the parser's existing word for "in the file but not part of the book", and
+   * `assembleBook` already removes it before a single anchor is assigned, so a
+   * page number never consumes an id that a real paragraph should have had.
+   *
+   * It has to happen before this function returns, because `epub.ts` marks its
+   * page breaks on the first block that will *survive* — mark a break on a
+   * running head and dropping it later would take the break with it, running
+   * two chapters together.
+   *
+   * Only prose is examined. A heading that happens to look like this is a
+   * heading, and the reader is entitled to see it.
+   */
+  return blocks.map((block) =>
+    block.kind === 'prose' && isRunningHead(block.text)
+      ? { ...block, kind: 'furniture' as const }
+      : block,
+  )
 }
 
 /**
