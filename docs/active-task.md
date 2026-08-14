@@ -8,40 +8,38 @@
 
 ---
 
-## Next task — WP-59 step 2: ISBN and publisher out of the file
+## Next task — WP-59 step 4: the Stats tab
 
-**Goal.** The epub parser reads only `title` and `creator` out of the OPF and
-walks straight past `dc:identifier` and `dc:publisher` — which most epubs carry.
-Read them, store them on `BookMeta`, and the catalogue lookup in step 3 becomes
-*exact* instead of a title search that confidently returns the wrong edition, an
-audiobook, or a study guide.
+Steps 1–3 are shipped: `finishedAt`, ISBN/publisher/subtitle out of the OPF, and
+the Google Books lookup with its match guard, shelf backfill and per-book
+Refresh. **Stats is what's left**, and it now has real data to stand on —
+`pageCount`, `subjects`, `averageRating` and `ratingsCount` are stored on the 32
+books and shown on each book's page.
 
-**Done when:**
-- `dc:identifier` is read, ISBN-13 preferred over ISBN-10, the `urn:isbn:` and
-  `isbn:` prefixes and any hyphens stripped, and a non-ISBN identifier (a UUID,
-  a publisher's internal id — very common) is **ignored rather than stored**.
-- `dc:publisher` is stored when present, absent when not — no empty strings, the
-  same "absent, not null" rule the rest of `BookMeta` follows.
-- Both are optional fields on `BookMeta`, mapped in the cloud row helpers, with a
-  migration adding the two columns.
-- **No network, no key, no API in this step.** Existing books get them on the
-  next re-parse; do *not* bump `PARSER_VERSION` for this alone unless the reader
-  asks — it forces a re-parse of 33 books to gain two strings.
+**Ask before starting.** The reader has not yet chosen between Stats and the
+offered "More by this author" shelf (`q=inauthor:"…"` on the endpoint that
+already exists — see `progress.md`). Confirm which one they want.
+
+**Done when (Stats):**
+- Pages read = **finished books × the print edition's page count**, summed —
+  the reader's own simplification, and why there is no reading-events log.
+- A part-read book counts in proportion: `percent × pageCount`.
+- **All of a book's pages land on its finish date.** Yearly totals only; a
+  monthly chart would be spiky and slightly fictional.
+- Books Google could not match are reported — "3 books uncounted" — never
+  quietly under-reported.
+- Genres blend Google's coarse `subjects` with the app's own `genre`.
 - Tests, typecheck, build green.
 
 ### Files in scope
-- `web/src/parse/epub.ts` — the OPF read. **Start here**; the `title`/`creator`
-  lookup is the pattern to follow.
-- `web/src/structure/types.ts` — `BookMeta`; add beside `finishedAt`.
-- `web/src/storage/cloud/rows.ts` + `rows.test.ts` — the row mapping and the
-  `bareRow` fixture (every new optional column must be added there or the test
-  file stops typechecking).
-- `supabase/migrations/` — a new numbered file; `0003_finished_at.sql` is the
-  shape to copy.
-- Whatever epub test fixture already exists next to `epub.ts` — reuse it, don't
-  add a book to the repo.
+- `web/src/structure/types.ts` — `BookMeta`: `finishedAt`, `pageCount`,
+  `subjects`, `genre`, `averageRating`, `ratingsCount` are all already there.
+- `web/src/pages/BookInfo.tsx` + `.module.css` — the visual language the rest of
+  the app should now match, and the seven-theme `color-mix` pattern to copy.
+- `web/src/app/AppShell.tsx` — where a new tab would be registered.
+- `web/src/storage/index.ts` — the repository read the page would use.
 
-Out of scope: the Google Books call, any UI, and Stats.
+Out of scope: any new network call, and `0008` (see below).
 
 ---
 
@@ -95,6 +93,14 @@ Known and accepted about the page maths:
 
 Not waiting on the reader's taste — waiting on a file or a chore.
 
+- **Redeploy on Vercel** so the *Production* `GOOGLE_BOOKS_KEY` takes effect,
+  then press Refresh on one book before running the 32-book backfill. Env vars
+  are per-environment: adding one to Preview does nothing for Production, and
+  neither reaches a deploy that already went out. Probe reads: 401 = key
+  present, 503 = key missing, 404 = endpoint not deployed.
+- **Migration `0008`, agreed and deferred:** drop `subject`, `type`,
+  `type_overridden`, `title_overridden`; remove `repository.renameBook` (no UI)
+  and the `healTitles` override skip.
 - **Apply `supabase/migrations/0003_finished_at.sql` in the Supabase SQL
   editor.** Until it runs, finishing a book on the cloud backend errors — caught,
   so nothing breaks — and no finish date is stored. The boot backfill fills them
@@ -155,6 +161,23 @@ so a future session recognises them as decisions rather than loose ends.
 
 ## Carried forward — things that will bite
 
+- **Run the suite as `npm test --workspace web`.** From the repo root it misses
+  `web/`'s Vite config and reports phantom failures (`Failed to resolve import
+  "virtual:pwa-register"`) that look exactly like a regression. Cost a round.
+- **Never rewrite a source file with a PowerShell `-replace` pipeline.**
+  `(Get-Content -Raw) … | Set-Content -Encoding utf8` mangled every non-ASCII
+  character in `BookInfo.tsx` (`—` → `â€”`) *and* the pattern did not match. Use
+  the Edit tool. `git checkout --` was the recovery.
+- **`git commit -m` with a PowerShell here-string on one line** is parsed as
+  pathspecs. Write the message to a scratch file and use `git commit -F`.
+- **`git checkout main` fails inside a worktree** — `main` is checked out in the
+  primary tree. Merge from there instead: `git -C C:\Users\chand\Python\
+  reading-buddy merge <branch>` then push. A merge run *inside* the worktree
+  merges the branch into itself and prints "Already up to date" — nothing ships,
+  and it looks like success.
+- **`subject` is not `subjects`.** `subject` is the app's own single domain tag
+  (being dropped in `0008`); `subjects` is Google's BISAC heading list, and is
+  what the book page displays.
 - **`Promise.all` fails as a group, so a fallback has to cover the whole
   bundle.** `loadLibrary` fires four reads together; three had an offline
   fallback and the fourth — a check about the *Update* button — did not, and its

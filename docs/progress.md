@@ -15,19 +15,16 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1080 tests across 60 files**, precache 34 entries / 1129.02 KiB
-  (2026-08-12).
-- **Two chores the app cannot do for itself, both Supabase migrations to paste
-  into the SQL editor:**
-  - `supabase/migrations/0003_finished_at.sql`. Until it runs, finishing a book
-    on the cloud backend errors — harmlessly, it is caught, and the boot
-    backfill picks it up afterwards — but no finish date is stored.
-  - `supabase/migrations/0006_position_within.sql`. Until it runs the reopen
-    offset works locally but is dropped on sync — no worse than before it
-    existed, because absent reads as zero.
-- **The next arc is agreed and written up in `active-task.md`:** ISBN from the
-  file → Google Books → Stats. Step 1 of that arc (`finishedAt`) is already
-  shipped; step 2 needs no API at all.
+  **1195 tests across 68 files**, precache 34 entries / 1358.68 KiB
+  (2026-08-14).
+- **One chore only the reader can do: redeploy on Vercel** so the newly added
+  *Production* `GOOGLE_BOOKS_KEY` takes effect, then press Refresh on one book
+  before letting the 32-book backfill run. The probe reads: 401 = key present,
+  503 = key missing, 404 = endpoint not deployed.
+- **Steps 2 and 3 of the Google Books arc are shipped.** Only **step 4, Stats**,
+  is left. Migration `0007` has been run.
+- **Two older Supabase migrations still need pasting into the SQL editor** —
+  `0003_finished_at.sql` and `0006_position_within.sql`. Both fail softly.
 - **Nothing is waiting on the reader. The queue is empty as of 2026-08-10** —
   the first time it has been, and worth not quietly refilling.
   - **The greyed-out offline shelf was seen and approved on the phone**, along
@@ -42,6 +39,30 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **A book's own page stopped looking like a database record** — 2026-08-14
+  (`0fb3e76`, `c02e87c`, `6370d91`, `8ce41d5`, `79a6de8`). The reader's brief,
+  with a Google Play Books screenshot: hero cover, title, author, a genre pill
+  where the mock says "Pre-Order"; a three-cell spec strip (Format · Pages ·
+  Published); one glass CTA reading **Continue reading** or **Read**; the
+  description folded to five lines behind a chevron; a tinted details card
+  carrying Added, Last read, Publisher, ISBN, readers' rating + count and the
+  Google subjects; a filled Refresh button; the way home drawn as a house.
+  Progress is stated **once**, under the button it describes.
+  - **The mock is dark-only; this app has seven themes.** Every colour is
+    `color-mix(in srgb, var(--color-accent) N%, …)`, so one rule is warm brown
+    on the light themes and gold on the dark with no per-theme override. Where a
+    solid fill was wanted, the `--color-accent` / `--color-accent-contrast` pair
+    is legible in all seven by construction.
+  - **Subjects and ISBN needed no schema work** — both were already parsed,
+    stored and synced, and had simply never been shown. Existing books show them
+    with no re-fetch.
+  - **No glyphs.** The chevron is CSS borders; every icon is an SVG path. A
+    Unicode character a system font lacks renders as an empty box, silently.
+- **Home asks a question instead of narrating the shelf** — 2026-08-14
+  (`b4bb54c`). "Pick up where you left off" described the shelf directly beneath
+  it, which the shelf was already doing; "What book are you picking up today?"
+  replaces it, set in the reading serif and hung off a short accent rule so it
+  reads as a designed line rather than a caption.
 - **A book reopens on the page that was left, not the paragraph** — 2026-08-12
   (`7f6ef3d`). A saved place names the paragraph the visible page *begins in* —
   right to record, and the comment saying why is still there — but reopening
@@ -88,46 +109,16 @@ Get that loop working before building any breadth.
   finished in a tunnel (the 100% page turn is queued like any other write), which
   is why finishing needs no outbox entry of its own.
   **Owes one manual step: `supabase/migrations/0003_finished_at.sql`.**
-- **Four smaller pieces the reader asked for, all tested on the phone** —
-  2026-08-10. All four shelves hold their place on Home when empty, with a
-  heading, a plank and one quiet line in the gap (`64d77cb`). The update panel no
-  longer looks dead while it works — a busy state, and a 4-second reload safety
-  net for the `controllerchange` event that may never arrive (`2cb9b86`). The
-  accent side-stripe on the boxes that want noticing became a soft wash
-  (`ca878b7`) via one new token, `--color-accent-wash`, mixed from
-  `--color-accent` — custom properties are substituted at *use* time, so a single
-  `:root` line follows all seven themes. And every carried-open question in the
-  docs was closed (`4dff543`).
-- **The offline shelf lists every book, greying the ones it can't open** —
-  2026-08-10, the reader's call after seeing 1 book of 33 with Wi-Fi off.
-  Nothing was lost and it did not look that way, which was the whole problem.
-  - **The listing is remembered separately from the books** (`cloud/shelf.ts`):
-    titles and authors for all 33 are a few kilobytes, where the books are
-    megabytes — which is exactly why the listing can be kept for everything when
-    the books cannot. In memory *and* `localStorage`: the second is what
-    survives a relaunch, the first is what works where `localStorage` doesn't
-    (private mode, the test runner) and is why the tests can see it at all.
-  - **"Can this be opened?" is answered by what happened, not by
-    `navigator.onLine`** — the wrapper records whether the last shelf came from
-    the cloud or the copy, because `onLine === true` is what a captive portal
-    reports. `unavailableBooks()` in `storage/index.ts` is the one thing a
-    screen may know about the copy, since it is the one thing a reader can see.
-  - **Home filters instead of greying.** Its job is "pick up where you left
-    off"; four dimmed tiles that all refuse to open is a worse front door than a
-    shorter, true one. The full shelf is one tap away.
-  - **A three-run-flaky test was fixed at the root**: `readAndCache` waited for
-    the copied *sections*, but the copy writes pictures, the source file and the
-    marks after them, so tests were cutting the signal mid-copy. `copyInFlight`
-    now exposes the real "is it done?".
-  - Gates: **976 tests**, typecheck and build green.
-- **Older rounds — WP-53, WP-54, WP-55, the first cloud write-up, the sign-in
+- **Older rounds — the offline shelf, the four phone-tested pieces, — WP-53, WP-54, WP-55, the first cloud write-up, the sign-in
   toggle and the first live setup — dropped
   from here to keep this file short.** Each has a full entry in `docs/backlog.md`
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (1080, 60 files), `npm run typecheck`, `npm run build` — all
-passing as of 2026-08-12. Precache 34 entries / 1129.02 KiB. Every
+**Gates:** `npm test` (1195, 68 files), `npm run typecheck`, `npm run build` — all
+passing as of 2026-08-14. Precache 34 entries / 1358.68 KiB. **Run the suite as
+`npm test --workspace web`** — from the repo root it misses `web/`'s Vite config
+and reports phantom import failures. Every
 parser stays behind a dynamic `import()`, so pdf.js (434 kB) and mammoth
 (500 kB) remain in their own chunks and are fetched only when a file of that
 type is imported.
@@ -147,12 +138,11 @@ type is imported.
 **title and author** today; everything Stats wants (page count, categories,
 average rating) comes from a catalogue.
 1. `finishedAt` — **done** (`4f9175c`).
-2. **ISBN and publisher out of the EPUB's own OPF** (`dc:identifier`,
-   `dc:publisher`). No network, no key — the parser simply ignores fields that
-   are already in the file. This is the lookup key for step 3.
-3. **The Google Books lookup, through `api/`** — never a `VITE_` variable, which
-   would compile the key into every visitor's JavaScript.
-4. **Stats.** Pages read = finished books × the print edition's page count — the
+2. ISBN, publisher and subtitle out of the EPUB's own OPF — **done**.
+3. The Google Books lookup through `api/`, with the match guard, the shelf
+   backfill and a per-book Refresh — **done** (`fbea9ad` → `a1cce60`). The key
+   is server-side only; never a `VITE_` variable.
+4. **Stats — the only step left.** Pages read = finished books × the print edition's page count — the
    reader's own simplification, and the reason there is no reading-events log.
    A part-read book shows an approximation: percent × page count.
 
@@ -166,6 +156,12 @@ then AI.
   a synthetic click is not a finger, so that stays true of any future change to
   them. One chore survives, unrelated to taste: run **Library → Update** to pull
   covers forward to `PARSER_VERSION` 9.
+- **Offered, not yet answered (2026-08-14): "More by this author."** Google
+  Books has **no author entity** — `volumeInfo.authors` is a plain `string[]`,
+  with no bio, nationality or bibliography anywhere in the API. But a shelf of
+  the author's other books is one query away on the endpoint that already
+  exists (`q=inauthor:"…"`). A *biography* would need Wikidata/Wikipedia or
+  Open Library — a second source, worth doing second if at all.
 - **Cheap follow-ons the redesign made cheap**, if the reader wants them:
   favourites (a boolean, one filter clause, one chip) and renaming/deleting a
   folder from the filter sheet — `repository.renameFolder` and `deleteFolder`
@@ -190,6 +186,10 @@ then AI.
 - **`.azw3` / `.kfx` declined** — DRM; see the note in `backlog.md`.
 
 ### Open items
+- **Migration `0008`, agreed and deferred:** drop `subject`, `type`,
+  `type_overridden`, `title_overridden`; remove `repository.renameBook` (no UI)
+  and the `healTitles` override skip. Note `subject` (the app's own tag, being
+  dropped) is **not** `subjects` (Google's BISAC headings, now displayed).
 - **The live Anthropic key still sits in `Claude API/API.txt`**, on the
   reader's own machine, gitignored and never committed. `.env.example` is
   ready at the repo root; the key itself still needs a manual copy into a

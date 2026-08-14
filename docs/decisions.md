@@ -953,3 +953,28 @@ sign-in screen.
   Google Books: the fraction of a second before the text is ready is held on the
   cover for 550 ms and faded out, so the wait reads as a book opening rather
   than as loading. — 2026-08-12
+- **A dark-only mock is a shape, not a palette.** The book-page redesign came
+  from a Google Play Books screenshot and a second dark mock-up; every colour in
+  it is `color-mix(in srgb, var(--color-accent) N%, …)` instead, so one rule
+  reads warm brown on the light themes and gold on the dark. Where a solid fill
+  was wanted, the `--color-accent` / `--color-accent-contrast` pair is legible in
+  all seven themes by construction. — 2026-08-14
+- **Never rely on a Unicode glyph a system font might not carry** — it renders as
+  an empty box, silently, and only on the device that lacks it. The half-star,
+  the chevron and every icon on the book page are CSS borders or SVG paths.
+  — 2026-08-14
+- **The reader's own ISBN wins over Google's.** The file's `isbn` identifies the
+  edition actually on the shelf; `googleIsbn13` / `googleIsbn10` record the
+  edition Google *matched*, and the two disagree often. — 2026-08-14
+- **Say a thing once, next to the thing it describes.** Reading progress was
+  printed under the star rating and again under the Read button; a progress bar
+  beside the reader's own rating implies the two are related, and they are not.
+  It lives under the button. — 2026-08-14
+- **A line under a heading has to earn its place.** "Pick up where you left off"
+  narrated the shelf directly beneath it; Home asks "What book are you picking up
+  today?" instead — a question, set in the reading serif and hung off a short
+  accent rule so it reads as designed rather than as a caption. — 2026-08-14
+- **Google Books has no author entity.** `volumeInfo.authors` is a `string[]` of
+  names — no bio, no nationality, no bibliography. "More by this author" is one
+  `q=inauthor:"…"` query away; an author biography needs a second source
+  (Wikidata or Open Library). — 2026-08-14
