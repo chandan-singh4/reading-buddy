@@ -4,11 +4,28 @@
    the shared page pieces (headings, empty states, the update banner) are still
    `page.module.css`. */
 
+/* The search stays put while the shelf scrolls under it — on a shelf of thirty
+   books, having to scroll back to the top to search is the reason people stop
+   searching. It sticks *below* the app's own top bar rather than at 0, or the
+   two would overlap.
+
+   The pill can't do this itself: it has margins, so rows would show through the
+   gap around it. The dock is the full-width opaque band the pill sits in — it
+   bleeds out to the screen edges by cancelling `.content`'s side padding, the
+   same trick `SelectionBar` uses. Its z-index stays under the top bar's 2. */
+.searchDock {
+  position: sticky;
+  top: var(--top-bar-height);
+  z-index: 1;
+  margin-inline: calc(var(--space-4) * -1);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-bg);
+}
+
 .searchBar {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-block: var(--space-3);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
   border-radius: 999px;
   background-color: var(--color-surface-raised);

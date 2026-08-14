@@ -456,18 +456,22 @@ export default function Library() {
           moved out from behind it — with the same icon opening the same sheet
           two inches below, the one in here was a second door onto a room the
           reader is already standing in. */}
-      <div className={libraryStyles.searchBar}>
-        <span className={libraryStyles.searchIcon} aria-hidden="true">
-          ⌕
-        </span>
-        <input
-          type="search"
-          className={libraryStyles.searchInput}
-          value={query}
-          placeholder="Search library…"
-          aria-label="Search your library"
-          onChange={(event) => setQuery(event.target.value)}
-        />
+      {/* The dock is what sticks; the pill inside it is unchanged. See
+          `.searchDock` for why the pill can't stick on its own. */}
+      <div className={libraryStyles.searchDock}>
+        <div className={libraryStyles.searchBar}>
+          <span className={libraryStyles.searchIcon} aria-hidden="true">
+            ⌕
+          </span>
+          <input
+            type="search"
+            className={libraryStyles.searchInput}
+            value={query}
+            placeholder="Search library…"
+            aria-label="Search your library"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
       </div>
 
       {/* Sort, folder, reading status and view, on the shelf rather than two

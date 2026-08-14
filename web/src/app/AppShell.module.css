@@ -21,6 +21,14 @@
 }
 
 .frame {
+  /* How tall `.topBar` below ends up: its two paddings, the 2.75rem control
+     that sets its content height, and the hairline border. Declared here so a
+     screen that wants to stick something of its own *under* the bar (the
+     library's search) can say `top: var(--top-bar-height)` instead of
+     guessing a number that drifts the next time the bar is touched. Change the
+     padding or the button size below and change this in the same edit. */
+  --top-bar-height: calc(var(--safe-top) + var(--space-3) * 2 + 2.75rem + 1px);
+
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
