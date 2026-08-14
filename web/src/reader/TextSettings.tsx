@@ -44,12 +44,19 @@ import {
 import styles from './TextSettings.module.css'
 
 /** Which group of settings is showing. */
-type Pane = 'text' | 'mode' | 'more'
+type Pane = 'text' | 'mode' | 'margins'
 
+/*
+ * The third tab is named after the one thing in it. It was called "More",
+ * which is a promise of several things and a tab you have to open to find out
+ * what is behind it — for a single setting that is a worse label than the
+ * setting's own name. If a second margin-ish control ever joins it, that is the
+ * moment to reconsider, not before.
+ */
 const PANES: readonly { id: Pane; label: string }[] = [
   { id: 'text', label: 'Text' },
   { id: 'mode', label: 'Reading mode' },
-  { id: 'more', label: 'More' },
+  { id: 'margins', label: 'Margins' },
 ]
 
 /*
@@ -248,16 +255,16 @@ export function TextSettings({ settings, onSettingsChange }: TextSettingsProps) 
         </div>
       )}
 
-      {pane === 'more' && (
+      {pane === 'margins' && (
         <div className={styles.pane} role="tabpanel">
           {/*
             Margins, drawn. The rectangle is a page with lines of type on it and
             the chosen gutter either side, so the setting is previewed at the
             moment it is chosen instead of after the sheet has been dismissed.
           */}
+          {/* No row label: the tab above it already says "Margins", and this
+              pane holds nothing else to tell it apart from. */}
           <div className={styles.row} data-dimmed={dim('margins')}>
-            <span className={styles.rowLabel}>Margins</span>
-
             <div className={styles.page} data-width={settings.margins} aria-hidden="true">
               <span className={styles.pageInk}>
                 {Array.from({ length: 7 }, (_, index) => (

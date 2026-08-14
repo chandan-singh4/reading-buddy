@@ -43,13 +43,17 @@
   pointer-events: none;
 }
 
+/*
+ * The tab strip sits *inside* the raised sheet, so it goes the other way — a
+ * recessed track with the chosen tab riding proud of it. Same rim light as the
+ * sheet on the selected pill, for the same reason.
+ */
 .tabs {
   display: flex;
   gap: 2px;
   padding: 3px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  border-radius: 999px;
 }
 
 .tab {
@@ -61,7 +65,7 @@
   color: var(--color-text-muted);
   background: transparent;
   border: none;
-  border-radius: calc(var(--radius-md) - 3px);
+  border-radius: 999px;
   cursor: pointer;
 }
 
@@ -69,7 +73,9 @@
   color: var(--color-text);
   font-weight: 600;
   background: var(--color-surface-raised);
-  box-shadow: var(--shadow-raised);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-text) 22%, transparent),
+    0 6px 14px -8px rgb(0 0 0 / 45%);
 }
 
 .pane {
@@ -248,27 +254,42 @@
 /*
  * The colour itself. Painted with literal hex rather than the theme tokens on
  * purpose: a swatch has to show the theme it *offers*, and the tokens are
- * whatever theme is currently on. They are the page and ink values from
+ * whatever theme is currently on. Page, ink and accent are the values from
  * `theme.css` — if one is edited there, edit its swatch here too.
+ *
+ * Three colours rather than one, because one was not enough to tell them
+ * apart. Light, Slate and High contrast all have a near-white page, so a chip
+ * that was only its page colour showed three identical white circles and the
+ * whole point of colour-coding was lost. The wedge across the bottom is the
+ * theme's *accent* — warm brown, steel blue, hard blue — which is the colour
+ * that actually differs, and is what the reader will see on every control once
+ * the theme is on.
  */
 .swatchChip {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  padding-top: 9px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   font-family: var(--face-serif);
   font-size: var(--text-base);
-  background: var(--swatch-page);
+  background: linear-gradient(
+    155deg,
+    var(--swatch-page) 0 64%,
+    var(--swatch-accent) 64% 100%
+  );
   color: var(--swatch-ink);
-  box-shadow: inset 0 0 0 1px var(--color-border);
+  /* The chip's own ink as its edge, so a white chip on a white sheet still has
+     a shape. A shared border token gave the pale themes no outline at all. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--swatch-ink) 30%, transparent);
 }
 
 .swatch[aria-pressed='true'] .swatchChip {
   box-shadow:
-    inset 0 0 0 1px var(--color-border),
-    0 0 0 2px var(--color-accent);
+    inset 0 0 0 1px color-mix(in srgb, var(--swatch-ink) 30%, transparent),
+    0 0 0 3px var(--color-accent);
 }
 
 .swatch[aria-pressed='true'] .swatchName {
@@ -282,38 +303,46 @@
   text-align: center;
 }
 
-/* Auto follows the phone, so it is shown as both at once. */
+/* Auto follows the phone, so it is shown as both at once — no accent wedge,
+   because which accent it would be is exactly what Auto doesn't know. */
 .swatch[data-swatch='auto'] .swatchChip {
-  background: linear-gradient(135deg, #fbfaf8 0 50%, #14130f 50% 100%);
-  color: #7a7a72;
+  background: linear-gradient(155deg, #fbfaf8 0 50%, #14130f 50% 100%);
+  color: #8a857c;
 }
 .swatch[data-swatch='light'] {
   --swatch-page: #fbfaf8;
   --swatch-ink: #1a1815;
+  --swatch-accent: #7a5c3e;
 }
 .swatch[data-swatch='dark'] {
   --swatch-page: #14130f;
   --swatch-ink: #ece7df;
+  --swatch-accent: #c9a227;
 }
 .swatch[data-swatch='dim'] {
   --swatch-page: #22262b;
   --swatch-ink: #d6dbe1;
+  --swatch-accent: #d9a441;
 }
 .swatch[data-swatch='sepia'] {
   --swatch-page: #f2e8d3;
   --swatch-ink: #3b2f20;
+  --swatch-accent: #7a5c3e;
 }
 .swatch[data-swatch='slate'] {
   --swatch-page: #eef1f4;
   --swatch-ink: #1f262d;
+  --swatch-accent: #3d6b8e;
 }
 .swatch[data-swatch='forest'] {
   --swatch-page: #141d18;
   --swatch-ink: #dfe8e0;
+  --swatch-accent: #8fbf7f;
 }
 .swatch[data-swatch='contrast'] {
   --swatch-page: #ffffff;
   --swatch-ink: #000000;
+  --swatch-accent: #0000cc;
 }
 
 /* ---- Margins, drawn -------------------------------------------------- */

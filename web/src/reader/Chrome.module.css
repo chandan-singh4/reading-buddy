@@ -189,6 +189,21 @@
   background: rgb(0 0 0 / 0.35);
 }
 
+/*
+ * The sheet floats now, and the reason is the slider underneath it.
+ *
+ * It used to be a panel welded to the bottom edge, sharing that edge with the
+ * footer bar — so the page slider read as the last row *of the sheet* rather
+ * than as the book's own control. Two unrelated things, one apparent surface.
+ *
+ * So it lifts off: inset from all four sides, rounded the whole way round, with
+ * a gap under it through which the slider is visibly a separate thing. The
+ * surface itself is the treatment the "Continue reading" button already uses
+ * (see `.readButton` in `BookInfo.module.css`) — a faint accent wash over the
+ * surface colour, and a rim light along the top edge only, which is what makes
+ * a flat rectangle read as something curved and raised. Borrowed deliberately:
+ * a lifted thing should be lifted the same way everywhere in the app.
+ */
 .sheet {
   pointer-events: auto;
   /* Was `flex: 1`, which ate every pixel between the bars and left nothing to
@@ -198,10 +213,19 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--color-surface-raised);
-  border-top-left-radius: var(--radius-md);
-  border-top-right-radius: var(--radius-md);
-  box-shadow: var(--shadow-raised);
+  margin: 0 var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-accent) 16%, transparent),
+      color-mix(in srgb, var(--color-accent) 5%, transparent)
+    ),
+    var(--color-surface-raised);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-text) 22%, transparent),
+    0 14px 30px -16px rgb(0 0 0 / 55%);
   font-family: var(--font-ui);
 }
 
@@ -508,6 +532,7 @@ li:first-child > .bookmarkChapter {
  */
 .sheet:has([data-adjusting='true']) {
   background: transparent;
+  border-color: transparent;
   box-shadow: none;
 }
 

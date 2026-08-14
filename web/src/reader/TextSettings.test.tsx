@@ -93,7 +93,7 @@ describe('TextSettings', () => {
 
   it('sets the margins from the slider under the drawn page', () => {
     const onSettingsChange = show()
-    openPane('More')
+    openPane('Margins')
     fireEvent.change(screen.getByRole('slider', { name: 'Margins' }), {
       target: { value: '1' },
     })
