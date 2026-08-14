@@ -609,12 +609,23 @@ export function htmlToBlocks(html: string): Block[] {
    * running head and dropping it later would take the break with it, running
    * two chapters together.
    *
-   * Only prose is examined. A heading that happens to look like this is a
-   * heading, and the reader is entitled to see it.
+   * Headings are examined as well as prose. That was not the first instinct —
+   * a heading is the author speaking, and dropping one silently removes a
+   * division of the book. But a converter reaching for `<h1>` is describing how
+   * the line *looked* on the page, not what it was, and the running head at the
+   * top of a printed page looks exactly like a heading. "6 | You Are the One
+   * You've Been Waiting For" arrived as one. The shape test is the same, and it
+   * is strict enough that a real heading has to be trying to match it.
+   *
+   * The cost is the block's `ids`: furniture is dropped whole, so a link
+   * pointing at one of these resolves to nothing and becomes plain text. That
+   * is accepted here because the only thing that routinely links to headings is
+   * the contents page, and a contents page points at chapter openings — never
+   * at the page furniture repeated above them.
    */
   return blocks.map((block) =>
-    block.kind === 'prose' && isRunningHead(block.text)
-      ? { ...block, kind: 'furniture' as const }
+    (block.kind === 'prose' || block.kind === 'heading') && isRunningHead(block.text)
+      ? { kind: 'furniture' as const, text: block.text }
       : block,
   )
 }

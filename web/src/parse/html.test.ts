@@ -251,3 +251,24 @@ describe('htmlToBlocks — parts of a book that are displayed, not read through'
     expect(block.label).toBeUndefined()
   })
 })
+
+describe('running heads the print edition left behind', () => {
+  it('drops one that arrived as a paragraph', () => {
+    const blocks = htmlToBlocks('<p>Introduction | 7</p><p>The real first line.</p>')
+    expect(blocks.map((b) => b.kind)).toEqual(['furniture', 'prose'])
+  })
+
+  it('drops one that arrived as a heading', () => {
+    // What a converter does with the line at the top of a printed page: it
+    // looked like a heading, so it was marked up as one.
+    const blocks = htmlToBlocks(
+      '<h1>6 | You Are the One You’ve Been Waiting For</h1><p>The real first line.</p>',
+    )
+    expect(blocks.map((b) => b.kind)).toEqual(['furniture', 'prose'])
+  })
+
+  it('keeps a heading that is a real heading', () => {
+    const blocks = htmlToBlocks('<h1>Chapter One</h1><h2>The Burdened Self</h2>')
+    expect(blocks.map((b) => b.kind)).toEqual(['heading', 'heading'])
+  })
+})

@@ -110,5 +110,13 @@
  *   re-parse is the only remedy: the lines are ordinary paragraphs in the
  *   stored text, indistinguishable after the fact from the ones the author
  *   wrote.
+ * - **14** — 13 again, for the half of them it missed. 13 examined paragraphs
+ *   only, on the reasoning that a heading is the author speaking. But a
+ *   converter reaching for `<h1>` is describing how a line *looked* on the
+ *   page, and the running head at the top of a printed page looks exactly like
+ *   a heading — so "Introduction | 7" was dropped and "6 | You Are the One
+ *   You've Been Waiting For", the same furniture from the facing page, stayed.
+ *   Books updated under 13 kept every running head their file marked up as a
+ *   heading, and need asking again.
  */
-export const PARSER_VERSION = 13
+export const PARSER_VERSION = 14
