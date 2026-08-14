@@ -270,6 +270,24 @@ export function Block({
   // inside a block the browser has already decided not to split.
   const opens = block.startsPage ? ` ${styles.startsPage}` : ''
 
+  /*
+   * A heading the source book only ever marked up as a bold paragraph — which
+   * is how most print conversions write every heading below the chapter level.
+   * The parser labels it; here it becomes a real heading, sharing the treatment
+   * of one the file admitted to, so the two never look like different things.
+   *
+   * This also fixes the indent for free: the run-on rule indents a paragraph
+   * that follows another paragraph, and the line under a heading should start
+   * flush. As a `<p>` it was being indented as though it continued the heading.
+   */
+  if (block.kind === 'prose' && block.label === 'subheading') {
+    return (
+      <h3 id={id} className={styles.heading + opens}>
+        {text}
+      </h3>
+    )
+  }
+
   switch (block.kind) {
     case 'heading':
       // Always h3: the section's own title is the h2 above it, and a book's

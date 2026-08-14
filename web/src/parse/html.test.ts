@@ -272,3 +272,43 @@ describe('running heads the print edition left behind', () => {
     expect(blocks.map((b) => b.kind)).toEqual(['heading', 'heading'])
   })
 })
+
+describe('a heading the book only set in bold', () => {
+  it('labels a wholly bold paragraph as a subheading', () => {
+    // The real markup from a calibre conversion of print.
+    const [block] = htmlToBlocks('<p class="calibre1"><b class="calibre4">The Three Projects</b></p>')
+    expect(block.kind).toBe('prose')
+    expect(block.label).toBe('subheading')
+  })
+
+  it('takes <strong> as readily as <b>', () => {
+    const [block] = htmlToBlocks('<p><strong>Cultural Constraints to Intimacy</strong></p>')
+    expect(block.label).toBe('subheading')
+  })
+
+  it('leaves a sentence with a bolded phrase in it', () => {
+    const [block] = htmlToBlocks('<p>There is <b>another way</b>, and we will explore it.</p>')
+    expect(block.label).toBeUndefined()
+  })
+
+  it('leaves a bold line that ends like a sentence', () => {
+    const [block] = htmlToBlocks('<p><b>Do not skip this chapter.</b></p>')
+    expect(block.label).toBeUndefined()
+  })
+
+  it('leaves a whole bold paragraph, which is emphasis and not a heading', () => {
+    const long = `<p><b>${'This is a long stretch of text the author wanted stressed rather than a heading naming a section'}</b></p>`
+    expect(htmlToBlocks(long)[0]!.label).toBeUndefined()
+  })
+
+  it('leaves ordinary prose', () => {
+    expect(htmlToBlocks('<p>For reasons that will be discussed at length</p>')[0]!.label).toBeUndefined()
+  })
+})
+
+describe('a contents entry is not a subheading', () => {
+  it('leaves a bold line that ends in its page number', () => {
+    const [block] = htmlToBlocks('<p><b>An Example of Growing Toward Self-Leadership 130</b></p>')
+    expect(block.label).toBeUndefined()
+  })
+})

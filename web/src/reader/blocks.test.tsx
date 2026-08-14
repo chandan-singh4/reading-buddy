@@ -347,3 +347,20 @@ describe('a link behaves like the words around it', () => {
     expect(container.textContent).toContain('Chapter One The Worst Breathers in the Animal Kingdom')
   })
 })
+
+describe('a heading the book only set in bold', () => {
+  it('renders as a heading, not as a paragraph', () => {
+    const { container } = render(
+      <Block block={blockOf('prose', 'The Three Projects', { label: 'subheading' })} />,
+    )
+    const heading = screen.getByRole('heading', { level: 3 })
+    expect(heading.textContent).toBe('The Three Projects')
+    expect(heading.className).toContain(styles.heading)
+    expect(container.querySelector('p')).toBeNull()
+  })
+
+  it('leaves prose without the label as a paragraph', () => {
+    const { container } = render(<Block block={blockOf('prose', 'The Three Projects')} />)
+    expect(container.querySelector('p')).not.toBeNull()
+  })
+})

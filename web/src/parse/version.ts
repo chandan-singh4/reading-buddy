@@ -130,5 +130,17 @@
  *   Needing the whole book to see that is why it lives in `assemble.ts` and not
  *   in a format's own parser. Books updated under 13 or 14 kept every one of
  *   these.
+ * - **16** — the headings a book only ever set in bold. Below the chapter
+ *   level, a print conversion rarely uses `<h1>`–`<h6>`: a subheading is a
+ *   paragraph in heavier type, `<p><b>The Three Projects</b></p>`, because that
+ *   is all it was on the page. The parser flattens inline formatting to plain
+ *   text, so the line arrived indistinguishable from prose and the reader lost
+ *   every signal that a new section had begun. A wholly bold paragraph that is
+ *   short, does not end like a sentence, and does not end in a page number (a
+ *   contents entry, set in the same bold) is now labelled `subheading`, and the
+ *   reading screen sets it as a heading. Labelled rather than promoted to a
+ *   real heading block on purpose: a heading is consumed as a division title
+ *   and vanishes from the text, which would shift every anchor after it — and
+ *   an anchor is what a highlight is pinned to.
  */
-export const PARSER_VERSION = 15
+export const PARSER_VERSION = 16

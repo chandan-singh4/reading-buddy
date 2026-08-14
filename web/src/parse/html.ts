@@ -457,6 +457,59 @@ function contentBlockOf(
  * Runs in the browser (and in jsdom under test) — it needs a DOM. Callers on a
  * non-DOM runtime should convert to markdown first instead.
  */
+/**
+ * The longest a bold line can be and still be read as a heading. A heading
+ * names a thing; past this it is a sentence the author wanted stressed.
+ */
+const BOLD_HEADING_MAX = 70
+
+/** A heading is a label, so anything finishing like a statement is not one. */
+const ENDS_LIKE_A_SENTENCE = /[.!?,;:]$/
+
+/**
+ * "An Example of Growing Toward Self-Leadership 130" — a contents entry, not a
+ * heading. A contents page sets its lines in the same bold as the headings they
+ * point at, and the page number trailing the title is what tells them apart.
+ */
+const ENDS_WITH_A_PAGE_NUMBER = /\s\d{1,4}$/
+
+/**
+ * Whether this paragraph is a section heading wearing a paragraph's clothes.
+ *
+ * Plenty of books — especially anything converted from print — never use
+ * `<h1>`–`<h6>` below the chapter level. A subheading is simply a paragraph set
+ * in bold, because in the print original it was just *heavier type*:
+ *
+ *     <p class="calibre1"><b class="calibre4">The Three Projects</b></p>
+ *
+ * The markup says "paragraph"; every reader can see it is a heading. Since the
+ * parser flattens inline formatting to plain text, that difference was being
+ * dropped on the floor and the line arrived indistinguishable from prose.
+ *
+ * Recognised by three things together, because bold alone is far too common:
+ * the whole paragraph is bold (not a bolded phrase inside a sentence), it is
+ * short, and it does not end like a sentence. Emphasis inside real prose fails
+ * the first test; a bolded warning fails the other two.
+ *
+ * Deliberately *not* promoted to a real `heading` block. A heading is consumed
+ * as a division title and disappears from the text, which would shift every
+ * anchor after it — and an anchor is what a highlight is pinned to. Labelling
+ * the paragraph leaves it exactly where it is and lets the reading screen set
+ * it apart, which is all the reader actually asked for.
+ */
+function isBoldHeading(element: Element, text: string): boolean {
+  if (text.length === 0 || text.length > BOLD_HEADING_MAX) return false
+  if (ENDS_LIKE_A_SENTENCE.test(text)) return false
+  if (ENDS_WITH_A_PAGE_NUMBER.test(text)) return false
+
+  const bold = [...element.querySelectorAll('b, strong')]
+  if (bold.length === 0) return false
+  // The bold has to account for the whole line. A sentence with two words
+  // emphasised in it is prose, and this is the test that says so.
+  const bolded = normalise(bold.map((node) => node.textContent ?? '').join(' '))
+  return bolded === text
+}
+
 export function htmlToBlocks(html: string): Block[] {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const blocks: Block[] = []
@@ -582,7 +635,9 @@ export function htmlToBlocks(html: string): Block[] {
           ? { kind: 'note', text, label: noteType }
           : displayType
             ? { kind: 'prose', text, label: displayType }
-            : { kind: 'prose', text }
+            : isBoldHeading(element, text)
+              ? { kind: 'prose', text, label: 'subheading' }
+              : { kind: 'prose', text }
         if (links.length > 0) block.links = links
         blocks.push(withLinks(block, element))
         continue
