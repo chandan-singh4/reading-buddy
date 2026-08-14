@@ -263,9 +263,14 @@
   --color-text: #1f262d;
   --color-text-muted: #5f6b76;
   --color-border: #d1d8df;
-  --color-accent: #3d6b8e;
+  /* Royal blue, by request. It was a muted steel blue, which was the safe
+     choice against a cool grey page and also an indistinct one — next to High
+     contrast's blue it read as "the other blue". This is a colour with an
+     opinion, and the theme is the cool one, so it belongs here rather than
+     anywhere else. White on it clears 4.7:1, so the buttons stay readable. */
+  --color-accent: #4169e1;
   --color-accent-contrast: #ffffff;
-  --color-focus: #3b6ea5;
+  --color-focus: #3355cc;
 
   --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
 
