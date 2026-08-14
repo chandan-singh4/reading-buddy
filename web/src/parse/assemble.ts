@@ -129,11 +129,17 @@ function resolveLevels(blocks: readonly Block[]): Levels | null {
 
 /**
  * Demote a heading that turned out not to be structural. Levels deeper than the
- * section level are content, not divisions — keeping them as markdown-style
- * prose means no text is lost between the source file and the reader.
+ * section level are content, not divisions — keeping them as prose means no
+ * text is lost between the source file and the reader.
+ *
+ * The text used to be prefixed with markdown `#`s to record the level it came
+ * from. Nothing ever read them back: the reader renders a block's text as it
+ * stands, so `#### Tantrism and Kundalini Yoga` reached the page with the
+ * hashes still on it. The level is carried by `label: 'subheading'` instead,
+ * which the reader already knows how to draw as a small heading.
  */
 function demoteHeading(block: HeadingBlock): ContentBlock {
-  const demoted: ContentBlock = { kind: 'prose', text: `${'#'.repeat(block.level)} ${block.text}` }
+  const demoted: ContentBlock = { kind: 'prose', text: block.text, label: 'subheading' }
   // A demoted heading keeps its place in the book, so it keeps the fact that it
   // opened one of the source's documents — losing that here would silently undo
   // the page break for exactly the books that use deep heading levels.

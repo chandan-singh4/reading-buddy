@@ -142,5 +142,13 @@
  *   real heading block on purpose: a heading is consumed as a division title
  *   and vanishes from the text, which would shift every anchor after it — and
  *   an anchor is what a highlight is pinned to.
+ * - **17** — the `####` on the page. A book with headings deeper than its
+ *   section level had those headings demoted to prose, and the demotion wrote
+ *   the level down as literal markdown hashes: `#### TANTRISM AND KUNDALINI
+ *   YOGA`. Nothing downstream ever parsed them back out — the reader draws a
+ *   block's text as it stands — so the hashes were simply printed. Demoted
+ *   headings now carry `label: 'subheading'` and their own bare text, which is
+ *   the same treatment 16 gave to bold-only headings and which the reading
+ *   screen already sets as a small heading.
  */
-export const PARSER_VERSION = 16
+export const PARSER_VERSION = 17
