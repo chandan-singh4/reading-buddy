@@ -92,6 +92,25 @@ export default function Library() {
   /** What has been typed into the search. Empty means "show everything". */
   const [query, setQuery] = useState('')
 
+  /** Whether the cursor is in the search field. */
+  const [searchFocused, setSearchFocused] = useState(false)
+
+  /**
+   * Whether the furniture around the search is softened.
+   *
+   * Focused *and* typed into, not either alone. On focus alone the screen
+   * would go soft the instant a thumb brushed the field, before the reader had
+   * asked for anything; on text alone it would stay soft after they tapped
+   * away, leaving the sort and folder controls looking disabled while a query
+   * is still in force — and they are exactly what a reader reaches for next.
+   */
+  const searching = searchFocused && query.trim() !== ''
+
+  const recede = (extra?: string) =>
+    [libraryStyles.recedable, searching ? libraryStyles.receded : '', extra ?? '']
+      .filter(Boolean)
+      .join(' ')
+
   /**
    * Read synchronously on the very first render rather than in an effect, so
    * the shelf paints in the reader's chosen view immediately. Loading it after
@@ -439,7 +458,7 @@ export default function Library() {
           }}
         />
       ) : (
-        <h1 className={styles.title}>
+        <h1 className={recede(styles.title)}>
           {/* Looked up in `choices` rather than `folderMap`, so "Unread" and
               "Finished" title the screen the same way a folder the reader made
               does — from their side there is no difference between the two. */}
@@ -470,6 +489,8 @@ export default function Library() {
             placeholder="Search library…"
             aria-label="Search your library"
             onChange={(event) => setQuery(event.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
           />
         </div>
       </div>
@@ -477,30 +498,37 @@ export default function Library() {
       {/* Sort, folder, reading status and view, on the shelf rather than two
           taps and a slide away behind the icon above — which still opens the
           full set. See `FilterBar` for why they came out of the sheet. */}
-      <FilterBar
-        prefs={prefs}
-        folders={choices}
-        onChange={savePrefs}
-        onOpenAll={() => setFilterOpen(true)}
-      />
+      {/* Softened while the reader is typing — see `.recedable`. Wrapped
+          together because they are one band of controls from the reader's side,
+          and blurring them at two slightly different moments would show it. */}
+      <div className={recede()}>
+        <FilterBar
+          prefs={prefs}
+          folders={choices}
+          onChange={savePrefs}
+          onOpenAll={() => setFilterOpen(true)}
+        />
 
-      {/* Says what is being hidden, and offers the one tap that stops hiding
-          it. A filter left on from a previous session is otherwise
-          indistinguishable from books having gone missing. */}
-      {isFiltered(prefs) && (
-        <div className={libraryStyles.activeFilters}>
-          <span className={styles.pending}>
-            Showing {visible.length} of {books.length}
-          </span>
-          <button
-            type="button"
-            className={libraryStyles.clear}
-            onClick={() => savePrefs({ ...prefs, statuses: [], shelves: [], folderId: undefined })}
-          >
-            Clear filters
-          </button>
-        </div>
-      )}
+        {/* Says what is being hidden, and offers the one tap that stops hiding
+            it. A filter left on from a previous session is otherwise
+            indistinguishable from books having gone missing. */}
+        {isFiltered(prefs) && (
+          <div className={libraryStyles.activeFilters}>
+            <span className={styles.pending}>
+              Showing {visible.length} of {books.length}
+            </span>
+            <button
+              type="button"
+              className={libraryStyles.clear}
+              onClick={() =>
+                savePrefs({ ...prefs, statuses: [], shelves: [], folderId: undefined })
+              }
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+      </div>
 
       {importing.status === 'scanning' && (
         <p className={styles.pending} role="status">

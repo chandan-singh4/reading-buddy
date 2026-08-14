@@ -41,29 +41,60 @@ export const EMPTY_CONTEXT: LibraryContext = {
  * finds a book filed under Philosophy and For the course alike, which is the
  * point of letting it be in both.
  */
-function haystack(book: BookMeta, context: LibraryContext): string {
+function haystack(book: BookMeta, context: LibraryContext): string[] {
   const names = foldersOf(book, context.folders).map((folder) => folder.name)
-  return [book.title, book.author ?? '', ...names].join(' ').toLowerCase()
+  return wordsOf([book.title, book.author ?? '', ...names].join(' '))
+}
+
+/**
+ * Text cut into comparable words: lower-cased, stripped of accents, split on
+ * anything that isn't a letter or a digit.
+ *
+ * Splitting on punctuation rather than on spaces is what makes "help" find
+ * *Self-Help* and "love" find *On Love:* — a reader typing a word does not
+ * think about the hyphen or the colon that happens to be next to it. Accents
+ * are folded for the same reason `byText` sorts with `sensitivity: 'base'`:
+ * "emile" has to find *Émile*, because most keyboards can't easily type the
+ * accent and nobody thinks of it as a different letter.
+ */
+function wordsOf(text: string): string[] {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
 }
 
 /**
  * Books matching a typed query.
  *
- * Every word must match, in any of the searched fields — so "jung red" finds
- * *The Red Book* by Jung, which a single substring test across the whole phrase
- * would miss. Words rather than a phrase is also what makes searching across
- * *different* fields work at all: "philosophy kuhn" is a folder and an author.
+ * **Each typed word must begin a word** in one of the searched fields. Typing
+ * "o" offers every book with a word starting in O, "on" narrows that to *On
+ * Love* and *Ongoingness*, "on l" narrows it again — the shelf shrinks with
+ * each keystroke, which is the behaviour that makes a search feel like it is
+ * listening. A plain substring test does not do this: "on" also matched
+ * *Wittgenstein* and *Confessions*, so the first letters of a title thinned the
+ * shelf out far too slowly to be worth typing.
+ *
+ * The start of *any* word, not the start of the title: nobody looking for *The
+ * Prophet* types "the" first. That is also what keeps searching by author and
+ * by folder working.
+ *
+ * Every typed word must match, though not necessarily the same field — so
+ * "jung red" finds *The Red Book* by Jung, and "philosophy kuhn" is a folder
+ * and an author at once.
  */
 export function matchesSearch(
   book: BookMeta,
   query: string,
   context: LibraryContext = EMPTY_CONTEXT,
 ): boolean {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
-  if (words.length === 0) return true
+  const typed = wordsOf(query)
+  if (typed.length === 0) return true
 
   const text = haystack(book, context)
-  return words.every((word) => text.includes(word))
+  return typed.every((word) => text.some((candidate) => candidate.startsWith(word)))
 }
 
 /**

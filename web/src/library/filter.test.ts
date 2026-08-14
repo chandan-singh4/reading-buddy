@@ -66,6 +66,37 @@ describe('matchesSearch', () => {
   it('matches everything when nothing is typed', () => {
     expect(matchesSearch(book('1'), '   ')).toBe(true)
   })
+
+  it('narrows with each letter, from the start of a word', () => {
+    const love = book('1', { title: 'On Love' })
+
+    // The shelf shrinks as the reader types, which is the whole point.
+    expect(matchesSearch(love, 'o')).toBe(true)
+    expect(matchesSearch(love, 'on')).toBe(true)
+    expect(matchesSearch(love, 'on l')).toBe(true)
+    expect(matchesSearch(love, 'onx')).toBe(false)
+  })
+
+  it('will not match the middle of a word', () => {
+    // "on" used to find this, so the first letters of a title barely thinned
+    // the shelf at all.
+    expect(matchesSearch(book('1', { title: 'Confessions' }), 'on')).toBe(false)
+    expect(matchesSearch(book('1', { title: 'Psychology' }), 'logy')).toBe(false)
+  })
+
+  it('matches a word anywhere in the title, not just the first', () => {
+    // Nobody looking for The Prophet types "the" first.
+    expect(matchesSearch(book('1', { title: 'The Prophet' }), 'proph')).toBe(true)
+  })
+
+  it('splits on punctuation, so a hyphen or a colon is not a wall', () => {
+    expect(matchesSearch(book('1', { title: 'On Love: an essay' }), 'essay')).toBe(true)
+    expect(matchesSearch(book('1', { title: 'Self-Help' }), 'help')).toBe(true)
+  })
+
+  it('ignores accents, which most keyboards cannot easily type', () => {
+    expect(matchesSearch(book('1', { title: 'Émile' }), 'emile')).toBe(true)
+  })
 })
 
 describe('arrange — filtering', () => {
