@@ -190,19 +190,22 @@
 }
 
 /*
- * The sheet floats now, and the reason is the slider underneath it.
+ * The sheet has to read as a separate surface from the page slider under it,
+ * and the separation is done with *finish*, not with a gap.
  *
- * It used to be a panel welded to the bottom edge, sharing that edge with the
- * footer bar — so the page slider read as the last row *of the sheet* rather
- * than as the book's own control. Two unrelated things, one apparent surface.
+ * The first attempt inset it from all four sides and floated it. That did
+ * separate it, and it also cut two strips of bare app background down the left
+ * and right of the panel — a hard pale edge either side of the sheet, which is
+ * a louder thing on the screen than the seam it was hiding. So the sheet is
+ * full width again, flush to the bottom, and the difference is carried by the
+ * surface itself: the treatment the "Continue reading" button already uses (see
+ * `.readButton` in `BookInfo.module.css`) — a faint accent wash over the surface
+ * colour, and a rim light along the top edge only, which is what makes a flat
+ * rectangle read as something curved and raised. The slider sits below that lit
+ * edge on plain bar surface, so it is visibly not part of this.
  *
- * So it lifts off: inset from all four sides, rounded the whole way round, with
- * a gap under it through which the slider is visibly a separate thing. The
- * surface itself is the treatment the "Continue reading" button already uses
- * (see `.readButton` in `BookInfo.module.css`) — a faint accent wash over the
- * surface colour, and a rim light along the top edge only, which is what makes
- * a flat rectangle read as something curved and raised. Borrowed deliberately:
- * a lifted thing should be lifted the same way everywhere in the app.
+ * Borrowed deliberately: a lifted thing should be lifted the same way
+ * everywhere in the app.
  */
 .sheet {
   pointer-events: auto;
@@ -213,9 +216,11 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin: 0 var(--space-3) var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+  /* Top edge only. A border down the sides would draw the same hard line the
+     margins did, one pixel wide instead of twelve. */
+  border-top: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
   background:
     linear-gradient(
       180deg,
