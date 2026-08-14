@@ -81,7 +81,9 @@ describe('BookInfo', () => {
     openInfo()
 
     expect(await screen.findByText('Not started')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Start reading' })).toBeTruthy()
+    // "Read", not "Start reading": the button is the shortest true thing it
+    // could say, and the line under it already says where it lands.
+    expect(screen.getByRole('link', { name: 'Read' })).toBeTruthy()
   })
 
   it('shows progress and offers to continue once reading has begun', async () => {
@@ -268,6 +270,22 @@ describe('BookInfo', () => {
       openInfo()
 
       expect(await screen.findByText('Google Books has no record of this one.')).toBeTruthy()
+    })
+
+    // The blurb is somebody else's marketing copy; folded, it can't push the
+    // reader's own notes and quotes off the bottom of the screen.
+    it('folds the description, and opens it on the chevron', async () => {
+      await repository.saveParsedBook(bookOf({ description: 'A breathtaking contemporary epic.' }))
+      openInfo()
+
+      expect(await screen.findByText('A breathtaking contemporary epic.')).toBeTruthy()
+      const toggle = screen.getByRole('button', { name: 'Show more' })
+      expect(toggle.getAttribute('aria-expanded')).toBe('false')
+
+      fireEvent.click(toggle)
+      expect(screen.getByRole('button', { name: 'Show less' }).getAttribute('aria-expanded')).toBe(
+        'true',
+      )
     })
 
     it('offers to ask again', async () => {

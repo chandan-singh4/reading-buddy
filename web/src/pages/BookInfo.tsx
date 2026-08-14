@@ -61,6 +61,18 @@ function dateOf(iso: string): string {
 }
 
 /**
+ * What goes in the narrow "Published" cell of the spec strip.
+ *
+ * Google returns anything from `1995` to `1995-03-02`, and the cell is a third
+ * of a phone wide. The year is the part anyone reads at a glance; the full date
+ * is still in the catalogue if it ever matters.
+ */
+function publishedLabel(published: string | undefined): string {
+  if (!published) return '—'
+  return /^\d{4}-/.test(published) ? published.slice(0, 4) : published
+}
+
+/**
  * A book's own screen (WP-47) — reached from a shelf tile's "ⓘ", not from
  * tapping the cover, which still opens straight into the reader. Title,
  * author, format, status and a 1–5 rating live here; WP-48 adds quotes and
@@ -189,7 +201,7 @@ export default function BookInfo() {
   }
 
   const { book, position } = state
-  const startLabel = position ? 'Continue reading' : 'Start reading'
+  const startLabel = position ? 'Continue reading' : 'Read'
 
   return (
     <div className={styles.page}>
@@ -204,61 +216,50 @@ export default function BookInfo() {
         <div className={styles.heroInfo}>
           <h1 className={styles.title}>{fullTitle(book.title, book.subtitle)}</h1>
           {book.author && <p className={styles.author}>{book.author}</p>}
-          <div className={styles.tags}>
-            <span className={styles.tag}>{FORMAT_LABELS[book.source]}</span>
-            {book.genre && <span className={styles.tag}>{book.genre}</span>}
-            {book.subject && <span className={styles.tag}>{book.subject}</span>}
-          </div>
+          {book.genre && <p className={styles.genre}>{book.genre}</p>}
         </div>
       </div>
 
-      <dl className={styles.facts}>
-        <div className={styles.fact}>
-          <dt>Status</dt>
-          <dd>{readingStatus(position)}</dd>
+      {/*
+       * Format, length and year, side by side above the button that starts the
+       * book. Three facts rather than a list of nine: this is the strip a
+       * reader's eye crosses on the way to "Continue reading", so it holds only
+       * what helps them decide to press it. Everything else waits below.
+       */}
+      <div className={styles.spec}>
+        <div className={styles.specCell}>
+          <span className={styles.specValue}>{FORMAT_LABELS[book.source]}</span>
+          <span className={styles.specLabel}>Format</span>
         </div>
-        <div className={styles.fact}>
-          <dt>Added</dt>
-          <dd>{dateOf(book.importedAt)}</dd>
+        <div className={styles.specCell}>
+          <span className={styles.specValue}>{book.pageCount ?? '—'}</span>
+          <span className={styles.specLabel}>Pages</span>
         </div>
-        {position && (
-          <div className={styles.fact}>
-            <dt>Last read</dt>
-            <dd>{dateOf(position.at)}</dd>
-          </div>
-        )}
-        {book.publisher && (
-          <div className={styles.fact}>
-            <dt>Publisher</dt>
-            <dd>{book.publisher}</dd>
-          </div>
-        )}
-        {book.published && (
-          <div className={styles.fact}>
-            <dt>Published</dt>
-            <dd>{book.published}</dd>
-          </div>
-        )}
-        {book.pageCount !== undefined && (
-          <div className={styles.fact}>
-            <dt>Pages</dt>
-            <dd>{book.pageCount}</dd>
-          </div>
-        )}
-        {/* Never one without the other. Every average in this library rests on
-            one or two votes, and "4.5" alone reads as a verdict. */}
-        {book.averageRating !== undefined && book.ratingsCount !== undefined && (
-          <div className={styles.fact}>
-            <dt>Readers</dt>
-            <dd>
-              {book.averageRating.toFixed(2)} out of 5 · {book.ratingsCount.toLocaleString()}{' '}
-              {book.ratingsCount === 1 ? 'rating' : 'ratings'}
-            </dd>
-          </div>
-        )}
-      </dl>
+        <div className={styles.specCell}>
+          <span className={styles.specValue}>{publishedLabel(book.published)}</span>
+          <span className={styles.specLabel}>Published</span>
+        </div>
+      </div>
 
-      {book.description && <p className={styles.blurb}>{book.description}</p>}
+      <Link to={`/book/${id}`} className={styles.readButton}>
+        {startLabel}
+      </Link>
+      <p className={styles.progress}>{readingStatus(position)}</p>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionHeading}>About this book</h2>
+        {book.description ? (
+          <Blurb text={book.description} />
+        ) : (
+          <p className={styles.pending}>
+            {book.metadataFetchedAt
+              ? // Said plainly. This book is genuinely not in the catalogue,
+                // which is a fact about Google and not about the book.
+                'Google Books has no record of this one.'
+              : 'Nothing has been looked up for this book yet.'}
+          </p>
+        )}
+      </section>
 
       {isOutOfDate(book) && updating.status !== 'done' && (
         <section className={styles.section}>
@@ -303,15 +304,36 @@ export default function BookInfo() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Book details</h2>
-        <p className={styles.pending}>
-          {book.googleVolumeId
-            ? 'Publisher, length and cover came from Google Books.'
-            : book.metadataFetchedAt
-              ? // Said plainly. This book is genuinely not in the catalogue,
-                // which is a fact about Google and not about the book.
-                'Google Books has no record of this one.'
-              : 'Nothing has been looked up for this book yet.'}
-        </p>
+
+        <dl className={styles.facts}>
+          <div className={styles.fact}>
+            <dt>Added</dt>
+            <dd>{dateOf(book.importedAt)}</dd>
+          </div>
+          {position && (
+            <div className={styles.fact}>
+              <dt>Last read</dt>
+              <dd>{dateOf(position.at)}</dd>
+            </div>
+          )}
+          {book.publisher && (
+            <div className={styles.fact}>
+              <dt>Publisher</dt>
+              <dd>{book.publisher}</dd>
+            </div>
+          )}
+          {/* Never one without the other. Every average in this library rests on
+              one or two votes, and "4.5" alone reads as a verdict. */}
+          {book.averageRating !== undefined && book.ratingsCount !== undefined && (
+            <div className={styles.fact}>
+              <dt>Readers</dt>
+              <dd>
+                {book.averageRating.toFixed(2)} out of 5 · {book.ratingsCount.toLocaleString()}{' '}
+                {book.ratingsCount === 1 ? 'rating' : 'ratings'}
+              </dd>
+            </div>
+          )}
+        </dl>
 
         <button
           type="button"
@@ -370,10 +392,32 @@ export default function BookInfo() {
           await repository.deleteQuote(id, quoteId)
         }}
       />
+    </div>
+  )
+}
 
-      <Link to={`/book/${id}`} className={styles.readButton}>
-        {startLabel}
-      </Link>
+/**
+ * The publisher's blurb, folded to a few lines with a chevron to open it.
+ *
+ * These run to a full paragraph of marketing copy, and unfolded they push the
+ * reader's own notes and quotes off the bottom of the screen — the parts of
+ * this page that belong to them, buried under the part that doesn't. Folded is
+ * the honest default: enough to recognise the book, and one tap to the rest.
+ */
+function Blurb({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={styles.blurbBox}>
+      <p className={open ? styles.blurbOpen : styles.blurb}>{text}</p>
+      <button
+        type="button"
+        className={styles.blurbToggle}
+        aria-expanded={open}
+        aria-label={open ? 'Show less' : 'Show more'}
+        onClick={() => setOpen(!open)}
+      >
+        <span className={open ? styles.chevronUp : styles.chevron} aria-hidden="true" />
+      </button>
     </div>
   )
 }
