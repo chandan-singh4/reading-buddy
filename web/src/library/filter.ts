@@ -98,6 +98,30 @@ export function matchesSearch(
 }
 
 /**
+ * Whether the typed query is the opening of this book's title.
+ *
+ * Typing "th" while looking for *The Perennial Way* should not bury it under
+ * every book with a word starting in Th — the reader is spelling the title out
+ * from its first letter, and the book they are spelling has to be the one at
+ * the top. This is what `arrange` ranks on; it does not decide what is *shown*,
+ * so "prophet" still finds *The Prophet* and an author's name still works.
+ *
+ * All the words before the last must match whole ("on l" is the start of *On
+ * Love*, but "o l" is not the start of anything) and only the word still being
+ * typed counts as a prefix.
+ */
+function titleOpensWith(book: BookMeta, typed: readonly string[]): boolean {
+  if (typed.length === 0) return false
+
+  const title = wordsOf(book.title)
+  if (title.length < typed.length) return false
+
+  return typed.every((word, index) =>
+    index === typed.length - 1 ? title[index]!.startsWith(word) : title[index] === word,
+  )
+}
+
+/**
  * Books passing every active filter.
  *
  * An empty list means "all of them" throughout — see `LibraryPrefs.statuses`.
@@ -194,7 +218,28 @@ export function arrange(
     (book) => matchesSearch(book, query, context) && matchesFilters(book, prefs, context),
   )
 
+  const typed = wordsOf(query)
+  const order = COMPARATORS[prefs.sort]
+
   // Copied before sorting: `books` is the screen's state and sorting in place
   // would mutate it, which React is entitled to not re-render for.
-  return kept.sort((a, b) => COMPARATORS[prefs.sort](a, b, context))
+  return kept.sort((a, b) => {
+    /*
+     * While something is typed, books whose *title* opens with it come first,
+     * and the reader's chosen sort orders each group within itself.
+     *
+     * The sort is not overridden so much as given a tiebreak it could not know
+     * about: under "Title A → Z", spelling out "the pere…" walked past every
+     * book with Th anywhere in it before reaching the one being spelled, and
+     * the reader can't see the alphabet working — they can only see the book
+     * they want not being there. With nothing typed this branch is skipped
+     * entirely, so the shelf's resting order is exactly what it was.
+     */
+    if (typed.length > 0) {
+      const rank = Number(titleOpensWith(b, typed)) - Number(titleOpensWith(a, typed))
+      if (rank !== 0) return rank
+    }
+
+    return order(a, b, context)
+  })
 }

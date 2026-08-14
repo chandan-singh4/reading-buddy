@@ -99,6 +99,39 @@ describe('matchesSearch', () => {
   })
 })
 
+describe('arrange — ranking while searching', () => {
+  const perennial = book('perennial', { title: 'The Perennial Way' })
+  const breath = book('breath', { title: 'Breath: The New Science' })
+  const thinking = book('thinking', { title: 'Thinking, Fast and Slow' })
+  const shelf = [breath, thinking, perennial]
+
+  it('puts titles that open with the query first, under a title sort', () => {
+    // Alphabetically Breath comes first and The Perennial Way comes last, so
+    // spelling the title out walked *away* from the book being spelled.
+    expect(ids(arrange(shelf, 'th', prefs({ sort: 'title-asc' }), context()))).toEqual([
+      'perennial',
+      'thinking',
+      'breath',
+    ])
+  })
+
+  it('keeps the chosen sort within each group', () => {
+    const also = book('theory', { title: 'The Body Keeps the Score' })
+    const ranked = arrange([perennial, also, breath], 'the', prefs({ sort: 'title-asc' }), context())
+    // Both open with "The", so A → Z decides between them; Breath matches only
+    // in the middle and follows.
+    expect(ids(ranked)).toEqual(['theory', 'perennial', 'breath'])
+  })
+
+  it('leaves the order alone when nothing is typed', () => {
+    expect(ids(arrange(shelf, '', prefs({ sort: 'title-asc' }), context()))).toEqual([
+      'breath',
+      'perennial',
+      'thinking',
+    ])
+  })
+})
+
 describe('arrange — filtering', () => {
   const books = [
     book('unread'),

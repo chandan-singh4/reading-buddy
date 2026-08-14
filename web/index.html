@@ -4,8 +4,17 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
     />
+    <!-- `interactive-widget=resizes-content` is what keeps the library's search
+         bar on screen while the on-screen keyboard is up. Android's default is
+         `resizes-visual`: the keyboard is drawn *over* the page and the layout
+         viewport keeps its full height, so a `position: sticky` bar pinned to
+         the top of that viewport sits above the strip you can actually see —
+         it looks exactly like the bar failed to stick. `resizes-content`
+         shortens the layout viewport to the space left above the keyboard
+         instead, which is what every sticky and safe-area rule in this app
+         already assumes. -->
     <!-- Matches the manifest's theme_color; a mismatch shows as a strip of the
          wrong colour behind the status bar on Android. -->
     <meta name="theme-color" content="#14130f" />
