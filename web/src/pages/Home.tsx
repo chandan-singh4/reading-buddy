@@ -221,10 +221,12 @@ export default function Home() {
   return (
     <div className={styles.home}>
       <header className={styles.greeting}>
-        {/* The greeting alone. The line under it said "Pick up where you left
-            off", which is what the shelf directly below it already shows —
-            a caption narrating the thing it sits on top of. */}
         <h1 className={styles.greetingTitle}>{greeting}, {READER_NAME}.</h1>
+        {/* An open question, not a caption. The line that used to sit here
+            ("Pick up where you left off") described the shelf underneath it,
+            which the shelf was already doing for itself. This one asks the
+            reader something instead, so it earns its place. */}
+        <p className={styles.greetingAsk}>What book are you picking up today?</p>
       </header>
 
       {/*
