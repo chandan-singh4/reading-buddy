@@ -305,44 +305,60 @@ export default function BookInfo() {
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Book details</h2>
 
-        <dl className={styles.facts}>
-          <div className={styles.fact}>
-            <dt>Added</dt>
-            <dd>{dateOf(book.importedAt)}</dd>
-          </div>
-          {position && (
-            <div className={styles.fact}>
-              <dt>Last read</dt>
-              <dd>{dateOf(position.at)}</dd>
-            </div>
-          )}
+        {/* A tinted card of paired facts rather than a table of rows. Two
+            columns, each cell an icon, a label and a value — the same amount of
+            information in half the vertical space, and it reads as one object
+            belonging to the book instead of a database dump. */}
+        <dl className={styles.details}>
+          <Detail icon="calendar" label="Added" value={dateOf(book.importedAt)} />
+          {position && <Detail icon="check" label="Last read" value={dateOf(position.at)} />}
           {book.publisher && (
-            <div className={styles.fact}>
-              <dt>Publisher</dt>
-              <dd>{book.publisher}</dd>
-            </div>
+            <Detail icon="building" label="Publisher" value={book.publisher} wide />
           )}
+          {/* The file's own ISBN first: it identifies the edition actually on
+              the shelf, where Google's identifies the one it matched. */}
+          {isbnOf(book) && <Detail icon="barcode" label="ISBN" value={isbnOf(book)!} wide />}
           {/* Never one without the other. Every average in this library rests on
               one or two votes, and "4.5" alone reads as a verdict. */}
           {book.averageRating !== undefined && book.ratingsCount !== undefined && (
-            <div className={styles.fact}>
-              <dt>Readers</dt>
-              <dd>
-                {book.averageRating.toFixed(2)} out of 5 · {book.ratingsCount.toLocaleString()}{' '}
-                {book.ratingsCount === 1 ? 'rating' : 'ratings'}
-              </dd>
+            <Detail
+              icon="star"
+              label="Readers"
+              wide
+              value={`${book.averageRating.toFixed(2)} out of 5 · ${book.ratingsCount.toLocaleString()} ${
+                book.ratingsCount === 1 ? 'rating' : 'ratings'
+              }`}
+            />
+          )}
+          {/* Google's own subject headings, as chips. Finer than the single
+              genre pill at the top, and the only place they've ever been shown
+              — they have been stored on every matched book all along. */}
+          {book.subjects && book.subjects.length > 0 && (
+            <div className={`${styles.detail} ${styles.detailWide}`}>
+              <Icon name="tag" />
+              <div className={styles.detailBody}>
+                <dt className={styles.detailLabel}>Subjects</dt>
+                <dd className={styles.subjects}>
+                  {book.subjects.map((subject) => (
+                    <span key={subject} className={styles.subject}>
+                      {subject}
+                    </span>
+                  ))}
+                </dd>
+              </div>
             </div>
           )}
         </dl>
 
         <button
           type="button"
-          className={styles.updateButton}
+          className={styles.refreshButton}
           disabled={catalogue.status === 'busy'}
           onClick={() => {
             void refreshFromCatalogue()
           }}
         >
+          <Icon name="refresh" />
           {catalogue.status === 'busy' ? 'Looking…' : 'Refresh from Google Books'}
         </button>
 
@@ -373,6 +389,27 @@ export default function BookInfo() {
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Your rating</h2>
         <StarRow label="Overall" value={book.rating} onChange={rate} />
+
+        {/* The bar, not the number, is the point: "68%" is a fact and a
+            three-quarters-full bar is a feeling, and this is the page where
+            the reader decides whether to pick the book back up. */}
+        {position?.percent !== undefined && (
+          <div className={styles.progressBlock}>
+            <p className={styles.progressLabel}>
+              Reading progress: <strong>{position.percent}%</strong>
+            </p>
+            <div
+              className={styles.progressTrack}
+              role="progressbar"
+              aria-label="Reading progress"
+              aria-valuenow={position.percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div className={styles.progressFill} style={{ width: `${position.percent}%` }} />
+            </div>
+          </div>
+        )}
       </section>
 
       <section className={styles.section}>
@@ -393,6 +430,80 @@ export default function BookInfo() {
         }}
       />
     </div>
+  )
+}
+
+/**
+ * Which ISBN to show.
+ *
+ * The file's own first, because it identifies the edition actually on the
+ * shelf — Google's records the edition it *matched*, and the two disagree more
+ * often than you would expect. `googleIsbn13` before `googleIsbn10` only
+ * because the 13-digit form is the current standard.
+ */
+function isbnOf(book: BookMeta): string | undefined {
+  return book.isbn ?? book.googleIsbn13 ?? book.googleIsbn10
+}
+
+/** One labelled fact in the details card. `wide` spans both columns — for the
+    values (a publisher, an ISBN) that don't survive being cut to half a phone. */
+function Detail({
+  icon,
+  label,
+  value,
+  wide,
+}: {
+  icon: IconName
+  label: string
+  value: string
+  wide?: boolean
+}) {
+  return (
+    <div className={wide ? `${styles.detail} ${styles.detailWide}` : styles.detail}>
+      <Icon name={icon} />
+      <div className={styles.detailBody}>
+        <dt className={styles.detailLabel}>{label}</dt>
+        <dd className={styles.detailValue}>{value}</dd>
+      </div>
+    </div>
+  )
+}
+
+type IconName = 'calendar' | 'check' | 'building' | 'barcode' | 'star' | 'tag' | 'refresh'
+
+/**
+ * The line icons in the details card, drawn rather than typed.
+ *
+ * SVG paths rather than an icon font or a Unicode glyph for the same reason
+ * the half-star and the chevron are drawn: a character that a system font
+ * happens not to carry renders as an empty box on somebody's phone, and it
+ * fails silently. These are `currentColor`, so they take the accent from the
+ * rule around them and follow every theme without a second definition.
+ */
+const ICON_PATHS: Readonly<Record<IconName, string>> = {
+  calendar: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
+  check: 'M4 12.5l5 5L20 6.5',
+  building: 'M5 21V4h9v17M14 10h5v11M8 8h3M8 12h3M8 16h3',
+  barcode: 'M4 5v14M8 5v14M11 5v14M14 5v10M17 5v14M20 5v14',
+  star: 'M12 3.5l2.7 5.6 6 .9-4.35 4.3 1.03 6.1L12 17.5l-5.38 2.9 1.03-6.1L3.3 10l6-.9z',
+  tag: 'M3 12.5V4h8.5L21 13.5 12.5 22zM7.5 7.5h.01',
+  refresh: 'M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4',
+}
+
+function Icon({ name }: { name: IconName }) {
+  return (
+    <svg
+      className={styles.icon}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={ICON_PATHS[name]} />
+    </svg>
   )
 }
 
@@ -472,7 +583,9 @@ function StarRow({
 
   return (
     <div className={styles.ratingRow}>
-      <span className={styles.ratingLabel}>{label}</span>
+      {/* No visible label: the section heading above already says "Your
+          rating", and a second word beside the stars only pushed them off
+          centre. The group keeps the name for a screen reader. */}
       <div className={styles.stars} role="group" aria-label={label}>
         {STARS.map((star) => (
           <span key={star} className={styles.star}>

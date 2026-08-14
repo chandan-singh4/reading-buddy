@@ -166,30 +166,78 @@
   color: var(--color-text-muted);
 }
 
-.facts {
+/**
+ * The details card: paired facts on a tinted panel.
+ *
+ * Tinted from `--color-accent` rather than filled with it. A solid accent slab
+ * with reversed text is the obvious build and it breaks in half the themes —
+ * white on the dark theme's gold is unreadable. Mixing the accent *into* the
+ * surface keeps the card unmistakably part of the book's own colour while the
+ * text stays plain `--color-text` on a near-surface background, which is
+ * legible in every theme by construction.
+ */
+.details {
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
 }
 
-.fact {
+.detail {
   display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
 }
 
-.fact dt {
-  flex: none;
+/* A publisher's name or an ISBN does not survive being cut to half a phone. */
+.detailWide {
+  grid-column: 1 / -1;
+}
+
+.detailBody {
+  min-width: 0;
+}
+
+.detailLabel {
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
 
-.fact dd {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  text-align: right;
+.detailValue {
+  font-size: var(--text-sm);
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.icon {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.1rem;
+  color: var(--color-accent);
+}
+
+/* Google's subject headings. Chips rather than a comma list, because they are
+   a set of separate things — and a BISAC heading is long enough that a run of
+   them reads as one sentence when it isn't. */
+.subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.subject {
+  font-size: var(--text-xs);
+  padding: 0.15rem var(--space-2);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
 }
 
 /**
@@ -363,14 +411,33 @@
 
 .ratingRow {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  justify-content: center;
+  padding: var(--space-2) 0;
 }
 
-.ratingLabel {
+.progressBlock {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+}
+
+.progressLabel {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
-  min-width: 7rem;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
 }
 
 .notesInput {
@@ -378,9 +445,15 @@
   color: inherit;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
   resize: vertical;
+}
+
+.notesInput:focus-visible,
+.quoteInput:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 .quoteList {
@@ -426,23 +499,28 @@
   color: inherit;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
   resize: vertical;
 }
 
+/* A real button now rather than a bare accent word — it sits under a field
+   the reader has just typed into, and a link-shaped thing there reads as an
+   afterthought instead of the way to keep what they wrote. */
 .quoteSave {
-  justify-self: start;
+  justify-self: center;
+  padding: var(--space-2) var(--space-5);
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--color-accent);
-  background: none;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
   border: none;
-  padding: var(--space-1) 0;
+  border-radius: 999px;
 }
 
 .quoteSave:disabled {
   color: var(--color-text-muted);
+  background: var(--color-surface-raised);
 }
 
 /* Outlined rather than filled: "Start reading" below is the one thing this
@@ -461,6 +539,40 @@
 .updateButton:disabled {
   color: var(--color-text-muted);
   border-color: var(--color-border);
+}
+
+/**
+ * Refresh from Google Books — filled and full width, unlike `.updateButton`.
+ *
+ * It sits directly under the card it fills in, and it is the action of this
+ * section rather than a footnote to it. `--color-accent-contrast` is defined
+ * against `--color-accent` in every theme, so the pair is legible by
+ * construction and never needs a per-theme override.
+ */
+.refreshButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border: none;
+  border-radius: 999px;
+}
+
+/* The icon inside is `currentColor`, so it would otherwise stay accent-coloured
+   on an accent fill and vanish. */
+.refreshButton .icon {
+  color: inherit;
+}
+
+.refreshButton:disabled {
+  color: var(--color-text-muted);
+  background: var(--color-surface-raised);
 }
 
 /* The same wash the error boxes elsewhere use — noticing without shouting.

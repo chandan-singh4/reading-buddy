@@ -272,6 +272,32 @@ describe('BookInfo', () => {
       expect(await screen.findByText('Google Books has no record of this one.')).toBeTruthy()
     })
 
+    it('lists the subject headings Google returned', async () => {
+      await repository.saveParsedBook(
+        bookOf({ subjects: ['Philosophy / Buddhist', 'Religion / Eastern'] }),
+      )
+      openInfo()
+
+      expect(await screen.findByText('Philosophy / Buddhist')).toBeTruthy()
+      expect(screen.getByText('Religion / Eastern')).toBeTruthy()
+    })
+
+    // The file's edition, not the one Google matched — they disagree often.
+    it('prefers the file’s own ISBN over the catalogue’s', async () => {
+      await repository.saveParsedBook(bookOf({ isbn: '9780195093360', googleIsbn13: '9781234567897' }))
+      openInfo()
+
+      expect(await screen.findByText('9780195093360')).toBeTruthy()
+      expect(screen.queryByText('9781234567897')).toBeNull()
+    })
+
+    it('falls back to the catalogue’s ISBN when the file carried none', async () => {
+      await repository.saveParsedBook(bookOf({ googleIsbn13: '9781234567897' }))
+      openInfo()
+
+      expect(await screen.findByText('9781234567897')).toBeTruthy()
+    })
+
     // The blurb is somebody else's marketing copy; folded, it can't push the
     // reader's own notes and quotes off the bottom of the screen.
     it('folds the description, and opens it on the chevron', async () => {
