@@ -5,6 +5,9 @@
  */
 
 .chrome {
+  /* The dimming over the page, named once because two things draw it: the
+     scrim above the sheet, and the sheet's own bottom gap. */
+  --reader-scrim: rgb(0 0 0 / 0.35);
   position: fixed;
   inset: 0;
   z-index: 10;
@@ -186,7 +189,7 @@
   pointer-events: auto;
   flex: 1;
   min-height: 0;
-  background: rgb(0 0 0 / 0.35);
+  background: var(--reader-scrim);
 }
 
 /*
@@ -222,8 +225,18 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  /* Bottom only: clear of the page slider, flush to both edges. */
-  margin-bottom: var(--space-3);
+  /*
+   * The gap that holds it clear of the page slider, drawn as a border rather
+   * than as a margin.
+   *
+   * A margin left a bare strip: the scrim is a sibling that stops where the
+   * sheet begins, so the space under the sheet was the only part of the screen
+   * with nothing over it, and the lit page showed through it as a white band —
+   * the opposite of a gap. Painting the space in the scrim's own colour makes
+   * it continuous with the dimming above, so it reads as the page carrying on
+   * behind the sheet and the slider below is plainly a separate thing.
+   */
+  border-bottom: var(--space-3) solid var(--reader-scrim);
   /* Top edge only. A border down the sides would draw the same hard line the
      side margins did, one pixel wide instead of twelve. */
   border-top: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
@@ -234,6 +247,9 @@
       color-mix(in srgb, var(--color-accent) 5%, transparent)
     ),
     var(--color-surface-raised);
+  /* The bottom border is see-through and a background reaches under its border
+     by default, which would tint the gap with the sheet's own surface. */
+  background-clip: padding-box;
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--color-text) 22%, transparent),
     0 14px 30px -16px rgb(0 0 0 / 55%);
