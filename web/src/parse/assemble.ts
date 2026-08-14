@@ -26,6 +26,7 @@
 
 import type { ParsedBook } from '../storage/index.ts'
 import { resolveLinks } from './links.ts'
+import { stripRunningHeads } from './runningHead.ts'
 import type {
   BlockKind,
   BookMeta,
@@ -281,9 +282,15 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
   // ever learn to recognise it properly.
   const content = blocks.filter((block) => block.kind !== 'furniture')
 
-  const levels = resolveLevels(content)
+  // Running heads that were glued to the front of a paragraph rather than left
+  // standing alone. This runs here, and not in a format's own parser, because
+  // it needs the *whole* book: it identifies the head by what repeats across
+  // every page, and a single chapter file may only contain one.
+  const stripped = stripRunningHeads(content)
+
+  const levels = resolveLevels(stripped)
   const drafts =
-    levels === null ? groupByBuckets(content, meta) : groupByHeadings(content, levels, meta)
+    levels === null ? groupByBuckets(stripped, meta) : groupByHeadings(stripped, levels, meta)
 
   const manifestChapters: ManifestChapter[] = []
   const chapters: ChapterIndex[] = []

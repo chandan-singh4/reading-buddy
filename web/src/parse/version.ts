@@ -118,5 +118,17 @@
  *   You've Been Waiting For", the same furniture from the facing page, stayed.
  *   Books updated under 13 kept every running head their file marked up as a
  *   heading, and need asking again.
+ * - **15** — the half of them that were never a block at all, found by finally
+ *   opening the file instead of theorising at it. 13 and 14 both assumed a
+ *   running head arrives as its own paragraph. On a recto page it does. On a
+ *   verso page it sits above a sentence *continuing* from the page before, so
+ *   the converter emits one paragraph — "8 | You Are the One You've Been
+ *   Waiting For or distract from the pain and emptiness..." — and there is no
+ *   block to drop, only a prefix to strip. Where the prefix ends is settled by
+ *   what repeats: the text after the page number is identical on every other
+ *   page of the book, so the common opening of those paragraphs is the head.
+ *   Needing the whole book to see that is why it lives in `assemble.ts` and not
+ *   in a format's own parser. Books updated under 13 or 14 kept every one of
+ *   these.
  */
-export const PARSER_VERSION = 14
+export const PARSER_VERSION = 15
