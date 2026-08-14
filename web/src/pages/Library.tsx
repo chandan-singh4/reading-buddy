@@ -261,6 +261,21 @@ export default function Library() {
 
     return () => {
       cancelled = true
+      /*
+       * A search is a question, and leaving the screen is the end of asking
+       * it. The screens stay mounted now (see `app/screenActive.tsx`), so
+       * without this the reader comes back from Home to a shelf still showing
+       * four books out of thirty-two — and the reason why is a word in a field
+       * they have stopped looking at. The filters are deliberately *not*
+       * cleared with it: those are a saved preference the reader set on
+       * purpose and `prefs.ts` writes to disk, and the bar says out loud that
+       * they are on.
+       *
+       * Cleared on the way out rather than on the way back in, so the shelf
+       * has already recomposed by the time it is on screen again. Clearing on
+       * arrival would show the old, narrowed shelf for a frame first.
+       */
+      setQuery('')
     }
   })
 

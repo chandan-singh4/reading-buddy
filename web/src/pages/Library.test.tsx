@@ -20,6 +20,7 @@ import {
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { ScreenActiveProvider } from '../app/screenActive.tsx'
 import { FINISHED_FOLDER_ID } from '../library/systemFolders.ts'
 import { repository, type ParsedBook } from '../storage/index.ts'
 import { chapterPath, formatAnchor, sectionPath, type BookId } from '../structure/index.ts'
@@ -1083,5 +1084,65 @@ describe('the view and filter menu', () => {
 
     const titles = screen.getAllByRole('link').map((link) => link.textContent)
     expect(titles[0]).toContain('Red Book')
+  })
+})
+
+describe('leaving the shelf and coming back', () => {
+  /**
+   * The shell keeps every tab mounted, so leaving is not unmounting — this is
+   * what the screen sees when the reader goes to Home and comes back.
+   */
+  function openWithVisits() {
+    const view = render(
+      <ScreenActiveProvider value={true}>
+        <MemoryRouter>
+          <Library />
+        </MemoryRouter>
+      </ScreenActiveProvider>,
+    )
+
+    return (active: boolean) =>
+      view.rerender(
+        <ScreenActiveProvider value={active}>
+          <MemoryRouter>
+            <Library />
+          </MemoryRouter>
+        </ScreenActiveProvider>,
+      )
+  }
+
+  it('is emptied by leaving the screen, so coming back shows the whole shelf', async () => {
+    const visit = openWithVisits()
+    await screen.findByText('Aion')
+
+    const field = screen.getByRole('searchbox', { name: 'Search your library' })
+    fireEvent.change(field, { target: { value: 'red' } })
+    expect(screen.queryByText('Aion')).toBeNull()
+
+    // Off to Home, then back.
+    act(() => visit(false))
+    act(() => visit(true))
+
+    await screen.findByText('Aion')
+    expect(screen.getByRole('searchbox', { name: 'Search your library' })).toHaveProperty('value', '')
+  })
+
+  it('keeps the filters, which are a saved preference rather than a question', async () => {
+    const visit = openWithVisits()
+    await screen.findByText('Aion')
+
+    fireEvent.click(screen.getByRole('button', { name: 'All filters' }))
+    fireEvent.click(
+      await within(inSheet().getByRole('group', { name: 'Sort by' })).findByRole('button', {
+        name: 'Title Z → A',
+      }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+
+    act(() => visit(false))
+    act(() => visit(true))
+
+    await screen.findByText('Aion')
+    expect(screen.getAllByRole('link')[0]!.textContent).toContain('Red Book')
   })
 })
