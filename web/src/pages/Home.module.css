@@ -20,11 +20,6 @@
   color: var(--color-accent);
 }
 
-.greetingSub {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 /* Each shelf is its own panel: a heading, the covers, and the plank they stand
    on. Grouping them means the gap between shelves is one value, not three that
    have to be kept in agreement. */

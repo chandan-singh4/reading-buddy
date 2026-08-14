@@ -533,7 +533,8 @@ describe('crossing between two tabs', () => {
 
   it('keeps the screen being left on show, and only it fades', async () => {
     renderAt('/')
-    expect(await screen.findByText('Pick up where you left off.')).toBeDefined()
+    // The greeting is Home's own marker — whichever half of the day it is.
+    expect(await screen.findByRole('heading', { name: /Chandan/ })).toBeDefined()
 
     swipeLeft()
     await screen.findByRole('heading', { name: 'Library' })
@@ -569,7 +570,8 @@ describe('crossing between two tabs', () => {
 
   it('puts the screen being left away once it has gone', async () => {
     renderAt('/')
-    expect(await screen.findByText('Pick up where you left off.')).toBeDefined()
+    // The greeting is Home's own marker — whichever half of the day it is.
+    expect(await screen.findByRole('heading', { name: /Chandan/ })).toBeDefined()
 
     swipeLeft()
     await screen.findByRole('heading', { name: 'Library' })

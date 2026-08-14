@@ -221,8 +221,10 @@ export default function Home() {
   return (
     <div className={styles.home}>
       <header className={styles.greeting}>
+        {/* The greeting alone. The line under it said "Pick up where you left
+            off", which is what the shelf directly below it already shows —
+            a caption narrating the thing it sits on top of. */}
         <h1 className={styles.greetingTitle}>{greeting}, {READER_NAME}.</h1>
-        <p className={styles.greetingSub}>Pick up where you left off.</p>
       </header>
 
       {/*
