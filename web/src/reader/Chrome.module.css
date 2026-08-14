@@ -45,7 +45,24 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-1) var(--space-3);
-  background: var(--color-surface-raised);
+  /*
+   * The same accent wash the sheet wears, at half strength.
+   *
+   * The theme was reaching these bars all along — it is set on `<html>` and
+   * they take `--color-surface-raised` from it like everything else. What made
+   * the top bar look like it had missed the memo was that the sheet had a tint
+   * over that surface and the bars had none, so with all three on screen at
+   * once the two ends read as a different, colder material than the middle.
+   * Half strength rather than the sheet's, because the sheet is the thing that
+   * rose and should still be the most lit surface of the three.
+   */
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-accent) 8%, transparent),
+      color-mix(in srgb, var(--color-accent) 3%, transparent)
+    ),
+    var(--color-surface-raised);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-raised);
   font-family: var(--font-ui);

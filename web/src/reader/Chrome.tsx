@@ -56,7 +56,7 @@ const SHEET_TITLES: Record<SheetTab, string> = {
   contents: 'Contents',
   bookmarks: 'Bookmarks',
   notes: 'Notes',
-  aa: 'Text and display',
+  aa: 'Reading mode',
 }
 
 /**
@@ -233,7 +233,7 @@ export function Chrome({
           type="button"
           className={styles.iconControl}
           aria-expanded={sheetOpen && sheetTab === 'aa'}
-          aria-label="Text and display"
+          aria-label="Reading mode"
           onClick={() => onOpenSheet('aa')}
         >
           <span aria-hidden="true">Aa</span>

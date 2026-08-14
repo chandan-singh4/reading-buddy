@@ -78,14 +78,14 @@ describe('TextSettings', () => {
   // survive as a label or the panel is unusable without sight.
   it('chooses a theme from its colour', () => {
     const onSettingsChange = show()
-    openPane('Reading mode')
+    openPane('Themes')
     fireEvent.click(screen.getByRole('button', { name: 'Sepia' }))
     expect(onSettingsChange).toHaveBeenCalledWith({ theme: 'sepia' })
   })
 
   it('marks the theme in use', () => {
     show({ theme: 'forest' })
-    openPane('Reading mode')
+    openPane('Themes')
     expect(screen.getByRole('button', { name: 'Forest' }).getAttribute('aria-pressed')).toBe(
       'true',
     )

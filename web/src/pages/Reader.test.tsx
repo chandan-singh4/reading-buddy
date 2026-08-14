@@ -472,9 +472,9 @@ describe('the top bar and its menu', () => {
     openReader()
     await screen.findByText('The opening words.')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Text and display' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reading mode' }))
 
-    expect(sheet('Text and display').getByRole('slider', { name: 'Text size' })).toBeTruthy()
+    expect(sheet('Reading mode').getByRole('slider', { name: 'Text size' })).toBeTruthy()
   })
 
   // The menu is a dropdown, and a dropdown that can only be closed by choosing

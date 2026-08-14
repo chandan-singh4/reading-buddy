@@ -5,7 +5,7 @@
  * shown at once, each one named in words. It worked, and it read like a form.
  * This is the same five settings arranged the way a reading app arranges them:
  *
- * - **Three tabs** — Text, Reading mode, More — so the panel is short enough to
+ * - **Three tabs** — Text, Themes, Margins — so the panel is short enough to
  *   see without scrolling, and so "change the font" and "change the colours"
  *   are not the same visual problem.
  * - **Sliders** for the two settings that are really a dial with an order to it
@@ -55,7 +55,7 @@ type Pane = 'text' | 'mode' | 'margins'
  */
 const PANES: readonly { id: Pane; label: string }[] = [
   { id: 'text', label: 'Text' },
-  { id: 'mode', label: 'Reading mode' },
+  { id: 'mode', label: 'Themes' },
   { id: 'margins', label: 'Margins' },
 ]
 
@@ -127,7 +127,7 @@ export function TextSettings({ settings, onSettingsChange }: TextSettingsProps) 
         </p>
       )}
 
-      <div className={styles.tabs} role="tablist" aria-label="Text and display" data-dimmed={dim(null)}>
+      <div className={styles.tabs} role="tablist" aria-label="Reading mode" data-dimmed={dim(null)}>
         {PANES.map((option) => (
           <button
             key={option.id}
@@ -231,8 +231,9 @@ export function TextSettings({ settings, onSettingsChange }: TextSettingsProps) 
             theme's own page and ink, so the choice is made by looking rather
             than by remembering what "Dim" turned out to mean last time.
           */}
+          {/* No row label, for the reason the margins pane has none: the tab
+              above already says it, and there is nothing else in here. */}
           <div className={styles.row}>
-            <span className={styles.rowLabel}>Reading mode</span>
             <div className={styles.swatches} role="group" aria-label="Theme">
               {THEMES.map((option) => (
                 <button
