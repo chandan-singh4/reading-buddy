@@ -14,10 +14,32 @@
   overflow-x: hidden;
 }
 
+/*
+ * Home, as a house rather than the word.
+ *
+ * A round chip rather than a bare glyph, for two reasons: the icon alone is
+ * about 20 px of ink and this is the only way off the page, so it needs a
+ * target a thumb can find; and a circle at the top-left of a full-bleed screen
+ * is the shape every phone already uses for "back", so it needs no label to be
+ * understood. The name is still there for a screen reader, on `aria-label`.
+ */
 .back {
-  display: inline-block;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  justify-self: start;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+}
+
+.back .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  color: inherit;
 }
 
 .pending {

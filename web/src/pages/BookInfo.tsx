@@ -181,8 +181,8 @@ export default function BookInfo() {
   if (state.status === 'loading') {
     return (
       <div className={styles.page}>
-        <Link to="/" className={styles.back}>
-          ← Home
+        <Link to="/" className={styles.back} aria-label="Home">
+          <Icon name="home" />
         </Link>
         <p className={styles.pending}>Loading…</p>
       </div>
@@ -192,8 +192,8 @@ export default function BookInfo() {
   if (state.status === 'missing') {
     return (
       <div className={styles.page}>
-        <Link to="/" className={styles.back}>
-          ← Home
+        <Link to="/" className={styles.back} aria-label="Home">
+          <Icon name="home" />
         </Link>
         <p className={styles.pending}>This book isn’t on your shelf anymore.</p>
       </div>
@@ -205,8 +205,8 @@ export default function BookInfo() {
 
   return (
     <div className={styles.page}>
-      <Link to="/" className={styles.back}>
-        ← Home
+      <Link to="/" className={styles.back} aria-label="Home">
+        <Icon name="home" />
       </Link>
 
       <div className={styles.hero}>
@@ -467,7 +467,7 @@ function Detail({
   )
 }
 
-type IconName = 'calendar' | 'check' | 'building' | 'barcode' | 'star' | 'tag' | 'refresh'
+type IconName = 'calendar' | 'check' | 'building' | 'barcode' | 'star' | 'tag' | 'refresh' | 'home'
 
 /**
  * The line icons in the details card, drawn rather than typed.
@@ -486,6 +486,7 @@ const ICON_PATHS: Readonly<Record<IconName, string>> = {
   star: 'M12 3.5l2.7 5.6 6 .9-4.35 4.3 1.03 6.1L12 17.5l-5.38 2.9 1.03-6.1L3.3 10l6-.9z',
   tag: 'M3 12.5V4h8.5L21 13.5 12.5 22zM7.5 7.5h.01',
   refresh: 'M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4',
+  home: 'M3 10.6L12 3l9 7.6M5.6 9.4V21h12.8V9.4M9.6 21v-6.2h4.8V21',
 }
 
 function Icon({ name }: { name: IconName }) {
