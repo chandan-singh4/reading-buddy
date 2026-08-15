@@ -32,7 +32,7 @@ export { advanceBar, barLabel, showsPercent } from './bar.ts'
 export type { BarState } from './bar.ts'
 
 export { readFocusMode, writeFocusMode } from './focusMode.ts'
-export { DIM_FROM, MAX_DIM, clampDim, dimAfterDrag, inDimZone } from './paperDim.ts'
+export { DECK_DEFAULT, DECK_FROM, clampDeck, deckAfterDrag, inDeckZone } from './deckShade.ts'
 
 export {
   DEFAULT_SETTINGS,

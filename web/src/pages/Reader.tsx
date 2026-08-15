@@ -49,9 +49,9 @@ import {
   previousSection,
   readFocusMode,
   applyStoredTheme,
-  DIM_FROM,
-  dimAfterDrag,
-  inDimZone,
+  DECK_FROM,
+  deckAfterDrag,
+  inDeckZone,
   gutterOf,
   leadingOf,
   measureOf,
@@ -573,9 +573,9 @@ export default function Reader() {
    *
    * `y` is where it was claimed and `from` is how dark the page was at that
    * moment, so every move is reckoned from the start of the stroke rather than
-   * added up — see `dimAfterDrag`. Null means no such gesture is running.
+   * added up — see `deckAfterDrag`. Null means no such gesture is running.
    */
-  const dimDrag = useRef<{ y: number; from: number } | null>(null)
+  const deckDrag = useRef<{ y: number; from: number } | null>(null)
 
   /**
    * Whether this stroke began on the deck's band at all.
@@ -586,7 +586,7 @@ export default function Reader() {
    * once it has gone vertical. That is the direction gate: one question, asked
    * once, in each direction.
    */
-  const dimZone = useRef(false)
+  const deckZone = useRef(false)
 
   /**
    * Write the darkness straight to `<html>` while the finger is down.
@@ -597,8 +597,8 @@ export default function Reader() {
    * the setting once, on release, and the effect that applies the setting then
    * writes the same number it already holds.
    */
-  const showDim = useCallback((value: number) => {
-    document.documentElement.style.setProperty('--reader-dim', String(value))
+  const showDeck = useCallback((value: number) => {
+    document.documentElement.style.setProperty('--deck-shade', String(value))
   }, [])
 
   /**
@@ -2137,8 +2137,8 @@ export default function Reader() {
 
               touchStart.current = { x: event.clientX, y: event.clientY }
               dragSpeed.current = 0
-              // Asked here and nowhere else. See `dimZone`.
-              dimZone.current = inDimZone(event.clientX, window.innerWidth)
+              // Asked here and nowhere else. See `deckZone`.
+              deckZone.current = inDeckZone(event.clientX, window.innerWidth)
             }}
             onPointerMove={(event) => {
               if (!event.isPrimary) return
@@ -2148,9 +2148,9 @@ export default function Reader() {
                 return
               }
 
-              if (dimDrag.current) {
-                const { y, from: was } = dimDrag.current
-                showDim(dimAfterDrag(was, y - event.clientY, window.innerHeight))
+              if (deckDrag.current) {
+                const { y, from: was } = deckDrag.current
+                showDeck(deckAfterDrag(was, y - event.clientY, window.innerHeight))
                 return
               }
 
@@ -2168,8 +2168,8 @@ export default function Reader() {
               // in — and the capture is what guarantees the release arrives
               // when the finger slides off the edge of the screen, which a
               // gesture on the last 44 px does constantly.
-              if (dimZone.current && Math.abs(down) >= DIM_FROM && Math.abs(down) > Math.abs(across)) {
-                dimDrag.current = { y: event.clientY, from: settings.dim }
+              if (deckZone.current && Math.abs(down) >= DECK_FROM && Math.abs(down) > Math.abs(across)) {
+                deckDrag.current = { y: event.clientY, from: settings.deck }
                 touchStart.current = null
                 swiped.current = true
                 event.currentTarget.setPointerCapture(event.pointerId)
@@ -2209,15 +2209,15 @@ export default function Reader() {
             onPointerUp={(event) => {
               if (!event.isPrimary) return
 
-              if (dimDrag.current) {
-                const { y, from: was } = dimDrag.current
-                dimDrag.current = null
+              if (deckDrag.current) {
+                const { y, from: was } = deckDrag.current
+                deckDrag.current = null
                 // Committed once, here. The screen already shows this number —
-                // `showDim` has been writing it all along — so the only thing
+                // `showDeck` has been writing it all along — so the only thing
                 // the state change does is save it.
-                const value = dimAfterDrag(was, y - event.clientY, window.innerHeight)
-                showDim(value)
-                setSettings((current) => ({ ...current, dim: value }))
+                const value = deckAfterDrag(was, y - event.clientY, window.innerHeight)
+                showDeck(value)
+                setSettings((current) => ({ ...current, deck: value }))
                 return
               }
 
@@ -2252,9 +2252,9 @@ export default function Reader() {
               // back to the darkness that is actually saved. Left as it stood,
               // it would show a value nothing holds and would jump the next
               // time anything re-rendered.
-              if (dimDrag.current) {
-                dimDrag.current = null
-                showDim(settings.dim)
+              if (deckDrag.current) {
+                deckDrag.current = null
+                showDeck(settings.deck)
               }
               // The system has taken the gesture — a phone call, an edge swipe,
               // a second finger. There is no release coming, so the sheet is
@@ -2416,24 +2416,6 @@ export default function Reader() {
             <span className={styles.ribbonMark} aria-hidden="true" />
           </button>
 
-          {/*
-            The lamp turned down. Above the page, the decks, the spine, the
-            running head and the bookmark — everything that is the book — and
-            below the overlay and the status line, which are controls you have
-            deliberately called up and should be able to read while you use
-            them.
-
-            Last of the things at `z-index: 9`, and that is why it is written
-            here rather than up beside the decks where it belongs by subject.
-            Layers at the same level are painted in document order, and a
-            bookmark left glowing on a page turned right down looks like a
-            fault rather than a bookmark.
-
-            A veil rather than `filter: brightness()` on the page: a filter
-            makes a containing block, and everything on this screen that is
-            `position: fixed` is fixed to the screen on purpose.
-          */}
-          <div className={styles.veil} aria-hidden="true" />
 
           {/*
             The way back from a followed link. Shown only after one has been

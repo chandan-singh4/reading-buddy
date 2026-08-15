@@ -13,7 +13,7 @@
  * sees no change at all.
  */
 
-import { clampDim } from './paperDim'
+import { DECK_DEFAULT, clampDeck } from './deckShade'
 
 export type Theme =
   | 'auto'
@@ -89,12 +89,13 @@ export interface ReaderSettings {
   spacing: Spacing
   margins: Margins
   /**
-   * How far the paper is turned down, 0 to `MAX_DIM`. Set by dragging on the
-   * right-hand deck rather than in the Aa tab — see `paperDim.ts` — but stored
+   * How strongly the two blocks of paper at the side edges are drawn, as a
+   * brightness multiplier on the theme's own value. Set by dragging on the
+   * right-hand deck rather than in the Aa tab — see `deckShade.ts` — but stored
    * here, because it is the same kind of thing as the theme and a reader who
-   * dimmed the page last night expects it dim tonight.
+   * turned the decks down last night expects them down tonight.
    */
-  dim: number
+  deck: number
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
@@ -111,10 +112,9 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   textStep: 3,
   spacing: 'normal',
   margins: 'normal',
-  /* Full brightness. The theme already decides what the paper is; this only
-     ever takes light away from it, and taking light away is the reader's move
-     to make. */
-  dim: 0,
+  /* Exactly what the theme asks for. Every theme already picks a deck colour
+     that suits its paper, and this setting only ever pulls away from that. */
+  deck: DECK_DEFAULT,
 }
 
 export const TEXT_STEPS = ['0.875rem', '1rem', '1.125rem', '1.3125rem', '1.5rem'] as const
@@ -223,8 +223,8 @@ export function readReaderSettings(): ReaderSettings {
       margins: isMargins(parsed.margins) ? parsed.margins : DEFAULT_SETTINGS.margins,
       // Clamped rather than rejected: the value comes from a drag, so an old
       // build with a wider range should come back as "as dark as we now go"
-      // and not as "full brightness, and your setting is gone".
-      dim: typeof parsed.dim === 'number' ? clampDim(parsed.dim) : DEFAULT_SETTINGS.dim,
+      // and not as "the theme's own, and your setting is gone".
+      deck: typeof parsed.deck === 'number' ? clampDeck(parsed.deck) : DEFAULT_SETTINGS.deck,
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -263,9 +263,8 @@ export function applyStoredTheme(settings: ReaderSettings = readReaderSettings()
   if (settings.font === 'serif') root.removeAttribute('data-reading-font')
   else root.dataset.readingFont = settings.font
 
-  // On `<html>` with the theme, and for the same reason: it is a fact about
-  // how bright this device should be, not about one screen. Written at boot so
-  // a reader who dimmed the page last night does not get one bright frame
-  // before React catches up.
-  root.style.setProperty('--reader-dim', String(clampDim(settings.dim)))
+  // On `<html>` with the theme, because it is a change to how the theme draws
+  // one of its parts. Written at boot so a reader who turned the decks down
+  // last night does not get one frame of them at full strength.
+  root.style.setProperty('--deck-shade', String(clampDeck(settings.deck)))
 }

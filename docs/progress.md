@@ -64,25 +64,31 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
-- **Drag the right deck to turn the paper down** — 2026-08-15, browser-checked,
+- **Drag the right deck to darken the deck lines** — 2026-08-15, browser-checked,
   **not yet under a thumb**. A finger dragged up on the right-hand block of
-  paper darkens the page; dragged down, it lightens it. There is no slider and
-  nothing appears while you do it. The setting is saved with the theme and the
-  font, and applies at boot.
+  paper draws the deck lines darker; dragged down, it fades them. The page
+  itself does not change. There is no slider and nothing appears while you do
+  it. The setting is saved with the theme and the font, and applies at boot.
   - The band that listens is 44 px along the right edge, not the 11 px the deck
     is drawn at. You cannot hit 11 px with a thumb.
   - **The direction gate is one question asked once in each direction.** Where
-    the stroke started decides whether it can dim, and it is asked only at
-    `pointerdown`. Whether it went vertical first decides whether it can turn a
-    page, and once it has gone vertical the page turn has no way in — the
+    the stroke started decides whether it can shade the deck, and it is asked
+    only at `pointerdown`. Whether it went vertical first decides whether it can
+    turn a page, and once it has gone vertical the page turn has no way in — the
     gesture clears the touch-down point that the turn needs.
-  - A veil over the page, not `filter: brightness()`. A filter makes a
-    containing block, and this screen is full of `position: fixed`.
-  - Black, so a theme keeps its own colour. Stops at 0.72, so the darkest page
-    is still a page.
-  - Checked in a browser: up darkens, down lightens, neither moves the page; a
-    horizontal drag mid-page still turns; a vertical drag mid-page changes
-    nothing. The value survives a reload.
+  - `filter: brightness()` on `.decks`, driven by `--deck-shade`. A filter makes
+    a containing block, which is why it is unsafe over the page — but `.decks`
+    has no `position: fixed` child, so it costs nothing there. One number moves
+    the body, the sheet lines and the lit edge together.
+  - Both decks move, not only the right one. They are one indicator seen from
+    two sides.
+  - The range is 0.35 to 1.85 around 1, the theme's own value. `deckShade.ts`
+    holds the sums; 13 tests cover them.
+  - Checked in a browser at phone size: up darkens the deck to 0.35, down fades
+    it to 1.85, neither moves the page, and the value reaches `localStorage`.
+  - **Known limit — the gesture needs a phone-width screen.** The handlers sit
+    on the reading `<article>`. On a wide screen that column is centred, so the
+    44 px band at the window edge falls outside it and no touch arrives.
 - **The spacer is gone, and the copy keeps its paragraph indent** — 2026-08-15.
   The reader saw the re-wrap on the original font as well as on a new one. The
   font only moves where the paragraphs land, so the font was never the cause.

@@ -517,31 +517,6 @@
 }
 
 /*
- * The lamp turned down: the veil that carries `--reader-dim`.
- *
- * Set by dragging a finger up and down the right-hand deck; `paperDim.ts` has
- * the reasoning and the sums. Above the page (0), the decks (7) and the spine
- * (8); below the overlay (10) and the status line (11). It shares 9 with the
- * running head and the bookmark, and is written last in `Reader.tsx` so it
- * covers both — see the note there.
- *
- * Black, not a warm tint. The themes already decide what colour the paper is,
- * and a veil with an opinion would drag every one of them towards the same
- * brown. Taking light away should leave the theme where it was.
- *
- * No transition. The veil follows a finger, and a finger is already smooth; an
- * eased opacity would lag behind the drag and then coast on past the release.
- */
-.veil {
-  position: fixed;
-  inset: 0;
-  z-index: 9;
-  pointer-events: none;
-  background: #000;
-  opacity: var(--reader-dim, 0);
-}
-
-/*
  * The bookmark corner (WP-55).
  *
  * A tap target in the top right corner of the page that draws nothing until the
