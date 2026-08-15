@@ -14,12 +14,11 @@
  * arrangement is worth stating because it is the opposite of where this started:
  *
  * - The book is on screen alone. Nothing overlays it until it is asked for.
- * - A tap in the middle raises **one** bar, at the top: back, search, Aa, and a
- *   three-dot menu. Four controls, all reachable, none of them furniture.
- * - Contents, Bookmarks and Notes moved *out* of the bottom of the screen and
- *   into that menu; Aa opens the same sheet straight at its own panel. The
- *   bottom keeps only the slider, which is the one control that is about
- *   *moving* rather than about *opening something*.
+ * - A tap in the middle raises **one** bar, at the top: back, search, Aa, and
+ *   the focus lamp. Four controls, all reachable, none of them furniture.
+ * - Contents, Bookmarks and Notes moved *out* of the bottom of the screen. They
+ *   are a page of their own now, opened by the ⋮ beside the slider and shared
+ *   by a tab row; Aa is still a sheet, straight at its own panel.
  * - The bookmark left the bar entirely. It is a corner of the page now — see
  *   the ribbon in `pages/Reader.tsx`, which is where a bookmark belongs: on the
  *   paper, not in the toolbar.
@@ -40,19 +39,14 @@ import styles from './Chrome.module.css'
  * Which panel the sheet is showing. Notes is a stub until WP-25; the rest are
  * WP-14's.
  *
- * These used to be tabs along the top of the sheet. They are not any more — one
- * of them is opened at a time, by name, from the menu or from Aa — but the type
- * survives because "which panel" is still the question the sheet answers.
+ * Three of them are a page of their own now, with a tab row across the top —
+ * Google Books' arrangement, and the one this reader asked for. Aa is the
+ * exception: it stays a sheet that rises over the book, because changing the
+ * text size while you cannot see the text is no use at all.
  */
 export type SheetTab = 'contents' | 'bookmarks' | 'notes' | 'aa'
 
-/**
- * What the sheet calls itself when it is showing each panel.
- *
- * It needs a heading now that the row of tabs is gone: a sheet that rises with
- * no title on it leaves the reader to infer what they opened from its contents,
- * which works for a chapter list and not at all for an empty one.
- */
+/** What each panel calls itself — the tab labels, and the sheet's own heading. */
 const SHEET_TITLES: Record<SheetTab, string> = {
   contents: 'Contents',
   bookmarks: 'Bookmarks',
@@ -92,19 +86,23 @@ export interface ChromeProps {
    * see. Chrome stays presentational.
    */
   pages: Pages | null
+  /**
+   * The page each chapter opens on, or `null` for a book with no page numbers.
+   *
+   * Worked out by the reading page for the same reason `pages` is: the spine
+   * lives there. `null` costs the contents list its page column and nothing
+   * else.
+   */
+  chapterPages: ReadonlyMap<number, number> | null
   /** Whether the overlay is currently on screen. */
   shown: boolean
   focusMode: boolean
-  /** Whether the three-dot menu is down. */
-  menuOpen: boolean
   sheetOpen: boolean
   sheetTab: SheetTab
   /** The reading-comfort settings: theme, font, text size, spacing, margins. */
   settings: ReaderSettings
   onToggleFocus: () => void
-  onToggleMenu: () => void
-  /** Open the sheet at one panel. There is no "toggle" any more: every route in
-      names the panel it wants, which is what let the tab row go. */
+  /** Open one panel by name — the ⋮, the Aa button, and each tab all use this. */
   onOpenSheet: (tab: SheetTab) => void
   onCloseSheet: () => void
   /** Go to the first section of a chapter. */
@@ -150,7 +148,11 @@ function chapterNameOf(manifest: Manifest, chapter: number): string {
   return manifest.chapters.find((entry) => entry.chapter === chapter)?.title ?? 'Elsewhere'
 }
 
-/** What the three-dot menu opens, in the order it lists them. */
+/**
+ * The three panels that share the browse page, in tab order.
+ *
+ * Aa is not among them on purpose — see the note on `SheetTab`.
+ */
 const MENU_PANELS: SheetTab[] = ['contents', 'bookmarks', 'notes']
 
 export function Chrome({
@@ -158,14 +160,13 @@ export function Chrome({
   manifest,
   here,
   pages,
+  chapterPages,
   shown,
   focusMode,
-  menuOpen,
   sheetOpen,
   sheetTab,
   settings,
   onToggleFocus,
-  onToggleMenu,
   onOpenSheet,
   onCloseSheet,
   onJumpToChapter,
@@ -262,33 +263,6 @@ export function Chrome({
       </header>
 
       {/*
-        The three-dot menu: the things you open occasionally, kept off the bar
-        so the bar stays four controls wide however many of them there are.
-      */}
-      {menuOpen && (
-        <>
-          {/* Clear rather than dimmed: a dropdown is a small thing and dimming
-              the whole book behind it overstates it. It still has to catch the
-              tap that dismisses it. */}
-          <div className={styles.menuScrim} onClick={onToggleMenu} aria-hidden="true" />
-
-          <div className={styles.menu} role="menu" aria-label="More">
-            {MENU_PANELS.map((panel) => (
-              <button
-                key={panel}
-                type="button"
-                role="menuitem"
-                className={styles.menuItem}
-                onClick={() => onOpenSheet(panel)}
-              >
-                {SHEET_TITLES[panel]}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/*
         Search, in a panel of its own rather than as one more thing in the
         sheet. The results are a jump-to list exactly like the contents and the
         bookmarks, but it does not live beside them, so it carries its own way
@@ -372,7 +346,7 @@ export function Chrome({
         screen reader would be noise — the sheet's own ✕ and the back gesture
         are the two routes that get announced.
       */}
-      {sheetOpen && (
+      {sheetOpen && sheetTab === 'aa' && (
         <div
           className={styles.scrim}
           data-scrim="true"
@@ -381,13 +355,13 @@ export function Chrome({
         />
       )}
 
-      {sheetOpen && (
+      {/*
+        Aa, and only Aa, still rises as a sheet over the book. Text size is
+        judged against the text: a full page of settings would hide the very
+        thing the reader is adjusting.
+      */}
+      {sheetOpen && sheetTab === 'aa' && (
         <div className={styles.sheet} role="dialog" aria-label={SHEET_TITLES[sheetTab]}>
-          {/*
-            The heading the tab row used to supply. It is also where the ✕ went:
-            with four tabs there was always another tab to move to, so closing
-            was rare; opened by name from a menu, the only move left is out.
-          */}
           <div className={styles.sheetHead}>
             <h2 className={styles.sheetTitle}>{SHEET_TITLES[sheetTab]}</h2>
             <button
@@ -400,22 +374,94 @@ export function Chrome({
             </button>
           </div>
 
+          {/*
+            The whole of Aa lives in its own component now — see
+            `TextSettings.tsx`. It is the one panel with behaviour of its own
+            (tabs, and the fade while a slider is dragged), and leaving it
+            inline was what made this file's sheet a hundred lines of form.
+          */}
+          <div className={styles.sheetPanel}>
+            <TextSettings settings={settings} onSettingsChange={onSettingsChange} />
+          </div>
+        </div>
+      )}
+
+      {/*
+        Contents, Bookmarks and Notes: one page, three tabs, the book's name at
+        the top and a way back beside it.
+
+        They were a dropdown that opened a sheet — two taps to reach a chapter
+        list, and a list capped at two thirds of a short screen. They are lists
+        you *browse*, sometimes at length, and often after comparing one with
+        another. A page gives them the whole screen, and the tab row makes the
+        comparison one tap instead of a trip back through the menu.
+      */}
+      {sheetOpen && sheetTab !== 'aa' && (
+        <div className={styles.browse} role="dialog" aria-label={SHEET_TITLES[sheetTab]}>
+          <div className={styles.browseHead}>
+            <button
+              type="button"
+              className={styles.iconControl}
+              aria-label="Close"
+              onClick={onCloseSheet}
+            >
+              <span aria-hidden="true">←</span>
+            </button>
+            <h2 className={styles.browseTitle}>{bookTitle}</h2>
+          </div>
+
+          <div className={styles.tabRow} role="tablist" aria-label="Browse this book">
+            {MENU_PANELS.map((panel) => (
+              <button
+                key={panel}
+                type="button"
+                role="tab"
+                className={styles.tab}
+                aria-selected={sheetTab === panel}
+                onClick={() => onOpenSheet(panel)}
+              >
+                {SHEET_TITLES[panel]}
+              </button>
+            ))}
+          </div>
+
           {sheetTab === 'contents' && (
             <nav className={styles.sheetPanel} aria-label="Contents">
               <ul>
-                {manifest.chapters.map((entry) => (
-                  <li key={entry.chapter}>
-                    <button
-                      type="button"
-                      className={styles.contentsItem}
-                      aria-current={entry.chapter === chapter ? 'true' : undefined}
-                      onClick={() => onJumpToChapter(entry.chapter)}
-                    >
-                      <span className={styles.contentsNumber}>{entry.chapter}</span>
-                      {entry.title}
-                    </button>
-                  </li>
-                ))}
+                {manifest.chapters.map((entry) => {
+                  const here = entry.chapter === chapter
+                  const startPage = chapterPages?.get(entry.chapter)
+
+                  return (
+                    <li key={entry.chapter}>
+                      <button
+                        type="button"
+                        className={styles.contentsItem}
+                        aria-current={here ? 'true' : undefined}
+                        onClick={() => onJumpToChapter(entry.chapter)}
+                      >
+                        <span className={styles.contentsNumber}>{entry.chapter}</span>
+                        <span className={styles.contentsText}>
+                          {entry.title}
+                          {/*
+                            The page under the title, the way a printed contents
+                            page has always carried one — and, on the chapter
+                            you are in, where you actually are inside it. That
+                            second line is the one that answers "how far into
+                            this chapter am I?" without leaving the list.
+                          */}
+                          {startPage !== undefined && (
+                            <span className={styles.contentsPage}>
+                              {here && pages
+                                ? `currently on page ${pages.page}`
+                                : `page ${startPage}`}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </nav>
           )}
@@ -502,17 +548,6 @@ export function Chrome({
             </div>
           )}
 
-          {/*
-            The whole of Aa lives in its own component now — see
-            `TextSettings.tsx`. It is the one panel with behaviour of its own
-            (tabs, and the fade while a slider is dragged), and leaving it
-            inline was what made this file's sheet a hundred lines of form.
-          */}
-          {sheetTab === 'aa' && (
-            <div className={styles.sheetPanel}>
-              <TextSettings settings={settings} onSettingsChange={onSettingsChange} />
-            </div>
-          )}
         </div>
       )}
 
@@ -531,10 +566,10 @@ export function Chrome({
           <button
             type="button"
             className={styles.iconControl}
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
+            aria-expanded={sheetOpen && sheetTab !== 'aa'}
+            aria-haspopup="dialog"
             aria-label="More"
-            onClick={onToggleMenu}
+            onClick={() => onOpenSheet('contents')}
           >
             <span aria-hidden="true">⋮</span>
           </button>

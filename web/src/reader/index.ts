@@ -66,6 +66,7 @@ export {
   anchorAtPage,
   buildSpine,
   chapterAt,
+  chapterPages,
   hasWordCounts,
   pagesAt,
   pagesOf,

@@ -250,59 +250,78 @@
 }
 
 /*
- * The three-dot menu, standing on the right-hand end of the bottom bar.
+ * The browse page: Contents, Bookmarks and Notes, over the whole screen.
  *
- * Anchored to the corner it was opened from rather than centred, because a menu
- * that appears somewhere other than at the button you pressed makes you find it
- * again. The ⋮ now sits at the left of the foot, so the menu grows upwards out
- * of it: its bottom edge is the top of the bottom bar, which is the safe area,
- * the bar's own height and the status line below it.
+ * Opaque and full-bleed, because it is a place you go rather than a thing that
+ * hovers. It replaces a dropdown that opened a two-thirds-height sheet — a
+ * chapter list of forty entries scrolling inside a box, with the dimmed book
+ * showing round it, reads as a hesitation. This reads as a destination.
+ *
+ * `position: absolute` inside the overlay, exactly like `.searchPanel`, so it
+ * fades with the overlay instead of escaping it.
  */
-.menuScrim {
+.browse {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  z-index: 5;
   pointer-events: auto;
-}
-
-.menu {
-  position: absolute;
-  bottom: calc(var(--safe-bottom) + var(--reader-bar-bottom) + var(--status-line));
-  left: var(--space-3);
-  z-index: 4;
-  pointer-events: auto;
-  min-width: 11rem;
   display: flex;
   flex-direction: column;
-  padding: var(--space-2) 0;
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-raised);
+  min-height: 0;
+  /* Top and bottom only. The list inside scrolls, and a scrolling list should
+     run to both edges rather than stop short of them. */
+  padding: calc(var(--safe-top) + var(--space-2)) 0 calc(var(--safe-bottom) + var(--space-2));
+  background: var(--color-bg);
   font-family: var(--font-ui);
 }
 
-.menuItem {
-  min-height: 44px;
-  padding: 0 var(--space-4);
+.browseHead {
+  flex: none;
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-3);
+}
+
+/* The book's name, not the panel's. The tab row below says which panel. */
+.browseTitle {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Three equal tabs with the underline under the live one — the plainest way to
+   say "these are the same kind of thing, and you are in this one". */
+.tabRow {
+  flex: none;
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 var(--space-2);
   font-family: inherit;
   font-size: var(--text-sm);
-  color: var(--color-text);
-  text-align: left;
+  color: var(--color-text-muted);
   background: transparent;
   border: none;
+  border-bottom: 2px solid transparent;
   cursor: pointer;
 }
 
-.menuItem:active {
-  background: var(--color-surface);
-}
-
-.menuItem[aria-pressed='true'] {
+.tab[aria-selected='true'] {
   color: var(--color-accent);
   font-weight: 600;
+  border-bottom-color: var(--color-accent);
 }
 
 
@@ -437,7 +456,9 @@
   width: 100%;
   min-height: 44px;
   display: flex;
-  align-items: center;
+  /* Was centred. A row is two lines tall now — title, then page — and the
+     chapter number belongs beside the title, not beside the middle of both. */
+  align-items: baseline;
   gap: var(--space-3);
   padding: var(--space-2) 0;
   text-align: left;
@@ -458,6 +479,32 @@
   min-width: 2ch;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.contentsText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/*
+ * The page a chapter opens on, under its title.
+ *
+ * Quiet and small on purpose: it is the figure you look for when you are
+ * already looking, and it must not compete with the title beside it. On the
+ * chapter you are in it says where you are instead, and the accent colour the
+ * row already carries makes that line the one your eye lands on.
+ */
+.contentsPage {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.contentsItem[aria-current='true'] .contentsPage {
+  color: var(--color-accent);
 }
 
 /*

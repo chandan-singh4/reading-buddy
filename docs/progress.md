@@ -64,6 +64,18 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **Contents, Bookmarks and Notes are a page now, with page numbers** —
+  2026-08-15, proven by tests. The ⋮ opened a dropdown, and the dropdown opened
+  a sheet two thirds of a screen tall. It opens the page directly at Contents.
+  - The page fills the screen. It carries a back arrow, the book's title, and a
+    tab row: Contents, Bookmarks, Notes. One tap moves between them.
+  - Aa stays a sheet over the book. You judge text size against the text.
+  - The dropdown is gone: `menuOpen`, `toggleMenu`, `.menu`, `.menuScrim` and
+    `.menuItem` are all deleted. The reading page tracks two layers, not three.
+  - **Every chapter shows the page it opens on**, under its title. The chapter
+    you are in says `currently on page N` instead — your page, not its first.
+  - `chapterPages(spine)` in `progress.ts` works the figure out from the first
+    section of each chapter. No layout, no measuring, nothing loaded.
 - **The ⋮ moved to the slider, and Focus Mode took its place** — 2026-08-15,
   browser-checked at phone size. The ⋮ now sits at the left-hand end of the
   bottom row, before the slider. It still opens Contents, Bookmarks and Notes.

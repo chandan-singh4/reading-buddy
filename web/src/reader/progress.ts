@@ -329,6 +329,32 @@ export function anchorAtPage(
   return best
 }
 
+/**
+ * The page each chapter opens on, keyed by chapter number.
+ *
+ * The contents list wants what a printed table of contents has always had: a
+ * page beside every title. A chapter's first section already carries the words
+ * behind it, and a page *is* a fixed slice of words in this model, so the figure
+ * is the same arithmetic `pagesAt` does — read off the chapter's opening instead
+ * of the reader's position. No layout, no measuring, nothing loaded.
+ */
+export function chapterPages(spine: Spine): Map<number, number> {
+  const pageCount = pagesIn(spine.totalWords)
+  const pages = new Map<number, number>()
+
+  for (const entry of spine.entries) {
+    // The first entry of a chapter is where the chapter starts. Later sections
+    // of the same chapter start further in, so they must not overwrite it.
+    if (pages.has(entry.chapter)) continue
+    pages.set(
+      entry.chapter,
+      Math.min(pageCount, Math.floor(entry.startWords / WORDS_PER_PAGE) + 1),
+    )
+  }
+
+  return pages
+}
+
 /** Which chapter a slider position means. The inverse of `progressOf`. */
 export function chapterAt(manifest: Manifest, fraction: number): number {
   const chapterCount = manifest.chapters.length

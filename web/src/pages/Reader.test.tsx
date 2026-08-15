@@ -117,19 +117,20 @@ beforeEach(async () => {
 })
 
 /**
- * The three-dot menu on the top bar, which is where Contents, Bookmarks and
- * Notes live now (WP-55). It shows a glyph, so its accessible name is the
- * label, not its text.
+ * The three-dot button beside the page slider, which opens the browse page —
+ * Contents, Bookmarks and Notes. It shows a glyph, so its accessible name is
+ * the label, not its text.
  */
 const MENU_BUTTON = 'More'
 
 /**
- * Open one of the sheet's panels the way a reader does: the menu, then the
- * panel by name. Aa has its own button on the bar and doesn't come through here.
+ * Open one of the browse page's panels the way a reader does: the ⋮, which
+ * lands on Contents, then the tab. Aa has its own button on the bar and doesn't
+ * come through here.
  */
 function openSheetAt(panel: 'Contents' | 'Bookmarks' | 'Notes') {
   fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
-  fireEvent.click(screen.getByRole('menuitem', { name: panel }))
+  fireEvent.click(screen.getByRole('tab', { name: panel }))
 }
 
 /** Focus Mode has its own button on the top bar, where the ⋮ used to be. */
@@ -422,6 +423,18 @@ describe('the top bar and its menu', () => {
     expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
   })
 
+  it('puts a page beside every chapter, and says where you are in yours', async () => {
+    // 600 words in chapter 1 at 300 to a page, so chapter 2 opens on page 3.
+    // The chapter you are in says your own page instead of its first one —
+    // which is the figure you actually want while the list is open.
+    openReader()
+    await screen.findByText('The opening words.')
+
+    openSheetAt('Contents')
+    expect(screen.getByText('page 3')).toBeTruthy()
+    expect(screen.getByText('currently on page 1')).toBeTruthy()
+  })
+
   it('closes itself once you have jumped', async () => {
     openReader()
     await screen.findByText('The opening words.')
@@ -476,17 +489,19 @@ describe('the top bar and its menu', () => {
     expect(sheet('Reading mode').getByRole('slider', { name: 'Text size' })).toBeTruthy()
   })
 
-  // The menu is a dropdown, and a dropdown that can only be closed by choosing
-  // something from it is a trap.
-  it('closes the menu when the space around it is tapped', async () => {
+  // The ⋮ is one tap to a chapter list now, not a menu that asks a second
+  // question first. It has to carry its own way back out.
+  it('opens the browse page at Contents and closes it again', async () => {
     openReader()
     await screen.findByText('The opening words.')
 
     fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
-    expect(screen.getByRole('menu')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Contents' }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
 
-    fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
-    expect(screen.queryByRole('menu')).toBeNull()
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Contents' })).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('tab', { name: 'Contents' })).toBeNull()
   })
 })
 
@@ -916,17 +931,20 @@ describe('closing the navigation sheet', () => {
     // Found on a real phone: the sheet filled everything between the two bars,
     // so there was nowhere to tap to mean "no thanks" and the only way out was
     // to find the hamburger again.
+    //
+    // Aa is the sheet now. Contents, Bookmarks and Notes are a page of their
+    // own, with nothing behind them to tap.
     const { container } = openReader()
     await screen.findByText('The opening words.')
 
-    openSheetAt('Contents')
-    expect(screen.getByRole('dialog', { name: 'Contents' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Reading mode' }))
+    expect(screen.getByRole('dialog', { name: 'Reading mode' })).toBeTruthy()
 
     const scrim = container.querySelector('[data-scrim]')
     if (!scrim) throw new Error('expected something to tap outside the sheet')
     fireEvent.click(scrim)
 
-    expect(screen.queryByRole('dialog', { name: 'Contents' })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Reading mode' })).toBeNull()
   })
 
   it('closes on a back gesture instead of leaving the book', async () => {

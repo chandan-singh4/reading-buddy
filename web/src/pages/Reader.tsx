@@ -7,6 +7,7 @@ import {
   anchorAtPage,
   bookmarkOn,
   buildSpine,
+  chapterPages,
   chapterTitle,
   inBookOrder,
   labelFor,
@@ -415,8 +416,6 @@ export default function Reader() {
    * actually looking at.
    */
   const drawnAt = chromeShown ? PAGE_SCALE : 1
-  /** The three-dot menu on the top bar. */
-  const [menuOpen, setMenuOpen] = useState(false)
   /** Whether the search panel is up. Declared here with the other two layers
       rather than beside the search machinery below, because the three of them
       are governed together — see "the layers over the page". */
@@ -887,6 +886,15 @@ export default function Reader() {
     : null
 
   /**
+   * The page each chapter opens on, for the contents list.
+   *
+   * Depends only on the spine, so it is worked out once per book rather than on
+   * every render: the list is forty rows on a real book, and it must not be
+   * rebuilt each time the reader turns a page.
+   */
+  const chapterStartPages = useMemo(() => (spine ? chapterPages(spine) : null), [spine])
+
+  /**
    * Go to a paragraph — what following a link does.
    *
    * Same two steps as the page slider, for the same reason: the section may
@@ -1135,7 +1143,7 @@ export default function Reader() {
   /*
    * ## The layers over the page, and the one rule they follow
    *
-   * There are three: the menu, the sheet, and search. Only one is ever open,
+   * There are two: the sheet, and search. Only one is ever open,
    * and every route in says which one it wants rather than toggling. That is
    * not tidiness — it is what makes the back gesture below correct, because
    * "close whatever is over the book" is then a single, unambiguous action.
@@ -1143,7 +1151,6 @@ export default function Reader() {
 
   const openSheet = useCallback((tab: SheetTab) => {
     setSheetTab(tab)
-    setMenuOpen(false)
     setSearchOpen(false)
     setSheetOpen(true)
   }, [])
@@ -1152,12 +1159,7 @@ export default function Reader() {
     setSheetOpen(false)
   }, [])
 
-  const toggleMenu = useCallback(() => {
-    setMenuOpen((open) => !open)
-  }, [])
-
   const openSearch = useCallback(() => {
-    setMenuOpen(false)
     setSheetOpen(false)
     setSearchOpen(true)
   }, [])
@@ -1173,7 +1175,6 @@ export default function Reader() {
   }, [])
 
   const closeLayers = useCallback(() => {
-    setMenuOpen(false)
     setSheetOpen(false)
     setSearchOpen(false)
   }, [])
@@ -1201,7 +1202,7 @@ export default function Reader() {
     // One gesture, one layer. A reader with the sheet open over the toolbar
     // expects Back to close the sheet and leave them looking at the toolbar —
     // not to clear the screen in one go, which loses the state they were in.
-    if (menuOpen || sheetOpen || searchOpen) {
+    if (sheetOpen || searchOpen) {
       closeLayers()
       // The toolbar is still up behind the panel, so there is more to peel.
       return chromeShown
@@ -1209,9 +1210,9 @@ export default function Reader() {
 
     setChromeShown(false)
     return false
-  }, [menuOpen, sheetOpen, searchOpen, chromeShown, closeLayers])
+  }, [sheetOpen, searchOpen, chromeShown, closeLayers])
 
-  useBackDismiss(menuOpen || sheetOpen || searchOpen || chromeShown, dismissTopLayer)
+  useBackDismiss(sheetOpen || searchOpen || chromeShown, dismissTopLayer)
 
   const toggleFocus = useCallback(() => {
     setFocusMode((on) => !on)
@@ -2075,14 +2076,13 @@ export default function Reader() {
             manifest={frame.manifest}
             here={here}
             pages={pages}
+            chapterPages={chapterStartPages}
             shown={chromeShown}
             focusMode={focusMode}
-            menuOpen={menuOpen}
             sheetOpen={sheetOpen}
             sheetTab={sheetTab}
             settings={settings}
             onToggleFocus={toggleFocus}
-            onToggleMenu={toggleMenu}
             onOpenSheet={openSheet}
             onCloseSheet={closeSheet}
             onJumpToChapter={(chapter) => goTo({ chapter, section: 1 })}
