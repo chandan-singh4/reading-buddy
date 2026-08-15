@@ -28,9 +28,10 @@ that holds the Claude key.
 - Stay concise. Cut filler, preamble, and restating the obvious. Short and clear
   beats long and thorough — teach the idea, don't pad it.
 
-### Write chat replies in ASD-STE100
+### Write in ASD-STE100
 
-Use Simplified Technical English (ASD-STE100) for what you say to me in chat:
+Use Simplified Technical English (ASD-STE100) for chat replies, commit messages,
+and everything you write in `docs/`:
 
 - Use simple, approved words. Use one word for one meaning.
 - Use the active voice. Say who does the action.
@@ -40,8 +41,13 @@ Use Simplified Technical English (ASD-STE100) for what you say to me in chat:
 - Do not use metaphors, jokes, or long words when short words do the same work.
 - Write lists as lists. Write steps in the order I must do them.
 
-This applies to chat replies. Code comments, commit messages, and the docs in
-`docs/` keep their present style.
+Two notes on scope:
+
+- **Code comments are the exception.** They keep their present style. They
+  explain *why* to a reader who is deep in the code, and the constraint costs
+  more there than it gives.
+- **Do not rewrite old text to match.** Apply this to new writing only. Edit an
+  old paragraph into STE when you are changing that paragraph anyway.
 
 ## Context map — read on demand, never all at once
 
