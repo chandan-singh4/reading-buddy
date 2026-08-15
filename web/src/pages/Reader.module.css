@@ -160,8 +160,7 @@
   /* Room at the foot for the status line, which is out of the flow. Without it
      the last line of every page is read through the page number. */
   padding-bottom: var(--status-line);
-  /* And room at the head for the running title, on the themes that print one.
-     Zero on the rest, so this line costs them nothing. */
+  /* And room at the head for the running title. */
   padding-top: var(--running-head);
   /* Shrinks towards the top: the head of the page stays put and the foot rises,
      which is what makes the movement read as the page stepping back rather than

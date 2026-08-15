@@ -1939,9 +1939,9 @@ export default function Reader() {
             where it sits.
           */}
           {/*
-            And its opposite number at the head of the page. Collapsed to
-            nothing on every theme but Vintage, which is decided by one token
-            rather than by a condition here — see `--running-head`.
+            And its opposite number at the head of the page: the book's title,
+            printed small across the top margin. How much room it gets is one
+            token rather than a condition here — see `--running-head`.
           */}
           <RunningHead title={frame.book.title} />
 

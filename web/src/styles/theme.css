@@ -158,11 +158,15 @@
   --status-line: 2rem;
 
   /* The mirror of the line above, at the head of the page: the small capitals
-     that print the book's title across the top margin. Zero by default — most
-     themes are a screen, not a printed page, and a screen has no head margin —
-     so `RunningHead` collapses to nothing and `.stage` reserves nothing. A
-     theme that wants the furniture sets this one number. */
-  --running-head: 0rem;
+     that print the book's title across the top margin.
+
+     It arrived with the Vintage theme, on the reasoning that a head margin is a
+     printed-book convention and most themes are a screen. That was wrong in the
+     way theory usually is — seen on a phone it turned out to belong to *every*
+     page, because knowing which book you are in is not a period detail. So it
+     is the default, and stays one number: a theme that wanted no head margin
+     would set this to zero and `RunningHead` would collapse to nothing. */
+  --running-head: 1.5rem;
 
   /*
    * The two bars of the reading overlay.
@@ -376,11 +380,6 @@
   --color-focus: #35597f;
 
   --shadow-raised: 0 1px 3px rgb(52 36 14 / 0.14), 0 1px 2px rgb(52 36 14 / 0.07);
-
-  /* The one theme that prints a head margin. A scholarly edition puts the
-     title in small capitals across the top of every page, and that convention
-     is half of what makes this read as a printed book rather than a colour. */
-  --running-head: 1.5rem;
 
   color-scheme: light;
 }
