@@ -87,6 +87,7 @@ export type { SectionCountLookup, SectionRef } from './navigation.ts'
 export {
   beginDrag,
   cancelTurn,
+  clearSheets,
   dropDrag,
   dropStill,
   holdOutgoing,

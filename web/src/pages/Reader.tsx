@@ -22,6 +22,7 @@ import {
   wordsAt,
   beginDrag,
   cancelTurn,
+  clearSheets,
   curlProgress,
   dropDrag,
   dropStill,
@@ -2011,6 +2012,15 @@ export default function Reader() {
             */
             onPointerDown={(event) => {
               if (!event.isPrimary) return
+
+              // Nothing of ours should be on the page when a gesture starts. If
+              // something is — a turn whose animation was never given the frames
+              // to finish, most likely because the app was backgrounded
+              // mid-turn — the reader is looking at a still photograph of an old
+              // page and the book appears frozen. Sweeping here means that state
+              // cannot survive being touched, whatever put it there.
+              if (!drag.current && !held.current) clearSheets(strip.current)
+
               touchStart.current = { x: event.clientX, y: event.clientY }
               dragSpeed.current = 0
             }}
@@ -2047,12 +2057,15 @@ export default function Reader() {
               if (startDrag(by, event.clientX)) {
                 swiped.current = true
                 event.currentTarget.setPointerCapture(event.pointerId)
-              } else {
-                // No live sheet — a section boundary, or a reader who has asked
-                // for less movement. `onPointerUp` falls back to the threshold
-                // swipe, which is what `touchStart` is still being kept for.
-                swiped.current = true
               }
+              // No sheet means a section boundary, or a reader who has asked for
+              // less movement, and `onPointerUp` falls back to the threshold
+              // swipe — which is what `touchStart` is still being kept for.
+              // Deliberately *not* setting `swiped` on that path: this fires on
+              // eight pixels of horizontal movement, which a tap on a moving bus
+              // easily has, and marking the gesture swiped here swallowed the
+              // click that would have turned the page or shown the toolbar.
+              // Whoever actually turns a page sets it.
             }}
             onPointerUp={(event) => {
               if (!event.isPrimary) return

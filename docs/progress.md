@@ -15,7 +15,11 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1287 tests across 73 files** (2026-08-15).
+  **1290 tests across 73 files** (2026-08-15).
+- **The frozen-page report is answered but not explained.** The floor under it is
+  in and proven; the *cause* is not confirmed. If a page ever freezes again, the
+  question to ask first is whether one touch clears it — if it does, a teardown
+  is still being missed somewhere and the backstop is catching it.
 - **The finger-tracked page curl has never been under a finger.** The maths is
   covered by 24 tests and the wiring typechecks, but jsdom has no compositor and
   the preview tree has no book on its shelf, so no drag has ever been dragged.
@@ -58,6 +62,31 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **A frozen book, and the floor under it** — 2026-08-15. The reader opened a
+  book onto a full-page map and the page would not turn at all — no swipe, no
+  tap. **Root cause unconfirmed**, and worth saying plainly: the preview pane
+  delivers no frames (rAF and the Web Animations API both never fire in it), so
+  every copy strands there and it cannot tell a real leak from its own artefact.
+  What is certain is the *shape* of the failure: a page-turn copy is an opaque
+  photograph of the old page, so one left standing looks exactly like a book
+  that has stopped responding — gestures keep working underneath and nothing the
+  reader does changes what they see.
+  - **Both teardowns waited on frames, and frames are not a promise.** `playFlip`
+    waits on `animation.finished`; `settleDrag` waits on rAF. A tab backgrounded
+    mid-turn stops being offered either. Both now carry a `setTimeout` backstop
+    at duration + 600 ms, and both clears are idempotent so whichever arrives
+    first wins.
+  - **`clearSheets` is the floor.** Every scrap this module hangs on the page is
+    branded `data-page-sheet`, and `pointerdown` sweeps them whenever nothing is
+    legitimately in flight. Whatever drops the ball in future, the freeze cannot
+    outlast one touch.
+  - **A tap could be swallowed.** `swiped.current` was being set on eight pixels
+    of horizontal movement even when no drag started, so a slightly-moving tap
+    turned into nothing at all. Only a real turn sets it now.
+  - Verified live: the same drag that left **17 stranded clones** in the pane now
+    leaves **zero**, on the timer alone, with no frames at any point.
+  - Module-level `concealed` leaks across tests — `pageTurn.test.ts` sweeps in
+    `afterEach` now, or one test leaves the next unable to hide anything.
 - **The page turns with the thumb now, and the paper is a notch darker** —
   2026-08-15. Two things off one brief.
   - **Paper down ~4.5%.** Every channel × 0.955, so the hue is untouched and
@@ -206,7 +235,7 @@ Get that loop working before building any breadth.
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (1287, 73 files), `npm run typecheck`, `npm run build` — all
+**Gates:** `npm test` (1290, 73 files), `npm run typecheck`, `npm run build` — all
 passing as of 2026-08-15. Precache 34 entries / 1172.01 KiB. **Two tests flaked
 once under parallel load** (`Reader › goes to the next section`, `Library ›
 unfiles a book…`) and passed on re-run and in isolation — timing, not a

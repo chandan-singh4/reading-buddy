@@ -227,6 +227,38 @@ function revealFurniture(): void {
 }
 
 /**
+ * Sweep away any copy left standing after its turn ended.
+ *
+ * ## Why this exists at all
+ *
+ * Every copy this module makes is taken down by the thing that put it there —
+ * `playFlip` clears its own, `settleDrag` clears the sheet. Both rely on a
+ * frame arriving to tell them the animation has finished, and a frame is not a
+ * promise. A tab backgrounded mid-turn, a compositor that stops for a
+ * screenshot, an animation the browser never starts because the page was hidden
+ * on the exact frame it was scheduled — in every one of those the copy stays,
+ * and because a copy is a *photograph* of the page, the reader is left looking
+ * at a book that has stopped responding. Swipes and taps still work underneath
+ * it; nothing they do changes what they see. That is indistinguishable from a
+ * crash, and it is the worst failure this screen has.
+ *
+ * So this is the floor. Call it when nothing is legitimately in flight and it
+ * puts the real page back, whatever went wrong and whichever code path dropped
+ * the ball. **It is never the fix for a leak** — a leak that reaches here has
+ * already shown the reader a frozen page for as long as it took them to touch
+ * it again. It is the guarantee that the freeze cannot outlast one touch.
+ */
+export function clearSheets(strip: HTMLElement | null): void {
+  if (!strip || typeof document === 'undefined') return
+  const parent = strip.closest<HTMLElement>(FRAME) ?? strip.parentElement
+  if (!parent) return
+  for (const sheet of Array.from(parent.querySelectorAll<HTMLElement>('[data-page-sheet]'))) {
+    sheet.remove()
+  }
+  revealFurniture()
+}
+
+/**
  * A still picture of the whole page exactly as it looks now, laid over it.
  *
  * Both halves of a flip are made of these: the page being left, and — turning
@@ -289,6 +321,9 @@ function copyOf(strip: HTMLElement | null, layer: number, scale: number): HTMLEl
 function sheetBox(frame: DOMRect): HTMLElement {
   const box = document.createElement('div')
   box.setAttribute('aria-hidden', 'true')
+  // Every scrap this module hangs on the page is branded, so `clearSheets` can
+  // find one that has outlived its turn. See the note there.
+  box.dataset.pageSheet = ''
   box.style.position = 'absolute'
   box.style.top = '0'
   box.style.left = '0'
@@ -475,7 +510,11 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
   // Removed on completion *and* on failure — an animation can be cancelled by
   // the element being taken out from under it, and a copy left behind would sit
   // over the book showing the wrong page.
+  let cleared = false
   const clear = () => {
+    if (cleared) return
+    cleared = true
+    clearTimeout(guard)
     moving.remove()
     still?.remove()
     // Last, and unconditionally. The real page number has to come back even if
@@ -483,6 +522,24 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
     // no number on it is a worse outcome than a turn that didn't finish.
     revealFurniture()
   }
+
+  /*
+   * `finished` is a promise about frames, and frames are not guaranteed.
+   *
+   * The document timeline these animations run on stops while the page is
+   * hidden. A reader who turns a page and immediately switches app — or takes a
+   * call, or is interrupted by the system — can leave this animation created,
+   * never started and never finished, and `finished` then never settles. The
+   * copy is an opaque photograph of the page they just left, so what they come
+   * back to is a book that has frozen: swipes and taps keep working underneath,
+   * and nothing they do changes what is on the screen.
+   *
+   * A timer is not subject to the same rule. This is the same backstop
+   * `settleDrag` carries, for the same reason, and `clear` is idempotent so
+   * whichever gets there first is the one that counts.
+   */
+  const guard = setTimeout(clear, Number(MOVE_TIMING.duration ?? 0) + 600)
+
   turning.finished.then(clear, clear)
 }
 
@@ -604,6 +661,7 @@ export function beginDrag(
 
   const stage = document.createElement('div')
   stage.setAttribute('aria-hidden', 'true')
+  stage.dataset.pageSheet = ''
   stage.style.position = 'absolute'
   stage.style.inset = '0'
   stage.style.pointerEvents = 'none'
@@ -654,6 +712,7 @@ export function beginDrag(
 
   const cast = document.createElement('div')
   cast.setAttribute('aria-hidden', 'true')
+  cast.dataset.pageSheet = ''
   cast.style.position = 'absolute'
   cast.style.top = '0'
   cast.style.height = `${frame.height}px`
@@ -789,11 +848,31 @@ export function settleDrag(
   const from = gesture
   const span = Math.abs(to - from)
 
+  let over = false
   const finish = () => {
+    if (over) return
+    over = true
+    if (guard !== null) clearTimeout(guard)
     drag.frame = null
     dropDrag(drag)
     done(commit)
   }
+
+  /*
+   * The sheet comes down on a clock, not only on a frame.
+   *
+   * `requestAnimationFrame` is a request. A tab that goes to the background
+   * between the finger lifting and the settle ending simply stops being offered
+   * frames, and the loop below is left holding an opaque photograph of the page
+   * over the real one — the reader comes back to a book that has frozen. Timers
+   * are throttled in the background but they *fire*, so this is the promise the
+   * frame loop cannot make: however few frames arrive, the sheet is down and
+   * `done` has run shortly after the animation was due to end.
+   *
+   * Generous on purpose. It is a backstop, not a second animation, and it must
+   * never cut short a settle that is merely running on a slow device.
+   */
+  let guard: ReturnType<typeof setTimeout> | null = null
 
   // Already there, or a platform with no clock to animate against. Either way
   // the honest outcome is to be done rather than to schedule nothing.
@@ -819,6 +898,7 @@ export function settleDrag(
     drag.frame = requestAnimationFrame(step)
   }
 
+  guard = setTimeout(finish, ms + 600)
   drag.frame = requestAnimationFrame(step)
 }
 

@@ -7,9 +7,10 @@
 // page number and the "% left" stayed nailed to the screen while the paper they
 // are printed on rotated out from under them.
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { cancelTurn, holdOutgoing } from './pageTurn.ts'
+import { cancelTurn, clearSheets, holdOutgoing, settleDrag } from './pageTurn.ts'
+import type { Drag } from './pageTurn.ts'
 
 /**
  * The reading screen, as much of it as a page turn touches: the positioned
@@ -33,6 +34,12 @@ function readingScreen() {
 }
 
 afterEach(() => {
+  // The list of concealed furniture is module state, deliberately — one list,
+  // hidden once, restored once, however many copies a turn makes. That means it
+  // outlives a test, and a test that leaves it populated leaves the *next* one
+  // unable to hide anything, because concealing is a no-op while it is full.
+  // Sweeping is what empties it, so it is the teardown.
+  clearSheets(document.querySelector('article'))
   document.body.innerHTML = ''
 })
 
@@ -87,5 +94,90 @@ describe('the sheet that turns', () => {
     // Asserted across the furniture too, which is new ground for the copy.
     expect(document.querySelectorAll('#ch02-s03-p013')).toHaveLength(1)
     expect(document.querySelectorAll('#status-line')).toHaveLength(1)
+  })
+})
+
+/*
+ * The failure these guard against is the worst one this screen has: a copy that
+ * outlives its turn is an opaque photograph of an old page, so the book looks
+ * frozen even though every gesture underneath still works. Both mechanisms that
+ * take a copy down wait on frames, and frames stop arriving when the app is
+ * backgrounded — so both need a floor that does not.
+ */
+describe('a copy can never outlive its turn', () => {
+  it('sweeps a sheet that was left standing, and gives the furniture back', () => {
+    const { frame, strip, status } = readingScreen()
+
+    // Exactly the state a turn interrupted by the app being backgrounded leaves
+    // behind: the copy still there, the real page number still hidden under it.
+    holdOutgoing(strip, 1)
+    expect(frame.querySelectorAll('[data-page-sheet]').length).toBeGreaterThan(0)
+    expect(status.style.visibility).toBe('hidden')
+
+    clearSheets(strip)
+
+    expect(frame.querySelectorAll('[data-page-sheet]')).toHaveLength(0)
+    expect(status.style.visibility).toBe('')
+    // And the real page is untouched — this sweeps the photographs, not the book.
+    expect(strip.isConnected).toBe(true)
+  })
+
+  it('is safe to sweep when there is nothing to sweep', () => {
+    const { frame, strip, status } = readingScreen()
+    clearSheets(strip)
+    clearSheets(null)
+    expect(frame.querySelectorAll('[data-page-sheet]')).toHaveLength(0)
+    expect(status.style.visibility).toBe('')
+    expect(strip.isConnected).toBe(true)
+  })
+
+  it('takes the dragged sheet down on a clock when no frame ever arrives', async () => {
+    const { frame, strip, status } = readingScreen()
+
+    // A drag, standing, with the furniture concealed under it — then every
+    // frame withheld, which is what a backgrounded tab does.
+    const sheet = holdOutgoing(strip, 1)
+    expect(sheet).not.toBeNull()
+
+    const stage = document.createElement('div')
+    stage.dataset.pageSheet = ''
+    const cast = document.createElement('div')
+    cast.dataset.pageSheet = ''
+    frame.append(stage, cast)
+
+    const drag: Drag = {
+      by: 1,
+      width: 400,
+      parent: frame,
+      stage,
+      bands: [],
+      cast,
+      still: null,
+      frame: null,
+    }
+
+    const frames = vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(1)
+    try {
+      vi.useFakeTimers()
+      let committed: boolean | null = null
+      settleDrag(drag, 0.9, 0, (done) => {
+        committed = done
+      })
+
+      // Nothing has finished it — the frame loop is the only thing that would
+      // have, and it is not running.
+      expect(committed).toBeNull()
+      expect(stage.isConnected).toBe(true)
+
+      vi.advanceTimersByTime(5000)
+
+      expect(committed).toBe(true)
+      expect(stage.isConnected).toBe(false)
+      expect(cast.isConnected).toBe(false)
+      expect(status.style.visibility).toBe('')
+    } finally {
+      vi.useRealTimers()
+      frames.mockRestore()
+    }
   })
 })
