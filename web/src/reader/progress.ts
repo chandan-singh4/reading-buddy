@@ -182,19 +182,44 @@ export function paragraphStarts(section: Section): { anchor: Anchor; startWords:
  * The single number every page figure is derived from. Keeping it one number is
  * what stops the bar, the slider and the chapter countdown from disagreeing
  * about where you are.
+ *
+ * ## `pagesInto`, and why the offset arrives in pages
+ *
+ * An anchor names the paragraph the visible page *begins in*, and a paragraph
+ * can run over many columns — a long closing paragraph can be forty pages on its
+ * own. Reading through one moved nothing here, so the page number stood still,
+ * the percentage stood still, and the chapter countdown stood still, all while
+ * the reader was visibly turning pages. The screen already measures the missing
+ * half (`withinHere`, how many pages past that paragraph's first column the
+ * reader is) — it just had nowhere to put it.
+ *
+ * It arrives in *pages* because that is the only unit the column layout can
+ * report: the browser knows which column is showing, and nothing on the screen
+ * knows how many words are in it. Converting at `WORDS_PER_PAGE` is exact rather
+ * than approximate, because in this model that constant is the *definition* of a
+ * page — the same one `pagesAt` divides by on the way back out. One page of
+ * offset in is one page of page number out.
+ *
+ * Kept as an addition to the words rather than added to the finished page number
+ * for the same reason the rest of this file exists: every figure on the screen is
+ * derived from this one total, so adding it here moves the page, the percentage
+ * and the countdown together. Adding it afterwards would move the page number
+ * alone and leave the other two disagreeing with it.
  */
 export function wordsAt(
   spine: Spine,
   here: SectionRef,
   section?: Section,
   anchor?: Anchor,
+  pagesInto = 0,
 ): number {
   const entry = spine.entries[indexOfRef(spine, here)]
   const base = entry?.startWords ?? 0
-  if (!section || !anchor) return base
+  const offset = Math.max(0, pagesInto) * WORDS_PER_PAGE
+  if (!section || !anchor) return base + offset
 
   const within = paragraphStarts(section).find((start) => start.anchor === anchor)
-  return base + (within?.startWords ?? 0)
+  return base + (within?.startWords ?? 0) + offset
 }
 
 /**

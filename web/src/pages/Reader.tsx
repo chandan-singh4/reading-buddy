@@ -856,7 +856,17 @@ export default function Reader() {
     ? pagesAt(
         spine,
         here,
-        wordsAt(spine, here, page.status === 'ready' ? page.section : undefined, anchorHere),
+        // `withinHere` is the other half of the place, and without it the number
+        // froze: `anchorHere` is the paragraph the page *begins in*, so reading
+        // through one long paragraph changed nothing here at all. See the note
+        // on `pagesInto` in `wordsAt`.
+        wordsAt(
+          spine,
+          here,
+          page.status === 'ready' ? page.section : undefined,
+          anchorHere,
+          withinHere,
+        ),
       )
     : null
 

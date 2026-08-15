@@ -252,6 +252,48 @@ describe('moving inside one long section', () => {
     expect(pagesAt(spine, here, partWay).page).toBe(2)
   })
 
+  /*
+   * A paragraph can be longer than a page — a long closing paragraph can run
+   * forty of them — and the anchor names the paragraph the page *begins in*. So
+   * without the offset every figure on the screen stood still while the reader
+   * turned page after page through one unbroken paragraph.
+   */
+  describe('reading on through one long paragraph', () => {
+    const here = { chapter: 1, section: 1 }
+    const first = formatAnchor({ chapter: 1, section: 1, paragraph: 1 })
+
+    it('moves the page number one page per page, with the anchor unchanged', () => {
+      const flat = pagesAt(spine, here, wordsAt(spine, here, section, first)).page
+      for (const into of [1, 2, 3]) {
+        expect(pagesAt(spine, here, wordsAt(spine, here, section, first, into)).page).toBe(
+          flat + into,
+        )
+      }
+    })
+
+    it('carries the percentage and the chapter countdown with it', () => {
+      // The whole reason the offset goes into the word total rather than onto
+      // the finished page number: one source, so these cannot drift apart.
+      const flat = pagesAt(spine, here, wordsAt(spine, here, section, first))
+      const on = pagesAt(spine, here, wordsAt(spine, here, section, first, 3))
+
+      expect(on.percent).toBeGreaterThan(flat.percent)
+      expect(on.leftInChapter).toBeLessThan(flat.leftInChapter)
+    })
+
+    it('is a no-op at zero, so nothing that never measured one changes', () => {
+      expect(wordsAt(spine, here, section, first, 0)).toBe(wordsAt(spine, here, section, first))
+    })
+
+    it('still answers when no paragraph is named, which is what first paint is', () => {
+      // `anchorHere` is undefined until the section has been laid out once, and
+      // the offset must not be silently dropped on that path.
+      expect(wordsAt(spine, here, undefined, undefined, 2)).toBeGreaterThan(
+        wordsAt(spine, here),
+      )
+    })
+  })
+
   it('counts down the pages left in the chapter as you read', () => {
     const here = { chapter: 1, section: 1 }
     const start = pagesAt(spine, here, 0)
