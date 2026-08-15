@@ -157,6 +157,13 @@
      overlay's bottom bar, which must not cover it. */
   --status-line: 2rem;
 
+  /* The mirror of the line above, at the head of the page: the small capitals
+     that print the book's title across the top margin. Zero by default — most
+     themes are a screen, not a printed page, and a screen has no head margin —
+     so `RunningHead` collapses to nothing and `.stage` reserves nothing. A
+     theme that wants the furniture sets this one number. */
+  --running-head: 0rem;
+
   /*
    * The two bars of the reading overlay.
    *
@@ -348,6 +355,62 @@
 }
 
 /*
+ * Vintage — the second-hand hardback. Older literary prints and dense
+ * philosophy volumes: paper that has gone deeper and browner with age, ink that
+ * has sunk into it rather than sitting on top, and enough grain and foxing to
+ * read as a page that has been handled.
+ *
+ * The one theme here that trades a little legibility for character, and it does
+ * so knowingly. Text is a warm near-black rather than black, because a printed
+ * page has never been either; the contrast is still well past 12:1.
+ */
+:root[data-theme='vintage'] {
+  --color-bg: #e6d9bd;
+  --color-surface: #ede2ca;
+  --color-surface-raised: #dbcdae;
+  --color-text: #2b2317;
+  --color-text-muted: #6f6144;
+  --color-border: #c9b894;
+  --color-accent: #7a5427;
+  --color-accent-contrast: #f6efdd;
+  --color-focus: #35597f;
+
+  --shadow-raised: 0 1px 3px rgb(52 36 14 / 0.14), 0 1px 2px rgb(52 36 14 / 0.07);
+
+  /* The one theme that prints a head margin. A scholarly edition puts the
+     title in small capitals across the top of every page, and that convention
+     is half of what makes this read as a printed book rather than a colour. */
+  --running-head: 1.5rem;
+
+  color-scheme: light;
+}
+
+/*
+ * Paperback — the mass-market contemporary novel. Crisp eggshell, generous
+ * contrast, and almost no texture at all: this is the theme for someone who
+ * wants the page out of the way and the words on their own.
+ *
+ * Not the same as `light`. Light is the app's neutral, which is why it is very
+ * slightly warm and very slightly soft. This is a *reading* theme with an
+ * opinion — brighter, cooler, and flatter on purpose.
+ */
+:root[data-theme='paperback'] {
+  --color-bg: #f7f7f5;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ececea;
+  --color-text: #191919;
+  --color-text-muted: #6a6a68;
+  --color-border: #dededa;
+  --color-accent: #3f4a58;
+  --color-accent-contrast: #ffffff;
+  --color-focus: #2f6fd0;
+
+  --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.07), 0 1px 2px rgb(0 0 0 / 0.04);
+
+  color-scheme: light;
+}
+
+/*
  * The sheet of paper.
  *
  * The reading screen used to be one flat fill edge to edge, and a flat fill is
@@ -395,6 +458,9 @@
    * has to be written `%23` — it is a URL, and a bare `#` there would end it.
    */
   --grain-ink: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='120' height='120' filter='url(%23g)' opacity='0.045'/></svg>");
+  /* The same tile at three times the strength, for the one theme that wants
+     paper you can feel rather than paper you can only just tell is there. */
+  --grain-ink-heavy: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='120' height='120' filter='url(%23g)' opacity='0.135'/></svg>");
   --grain-glow: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncR type='linear' slope='1' intercept='0.7'/><feFuncG type='linear' slope='1' intercept='0.66'/><feFuncB type='linear' slope='1' intercept='0.6'/></feComponentTransfer></filter><rect width='120' height='120' filter='url(%23g)' opacity='0.05'/></svg>");
 
   /* Light's own sheet: warm, and restrained — this theme's whole point is that
@@ -405,6 +471,9 @@
   --paper-vignette: rgb(92 70 44 / 0.07);
   --paper-spine: rgb(80 58 34 / 0.08);
   --paper-edge: rgb(80 58 34 / 0.05);
+  /* Foxing — the brown blooms an old page develops. Off everywhere but
+     `vintage`, which is the only theme claiming to be an old page. */
+  --paper-foxing: transparent;
 }
 
 /*
@@ -437,6 +506,40 @@
   --paper-vignette: rgb(94 66 32 / 0.15);
   --paper-spine: rgb(76 52 26 / 0.19);
   --paper-edge: rgb(76 52 26 / 0.1);
+}
+
+/*
+ * Vintage's sheet is the loudest here, and it is the point of the theme. The
+ * grain is the heavy tile rather than the ordinary one, the fibre washes are
+ * strong enough to read as foxing — the brown blooms an old page develops where
+ * it was damp — and the spine is dark enough to suggest a tight binding.
+ *
+ * Foxing wants to be *blotchy* rather than smooth, which is what
+ * `--paper-foxing` adds: two more small, hard-edged washes that the other
+ * themes leave transparent.
+ */
+:root[data-theme='vintage'] {
+  --paper-grain: var(--grain-ink-heavy);
+  --paper-fibre-a: rgb(126 84 34 / 0.16);
+  --paper-fibre-b: rgb(102 74 40 / 0.13);
+  --paper-foxing: rgb(118 76 30 / 0.13);
+  --paper-vignette: rgb(72 46 16 / 0.24);
+  --paper-spine: rgb(56 36 12 / 0.3);
+  --paper-edge: rgb(56 36 12 / 0.16);
+}
+
+/*
+ * Paperback keeps the barest trace of one. Not nothing — a page with *no*
+ * variation at all is the flat rectangle this whole exercise was about — but
+ * far enough down that the eye reads it as clean rather than as textured.
+ */
+:root[data-theme='paperback'] {
+  --paper-grain: var(--grain-ink);
+  --paper-fibre-a: rgb(40 40 46 / 0.02);
+  --paper-fibre-b: rgb(60 60 70 / 0.018);
+  --paper-vignette: rgb(30 30 36 / 0.045);
+  --paper-spine: rgb(24 24 30 / 0.05);
+  --paper-edge: rgb(24 24 30 / 0.03);
 }
 
 :root[data-theme='sepia'] {
@@ -504,6 +607,8 @@
   --face-literata: 'Literata', Georgia, serif;
   --face-garamond: 'EB Garamond', Garamond, Georgia, serif;
   --face-lora: 'Lora', Georgia, serif;
+  --face-merriweather: 'Merriweather', Georgia, serif;
+  --face-caslon: 'Libre Caslon Text', 'Palatino Linotype', Palatino, Georgia, serif;
   --face-inter: 'Inter', system-ui, -apple-system, sans-serif;
   --face-atkinson: 'Atkinson Hyperlegible', system-ui, sans-serif;
   --face-dyslexic: 'OpenDyslexic', Verdana, sans-serif;
@@ -527,6 +632,14 @@
 
 :root[data-reading-font='lora'] {
   --font-reading: var(--face-lora);
+}
+
+:root[data-reading-font='merriweather'] {
+  --font-reading: var(--face-merriweather);
+}
+
+:root[data-reading-font='caslon'] {
+  --font-reading: var(--face-caslon);
 }
 
 :root[data-reading-font='inter'] {

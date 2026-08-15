@@ -54,6 +54,33 @@ describe('htmlToBlocks', () => {
     expect(texts('<div>Bare text in a div.</div>')).toEqual(['Bare text in a div.'])
   })
 
+  /*
+   * A scene break is the one mark a file states two completely different ways,
+   * and got wrong both times: `<hr>` disappeared, and typed asterisks were
+   * printed as characters.
+   */
+  describe('section breaks', () => {
+    it('keeps a horizontal rule as a break instead of dropping it', () => {
+      expect(htmlToBlocks('<p>Before.</p><hr/><p>After.</p>')).toEqual([
+        { kind: 'prose', text: 'Before.' },
+        { kind: 'prose', text: '***', label: 'break' },
+        { kind: 'prose', text: 'After.' },
+      ])
+    })
+
+    it('recognises the asterisks an author typed', () => {
+      expect(htmlToBlocks('<p>* * *</p>')).toEqual([
+        { kind: 'prose', text: '***', label: 'break' },
+      ])
+    })
+
+    it('leaves short prose that merely looks like one alone', () => {
+      // The dangerous false positive: a real line of the book, dropped to an
+      // ornament, would be a sentence the reader never sees.
+      expect(texts('<p>No.</p><p>“Why?”</p><p>…</p>')).toEqual(['No.', '“Why?”', '…'])
+    })
+  })
+
   it('keeps a list as one block rather than one anchor per item', () => {
     expect(htmlToBlocks('<ul><li>One</li><li>Two</li></ul>')).toEqual([
       { kind: 'list', text: '• One\n• Two', label: 'unordered' },

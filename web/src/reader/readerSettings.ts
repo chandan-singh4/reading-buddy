@@ -16,6 +16,8 @@
 export type Theme =
   | 'auto'
   | 'paper'
+  | 'vintage'
+  | 'paperback'
   | 'light'
   | 'dark'
   | 'sepia'
@@ -30,6 +32,8 @@ export type ReadingFont =
   | 'literata'
   | 'garamond'
   | 'lora'
+  | 'merriweather'
+  | 'caslon'
   | 'inter'
   | 'atkinson'
   | 'dyslexic'
@@ -42,6 +46,8 @@ export type ReadingFont =
  */
 export const THEMES: readonly { value: Theme; label: string }[] = [
   { value: 'paper', label: 'Paper' },
+  { value: 'vintage', label: 'Vintage' },
+  { value: 'paperback', label: 'Paperback' },
   { value: 'auto', label: 'Auto' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -64,6 +70,8 @@ export const READING_FONTS: readonly { value: ReadingFont; label: string; note?:
   { value: 'literata', label: 'Literata', note: 'Made for reading' },
   { value: 'garamond', label: 'EB Garamond', note: 'Classic book' },
   { value: 'lora', label: 'Lora', note: 'Warm serif' },
+  { value: 'caslon', label: 'Libre Caslon', note: 'Historical' },
+  { value: 'merriweather', label: 'Merriweather', note: 'Modern paperback' },
   { value: 'inter', label: 'Inter', note: 'Modern sans' },
   { value: 'atkinson', label: 'Atkinson', note: 'Low vision' },
   { value: 'dyslexic', label: 'OpenDyslexic', note: 'Dyslexia' },

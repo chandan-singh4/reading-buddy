@@ -161,5 +161,13 @@
  *   chapter's name is a sentence, and dropping it would delete a line of the
  *   book. Anything the dropped line carried — ids a contents page links to, a
  *   page break the source asked for — moves to the line that takes its place.
+ * - **19** — the scene break the file threw away. An author's pause between two
+ *   scenes of one chapter reaches a file either as `<hr>`, which this parser
+ *   had no rule for and so dropped silently, or as a short paragraph of
+ *   asterisks, which was printed as the literal characters `* * *`. Both are
+ *   now `prose` labelled `break`, and the reading screen draws the ornament
+ *   itself rather than printing the block's text — so the mark is the theme's
+ *   to choose. Labelled rather than given a `BlockKind`, for the same reason as
+ *   16 and 17: the block was already there, and its anchor must not move.
  */
-export const PARSER_VERSION = 18
+export const PARSER_VERSION = 19

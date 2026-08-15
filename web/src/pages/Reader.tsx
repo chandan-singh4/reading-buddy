@@ -11,6 +11,7 @@ import {
   inBookOrder,
   labelFor,
   searchBook,
+  RunningHead,
   StatusLine,
   type BookmarkRow,
   elementIdOf,
@@ -1937,6 +1938,13 @@ export default function Reader() {
             `data-page-furniture` and the copy `pageTurn.ts` makes of it, not
             where it sits.
           */}
+          {/*
+            And its opposite number at the head of the page. Collapsed to
+            nothing on every theme but Vintage, which is decided by one token
+            rather than by a condition here — see `--running-head`.
+          */}
+          <RunningHead title={frame.book.title} />
+
           <StatusLine
             manifest={frame.manifest}
             here={here}

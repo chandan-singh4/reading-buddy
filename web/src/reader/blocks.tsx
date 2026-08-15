@@ -280,6 +280,22 @@ export function Block({
    * that follows another paragraph, and the line under a heading should start
    * flush. As a `<p>` it was being indented as though it continued the heading.
    */
+  /*
+   * A scene break. The parser has already decided this is a division rather
+   * than a sentence (`isSectionBreak` in `parse/html.ts`); here it stops being
+   * text and becomes a mark.
+   *
+   * The asterisks are drawn by CSS rather than printed from `block.text`, so
+   * the ornament is the theme's to choose — Paperback centres a triple
+   * asterisk, another theme could rule a line — while the block itself keeps
+   * its anchor and its place in the book. `aria-hidden` on the ornament with
+   * the real gap left to the spacing: a screen reader announces a separator,
+   * not three stars.
+   */
+  if (block.kind === 'prose' && block.label === 'break') {
+    return <p id={id} className={styles.sectionBreak + opens} role="separator" />
+  }
+
   if (block.kind === 'prose' && block.label === 'subheading') {
     return (
       <h3 id={id} className={styles.heading + opens}>

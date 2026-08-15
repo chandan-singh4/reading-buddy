@@ -78,8 +78,18 @@
        purpose; anything symmetrical reads as a gradient rather than as paper. */
     radial-gradient(58% 44% at 17% 21%, var(--paper-fibre-a), transparent 70%),
     radial-gradient(52% 48% at 84% 66%, var(--paper-fibre-b), transparent 72%),
-    radial-gradient(68% 38% at 38% 94%, var(--paper-fibre-a), transparent 75%);
-  background-size: 120px 120px, 79px 79px, auto, auto, auto, auto, auto, auto;
+    radial-gradient(68% 38% at 38% 94%, var(--paper-fibre-a), transparent 75%),
+    /* Foxing — the brown blooms an old page develops where it was once damp.
+       Small and hard-edged where the fibre washes are broad and soft, which is
+       the difference between a stain and a shade. Transparent in every theme
+       but `vintage`, so these two layers cost nothing anywhere else. */
+    radial-gradient(9% 6% at 76% 14%, var(--paper-foxing), transparent 68%),
+    radial-gradient(6% 5% at 23% 61%, var(--paper-foxing), transparent 66%),
+    radial-gradient(12% 4% at 58% 88%, var(--paper-foxing), transparent 70%);
+  background-size:
+    120px 120px,
+    79px 79px,
+    auto, auto, auto, auto, auto, auto, auto, auto, auto;
   /*
    * No entry animation on the reading screen itself.
    *
@@ -150,6 +160,9 @@
   /* Room at the foot for the status line, which is out of the flow. Without it
      the last line of every page is read through the page number. */
   padding-bottom: var(--status-line);
+  /* And room at the head for the running title, on the themes that print one.
+     Zero on the rest, so this line costs them nothing. */
+  padding-top: var(--running-head);
   /* Shrinks towards the top: the head of the page stays put and the foot rises,
      which is what makes the movement read as the page stepping back rather than
      as the whole screen jumping. */

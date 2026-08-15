@@ -1,0 +1,58 @@
+/*
+ * The title printed across the head margin. See `RunningHead.tsx`, and
+ * `StatusLine.module.css` for why furniture is fixed rather than in the sheet.
+ */
+
+.runningHead {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  /* Below the status line's 11, because the toolbar comes *down* over this end
+     of the screen and a running head showing through a panel would read as a
+     bug. The foot has no such panel, which is why the two differ. */
+  z-index: 9;
+  padding-top: var(--safe-top);
+  padding-inline: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /*
+   * One number decides whether there is a running head at all.
+   *
+   * `--running-head` is 0 everywhere except the themes that want printed
+   * furniture, and `.stage` reserves exactly this much room at the head of the
+   * page. Height plus `overflow: hidden` rather than a `display` rule keyed to
+   * `[data-theme]`, so the space reserved and the space used can never disagree
+   * — a theme turns it on by setting one token, and nothing else has to know.
+   */
+  height: var(--running-head);
+  overflow: hidden;
+  /* Never a tap target: the head margin is somewhere the eye rests and the
+     thumb reaches, and the tap that belongs there is the page's. */
+  pointer-events: none;
+}
+
+/*
+ * Small, spaced, upper-case, and in the UI face rather than the reading face —
+ * all four saying the same thing, which is "this is not part of the text."
+ * Letter-spacing is not decoration here: capitals set tight are hard to read at
+ * this size, and this is meant to be legible in a glance and invisible in a
+ * paragraph.
+ */
+.label {
+  max-width: 100%;
+  font-family: var(--font-ui);
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: var(--leading-ui);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  /* Fainter than the page number, because it repeats on every page and the
+     page number does not. Furniture you notice twice is furniture too loud. */
+  opacity: 0.72;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

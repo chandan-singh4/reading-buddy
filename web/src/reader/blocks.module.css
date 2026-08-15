@@ -351,3 +351,38 @@
 .link:active {
   color: var(--color-accent);
 }
+
+/*
+ * A scene break: the pause between two scenes of one chapter.
+ *
+ * Empty in the markup — the mark is drawn here, not printed from the text —
+ * because the ornament belongs to the theme rather than to the book. A file
+ * that typed "* * *" and a file that used `<hr>` both arrive as this, and both
+ * come out looking like the edition the reader chose.
+ *
+ * `--ornament` is what a theme sets to change the mark; the default is the
+ * spaced triple asterisk a novel prints. `content` on `::before` rather than
+ * real characters keeps it out of selection, out of search, and out of a
+ * screen reader — the `role="separator"` on the element says the useful part.
+ */
+.sectionBreak {
+  /* Margin-top only, like everything else here — see the note at the top of
+     this file. The paragraph that follows is a `.prose` after a
+     `.sectionBreak`, not after another `.prose`, so it stays flush and unindented
+     by the existing rule, which is exactly what print does after a break. */
+  margin-top: var(--space-6);
+  text-align: center;
+  line-height: 1;
+  /* Never alone at the top or bottom of a column: a break that lands as the
+     first thing on a page has separated nothing the eye can see. */
+  break-inside: avoid;
+}
+
+.sectionBreak::before {
+  content: var(--ornament, '\002A \00A0 \002A \00A0 \002A');
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  opacity: 0.8;
+}

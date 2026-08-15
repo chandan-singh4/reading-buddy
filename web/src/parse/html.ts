@@ -510,6 +510,33 @@ function isBoldHeading(element: Element, text: string): boolean {
   return bolded === text
 }
 
+/**
+ * A section break: the pause an author puts between two scenes inside one
+ * chapter. In a printed book it is a line of asterisks, a small ornament, or
+ * simply extra white space; in a file it arrives as `<hr>` or as a short
+ * paragraph containing nothing but punctuation.
+ *
+ * Recognised so the reader can *draw* it. Left alone, `***` prints as the
+ * literal characters an author never meant to be read, and an `<hr>` — which
+ * this parser has no leaf rule for — vanishes silently, running two scenes
+ * together with no more than a paragraph gap between them.
+ *
+ * It stays `prose` with a label rather than becoming a `BlockKind` of its own:
+ * a break is already a block that was already there, and anchors are permanent
+ * — see `structure/types.ts`. Labelling changes how it draws and nothing else.
+ *
+ * Deliberately narrow. Three characters at most, and only characters that are
+ * used as ornaments, so a one-word line, an ellipsis of dialogue, or a stray
+ * "?" can never be mistaken for a division of the story.
+ */
+const ORNAMENT_ONLY = /^[*＊•·●○◆◇❖§~–—_]{1,3}$/
+
+function isSectionBreak(text: string): boolean {
+  // Spaces removed before counting, because "* * *" and "***" are the same
+  // mark typed two ways and only the ornaments should be counted.
+  return ORNAMENT_ONLY.test(text.replace(/\s+/g, ''))
+}
+
 export function htmlToBlocks(html: string): Block[] {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const blocks: Block[] = []
@@ -562,6 +589,15 @@ export function htmlToBlocks(html: string): Block[] {
       const semantics = own || inherited
       if (tag === 'NAV' || matchesAny(semantics, FURNITURE_TYPES)) {
         blocks.push({ kind: 'furniture', text: normalise(element.textContent) })
+        continue
+      }
+
+      // A horizontal rule is a scene break, and the only tag in a book that
+      // means something while containing nothing. Given text of its own so it
+      // survives the `if (block.text)` guards downstream and so a reader that
+      // knows nothing of the label still shows *something* in the gap.
+      if (tag === 'HR') {
+        blocks.push({ kind: 'prose', text: '***', label: 'break' })
         continue
       }
 
@@ -629,6 +665,12 @@ export function htmlToBlocks(html: string): Block[] {
 
         const { text, links } = textAndLinks(element)
         if (!text) continue
+        // "* * *" typed into the manuscript, which is how most breaks reach a
+        // file. Checked before anything else can claim the paragraph.
+        if (isSectionBreak(text)) {
+          blocks.push({ kind: 'prose', text: '***', label: 'break' })
+          continue
+        }
         const noteType = matchesAny(semantics, NOTE_TYPES)
         const displayType = matchesAny(semantics, DISPLAY_TYPES)
         const block: ContentBlock = noteType

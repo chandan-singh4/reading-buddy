@@ -16,6 +16,8 @@ export type { BookmarkRow, ChromeProps, SheetTab } from './Chrome.tsx'
 
 export { StatusLine } from './StatusLine.tsx'
 export type { StatusLineProps } from './StatusLine.tsx'
+export { RunningHead } from './RunningHead.tsx'
+export type { RunningHeadProps } from './RunningHead.tsx'
 
 export { bookmarkOn, inBookOrder, labelFor } from './bookmarks.ts'
 export type { BookmarkLike } from './bookmarks.ts'
