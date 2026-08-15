@@ -122,6 +122,22 @@ const EDGE_TAP = 0.25
 const DRAG_FROM = 8
 
 /**
+ * How long a landing keeps re-checking that it is still on the right page while
+ * the section lays itself out behind it. See `settleOn`.
+ *
+ * Three seconds is a compromise between two real readers: the one opening an
+ * illustrated book, whose columns keep moving for as long as the pictures take
+ * to decode, and the one who opens a book and immediately swipes — who must
+ * never be pulled back to where they started. The second is protected by the
+ * `moveSeq` check as well, so this bound only matters for a section that never
+ * finishes settling at all.
+ */
+const SETTLE_MS = 3000
+
+/** Frames of unchanged layout width that count as "the section has settled". */
+const SETTLE_FRAMES = 3
+
+/**
  * Whether a page can be dragged with the finger. **Off, and measured.**
  *
  * The curl itself is right — the geometry in `pageCurl.ts` is sound and tested.
@@ -728,9 +744,26 @@ export default function Reader() {
    * takes the page we scrolled to with it, which is how "back to page 1" arrives
    * on a screen of page 1 that isn't the one you left.
    *
-   * So the answer is checked again on the next two frames and corrected in place
-   * if the layout has moved under it. Silent when nothing changed, which is most
-   * of the time, and abandoned if the reader has moved on meanwhile.
+   * So the answer is checked again and corrected in place as the layout moves.
+   * Silent when nothing changed, which is most of the time, and abandoned the
+   * moment the reader moves for themselves.
+   *
+   * It used to check exactly twice, on the next two frames — about 32 ms — and
+   * that is the whole of the "closed on p027, reopened on p023" bug. Two frames
+   * is long enough for a font swap and nowhere near long enough for an image to
+   * decode. A book of full-page pictures opens with every image at zero height,
+   * so the columns are far too short and *every* paragraph reports a lower
+   * column number than it will end up in. We scroll to that number, the pictures
+   * arrive, forty pages of columns slide rightwards, and the reader is left
+   * looking at text from several paragraphs earlier.
+   *
+   * So instead of a fixed count, this follows the layout until it stops moving:
+   * `scrollWidth` is the width of the whole laid-out section, and it changes on
+   * every reflow. Correct on each frame; when the width has held still for a few
+   * frames the layout has settled and there is nothing left to chase. `SETTLE_MS`
+   * is the backstop for a section that never settles at all — a slowly-loading
+   * image over a bad connection — because chasing forever would mean a reader who
+   * scrolls at second four gets yanked back.
    */
   const settleOn = useCallback(
     (node: HTMLElement, within = 0) => {
@@ -749,10 +782,28 @@ export default function Reader() {
         if (Math.abs(element.scrollLeft - wanted) > 0.5) element.scrollLeft = wanted
       }
 
-      requestAnimationFrame(() => {
+      const until = Date.now() + SETTLE_MS
+      let lastWidth = -1
+      let stillFor = 0
+
+      const chase = () => {
+        const element = strip.current
+        if (!element || !node.isConnected || moveSeq.current !== mine) return
+
         correct()
-        requestAnimationFrame(correct)
-      })
+
+        const width = element.scrollWidth
+        stillFor = width === lastWidth ? stillFor + 1 : 0
+        lastWidth = width
+
+        // Three frames of an unchanged width is a settled layout. One is not:
+        // images land one at a time, and a single quiet frame between two of
+        // them would end the chase halfway through the reflow.
+        if (stillFor >= SETTLE_FRAMES || Date.now() > until) return
+        requestAnimationFrame(chase)
+      }
+
+      requestAnimationFrame(chase)
     },
     [showPage],
   )
