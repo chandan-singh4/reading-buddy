@@ -978,3 +978,25 @@ sign-in screen.
   names — no bio, no nationality, no bibliography. "More by this author" is one
   `q=inauthor:"…"` query away; an author biography needs a second source
   (Wikidata or Open Library). — 2026-08-14
+- **A theme is colour; a reading face is a separate axis.** Vintage and Paperback
+  ship their fonts (Libre Caslon, Merriweather) as *reading fonts*, not as part
+  of the theme — a reader who chose OpenDyslexic must not have it overridden by
+  picking a page colour. — 2026-08-14
+- **`:root:not([data-theme='light'])` is (0,2,0) and beats a bare `:root`.** File
+  order does not save you: defaults written in `:root` lose to the dark override
+  on any OS-dark phone, which bound every pale theme in black. Per-theme values
+  must be written per theme. Caught twice now — vignette, then the decks — and
+  both times only by reading computed values out of a live browser. — 2026-08-14
+- **The running head is on by default, in every theme.** It arrived as a Vintage
+  period detail; knowing which book you are in turned out to be useful on every
+  page. One token, `--running-head`. — 2026-08-14
+- **Page furniture either flips or holds still, and which one says what it is.**
+  The gutter shadow carries `data-page-furniture` because it *is* the sheet seen
+  edge-on; the decks do not, because a binding does not swing away when you turn
+  a page. — 2026-08-14
+- **The deck channel is a constant; only the fill moves.** The text is set in CSS
+  columns, so a column box that changed width as you read would re-decide every
+  page break and repaginate the book under the reader on each turn. — 2026-08-14
+- **A section break is a labelled block, never a new `BlockKind`.** Same reason
+  as `subheading`: anchors are permanent and a new block kind would shift every
+  anchor after it, moving the highlights pinned to them. — 2026-08-14

@@ -8,6 +8,21 @@
 
 ---
 
+## First, five minutes: look at the reading page on the phone
+
+Nothing is mid-edit, but a whole session's worth of reading-page work shipped
+**unseen** — the Browser pane would not composite frames, so it was verified by
+computed values and tests, never by eye. Before starting anything new, ask the
+reader how it looks. Three numbers in `styles/theme.css` are the likely tuning:
+`--page-deck` (11px, the stack of paper at each side edge), `--page-gutter`
+(24px, the shadow into the binding) and `--running-head` (1.5rem). Each is a
+one-line change.
+
+Also new and worth a glance: **Paper is the default theme**, Vintage and
+Paperback joined the Aa tab, and section breaks (`***`) now draw as an ornament.
+
+---
+
 ## Next task — WP-59 step 4: the Stats tab
 
 Steps 1–3 are shipped: `finishedAt`, ISBN/publisher/subtitle out of the OPF, and
@@ -269,3 +284,24 @@ so a future session recognises them as decisions rather than loose ends.
   onto `setTimeout` and dispatch a synthetic `scroll` to test. **Animation
   timing genuinely cannot be observed there.**
 - **No 3D transform on a shelf tile.**
+- **`:root:not([data-theme='light'])` outranks a bare `:root`.** (0,2,0) against
+  (0,1,0), so file order is irrelevant — a default written in `:root` loses to
+  the dark override on every OS-dark phone, and most phones are. Write per-theme
+  values per theme. This has now cost two rounds (the vignette, then the deck
+  colours) and **both were invisible in the file** — the only thing that found
+  them was reading `getComputedStyle` back out of a live browser while flipping
+  `document.documentElement.dataset.theme` through all ten themes. Do that.
+- **The reading page's column box must not change width.** Anything added at the
+  side edges reserves a *constant* channel and varies only what is drawn inside
+  it. A box that resized as you read would re-decide every page break in the
+  section on every turn — the page under the thumb changes as it is tapped.
+- **Furniture that flips carries `data-page-furniture`; furniture that holds
+  still does not.** `pageTurn.ts` reads that attribute and nothing else. The
+  status line, the running head and the gutter shadow flip. The decks do not.
+- **A new `BlockKind` shifts every anchor after it.** Highlights are pinned to
+  anchors, so finer types are *labelled* (`label: 'subheading'`, `'break'`) on a
+  block that was already there. Bumping `PARSER_VERSION` is the cheap half; the
+  anchors are the part that cannot be undone.
+- **Never import a `@fontsource` package's own CSS.** It pulls every alphabet it
+  ships into `dist/`, and the service worker then precaches all of it. Name the
+  Latin `.woff2` by hand in `styles/fonts.css`, as the existing faces do.

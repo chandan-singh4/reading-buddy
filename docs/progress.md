@@ -15,8 +15,17 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1195 tests across 68 files**, precache 34 entries / 1358.68 KiB
+  **1263 tests across 72 files**, precache 39 entries / 1436.66 KiB
   (2026-08-14).
+- **The reading page's new furniture has never been *seen*.** The Browser pane
+  would not composite frames all session, so the paper themes, the running head,
+  the gutter shadow and the decks were verified numerically (computed tokens
+  across all ten themes, deck widths 3px → 11px, gutter 24px) and by tests —
+  not by looking. **Worth a minute on the phone.** The three numbers most likely
+  to want tuning are `--page-deck` (11px), `--page-gutter` (24px) and
+  `--running-head` (1.5rem), all in `styles/theme.css`.
+- **`PARSER_VERSION` is 19.** Books on the shelf are behind until the idle
+  trickle catches them up, which it does one book at a time on its own.
 - **One chore only the reader can do: redeploy on Vercel** so the newly added
   *Production* `GOOGLE_BOOKS_KEY` takes effect, then press Refresh on one book
   before letting the 32-book backfill run. The probe reads: 401 = key present,
@@ -39,6 +48,40 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The reading page became a physical book** — 2026-08-14 (`52ed6d6`,
+  `33c5960`, `4320b4e`, `2bd572e`). Four rounds off one brief and two mockups.
+  - **Paper, Vintage and Paperback**, three page themes built from stacked CSS
+    gradients plus an inline SVG `feTurbulence` grain — no image file, so no
+    extra download, no precache entry and no fixed resolution to stretch.
+    **Paper is the default theme now.** Vintage adds foxing (the brown blooms a
+    damp page develops); Paperback keeps a trace of texture so it reads as clean
+    rather than flat.
+  - **Two reading faces** — Libre Caslon and Merriweather, self-hosted from
+    `@fontsource*`, **Latin subset named by hand** (importing a package's own CSS
+    pulls megabytes of alphabets into `dist/`, which the worker then precaches).
+    Fonts are their own axis, not part of a theme.
+  - **A running head** — the book's title in small capitals across the top
+    margin. Built for Vintage, then made the default on the reader's ask; the
+    book title, never the chapter, which is already printed at the chapter head.
+  - **The book around the page** — a gutter shadow that flips with the sheet
+    (`data-page-furniture`) and two decks of paper that do not, because a binding
+    does not. The decks thin on the right and thicken on the left as you read:
+    progress as weight in the hand rather than a percentage to read.
+  - **Section breaks survive the parser now** (`PARSER_VERSION` 19). `<hr>` was
+    dropped silently, running two scenes together; typed asterisks were printed
+    as literal `* * *`. Both are `prose` labelled `break`, drawn by CSS so the
+    ornament belongs to the theme.
+  - **The cascade trap bit twice.** `:root:not([data-theme='light'])` is (0,2,0)
+    and beats a bare `:root`, so on an OS-dark phone every pale theme took the
+    dark values — a black vignette on cream paper, then a black binding on it.
+    Both found by reading computed values out of a live browser, neither
+    findable in the file.
+- **Books catch up on open, and trickle in the background** — 2026-08-14
+  (`95389e9`). The reader's question — "with every update it'll have to reload
+  all the books every time?" A book re-parses the moment it is opened, and one
+  stale book at a time is rebuilt while the app is idle and visible. One
+  serialising promise lane, because parsing is main-thread; a session-scoped
+  give-up set so an unfixable book cannot starve the queue.
 - **A book's own page stopped looking like a database record** — 2026-08-14
   (`0fb3e76`, `c02e87c`, `6370d91`, `8ce41d5`, `79a6de8`). The reader's brief,
   with a Google Play Books screenshot: hero cover, title, author, a genre pill
@@ -115,9 +158,11 @@ Get that loop working before building any breadth.
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (1195, 68 files), `npm run typecheck`, `npm run build` — all
-passing as of 2026-08-14. Precache 34 entries / 1358.68 KiB. **Run the suite as
-`npm test --workspace web`** — from the repo root it misses `web/`'s Vite config
+**Gates:** `npm test` (1263, 72 files), `npm run typecheck`, `npm run build` — all
+passing as of 2026-08-14. Precache 39 entries / 1436.66 KiB. **Two tests flaked
+once under parallel load** (`Reader › goes to the next section`, `Library ›
+unfiles a book…`) and passed on re-run and in isolation — timing, not a
+regression, but they exist. **Run the suite as `npm test --workspace web`** — from the repo root it misses `web/`'s Vite config
 and reports phantom import failures. Every
 parser stays behind a dynamic `import()`, so pdf.js (434 kB) and mammoth
 (500 kB) remain in their own chunks and are fetched only when a file of that

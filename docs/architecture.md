@@ -87,8 +87,11 @@ is a heading or one of nine content kinds (`prose`, `quote`, `list`, `code`,
   list.
 - **`label` carries the finer distinction a `kind` deliberately doesn't** —
   `dedication` and `epigraph` (set apart the way print sets them apart), the
-  note types, a figure's real caption. New display treatments belong here rather
-  than in a tenth kind.
+  note types, a figure's real caption, `subheading` (a heading the file only
+  marked up as bold), and `break` (a scene break, which arrives as `<hr>` or as
+  a paragraph of asterisks). New display treatments belong here rather than in a
+  tenth kind — a new kind would shift every anchor after it, and an anchor is
+  what a highlight is pinned to.
 - **A consumed heading's ids are inherited by the block beneath it.** A heading
   that opens a chapter or section becomes that division's *title* and the block
   itself is discarded — so without this, every link pointing at a chapter
