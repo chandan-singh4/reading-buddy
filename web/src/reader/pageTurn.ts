@@ -39,6 +39,17 @@
  */
 
 import { MOVE_TIMING, prefersReducedMotion } from './motion.ts'
+import {
+  castShadow,
+  COMPLETE_MS,
+  completionEase,
+  curl,
+  PERSPECTIVE,
+  releaseInto,
+  SNAP_MS,
+  snapBackEase,
+  STRIPS,
+} from './pageCurl.ts'
 
 /** An outgoing page being held on screen, waiting for the new one to arrive. */
 export interface HeldPage {
@@ -255,35 +266,70 @@ function copyOf(strip: HTMLElement | null, layer: number, scale: number): HTMLEl
   if (!parent) return null
 
   const frame = parent.getBoundingClientRect()
-
-  const wrapper = document.createElement('div')
-  wrapper.setAttribute('aria-hidden', 'true')
-  wrapper.style.position = 'absolute'
-  wrapper.style.top = '0'
-  wrapper.style.left = '0'
-  wrapper.style.width = `${frame.width}px`
-  wrapper.style.height = `${frame.height}px`
-  wrapper.style.margin = '0'
-  wrapper.style.pointerEvents = 'none'
+  const wrapper = sheetBox(frame)
   wrapper.style.zIndex = String(layer)
-  // Opaque, or the page underneath shows through this one while they cross.
-  wrapper.style.background = 'var(--color-bg)'
-  wrapper.style.overflow = 'hidden'
 
+  const text = fillSheet(strip, parent, frame, wrapper, scale)
+  parent.append(wrapper)
+  // After insertion, never before: a node outside the document has no scroll
+  // position to set, and the copy would silently show page one of the chapter.
+  text.scrollLeft = strip.scrollLeft
+
+  concealFurniture(parent)
+
+  return wrapper
+}
+
+/**
+ * An empty page-sized box, positioned over the frame's top-left corner.
+ *
+ * Shared by the fixed animation and the dragged one so the two are the same
+ * object: whatever a turn is made of, it is made of this.
+ */
+function sheetBox(frame: DOMRect): HTMLElement {
+  const box = document.createElement('div')
+  box.setAttribute('aria-hidden', 'true')
+  box.style.position = 'absolute'
+  box.style.top = '0'
+  box.style.left = '0'
+  box.style.width = `${frame.width}px`
+  box.style.height = `${frame.height}px`
+  box.style.margin = '0'
+  box.style.pointerEvents = 'none'
+  // Opaque, or the page underneath shows through this one while they cross.
+  box.style.background = 'var(--color-bg)'
+  box.style.overflow = 'hidden'
+  return box
+}
+
+/**
+ * Put a picture of the whole page — text and furniture — inside `wrapper`.
+ *
+ * Split out of `copyOf` for the dragged turn, which needs the same picture
+ * several times over: one per strip of the curling sheet, each clipped to its
+ * own vertical band. Both callers get identical sheets by construction, which
+ * is the point of the split — a tapped turn and a dragged one must not be
+ * subtly different pictures of the same page.
+ *
+ * Returns the copied text, whose `scrollLeft` is the caller's job **once the
+ * wrapper is in the document** — a detached node has no scroll position to set,
+ * and a copy that quietly missed it shows page one of the chapter instead of
+ * the page the reader is looking at.
+ */
+function fillSheet(
+  strip: HTMLElement,
+  parent: HTMLElement,
+  frame: DOMRect,
+  wrapper: HTMLElement,
+  scale: number,
+): HTMLElement {
   const text = place(strip, frame, wrapper, scale)
   // The furniture is outside the box that shrinks — it holds its size while the
   // text steps back — so its copy is placed at 1, not at the text's scale.
   for (const item of Array.from(parent.querySelectorAll<HTMLElement>(FURNITURE))) {
     place(item, frame, wrapper, 1)
   }
-
-  parent.append(wrapper)
-  // After insertion: a node outside the document has no scroll position to set.
-  text.scrollLeft = strip.scrollLeft
-
-  concealFurniture(parent)
-
-  return wrapper
+  return text
 }
 
 /**
@@ -295,8 +341,15 @@ function copyOf(strip: HTMLElement | null, layer: number, scale: number): HTMLEl
  */
 const FLIP_DEGREES = 118
 
-/** How far the eye is from the page. Shallower reads as a pop-up book. */
-const FLIP_PERSPECTIVE = 1600
+/**
+ * How far the eye is from the page.
+ *
+ * One value for both kinds of turn — the fixed one below and the dragged one at
+ * the foot of this file — so a page tapped over and a page pulled over are the
+ * same object seen from the same place. It lives in `pageCurl.ts` with the rest
+ * of the geometry.
+ */
+const FLIP_PERSPECTIVE = PERSPECTIVE
 
 /**
  * Turn the page over.
@@ -468,5 +521,322 @@ function shadeOver(node: HTMLElement): HTMLElement | null {
  */
 export function cancelTurn(held: HeldPage | null): void {
   held?.node.remove()
+  revealFurniture()
+}
+
+/* ------------------------------------------------------------------------- *
+ * The dragged turn.
+ *
+ * Everything above plays a turn at a fixed speed once the reader has let go.
+ * Everything below lets them hold it half-turned. The shape is not defined
+ * here — it is arithmetic and lives in `pageCurl.ts`, which has no DOM in it so
+ * it can be tested. This half is only the elements that shape is written onto.
+ * ------------------------------------------------------------------------- */
+
+/** One vertical band of the curling sheet, and the two washes laid over it. */
+interface Band {
+  root: HTMLElement
+  /** The blank back of the page, faded in as this band passes edge-on. */
+  back: HTMLElement
+  /** The shadow on this band, from its own angle. */
+  dark: HTMLElement
+}
+
+/** A turn the reader is holding in their hand. */
+export interface Drag {
+  /** Which way it is going: 1 forwards, -1 back. */
+  by: 1 | -1
+  /** The sheet's width in unscaled pixels — what a whole turn's travel is. */
+  width: number
+  /** The frame the whole thing hangs in. */
+  parent: HTMLElement
+  /** The perspective box the bands live in. */
+  stage: HTMLElement
+  bands: Band[]
+  /** The shadow the lifted sheet throws on the page revealed beneath it. */
+  cast: HTMLElement
+  /**
+   * Turning back, the page being *left* — which has to stay visible under the
+   * arriving sheet, because the real strip beneath has already been scrolled to
+   * the destination. Forwards there is nothing to hold: the destination is on
+   * the strip and the sheet on top of it is the page being left.
+   */
+  still: HTMLElement | null
+  /** The settle in flight after release, so a new gesture can cut it short. */
+  frame: number | null
+}
+
+/**
+ * Build the sheet and hang it over the page, folded to `startAt`.
+ *
+ * ## The order the caller has to keep
+ *
+ * The bands are pictures of whatever the strip is showing *at the moment this
+ * is called*, so the two directions need opposite sequencing and there is no
+ * way to hide that from the caller:
+ *
+ * - **Forwards:** call this first — the bands become the page being left — and
+ *   scroll the strip to the destination straight afterwards. The next page is
+ *   then sitting underneath from the first millimetre of the drag, which is the
+ *   whole difference between a turn and a transition.
+ * - **Backwards:** take a still copy with `holdStill` *first*, then scroll the
+ *   strip to the destination, then call this. The bands become the arriving
+ *   page and the still copy is what they are arriving on top of.
+ *
+ * Returns `null` for a reader who has asked for less movement, or a platform
+ * with nothing to hang the sheet on. Both mean the caller should fall back to
+ * the instant change, which is what those readers asked for.
+ */
+export function beginDrag(
+  strip: HTMLElement | null,
+  by: 1 | -1,
+  scale: number,
+  still: HTMLElement | null,
+  startAt: number,
+): Drag | null {
+  if (!strip || prefersReducedMotion() || typeof document === 'undefined') return null
+
+  const parent = strip.closest<HTMLElement>(FRAME) ?? strip.parentElement
+  if (!parent) return null
+
+  const frame = parent.getBoundingClientRect()
+  if (frame.width <= 0) return null
+
+  const stage = document.createElement('div')
+  stage.setAttribute('aria-hidden', 'true')
+  stage.style.position = 'absolute'
+  stage.style.inset = '0'
+  stage.style.pointerEvents = 'none'
+  stage.style.zIndex = '3'
+  // Perspective belongs to the box the bands live in, applied once. Putting it
+  // on each band instead would give every band its own vanishing point, and the
+  // sheet would fan out rather than bend.
+  stage.style.perspective = `${PERSPECTIVE}px`
+  stage.style.transformStyle = 'preserve-3d'
+
+  const step = frame.width / STRIPS
+  const bands: Band[] = []
+  const texts: HTMLElement[] = []
+
+  for (let i = 0; i < STRIPS; i += 1) {
+    const root = document.createElement('div')
+    root.style.position = 'absolute'
+    root.style.top = '0'
+    root.style.left = `${i * step}px`
+    // A hair wider than the arithmetic says. Bands meet exactly in the maths
+    // and land on fractional device pixels in practice, and a sub-pixel seam
+    // between two opaque sheets is a bright hairline on a dark theme. The
+    // overlap is under a pixel and hides behind the next band.
+    root.style.width = `${step + 0.5}px`
+    root.style.height = `${frame.height}px`
+    root.style.overflow = 'hidden'
+    // The left edge, which is where the previous band's right edge is handed
+    // over. Any other origin and the seams open as the sheet bends.
+    root.style.transformOrigin = '0% 50%'
+    root.style.willChange = 'transform'
+    // The bands are opaque pictures of the same page; letting the compositor
+    // guess at their order produces flicker as they cross.
+    root.style.backfaceVisibility = 'visible'
+
+    // The page, slid left so that this band's slice of it lands in the band.
+    const sheet = sheetBox(frame)
+    sheet.style.left = `${-i * step}px`
+    sheet.style.pointerEvents = 'none'
+    root.append(sheet)
+    texts.push(fillSheet(strip, parent, frame, sheet, scale))
+
+    const back = wash(root, 'var(--color-bg)')
+    const dark = wash(root, '#000')
+
+    stage.append(root)
+    bands.push({ root, back, dark })
+  }
+
+  const cast = document.createElement('div')
+  cast.setAttribute('aria-hidden', 'true')
+  cast.style.position = 'absolute'
+  cast.style.top = '0'
+  cast.style.height = `${frame.height}px`
+  cast.style.pointerEvents = 'none'
+  cast.style.zIndex = '2'
+  cast.style.opacity = '0'
+
+  parent.append(cast)
+  parent.append(stage)
+
+  // After insertion, never before — see `fillSheet`. Every band has to be
+  // scrolled to the same page or the sheet shows different words in each slice.
+  for (const text of texts) text.scrollLeft = strip.scrollLeft
+
+  concealFurniture(parent)
+
+  const drag: Drag = {
+    by,
+    width: frame.width,
+    parent,
+    stage,
+    bands,
+    cast,
+    still,
+    frame: null,
+  }
+
+  /*
+   * Lay it all out before the reader's finger moves.
+   *
+   * The same bookkeeping problem `playFlip` documents, and worse here: this has
+   * just cloned a laid-out section STRIPS times over. If that layout is left to
+   * happen on the first `pointermove`, the sheet does not appear until the thumb
+   * is already an inch across the screen — and the reader reads the lag as the
+   * gesture not having been noticed. Forced on `pointerdown` instead, where a
+   * gesture is expected to cost something.
+   */
+  void stage.getBoundingClientRect().width
+  paintDrag(drag, startAt)
+
+  return drag
+}
+
+/** A full-bleed wash over a band, faded by `paintDrag`. Returns the element. */
+function wash(parent: HTMLElement, colour: string): HTMLElement {
+  const layer = document.createElement('div')
+  layer.style.position = 'absolute'
+  layer.style.inset = '0'
+  layer.style.pointerEvents = 'none'
+  layer.style.backgroundColor = colour
+  layer.style.opacity = '0'
+  parent.append(layer)
+  return layer
+}
+
+/**
+ * A still copy of the page being left, for a backward turn to land on.
+ *
+ * Must be taken *before* the strip is scrolled to the destination, which is why
+ * it is the caller's call and not something `beginDrag` can do for itself.
+ */
+export function holdStill(strip: HTMLElement | null, scale: number): HTMLElement | null {
+  return copyOf(strip, 1, scale)
+}
+
+/**
+ * Put back a still copy that never got used.
+ *
+ * Taking one conceals the real page furniture, so simply removing the node
+ * leaves the reader on a page with no page number and no running head until
+ * they turn again — and the copy that was carrying them has gone. This is the
+ * half of the pair that `remove()` on its own quietly misses.
+ */
+export function dropStill(still: HTMLElement | null): void {
+  still?.remove()
+  revealFurniture()
+}
+
+/**
+ * Write a gesture position onto the sheet.
+ *
+ * `gesture` runs 0 → 1 in the direction of travel for **both** directions: 0 is
+ * "not started", 1 is "turned". The mapping onto the curl is where the two part
+ * company — forwards the sheet unfolds from flat, backwards it arrives already
+ * folded away and flattens onto the page. One number for the caller, one shape
+ * for the eye, and no second set of keyframes to keep in step with the first.
+ *
+ * Nothing here is eased, tweened or scheduled. It is a straight write of the
+ * arithmetic in `pageCurl`, so a thumb held still leaves a sheet held still —
+ * the reader's actual requirement, and the reason this is not an animation with
+ * a scrubbed playback position.
+ */
+export function paintDrag(drag: Drag, gesture: number): void {
+  const progress = drag.by === 1 ? gesture : 1 - gesture
+  const strips = curl(drag.width, progress)
+
+  for (let i = 0; i < drag.bands.length; i += 1) {
+    const band = drag.bands[i]
+    const shape = strips[i]
+    if (!band || !shape) continue
+    band.root.style.transform = shape.transform
+    band.back.style.opacity = String(shape.blank)
+    band.dark.style.opacity = String(shape.dark)
+  }
+
+  const { at, opacity } = castShadow(drag.width, progress)
+  drag.cast.style.left = `${at}px`
+  drag.cast.style.width = `${CAST_WIDTH}px`
+  drag.cast.style.opacity = String(opacity)
+  drag.cast.style.backgroundImage = `linear-gradient(90deg, rgb(0 0 0 / 0.55) 0%, rgb(0 0 0 / 0) 100%)`
+}
+
+/** How far the fold's shadow reaches across the page it is falling on. */
+const CAST_WIDTH = 96
+
+/**
+ * The reader has let go. Run the rest of the turn, or put the page back.
+ *
+ * `done` is handed `true` when the turn completed and `false` when it sprang
+ * back, and is called **once**, after the sheet has been taken down. The caller
+ * uses it to decide whether the strip stays where it was scrolled to or goes
+ * home, which is why it cannot fire early: for one frame between the last paint
+ * and the removal, the sheet and the strip must agree.
+ */
+export function settleDrag(
+  drag: Drag,
+  gesture: number,
+  velocity: number,
+  done: (committed: boolean) => void,
+): void {
+  const commit = releaseInto(gesture, velocity) === 'complete'
+  const to = commit ? 1 : 0
+  const from = gesture
+  const span = Math.abs(to - from)
+
+  const finish = () => {
+    drag.frame = null
+    dropDrag(drag)
+    done(commit)
+  }
+
+  // Already there, or a platform with no clock to animate against. Either way
+  // the honest outcome is to be done rather than to schedule nothing.
+  if (span < 0.001 || typeof requestAnimationFrame !== 'function') {
+    finish()
+    return
+  }
+
+  // Distance-proportional, so letting go at 5% does not take as long as letting
+  // go at 95%. Floored, or a nearly-finished turn ends in a visible snap.
+  const ms = Math.max(90, (commit ? COMPLETE_MS : SNAP_MS) * span)
+  const ease = commit ? completionEase : snapBackEase
+  const started = performance.now()
+
+  const step = (now: number) => {
+    const t = (now - started) / ms
+    const value = from + (to - from) * ease(t)
+    paintDrag(drag, value)
+    if (t >= 1) {
+      finish()
+      return
+    }
+    drag.frame = requestAnimationFrame(step)
+  }
+
+  drag.frame = requestAnimationFrame(step)
+}
+
+/**
+ * Take the sheet down, however the turn ended.
+ *
+ * Unconditional about the furniture, like `playFlip`'s `clear`: a reader left
+ * looking at a page with no page number on it is a worse outcome than a turn
+ * that did not finish.
+ */
+export function dropDrag(drag: Drag | null): void {
+  if (!drag) return
+  if (drag.frame !== null && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(drag.frame)
+  }
+  drag.frame = null
+  drag.stage.remove()
+  drag.cast.remove()
+  drag.still?.remove()
   revealFurniture()
 }

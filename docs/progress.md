@@ -15,8 +15,18 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1263 tests across 72 files**, precache 39 entries / 1436.66 KiB
-  (2026-08-14).
+  **1287 tests across 73 files** (2026-08-15).
+- **The finger-tracked page curl has never been under a finger.** The maths is
+  covered by 24 tests and the wiring typechecks, but jsdom has no compositor and
+  the preview tree has no book on its shelf, so no drag has ever been dragged.
+  **This one is provable on the phone or not at all** — a synthetic pointer is
+  not a thumb.
+- **The 16 DOM clones a drag builds at `pointerdown` are unmeasured.** Each band
+  is a full `copyOf` of the laid-out section. Layout is forced up front so the
+  cost lands on the frame the gesture starts rather than mid-swing, and
+  **`STRIPS` in `web/src/reader/pageCurl.ts` is the one lever** — lower it and
+  the sheet degrades gracefully toward the old rigid flip. If the phone hitches
+  on the first millimetre of a swipe, that is this.
 - **The reading page's new furniture has never been *seen*.** The Browser pane
   would not composite frames all session, so the paper themes, the running head,
   the gutter shadow and the decks were verified numerically (computed tokens
@@ -48,6 +58,44 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The page turns with the thumb now, and the paper is a notch darker** —
+  2026-08-15. Two things off one brief.
+  - **Paper down ~4.5%.** Every channel × 0.955, so the hue is untouched and
+    only the luminance moves: `#f1e9db` → `#e6ded1`, with `--color-surface` and
+    `--color-surface-raised` alongside it so the sheet does not float on
+    furniture lighter than itself. Only Paper moved. The next nudge in either
+    direction is this same three-line edit, which is why it was not made into a
+    slider.
+  - **A finger-tracked curl replaces the threshold swipe.** Pointer Events with
+    `setPointerCapture`, so the release always arrives; horizontal travel maps
+    **linearly** onto 0→1 with no smoothing, because a thumb held still must
+    leave the page held still and any filter at all would let it creep.
+  - **The browser has no mesh warp for live DOM text**, so the sheet is a
+    snapshot cut into 16 vertical strips, each a flat quad with its own
+    `rotateY`. Strip *i*'s left edge is placed where strip *i−1*'s right edge
+    **computed out** (`xᵢ₊₁ = xᵢ + w·cos θᵢ`, `zᵢ₊₁ = zᵢ + w·sin θᵢ`) — any
+    closed-form shortcut shows daylight through the paper the moment the curve
+    is not uniform. A test asserts the joins at seven progress values.
+  - **Rigid-plus-curl, not a scaled arc:** `θ = π·p · (0.55 + 0.45·mᵏ)` with
+    `k = 1 + 1.4(1−p)`, so the sheet lifts at the corner early and evens out
+    late — the shape at 20% is a different curve from the shape at 80%.
+  - **The shadow is zero at flat by arithmetic, not by a guard** — it is derived
+    from `(1 − cos θ)/2`, so there is nothing a later refactor can delete.
+  - **Release is critically damped** (`1 − (1 + ωt)e^{−ωt}`, ω = 8, normalised
+    so it lands exactly on 1). Paper settles; it does not wobble past flat.
+    Velocity beats position **in both directions**: a page dragged past halfway
+    and thrown back goes back.
+  - **The strip scrolls to the destination at gesture *start*,** which is what
+    reveals the next page from the first millimetre. That inverts the old logic:
+    completing is now the case where nothing more happens, and it is the
+    *abandoned* turn that has work to do.
+  - **`touch-action` had to go from `pan-x` to `none`** — under `pan-x` the
+    browser can claim a horizontal gesture and fire `pointercancel` a few pixels
+    in. Harmless for a swipe decided at `touchend`; fatal for a dragged sheet.
+    The cost is pinch-zoom, which this screen answers with the Aa tab.
+  - **Section-crossing turns stay on the old path** on purpose: at a chapter
+    edge the destination is not laid out, so there is nothing honest to scrub
+    against. Reduced motion falls back too.
 - **The reading page became a physical book** — 2026-08-14 (`52ed6d6`,
   `33c5960`, `4320b4e`, `2bd572e`). Four rounds off one brief and two mockups.
   - **Paper, Vintage and Paperback**, three page themes built from stacked CSS
@@ -158,8 +206,8 @@ Get that loop working before building any breadth.
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (1263, 72 files), `npm run typecheck`, `npm run build` — all
-passing as of 2026-08-14. Precache 39 entries / 1436.66 KiB. **Two tests flaked
+**Gates:** `npm test` (1287, 73 files), `npm run typecheck`, `npm run build` — all
+passing as of 2026-08-15. Precache 34 entries / 1172.01 KiB. **Two tests flaked
 once under parallel load** (`Reader › goes to the next section`, `Library ›
 unfiles a book…`) and passed on re-run and in isolation — timing, not a
 regression, but they exist. **Run the suite as `npm test --workspace web`** — from the repo root it misses `web/`'s Vite config

@@ -263,12 +263,25 @@
      columns against each other, which here would mean half-empty pages. */
   column-fill: auto;
   overflow: hidden;
-  /* Every turn is driven from JS (`touchend`, edge tap, arrow keys) — the
-     browser is never asked to pan or scroll this box on its own. Without this,
-     a swipe that isn't perfectly horizontal (a finger arcs) reads to the
-     browser as an attempt to scroll the *page*, which is what was making the
-     screen visibly bob up and down while turning. */
-  touch-action: pan-x;
+  /*
+   * Every turn is driven from JS (the pointer drag, edge taps, arrow keys) — the
+   * browser is never asked to pan or scroll this box on its own. Without this,
+   * a swipe that isn't perfectly horizontal (a finger arcs) reads to the browser
+   * as an attempt to scroll the *page*, which is what was making the screen
+   * visibly bob up and down while turning.
+   *
+   * `none` rather than `pan-x`, changed when the turn started following the
+   * finger. Under `pan-x` the browser keeps the right to claim a horizontal
+   * gesture for itself, and when it does it fires `pointercancel` a few pixels
+   * in — which for a threshold swipe cost nothing, because the decision was
+   * taken at `touchend` anyway, and for a dragged sheet drops the page on the
+   * floor mid-turn. There is nothing here for a native pan to move in any case:
+   * the box is `overflow: hidden` and every pixel of its scroll is set from JS.
+   *
+   * The cost is pinch-zoom on the text, which this screen answers with the Aa
+   * tab's own size control rather than with the browser's.
+   */
+  touch-action: none;
   /* Deliberately *not* `scroll-behavior: smooth`. The browser times that one,
      and lengthens it with the distance travelled, so a turn inside a chapter
      ran visibly longer than a turn between two. Every move on this screen is

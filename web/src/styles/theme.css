@@ -374,10 +374,20 @@
  * A reader who has chosen a theme keeps it — this only changes what someone who
  * has never opened the Aa tab sees.
  */
+/*
+ * Taken down one notch on 2026-08-15, on the reader's ask after seeing it on
+ * the phone: every channel × 0.955, so the hue is untouched and only the
+ * luminance moves (about 4.5%). `#f1e9db` → `#e6ded1`, and the two surfaces
+ * with it so the sheet does not float on furniture lighter than itself.
+ *
+ * Deliberately still one number per line. The next nudge — in either
+ * direction — is this same edit again, which is why it was not made into a
+ * slider or derived from anything.
+ */
 :root[data-theme='paper'] {
-  --color-bg: #f1e9db;
-  --color-surface: #f7f1e6;
-  --color-surface-raised: #e8dfcd;
+  --color-bg: #e6ded1;
+  --color-surface: #ece6db;
+  --color-surface-raised: #ddd5c4;
   --color-text: #2a241c;
   --color-text-muted: #6e6355;
   --color-border: #dcd1bc;

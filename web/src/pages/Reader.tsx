@@ -20,12 +20,20 @@ import {
   pagesAt,
   refAtPage,
   wordsAt,
+  beginDrag,
   cancelTurn,
+  curlProgress,
+  dropDrag,
+  dropStill,
   fadeIn,
   holdOutgoing,
+  holdStill,
+  paintDrag,
   playFlip,
   scrollStrip,
+  settleDrag,
   type Cancel,
+  type Drag,
   type HeldPage,
   firstSection,
   isFresh,
@@ -102,6 +110,24 @@ const READING_LINE = 80
  * starts turning pages by accident.
  */
 const EDGE_TAP = 0.25
+
+/**
+ * How far a finger has to travel before it owns the page rather than the app.
+ *
+ * Below this a "drag" is a tap with an unsteady thumb, and building a sheet for
+ * every one of those would cost a clone of the chapter each time somebody
+ * touched the screen to see the page number.
+ */
+const DRAG_FROM = 8
+
+/**
+ * How much of the newest reading the drag's speed estimate keeps.
+ *
+ * Low enough that one janky frame cannot decide a turn, high enough that the
+ * number still describes the last few milliseconds rather than the whole
+ * gesture.
+ */
+const RUN_ON = 0.35
 
 /**
  * How much the page shrinks by when the toolbar comes up.
@@ -513,6 +539,46 @@ export default function Reader() {
   const touchStart = useRef<Touch | null>(null)
 
   /**
+   * The turn currently under the reader's thumb.
+   *
+   * A page turn is not a thing that is triggered any more — it is a thing that
+   * is *held*. Everything below is the bookkeeping that lets one finger own the
+   * sheet from the moment it starts moving until it lets go.
+   */
+  const drag = useRef<Drag | null>(null)
+
+  /**
+   * Where the drag was reckoned from — set at the moment the gesture is
+   * recognised, not where the finger first touched down.
+   *
+   * The difference is the recognition threshold, and it matters: measuring from
+   * the touch-down point would mean the sheet appears already eight pixels
+   * turned, which the eye catches as a jump. Measuring from here, the first
+   * frame of the curl is the first pixel of movement past the threshold.
+   */
+  const dragFrom = useRef(0)
+
+  /** How far through the gesture the thumb is, 0 to 1, in the turn's direction. */
+  const dragAt = useRef(0)
+
+  /** The page to put back if the turn is abandoned. */
+  const dragHome = useRef(1)
+
+  /**
+   * Speed, in px/ms, smoothed just enough to survive one stuttering frame.
+   *
+   * A flick is a real way to turn a page and it barely moves the sheet, so the
+   * release has to know about speed and not only distance. A raw last-two-points
+   * reading is far too jumpy — one dropped frame reads as a stop — and a long
+   * average lags behind the finger. A short exponential mean is the cheap
+   * middle: see `RUN_ON`.
+   */
+  const dragSpeed = useRef(0)
+
+  /** The previous move, for the speed above. */
+  const dragLast = useRef({ x: 0, at: 0 })
+
+  /**
    * A swipe just happened, so the click the browser synthesises after it should
    * be ignored. Without this, every swipe would also toggle the overlay.
    */
@@ -817,6 +883,103 @@ export default function Reader() {
     },
     [neighbours, showPage, goTo, drawnAt],
   )
+
+  /**
+   * Start a turn the finger is going to carry.
+   *
+   * Returns `true` if a sheet is now under the thumb. `false` means this gesture
+   * cannot be dragged and should fall back to the old threshold swipe, which
+   * happens in two cases worth naming:
+   *
+   * - **A reader who asked for less movement.** `beginDrag` declines, and they
+   *   get the instant change they asked for.
+   * - **The turn crosses a section boundary.** The destination is not laid out
+   *   yet — it has not been fetched — so there is nothing to reveal underneath
+   *   the sheet and nothing honest to scrub against. Those turns keep the
+   *   two-copy handoff in `turnPage`, which was built for exactly that seam.
+   */
+  const startDrag = useCallback(
+    (by: 1 | -1, at: number) => {
+      const element = strip.current
+      if (!element) return false
+
+      const now = measure(element)
+      const next = turn(now, by)
+      if (next === null) return false
+
+      dragHome.current = pageAt(now)
+
+      // Backwards, the arriving page is the one that moves, so the page being
+      // left has to be pinned down *before* the strip is scrolled off it. See
+      // the ordering note on `beginDrag`.
+      const still = by === -1 ? holdStill(element, drawnAt) : null
+
+      // Forwards the bands are the page being left, so they are built first and
+      // the strip slides to the destination behind them.
+      const sheet = by === 1 ? beginDrag(element, by, drawnAt, null, 0) : null
+      showPage(next, true)
+      const built = sheet ?? (by === -1 ? beginDrag(element, by, drawnAt, still, 0) : null)
+
+      if (!built) {
+        // Declined — reduced motion, or no frame to hang it on. Put the strip
+        // back and let the release play the fixed animation instead. Through
+        // `dropStill`, not `remove`: taking a still copy hides the real page
+        // furniture, and it has to be given back on this path too.
+        dropStill(still)
+        showPage(dragHome.current, true)
+        return false
+      }
+
+      drag.current = built
+      dragFrom.current = at
+      dragAt.current = 0
+      dragSpeed.current = 0
+      dragLast.current = { x: at, at: performance.now() }
+      return true
+    },
+    [showPage, drawnAt],
+  )
+
+  /** Move the sheet to wherever the thumb now is. */
+  const moveDrag = useCallback((at: number) => {
+    const held = drag.current
+    if (!held) return
+
+    // Positive in the direction of travel, whichever direction that is, so one
+    // number drives both and the shape never needs to know which way it is
+    // going.
+    const travel = held.by === 1 ? dragFrom.current - at : at - dragFrom.current
+    dragAt.current = curlProgress(travel, held.width)
+    paintDrag(held, dragAt.current)
+
+    const now = performance.now()
+    const gap = now - dragLast.current.at
+    if (gap > 0) {
+      const moved = (held.by === 1 ? dragLast.current.x - at : at - dragLast.current.x) / gap
+      dragSpeed.current = dragSpeed.current * (1 - RUN_ON) + moved * RUN_ON
+      dragLast.current = { x: at, at: now }
+    }
+  }, [])
+
+  /**
+   * The finger is off. Let the sheet finish, or put it back.
+   *
+   * The strip has been sitting on the destination since the gesture began, so
+   * completing is the case where nothing more has to happen — the sheet simply
+   * comes off and reveals what was already there. It is the *abandoned* turn
+   * that has work to do, which is the opposite way round from how this read
+   * before the drag existed, and worth knowing when reading the branch below.
+   */
+  const endDrag = useCallback(() => {
+    const held = drag.current
+    if (!held) return
+    drag.current = null
+
+    const home = dragHome.current
+    settleDrag(held, dragAt.current, dragSpeed.current, (committed) => {
+      if (!committed) showPage(home, true)
+    })
+  }, [showPage])
 
   /**
    * Turn a page from the keyboard.
@@ -1295,11 +1458,15 @@ export default function Reader() {
   }, [page, here, spine, showPage, settleOn])
 
   // A held page must never outlive the screen it was copied from — leaving the
-  // book mid-turn would otherwise leave the copy in the document.
+  // book mid-turn would otherwise leave the copy in the document. The same is
+  // true of a sheet still under a thumb: closing the book with a page half
+  // turned has to take the sheet, its shadow and its running frame with it.
   useEffect(() => {
     return () => {
       cancelTurn(held.current)
       held.current = null
+      dropDrag(drag.current)
+      drag.current = null
     }
   }, [])
 
@@ -1827,25 +1994,93 @@ export default function Reader() {
           <article
             ref={strip}
             className={styles.page}
-            onTouchStart={(event) => {
-              const point = event.touches[0]
-              touchStart.current = point ? { x: point.clientX, y: point.clientY } : null
+            /*
+              The page follows the thumb.
+
+              Pointer events rather than touch events, so one set of handlers
+              covers a finger, a stylus and a mouse drag — and so `setPointerCapture`
+              can guarantee the release arrives even if the finger leaves the
+              article, which a turn dragged right off the edge of the screen
+              always does.
+
+              A drag in flight is *not* a layer and owes `dismissTopLayer`
+              nothing: it is ended by the finger coming off or by
+              `pointercancel`, never by Back. Said here because everything else
+              drawn over this page is a layer, and the next reader of this file
+              will be looking for the registration.
+            */
+            onPointerDown={(event) => {
+              if (!event.isPrimary) return
+              touchStart.current = { x: event.clientX, y: event.clientY }
+              dragSpeed.current = 0
             }}
-            onTouchEnd={(event) => {
+            onPointerMove={(event) => {
+              if (!event.isPrimary) return
+
+              if (drag.current) {
+                moveDrag(event.clientX)
+                return
+              }
+
               const from = touchStart.current
-              const point = event.changedTouches[0]
-              touchStart.current = null
-              if (!from || !point) return
+              if (!from) return
 
-              const swipe = swipeOf(from, { x: point.clientX, y: point.clientY })
-              if (!swipe) return
+              const across = event.clientX - from.x
+              const down = event.clientY - from.y
+              if (Math.abs(across) < DRAG_FROM) return
 
-              // A swipe is a gesture in its own right, so it must not also be
-              // read as the tap below that shows the overlay.
-              swiped.current = true
+              // A finger that is mostly going up or down is not turning a page.
+              // It gets one chance: once the gesture is claimed here it stays
+              // claimed, and once it is rejected the rest of the stroke is left
+              // alone rather than being re-tested every few pixels.
+              if (Math.abs(down) > Math.abs(across)) {
+                touchStart.current = null
+                return
+              }
+
               // Pushing the page leftwards moves forwards, as pushing a sheet
               // of paper aside would.
+              const by = across < 0 ? 1 : -1
+              // Reckoned from here, not from the touch-down point, so the first
+              // frame of the curl is the first pixel past the threshold and the
+              // sheet does not appear already part-turned.
+              if (startDrag(by, event.clientX)) {
+                swiped.current = true
+                event.currentTarget.setPointerCapture(event.pointerId)
+              } else {
+                // No live sheet — a section boundary, or a reader who has asked
+                // for less movement. `onPointerUp` falls back to the threshold
+                // swipe, which is what `touchStart` is still being kept for.
+                swiped.current = true
+              }
+            }}
+            onPointerUp={(event) => {
+              if (!event.isPrimary) return
+
+              if (drag.current) {
+                touchStart.current = null
+                endDrag()
+                return
+              }
+
+              const from = touchStart.current
+              touchStart.current = null
+              if (!from) return
+
+              // The fallback: a section-crossing turn, or reduced motion. The
+              // old threshold swipe, unchanged, still handing the seam to
+              // `turnPage`'s two-copy handoff.
+              const swipe = swipeOf(from, { x: event.clientX, y: event.clientY })
+              if (!swipe) return
+              swiped.current = true
               turnPage(swipe === 'left' ? 1 : -1)
+            }}
+            onPointerCancel={() => {
+              touchStart.current = null
+              // The system has taken the gesture — a phone call, an edge swipe,
+              // a second finger. There is no release coming, so the sheet is
+              // settled from where it stands rather than left over the page.
+              if (drag.current) endDrag()
             }}
             onClick={(event) => {
               if (swiped.current) {

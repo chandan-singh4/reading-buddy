@@ -8,97 +8,178 @@
 
 ---
 
-## First, five minutes: look at the reading page on the phone
+## In flight — the finger-tracked page curl
 
-Nothing is mid-edit, but a whole session's worth of reading-page work shipped
-**unseen** — the Browser pane would not composite frames, so it was verified by
-computed values and tests, never by eye. Before starting anything new, ask the
-reader how it looks. Three numbers in `styles/theme.css` are the likely tuning:
-`--page-deck` (11px, the stack of paper at each side edge), `--page-gutter`
-(24px, the shadow into the binding) and `--running-head` (1.5rem). Each is a
-one-line change.
+The reader has seen the book furniture on the phone and signed it off. Two things
+came back, and this task is both of them.
 
-Also new and worth a glance: **Paper is the default theme**, Vintage and
-Paperback joined the Aa tab, and section breaks (`***`) now draw as an ornament.
+**Stats (WP-59 step 4) is deliberately parked** — the plan for it is preserved at
+the bottom of this file. Do not start it without the reader asking.
+
+### 1. The paper, one notch darker
+
+`--color-bg` on `:root[data-theme='paper']` in `styles/theme.css`, `#f1e9db` →
+`#e6ded1`: every channel × 0.955, so the hue is untouched and only the luminance
+moves (~4.5%). One line, deliberately one line — the reader will look at it on
+the phone and say *more* or *stop*, and the next nudge is the same edit again.
+
+Only Paper moves. The other nine themes were each chosen as a whole and are not
+this reader's complaint.
+
+### 2. The flip follows the thumb
+
+Replace the threshold swipe — which fires a fixed 118° animation on release —
+with a curl the finger scrubs in real time, anchored at the **left screen edge**.
+The reader's call: single-column portrait, so the sheet peels off the whole
+screen right-to-left. No central spine.
+
+**Done when:**
+- Dragging left curls the page continuously. Stop the thumb and the sheet **holds
+  its exact shape** — no easing, no drift, no animation running underneath.
+- The free edge curls off the screen plane (Z) as it travels; the hinge at x=0
+  never moves.
+- The next page is visible under the peeling sheet from the first millimetre —
+  not revealed at the end.
+- The fold's shadow deepens as the fold steepens and is **exactly zero** at flat.
+- Release past 50%, or fast in either direction, completes the turn. Under 50%
+  and slow springs back to perfectly flat.
+- Dragging right curls the *previous* page back on from the left, the same motion
+  run backwards.
+- Reduced motion keeps today's instant change. Tap-the-edge and the arrow keys
+  still turn pages and still play the existing `playFlip`.
+- Tests, typecheck, build green. **The gesture itself is provable on the phone
+  and nowhere else** — a synthetic pointer is not a thumb.
+
+### The math, so it isn't re-derived
+
+The sheet is one snapshot sliced into **N = 16 vertical strips**. Strips, because
+the browser has no mesh warp for live DOM: N flat quads with their own
+`rotate3d` is the same deformation matrix evaluated per strip instead of per
+vertex, and at 16 the seams are invisible.
+
+Let `W` = sheet width, `p ∈ [0,1]` = progress, `w = W/N`, and `mᵢ` = the midpoint
+of strip *i* in `[0,1]`.
+
+**Bend angle along the sheet.** A page hinged at a spine tilts as a *whole* and
+curls *extra* near its free edge, so the angle is a floor plus a rising term:
+
+```
+θmax(p) = π · p
+θᵢ      = θmax · ( A + (1 − A) · mᵢ^k )      A = 0.55
+k(p)    = 1 + 1.4 · (1 − p)
+```
+
+`A` is the rigid part — at `A = 1` the sheet is a flat board pivoting, at `A = 0`
+it is a scroll unrolling. `k` is why the corner peels first and the fold evens
+out: high early (bend concentrated at the free edge), 1 by the end (a clean
+even fold).
+
+**Position, by cumulative sum.** Each strip's left edge starts where the previous
+strip's right edge landed, which is what makes the seams *exact* rather than
+nearly-right:
+
+```
+x₀ = 0,  z₀ = 0
+xᵢ₊₁ = xᵢ + w · cos θᵢ
+zᵢ₊₁ = zᵢ + w · sin θᵢ
+```
+
+**Transform per strip**, absolutely positioned at `left = i·w`, origin `0% 50%`:
+
+```
+translate3d(xᵢ − i·w, 0, zᵢ) rotateY(−θᵢ)
+```
+
+Perspective goes on the *container*, once (`FLIP_PERSPECTIVE`, 1600px — keep the
+existing value, a shallower one reads as a pop-up book).
+
+**Shading, per strip, from that strip's own angle.** This is the existing
+`shadeOver` idea generalised: a strip goes paper-blank exactly as *it* passes
+edge-on, so the free edge blanks before the hinge does, which is what makes it
+read as a fold rather than a spinning rectangle.
+
+```
+blank ᵢ = clamp((θᵢ − 70°) / 25°, 0, 1)        the back of the page: no text on it
+darkᵢ   = S · (1 − cos θᵢ) / 2                 S ≈ 0.42
+```
+
+`darkᵢ` is zero when `θᵢ = 0` by construction — the shadow cannot survive a flat
+page, which is the requirement, enforced by the formula rather than by a guard.
+
+**Release.** Velocity is an exponential moving average of `dx/dt` across
+pointermoves. Complete if `p > 0.5` or `|v| > 0.5 px/ms`; otherwise spring back.
+Completion is an ease-out to 1; snap-back is a critically damped spring
+(`ω = 18`, no overshoot — paper does not wobble).
+
+### Files in scope
+
+- `web/src/reader/pageCurl.ts` — **new.** All of the above as pure functions. No
+  DOM, so jsdom can prove the math even though it cannot prove the gesture.
+- `web/src/reader/pageCurl.test.ts` — **new.**
+- `web/src/reader/pageTurn.ts` — already owns `copyOf`, the furniture concealment
+  and the sheet metaphor. Gains the slicing and the live drag; `playFlip` stays
+  for the tap and key routes.
+- `web/src/reader/index.ts` — the barrel; new exports.
+- `web/src/pages/Reader.tsx` — `turnPage` (~782) and the `onTouchStart` /
+  `onTouchEnd` pair on the `<article>` (~1830), which become pointer handlers.
+  The structural change: the strip scrolls to the destination at gesture *start*,
+  not at commit, so the next page is under the sheet the whole way.
+- `web/src/pages/Reader.module.css` — `perspective` and `transform-style` on the
+  frame; `touch-action` on the page.
+- `web/src/reader/motion.ts` — `prefersReducedMotion`, `MOVE_TIMING`.
+- `web/src/styles/theme.css` — the one-line darkening.
+
+Out of scope: the other nine themes, Stats, and mirrored show-through text on the
+back of the sheet (the back stays blank paper — the reader has already called the
+current blank-back turn beautiful).
+
+### Traps this task walks straight into
+
+- **`position: fixed` dies inside the frame**, and the sheet is full of copied
+  furniture. `copyOf` already places everything from measured rectangles for
+  exactly this reason — do not "simplify" it back to inherited styles.
+- **`:root:not([data-theme='light'])` outranks a bare `:root`.** The darkening is
+  written on `[data-theme='paper']`, which is safe, but check the computed value
+  on an OS-dark phone anyway. This has cost two rounds already.
+- **Scaled rectangles come back scaled.** `drawnAt` is handed in for that reason;
+  `W` must be the *unscaled* sheet width or every strip lands at the wrong pitch.
+- **Every layer owes Back an answer** (`dismissTopLayer`). A drag in flight is not
+  a layer — it is cancelled by `pointercancel`, not by Back — but say so in the
+  code so the next reader doesn't wire it in.
+- **A hidden preview pane runs no rAF.** The Browser pane cannot observe this at
+  all. Verify the math in tests and the look on the phone.
 
 ---
 
-## Next task — WP-59 step 4: the Stats tab
+## Parked — WP-59 step 4: the Stats tab
 
 Steps 1–3 are shipped: `finishedAt`, ISBN/publisher/subtitle out of the OPF, and
 the Google Books lookup with its match guard, shelf backfill and per-book
-Refresh. **Stats is what's left**, and it now has real data to stand on —
-`pageCount`, `subjects`, `averageRating` and `ratingsCount` are stored on the 32
-books and shown on each book's page.
-
-**Ask before starting.** The reader has not yet chosen between Stats and the
-offered "More by this author" shelf (`q=inauthor:"…"` on the endpoint that
-already exists — see `progress.md`). Confirm which one they want.
+Refresh. Stats is what is left, and it has real data to stand on — `pageCount`,
+`subjects`, `averageRating` and `ratingsCount` are stored on the 32 books.
 
 **Done when (Stats):**
-- Pages read = **finished books × the print edition's page count**, summed —
-  the reader's own simplification, and why there is no reading-events log.
+- Pages read = **finished books × the print edition's page count**, summed — the
+  reader's own simplification, and why there is no reading-events log.
 - A part-read book counts in proportion: `percent × pageCount`.
 - **All of a book's pages land on its finish date.** Yearly totals only; a
   monthly chart would be spiky and slightly fictional.
 - Books Google could not match are reported — "3 books uncounted" — never
   quietly under-reported.
 - Genres blend Google's coarse `subjects` with the app's own `genre`.
-- Tests, typecheck, build green.
 
-### Files in scope
-- `web/src/structure/types.ts` — `BookMeta`: `finishedAt`, `pageCount`,
-  `subjects`, `genre`, `averageRating`, `ratingsCount` are all already there.
-- `web/src/pages/BookInfo.tsx` + `.module.css` — the visual language the rest of
-  the app should now match, and the seven-theme `color-mix` pattern to copy.
-- `web/src/app/AppShell.tsx` — where a new tab would be registered.
-- `web/src/storage/index.ts` — the repository read the page would use.
-
-Out of scope: any new network call, and `0008` (see below).
-
----
-
-## The arc this belongs to — Google Books metadata, then Stats
-
-Agreed with the reader 2026-08-10. **`finishedAt` is built and shipped**; the
-rest is planned, not started.
-
-The reader's insight, which cut a whole feature out of the plan: **pages read
-does not need a reading log.** Finished books × the print edition's page count,
-summed. Ten books at 200 pages is 2,000 pages, and it works retroactively
-because "finished" was already derivable. An earlier proposal here for an
-append-only reading-events log was over-engineering and is dropped.
-
-1. **`finishedAt` — done.** Written once, never moved. See the note in
-   `structure/types.ts`. `backfillFinishedAt` at boot dates the books finished
-   before the field existed, from the position's own `at`, and doubles as the
-   recovery path for a book finished with no signal.
-2. **ISBN + publisher from the file.** Free, offline, exact. The epub parser
-   reads only `title` and `creator` out of the OPF today and walks past
-   `dc:identifier` — most epubs carry an ISBN right there. This is what makes
-   the lookup exact instead of a guess.
-3. **Google Books lookup.** By ISBN, with title+author only as a fallback — a
-   title search confidently returns the wrong edition, an audiobook, or a study
-   guide. **The key goes through `api/`, never a `VITE_` variable.** Must
-   degrade offline and cache its answer on the book.
-4. **Stats.** Genres read, pages this year, the reader's rating against the
-   average.
+**Files (when it restarts):** `web/src/structure/types.ts`,
+`web/src/pages/BookInfo.tsx` + `.module.css` (the visual language to match, and
+the seven-theme `color-mix` pattern), `web/src/app/AppShell.tsx`,
+`web/src/storage/index.ts`.
 
 Known and accepted about the page maths:
 
-- **Page counts are a convention, not a measurement.** These books have no
-  pages — text flows into columns, so the count changes with type size, which
-  is why bookmarks anchor to a paragraph. `percent × printedPageCount` is
-  meaningful to a human even though nothing ever rendered "page 412". Say so
-  before someone "fixes" it.
-- **Part-read books count in proportion**, the reader's call: show
-  "*n* pages read out of *m*" from the percent already stored, so a book put
-  down at 60% is not worth nothing.
-- **All the pages land on the finish date.** A book read December→February
-  drops into February. Yearly totals are honest; a *monthly* chart would be
-  spiky and slightly fictional.
-- **Books Google can't match contribute zero.** Stats must say "3 books
-  uncounted" rather than quietly under-reporting.
+- **Page counts are a convention, not a measurement.** These books have no pages
+  — text flows into columns, so the count changes with type size, which is why
+  bookmarks anchor to a paragraph. `percent × printedPageCount` is meaningful to
+  a human even though nothing ever rendered "page 412". Say so before someone
+  "fixes" it.
 - **Google's categories are coarse** ("Body, Mind & Spirit"). The app's own
   `type` and `subject` are finer; the good answer probably blends them.
 
@@ -171,6 +252,11 @@ so a future session recognises them as decisions rather than loose ends.
   books, and that stays; the **listing** is remembered separately
   (`storage/cloud/shelf.ts`) so a lost signal shows all 33 with the unopenable
   ones greyed. Home filters rather than greys, on purpose.
+- **The reading page's furniture is signed off.** Paper themes, the running head,
+  the gutter shadow and the two decks were shipped unseen on 2026-08-14 and have
+  now been looked at on the phone. `--page-deck` (11px), `--page-gutter` (24px)
+  and `--running-head` (1.5rem) stand as they are. Only the paper's *lightness*
+  came back, and that is the task above.
 
 ---
 
@@ -263,7 +349,7 @@ so a future session recognises them as decisions rather than loose ends.
   mounted while hidden**, so scope locators with `visible=true`. **Gestures are
   still a phone question.**
 - **Books imported before a parser change keep the old parse, silently.**
-  `PARSER_VERSION` is 9 and the shelf offers the update — but it needs the kept
+  `PARSER_VERSION` is 19 and the shelf offers the update — but it needs the kept
   source file.
 - **A title fix reaches everyone; a parser fix does not.** `TITLE_CLEAN_VERSION`
   recomputes from what is already stored, at boot, for free.
@@ -305,3 +391,5 @@ so a future session recognises them as decisions rather than loose ends.
 - **Never import a `@fontsource` package's own CSS.** It pulls every alphabet it
   ships into `dist/`, and the service worker then precaches all of it. Name the
   Latin `.woff2` by hand in `styles/fonts.css`, as the existing faces do.
+</content>
+</invoke>

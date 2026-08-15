@@ -84,8 +84,20 @@ export {
 } from './navigation.ts'
 export type { SectionCountLookup, SectionRef } from './navigation.ts'
 
-export { cancelTurn, holdOutgoing, playFlip } from './pageTurn.ts'
-export type { HeldPage } from './pageTurn.ts'
+export {
+  beginDrag,
+  cancelTurn,
+  dropDrag,
+  dropStill,
+  holdOutgoing,
+  holdStill,
+  paintDrag,
+  playFlip,
+  settleDrag,
+} from './pageTurn.ts'
+export type { Drag, HeldPage } from './pageTurn.ts'
+
+export { COMMIT_AT, curlProgress, FLICK } from './pageCurl.ts'
 
 export {
   MOVE_EASING,
