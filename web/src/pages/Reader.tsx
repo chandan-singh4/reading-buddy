@@ -122,6 +122,36 @@ const EDGE_TAP = 0.25
 const DRAG_FROM = 8
 
 /**
+ * Whether a page can be dragged with the finger. **Off, and measured.**
+ *
+ * The curl itself is right — the geometry in `pageCurl.ts` is sound and tested.
+ * What is wrong is what it is drawn on. `beginDrag` builds the sheet out of
+ * `STRIPS` copies of the page, and a copy is `cloneNode(true)` of the whole
+ * laid-out section: not the page you can see, the entire chapter, as a
+ * multi-column strip that may be thousands of columns wide. Every copy has to
+ * be laid out before it can be shown, and column layout is work proportional to
+ * the whole section. So the cost of starting a drag is
+ * **(one section layout) × 16**, paid synchronously, on the first millimetre of
+ * a swipe.
+ *
+ * Measured in a real browser on a 2,542-page section: **one clone 1.9 s,
+ * sixteen 24.5 s** with the main thread blocked throughout, and 102,300 nodes
+ * in the document. On a phone, with a book that also has full-page images, the
+ * renderer runs out of memory before it finishes and the tab dies — which is
+ * exactly what happened, and why tapping did nothing while it was happening.
+ * Nothing was frozen; the thread was simply never free to answer.
+ *
+ * Lowering `STRIPS` does not fix this, it divides it: the cost is linear in the
+ * clone count and the constant is already seconds. The fix is to stop cloning
+ * DOM per strip — snapshot the page **once** to a bitmap and give the sixteen
+ * bands the same image at sixteen offsets, which costs one snapshot and no
+ * layout at all. Until that exists this stays `false` and the reading screen
+ * keeps the threshold swipe, which takes one copy and only when the turn
+ * actually happens.
+ */
+const DRAG_TURNS = false
+
+/**
  * How much of the newest reading the drag's speed estimate keeps.
  *
  * Low enough that one janky frame cannot decide a turn, high enough that the
@@ -2054,7 +2084,7 @@ export default function Reader() {
               // Reckoned from here, not from the touch-down point, so the first
               // frame of the curl is the first pixel past the threshold and the
               // sheet does not appear already part-turned.
-              if (startDrag(by, event.clientX)) {
+              if (DRAG_TURNS && startDrag(by, event.clientX)) {
                 swiped.current = true
                 event.currentTarget.setPointerCapture(event.pointerId)
               }

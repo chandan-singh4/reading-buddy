@@ -47,7 +47,14 @@ Get that loop working before building any breadth.
 - **Steps 2 and 3 of the Google Books arc are shipped.** Only **step 4, Stats**,
   is left. Migration `0007` has been run.
 - **Two older Supabase migrations still need pasting into the SQL editor** —
-  `0003_finished_at.sql` and `0006_position_within.sql`. Both fail softly.
+  `0003_finished_at.sql` and `0006_position_within.sql`. Both fail softly — and
+  `0006` failing softly is the **"reopens a few pages back"** bug. `within` (how
+  many pages into the saved paragraph the reader was) round-trips correctly
+  through Dexie and through every cloud layer, but a project without that column
+  gets rows back with no `within` key at all (`rows.ts:153`), which
+  `rows.ts:421` reads as `undefined` → 0 → the book reopens at the page where
+  that paragraph *started*. Exactly the reported symptom. No code change fixes
+  it; the migration has to be pasted in.
 - **Nothing is waiting on the reader. The queue is empty as of 2026-08-10** —
   the first time it has been, and worth not quietly refilling.
   - **The greyed-out offline shelf was seen and approved on the phone**, along
@@ -62,11 +69,37 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The finger-tracked turn is switched off, and why** — 2026-08-15. The book
+  did not freeze and it did not leak; the main thread was simply never free to
+  answer. `beginDrag` builds the sheet out of `STRIPS` (16) copies, and a copy is
+  `cloneNode(true)` of the **whole laid-out section** — not the visible page, the
+  entire chapter as a multi-column strip thousands of columns wide. Every copy
+  must be laid out before it can be drawn, so starting a drag costs one full
+  section layout × 16, synchronously, on the first millimetre of a swipe.
+  - **Measured in a real browser**, on a deliberately representative
+    single-section book (6,003 nodes, 2,542 pages wide): one clone **1,923 ms**;
+    one drag start **24,583 ms** of blocked main thread, 17 articles on the page,
+    **102,300 DOM nodes**. JS heap grew only 0.6 MB — the cost is layout and
+    render, not objects. Sixteen × 1,923 ≈ 30,763, so it is exactly linear in the
+    clone count.
+  - That is the crash: on a phone, on a 1,583-page book with full-page images,
+    the renderer runs out of memory before it finishes and Chrome shows
+    "Aw, Snap!". It is also why tapping did nothing — the taps were queued behind
+    a thread that never came back.
+  - **Lowering `STRIPS` divides this, it does not fix it.** `DRAG_TURNS` in
+    `Reader.tsx` is `false` and the reading screen is back on the threshold
+    swipe, which takes one copy and only when the turn actually happens. The
+    curl geometry in `pageCurl.ts` is sound and stays, tests and all.
+  - **The rebuild, when it comes:** snapshot the page **once** to a bitmap and
+    give the sixteen bands that one image at sixteen `background-position`
+    offsets. One decode, no layout, no DOM clones. Then flip `DRAG_TURNS`.
 - **A frozen book, and the floor under it** — 2026-08-15. The reader opened a
   book onto a full-page map and the page would not turn at all — no swipe, no
-  tap. **Root cause unconfirmed**, and worth saying plainly: the preview pane
-  delivers no frames (rAF and the Web Animations API both never fire in it), so
-  every copy strands there and it cannot tell a real leak from its own artefact.
+  tap; then it crashed the tab. **Root cause now measured — see the entry above
+  this one.** The work below is still right, but it was a floor under the
+  symptom, not the cause. The preview pane delivers no frames (rAF and the Web
+  Animations API both never fire in it), so every copy strands there and it
+  could not tell a real leak from its own artefact.
   What is certain is the *shape* of the failure: a page-turn copy is an opaque
   photograph of the old page, so one left standing looks exactly like a book
   that has stopped responding — gestures keep working underneath and nothing the

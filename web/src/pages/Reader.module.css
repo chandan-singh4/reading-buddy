@@ -280,6 +280,10 @@
    *
    * The cost is pinch-zoom on the text, which this screen answers with the Aa
    * tab's own size control rather than with the browser's.
+   *
+   * Kept at `none` even with `DRAG_TURNS` off: the bobbing it cures is the
+   * threshold swipe's problem too, and the previous `pan-x` gave no pinch-zoom
+   * back — it permits a horizontal pan and nothing else.
    */
   touch-action: none;
   /* Deliberately *not* `scroll-behavior: smooth`. The browser times that one,
