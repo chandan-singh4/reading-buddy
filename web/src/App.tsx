@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router'
 
 import AppShell from './app/AppShell.tsx'
+import { startCatchUp } from './app/bookCatchUp.ts'
+import { tookConsent } from './app/bookUpdate.ts'
 import { AuthGate } from './auth/AuthGate.tsx'
 import { RouteTransition, useViewLocation } from './app/routeTransition.tsx'
 import { UpdatePrompt } from './app/UpdatePrompt.tsx'
@@ -39,6 +42,16 @@ export function AppRoutes() {
 }
 
 export default function App() {
+  /*
+   * The books bring themselves up to date in the background, one at a time,
+   * for as long as the app is open (`app/bookCatchUp.ts`). Started here rather
+   * than inside a screen so it survives every navigation, and read here rather
+   * than in `UpdatePrompt` because `tookConsent` can only be read once — it
+   * clears itself, and it means "the reader just accepted an update", which is
+   * the one launch worth starting on without the usual opening pause.
+   */
+  useEffect(() => startCatchUp(tookConsent()), [])
+
   return (
     <BrowserRouter>
       {/*

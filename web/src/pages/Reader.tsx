@@ -55,6 +55,7 @@ import {
   type Strip,
   type Touch,
 } from '../reader/index.ts'
+import { catchUpOnOpen } from '../app/bookCatchUp.ts'
 import { knownBook, noteReading } from '../app/shelvesAhead.ts'
 import { repository, type StoredBookmark } from '../storage/index.ts'
 import { tryParseAnchor } from '../structure/index.ts'
@@ -1031,13 +1032,32 @@ export default function Reader() {
 
     void (async () => {
       try {
-        const [book, manifest] = await Promise.all([
-          repository.getBook(id),
-          repository.getManifest(id),
-        ])
+        const found = await repository.getBook(id)
+        if (cancelled) return
+        if (!found) {
+          setFrame({ status: 'missing' })
+          return
+        }
+
+        /*
+         * A book behind the current parser is re-read *here*, before its
+         * manifest is asked for — the manifest is what the old parse produced,
+         * and reading it first would mean showing the old chapters and then
+         * pulling them out from under the reader.
+         *
+         * This is the moment the wait buys something, and it costs no new UI:
+         * `<Opening>` already holds a cover over the page until it is ready, so
+         * a stale book simply takes a second or two longer to open. Ordinarily
+         * there is nothing to do, because the background trickle has already
+         * been through the shelf — see `app/bookCatchUp.ts`.
+         */
+        const book = (await catchUpOnOpen(found)) ?? found
         if (cancelled) return
 
-        if (!book || !manifest) {
+        const manifest = await repository.getManifest(id)
+        if (cancelled) return
+
+        if (!manifest) {
           setFrame({ status: 'missing' })
           return
         }
