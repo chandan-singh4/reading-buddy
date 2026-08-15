@@ -443,8 +443,11 @@ describe('the top bar and its menu', () => {
     await screen.findByText('The opening words.')
 
     openSheetAt('Contents')
-    expect(screen.getByText('page 3')).toBeTruthy()
-    expect(screen.getByText('currently on page 1')).toBeTruthy()
+
+    // The dots and the figure are decoration, so the number is said in words on
+    // the row itself — which is also the only way to check it here.
+    expect(screen.getByRole('button', { name: 'The Middle, page 3' })).toBeTruthy()
+    expect(screen.getByText(/reading now · page 1/)).toBeTruthy()
   })
 
   it('swipes from one tab to the next, and stops at the ends', async () => {

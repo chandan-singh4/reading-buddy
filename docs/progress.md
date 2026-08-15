@@ -78,6 +78,15 @@ Get that loop working before building any breadth.
     section of each chapter. No layout, no measuring, nothing loaded.
   - **Swipe left and right to change tab.** `stepThrough` in `swipe.ts` already
     did this job and had no caller. It stops at the ends; the row does not loop.
+  - **The contents are set like a printed contents page** — the reader sent a
+    mock-up and asked for it. CONTENTS letterspaced under a small ornament, a
+    hairline rule, titles ranged left, page numbers ranged right, and a dot
+    leader across the gap. Set in `--font-reading`, because the page belongs to
+    the book. The chapter you are in is bold in the accent, with
+    `✦ reading now · page N ✦` centred under it.
+  - **Parts are the one thing from the mock-up that is missing.** Nothing in the
+    manifest says which part a chapter belongs to, so "PART ONE" would have to
+    be invented. It needs a parser change first.
   - **The page number hides while the page is open.** The status line is
     `z-index: 11`, above the overlay on purpose, so a full-screen list could not
     cover it. `<html>` now carries `data-browsing`, and `theme.css` fades the

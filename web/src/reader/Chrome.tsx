@@ -462,40 +462,70 @@ export function Chrome({
             ))}
           </div>
 
+          {/*
+            The contents, set like the contents page of a printed book.
+
+            A list of chapters is the one screen in this app that has a
+            centuries-old typographic answer, and the reader asked for it: the
+            word CONTENTS letterspaced under a small ornament, titles ranged
+            left, page numbers ranged right, and a line of dots joining the two
+            so the eye can cross the gap. It is set in the reading face rather
+            than the interface face, because it is part of the book.
+
+            Parts — "PART ONE" between chapters — are the one thing from the
+            sketch that isn't here. Nothing in the manifest records which part a
+            chapter belongs to, so they would have to be invented.
+          */}
           {sheetTab === 'contents' && (
-            <nav className={styles.sheetPanel} aria-label="Contents">
+            <nav className={styles.contents} aria-label="Contents">
+              <div className={styles.contentsHead} aria-hidden="true">
+                <span className={styles.contentsFlower}>❁</span>
+                <p className={styles.contentsWord}>Contents</p>
+                <span className={styles.contentsRule}>✦</span>
+              </div>
+
               <ul>
                 {manifest.chapters.map((entry) => {
-                  const here = entry.chapter === chapter
+                  const reading = entry.chapter === chapter
                   const startPage = chapterPages?.get(entry.chapter)
+                  const title = entry.title || `Chapter ${entry.chapter}`
 
                   return (
                     <li key={entry.chapter}>
                       <button
                         type="button"
                         className={styles.contentsItem}
-                        aria-current={here ? 'true' : undefined}
+                        aria-current={reading ? 'true' : undefined}
+                        /* The dots are decoration, so the number has to be said
+                           in words to anyone who can't see them line up. */
+                        aria-label={
+                          startPage === undefined ? title : `${title}, page ${startPage}`
+                        }
                         onClick={() => onJumpToChapter(entry.chapter)}
                       >
-                        <span className={styles.contentsNumber}>{entry.chapter}</span>
-                        <span className={styles.contentsText}>
-                          {entry.title}
-                          {/*
-                            The page under the title, the way a printed contents
-                            page has always carried one — and, on the chapter
-                            you are in, where you actually are inside it. That
-                            second line is the one that answers "how far into
-                            this chapter am I?" without leaving the list.
-                          */}
-                          {startPage !== undefined && (
-                            <span className={styles.contentsPage}>
-                              {here && pages
-                                ? `currently on page ${pages.page}`
-                                : `page ${startPage}`}
-                            </span>
-                          )}
-                        </span>
+                        <span className={styles.contentsTitle}>{title}</span>
+                        <span className={styles.contentsLeader} aria-hidden="true" />
+                        {startPage !== undefined && (
+                          <span className={styles.contentsPage} aria-hidden="true">
+                            {startPage}
+                          </span>
+                        )}
                       </button>
+
+                      {/*
+                        Where you actually are, under the chapter you are in.
+                        The right-hand column is where each chapter *starts*, so
+                        without this line the list can say 91 while you are on
+                        102 — true of the chapter, and not an answer to the
+                        question a reader opens the contents to ask.
+                      */}
+                      {reading && pages && (
+                        <p className={styles.readingNow}>
+                          <span aria-hidden="true">✦ </span>
+                          reading now · page {pages.page}
+                          <span aria-hidden="true"> ✦</span>
+                        </p>
+                      )}
                     </li>
                   )
                 })}
