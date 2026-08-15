@@ -162,6 +162,11 @@
   padding-bottom: var(--status-line);
   /* And room at the head for the running title. */
   padding-top: var(--running-head);
+  /* And room at both side edges for the block of paper the page is bound into
+     — see `reader/PageDecks.tsx`. A constant, never the deck's current width:
+     the column box must not change size as you read, or every page break in the
+     section would be re-decided on every turn. */
+  padding-inline: var(--page-deck);
   /* Shrinks towards the top: the head of the page stays put and the foot rises,
      which is what makes the movement read as the page stepping back rather than
      as the whole screen jumping. */

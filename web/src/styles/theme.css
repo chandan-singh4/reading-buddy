@@ -169,6 +169,38 @@
   --running-head: 1.5rem;
 
   /*
+   * The book you are holding, at the two side edges of the page.
+   *
+   * `--page-deck` is the channel each stack of paper lives in, and it is a
+   * constant on purpose — the deck's *fill* moves as you read, the space it is
+   * allowed does not. The text is set in columns, and a column box that changed
+   * width would re-decide where every page break falls, repaginating the book
+   * under the reader on every single turn. See `reader/PageDecks.tsx`.
+   *
+   * `--page-gutter` is the soft curve of the sheet into the binding, just
+   * inside the left deck. Wider than the deck because a shadow that ends where
+   * you can see it ending stops being a shadow.
+   */
+  --page-deck: 0.6875rem;
+  --page-gutter: 1.5rem;
+  /* What is left of a deck at its thinnest: the cover and the few sheets that
+     are always there, even on the first page. */
+  --deck-stub: 0.1875rem;
+
+  /*
+   * And what they are made of.
+   *
+   * Written once rather than per theme, unlike the paper tokens, because these
+   * are all shadow — the block of paper is seen edge-on and in its own shade,
+   * so a warm page and a cool one both want the same darkening, only more or
+   * less of it. The dark themes take the one override below.
+   */
+  --paper-gutter: rgb(46 32 16 / 0.15);
+  --deck-body: rgb(46 32 16 / 0.05);
+  --deck-sheet: rgb(46 32 16 / 0.11);
+  --deck-edge: rgb(46 32 16 / 0.1);
+
+  /*
    * The two bars of the reading overlay.
    *
    * Named here because three things have to agree about them: the bars, which
@@ -494,6 +526,15 @@
     --paper-vignette: rgb(0 0 0 / 0.3);
     --paper-spine: rgb(0 0 0 / 0.34);
     --paper-edge: rgb(0 0 0 / 0.22);
+
+    /* On a dark page a shadow cannot be darker than the paper, so the block of
+       sheets is drawn by the *light* catching their edges instead. The gutter
+       is still a shadow, and still black — it is the one place a dark page has
+       something behind it. */
+    --paper-gutter: rgb(0 0 0 / 0.42);
+    --deck-body: rgb(0 0 0 / 0.28);
+    --deck-sheet: rgb(236 236 240 / 0.07);
+    --deck-edge: rgb(236 236 240 / 0.05);
   }
 }
 
@@ -568,6 +609,58 @@
   --paper-vignette: rgb(0 0 0 / 0.3);
   --paper-spine: rgb(0 0 0 / 0.34);
   --paper-edge: rgb(0 0 0 / 0.22);
+
+  /* The same lit-edge treatment the media query above describes, repeated here
+     because a reader on a light-set phone can still choose a dark theme — the
+     media query would not fire for them, and they would get a book bound in
+     shadows that their page is darker than. */
+  --paper-gutter: rgb(0 0 0 / 0.42);
+  --deck-body: rgb(0 0 0 / 0.28);
+  --deck-sheet: rgb(236 236 240 / 0.07);
+  --deck-edge: rgb(236 236 240 / 0.05);
+}
+
+/*
+ * The pale bindings, restated per theme.
+ *
+ * This looks like a duplicate of the defaults in `:root` and is not. The dark
+ * override above is written `:root:not([data-theme='light'])`, which is
+ * specificity (0,2,0), and a bare `:root` is (0,1,0) — so on any phone whose OS
+ * is set to dark, *every* light theme was silently taking the dark book. Cream
+ * paper bound in black. Exactly the trap the vignette fell into, caught the
+ * same way: by reading the computed values back out of a real browser rather
+ * than trusting the file to say what it means.
+ *
+ * Naming each theme puts these at (0,2,0) too, and later in the file, which is
+ * what actually wins. The `:root` copies stay as the sane fallback for a theme
+ * added tomorrow and forgotten here.
+ */
+:root[data-theme='paper'],
+:root[data-theme='light'],
+:root[data-theme='sepia'],
+:root[data-theme='vintage'],
+:root[data-theme='paperback'],
+:root[data-theme='slate'] {
+  --paper-gutter: rgb(46 32 16 / 0.15);
+  --deck-body: rgb(46 32 16 / 0.05);
+  --deck-sheet: rgb(46 32 16 / 0.11);
+  --deck-edge: rgb(46 32 16 / 0.1);
+}
+
+/* Vintage is bound in older, browner board than the rest. */
+:root[data-theme='vintage'] {
+  --paper-gutter: rgb(52 34 12 / 0.22);
+  --deck-body: rgb(52 34 12 / 0.08);
+  --deck-sheet: rgb(52 34 12 / 0.16);
+  --deck-edge: rgb(52 34 12 / 0.14);
+}
+
+/* And Paperback in the newest, which is to say the faintest. */
+:root[data-theme='paperback'] {
+  --paper-gutter: rgb(24 24 30 / 0.1);
+  --deck-body: rgb(24 24 30 / 0.035);
+  --deck-sheet: rgb(24 24 30 / 0.08);
+  --deck-edge: rgb(24 24 30 / 0.07);
 }
 
 /* No texture at all. Every drop of contrast goes to the words. */
@@ -578,6 +671,14 @@
   --paper-vignette: transparent;
   --paper-spine: transparent;
   --paper-edge: transparent;
+  /* Including the binding. This theme is for someone who needs the words to
+     win, and a stack of grey lines beside a paragraph is exactly the kind of
+     ambient decoration it exists to remove. The channel stays reserved so the
+     column width does not change with the theme. */
+  --paper-gutter: transparent;
+  --deck-body: transparent;
+  --deck-sheet: transparent;
+  --deck-edge: transparent;
 }
 
 /*

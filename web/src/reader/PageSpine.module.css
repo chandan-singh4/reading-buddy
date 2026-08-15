@@ -1,0 +1,38 @@
+/*
+ * The curve of the sheet into the binding. See `PageSpine.tsx` for why this
+ * flips with the page and `PageDecks` does not.
+ */
+
+.spine {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  /* Starts where the left deck ends: the sheet begins at the inside face of the
+     binding, not at the edge of the screen. */
+  left: var(--page-deck);
+  width: var(--page-gutter);
+  z-index: 8;
+  pointer-events: none;
+
+  /*
+   * Two stops doing two jobs.
+   *
+   * The first is the crease — a narrow, harder line right at the binding, where
+   * the paper is folded rather than merely bent. The second is the long, soft
+   * falloff of a curved surface turning away from the light, and it has to be
+   * long: a shadow that ends abruptly reads as a drawn line, which is the
+   * failure mode this whole effect is trying to avoid.
+   *
+   * `--paper-gutter` is a theme token, so a dark theme gets a gutter that is
+   * darker than its page rather than a grey smear over a black one. Every value
+   * is low-opacity black or its theme's equivalent — the brief was subtle, and
+   * the test is that you should not be able to point at where it stops.
+   */
+  background-image: linear-gradient(
+    90deg,
+    var(--paper-gutter),
+    color-mix(in srgb, var(--paper-gutter) 55%, transparent) 22%,
+    color-mix(in srgb, var(--paper-gutter) 18%, transparent) 55%,
+    transparent
+  );
+}

@@ -1,0 +1,75 @@
+/*
+ * The block of paper either side of the page. See `PageDecks.tsx` for why the
+ * channel is a constant and only the fill inside it moves.
+ */
+
+.decks {
+  position: fixed;
+  inset: 0;
+  /* Under the spine, which is under the status line. The order matters at the
+     left edge, where all three meet: binding, then the sheet curving into it,
+     then the page number printed on that sheet. */
+  z-index: 7;
+  pointer-events: none;
+}
+
+/*
+ * One deck.
+ *
+ * `width` is the fill, not the channel: the channel is the fixed `--page-deck`
+ * that `.stage` reserves, and the deck grows and shrinks inside it. The stub
+ * is what remains at zero — the cover and the few sheets that are always on
+ * the far side of wherever you are.
+ */
+.left,
+.right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--deck-stub) + var(--fill, 0.5) * (var(--page-deck) - var(--deck-stub)));
+  /*
+   * Sheets, drawn as lines rather than counted as elements.
+   *
+   * A repeating gradient at a sub-pixel pitch gives the texture of many sheets
+   * without a DOM node per sheet — and the number of *drawn* lines then falls
+   * as the deck thins, which is the whole illusion: a thinner stack is not a
+   * narrower block of colour, it is fewer sheets.
+   *
+   * The transition is long and eased because this is ambient information. A
+   * deck that snapped to its new width on every turn would be a thing that
+   * moves in the corner of your eye, which is exactly what you do not want
+   * beside a paragraph you are reading.
+   */
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--deck-sheet) 0 0.5px,
+    transparent 0.5px 2px
+  );
+  transition: width var(--motion-slow, 320ms) var(--ease-standard, ease-out);
+}
+
+.left {
+  left: 0;
+  /* The outer edge of the block is in shadow and the inner edge catches the
+     light, which is what tells the eye this is a solid object seen edge-on
+     rather than a striped border. Mirrored on the right, below. */
+  background-color: var(--deck-body);
+  box-shadow: inset -1px 0 0 var(--deck-edge);
+}
+
+.right {
+  right: 0;
+  background-color: var(--deck-body);
+  box-shadow: inset 1px 0 0 var(--deck-edge);
+}
+
+/*
+ * Nothing to animate for a reader who has asked for less motion — the deck
+ * still moves, it simply arrives rather than travels.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .left,
+  .right {
+    transition: none;
+  }
+}

@@ -11,6 +11,8 @@ import {
   inBookOrder,
   labelFor,
   searchBook,
+  PageDecks,
+  PageSpine,
   RunningHead,
   StatusLine,
   type BookmarkRow,
@@ -1944,6 +1946,16 @@ export default function Reader() {
             token rather than a condition here — see `--running-head`.
           */}
           <RunningHead title={frame.book.title} />
+
+          {/*
+            The book around the page: the two stacks of paper at the side edges,
+            and the shadow of this sheet curving down into the binding. They
+            look like one object and behave like two — the decks hold still
+            because a binding does, and the gutter flips because it belongs to
+            the sheet. `PageSpine.tsx` has the reasoning.
+          */}
+          <PageDecks percent={pages?.percent ?? null} />
+          <PageSpine />
 
           <StatusLine
             manifest={frame.manifest}

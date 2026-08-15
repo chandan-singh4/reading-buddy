@@ -16,6 +16,9 @@ export type { BookmarkRow, ChromeProps, SheetTab } from './Chrome.tsx'
 
 export { StatusLine } from './StatusLine.tsx'
 export type { StatusLineProps } from './StatusLine.tsx'
+export { PageDecks } from './PageDecks.tsx'
+export type { PageDecksProps } from './PageDecks.tsx'
+export { PageSpine } from './PageSpine.tsx'
 export { RunningHead } from './RunningHead.tsx'
 export type { RunningHeadProps } from './RunningHead.tsx'
 
