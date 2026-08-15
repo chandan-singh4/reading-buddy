@@ -330,3 +330,53 @@ describe('anchoring is unaffected in kind', () => {
     })
   })
 })
+
+/*
+ * This rule deletes a line of the book, so what it must *not* delete matters as
+ * much as what it must.
+ */
+describe('a chapter title the book prints twice', () => {
+  const textOf = (book: ReturnType<typeof assembleBook>) =>
+    book.sections.flatMap((section) => section.paragraphs).map((p) => p.text)
+
+  it('drops the echo, since the heading is already the chapter title', () => {
+    const book = assembleBook(
+      htmlToBlocks('<h1>Introduction</h1><p>Introduction</p><p>Lucid dreaming is old.</p>'),
+      meta(),
+    )
+    expect(book.chapters[0].title).toBe('Introduction')
+    expect(textOf(book)).toEqual(['Lucid dreaming is old.'])
+  })
+
+  it('does not care about case or stray punctuation', () => {
+    const book = assembleBook(
+      htmlToBlocks('<h1>Introduction</h1><p>INTRODUCTION.</p><p>Real prose.</p>'),
+      meta(),
+    )
+    expect(textOf(book)).toEqual(['Real prose.'])
+  })
+
+  it('keeps a sentence that merely begins with the chapter name', () => {
+    const book = assembleBook(
+      htmlToBlocks('<h1>Introduction</h1><p>Introduction to a long subject.</p>'),
+      meta(),
+    )
+    expect(textOf(book)).toEqual(['Introduction to a long subject.'])
+  })
+
+  it('leaves a repeat that is not the first thing in the chapter', () => {
+    const book = assembleBook(
+      htmlToBlocks('<h1>Introduction</h1><p>Real prose.</p><p>Introduction</p>'),
+      meta(),
+    )
+    expect(textOf(book)).toEqual(['Real prose.', 'Introduction'])
+  })
+
+  it('still starts the surviving text at the first anchor', () => {
+    const book = assembleBook(
+      htmlToBlocks('<h1>Introduction</h1><p>Introduction</p><p>Real prose.</p>'),
+      meta(),
+    )
+    expect(book.sections[0].paragraphs[0].anchor).toBe('[ch01-s01-p001]')
+  })
+})

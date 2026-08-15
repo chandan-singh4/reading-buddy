@@ -331,14 +331,43 @@
 }
 
 /*
- * A chapter's first section gets the room a title page gets in print. Enough
- * space above that the title is clearly *starting* something rather than
- * continuing it — but not a whole screen of it, because on a phone that would
- * push the first sentence onto page two.
+ * A chapter's first section gets the room a title page gets in print — the
+ * "sink", the band of white a chapter drops from the top of the page before it
+ * begins. Roughly a fifth of the page, which is where print puts it.
+ *
+ * Capped in `rem` as well as measured in `dvh`, and both matter. On a phone a
+ * fifth of the screen is the right amount of air; on a tall desktop window it
+ * is a chapter that starts halfway down for no reason, and the cap stops it. On
+ * a short window `dvh` wins and the first sentence still fits, which is the
+ * failure this was hedging against before: a fixed sink big enough to look
+ * right pushes the opening line onto page two on the smallest screens.
  */
 .opening {
-  margin-top: var(--space-6);
+  margin-top: min(20dvh, 8rem);
   margin-bottom: var(--space-8);
+}
+
+/*
+ * The drop cap — the big opening letter that sits down into the lines beside
+ * it. `.opening + p` is "the first paragraph of a chapter's first section", so
+ * it lands once per chapter and never mid-flow.
+ *
+ * An element selector for the paragraph because `.prose` is declared in
+ * `blocks.module.css` and CSS Modules hashes the two files separately, the same
+ * reason `.header + figure` above is written that way.
+ *
+ * `float` is what makes it a drop cap rather than a big first letter: the
+ * following lines wrap around it instead of one tall line pushing the rest of
+ * the paragraph down. `line-height: 0.8` is doing the sinking — the cap's own
+ * box has to be shorter than the letter for the letter to hang below its line.
+ */
+.opening + p::first-letter {
+  float: left;
+  font-size: 3.1em;
+  line-height: 0.8;
+  padding-top: 0.06em;
+  padding-right: 0.07em;
+  font-weight: 500;
 }
 
 /* "Part Three" — the chapter's own name, said once and quietly, above its

@@ -244,7 +244,62 @@ function groupByHeadings(
     }
   }
 
+  for (const draft of chapters) {
+    dropEchoedTitle(draft.sections[0], draft.title)
+    for (const section of draft.sections) dropEchoedTitle(section, section.title)
+  }
+
   return chapters
+}
+
+// --- A title the book says twice ---------------------------------------------
+
+/**
+ * Compare two lines the way a reader would: is this the same title?
+ *
+ * Loose on purpose. The heading and the echo of it are rarely byte-identical —
+ * one is `INTRODUCTION` and the other `Introduction`, or one carries a stray
+ * non-breaking space or a trailing colon from the template that emitted it. What
+ * survives normalising is the letters and digits, which is the part a reader
+ * would say out loud.
+ */
+function sameLine(a: string, b: string): boolean {
+  const key = (text: string) =>
+    text
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim()
+      .toLowerCase()
+  const left = key(a)
+  return left.length > 0 && left === key(b)
+}
+
+/**
+ * Drop a division's first block when all it does is repeat the division's name.
+ *
+ * A chapter that opens `<h1>Introduction</h1><p>Introduction</p>` is common —
+ * some converters emit the title twice, once as structure and once as the line
+ * that was printed on the page. The heading becomes the chapter's title and
+ * vanishes into the header, so what reaches the reader is the app's own title
+ * followed immediately by the same word again, which reads as a bug because it
+ * is one.
+ *
+ * Only the *first* block, and only an exact match after normalising: a
+ * paragraph that merely begins with the chapter's name is a sentence, not an
+ * echo, and dropping it would delete a line of the book.
+ */
+function dropEchoedTitle(section: DraftSection | undefined, title: string | undefined): void {
+  if (!section || !title) return
+  const first = section.blocks[0]
+  if (!first || first.kind !== 'prose' || !sameLine(first.text, title)) return
+
+  section.blocks.shift()
+  const next = section.blocks[0]
+  if (!next) return
+  // Whatever the dropped line was carrying belongs to the line that takes its
+  // place: ids are what a book's own contents page links to, and `startsPage`
+  // is a page break the source asked for.
+  if (first.ids) next.ids = [...first.ids, ...(next.ids ?? [])]
+  if (first.startsPage) next.startsPage = true
 }
 
 /**

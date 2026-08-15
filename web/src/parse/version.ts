@@ -150,5 +150,16 @@
  *   headings now carry `label: 'subheading'` and their own bare text, which is
  *   the same treatment 16 gave to bold-only headings and which the reading
  *   screen already sets as a small heading.
+ * - **18** — the chapter title said twice. A converter often emits a chapter's
+ *   name both as structure and as the line that was printed on the page:
+ *   `<h1>Introduction</h1><p>Introduction</p>`. The heading becomes the
+ *   chapter's title and moves into the reading screen's header, so what was
+ *   left was the app's own title followed immediately by the same word again.
+ *   A division's first block is dropped when it repeats that division's name
+ *   exactly, letters and digits compared and case ignored. Only the first
+ *   block, and only an exact match: a paragraph that merely opens with the
+ *   chapter's name is a sentence, and dropping it would delete a line of the
+ *   book. Anything the dropped line carried — ids a contents page links to, a
+ *   page break the source asked for — moves to the line that takes its place.
  */
-export const PARSER_VERSION = 17
+export const PARSER_VERSION = 18
