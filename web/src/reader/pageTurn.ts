@@ -105,16 +105,6 @@ export function holdOutgoing(
 const FURNITURE = '[data-page-furniture]'
 
 /**
- * How many children `pageCopy` will look back through for a column boundary.
- *
- * Generous, because looking is cheap once the strip is laid out and the answer
- * is almost always one or two children back — a book breaks a column every few
- * paragraphs. It exists to stop the search walking six thousand children in the
- * one case where there is no boundary to find.
- */
-const REACH = 64
-
-/**
  * A picture, not a page: nothing in a copy may be tapped, focused, found by a
  * search or read out by a screen reader, all of which would be describing
  * something the reader can no longer see. Ids go too — the reading screen looks
@@ -261,11 +251,10 @@ interface PageCopy {
  *
  * ## Two things that have to be exact, or the copy shows the wrong words
  *
- * **Where the text starts.** The copy prefers to begin at a child that begins a
+ * **Where the text starts.** The copy always begins at a child that begins a
  * column in the strip, so its own first column begins in the same state and
- * every break after it falls in the same place. Where no such child is within
- * reach it begins anywhere and makes up the height with a spacer. See
- * `columnTop` for the difference between the two.
+ * every break after it falls in the same place. See `columnTop` for why no
+ * other start works.
  *
  * **Where to scroll it to.** A block child's left edge *is* its column's left
  * edge, so the first kept paragraph's position is a column boundary, and content
@@ -352,42 +341,41 @@ function pageCopy(strip: HTMLElement): PageCopy {
    * sits at the top of the copy's first column exactly as it sits at the top of
    * its own, and every break decision after it is made from the same state.
    *
-   * Returns -1 when there is no such child within `REACH`, and the copy then
-   * falls back to the spacer. A book can go a long way without a paragraph that
-   * happens to land on a boundary, and copying the whole chapter instead is the
-   * stall this work exists to remove.
+   * The search has no limit, and it does not need one. Child 0 is the top of the
+   * strip's first column, so the walk always ends on a boundary. Where a book
+   * goes a long way without one, the copy is longer and the turn is slower —
+   * still bounded by the whole strip, which is what the old fallback copied
+   * anyway. There is no "nearly right" branch left, on purpose: the spacer that
+   * used to fill this role is the fault the reader kept seeing, and the reader
+   * saw it on every font, because the font only moves where the paragraphs land.
    */
   const columnTop = (from: number) => {
-    for (let i = from; i >= 0 && from - i < REACH; i -= 1) {
+    for (let i = from; i > 0; i -= 1) {
       if (Math.abs(below(i)) < 1) return i
     }
-    return -1
+    return 0
   }
 
-  const candidate = Math.max(0, search(strip.scrollLeft - pageWidth) - 1)
-  const aligned = columnTop(candidate)
-  const first = aligned < 0 ? candidate : aligned
+  const first = columnTop(Math.max(0, search(strip.scrollLeft - pageWidth) - 1))
   const last = Math.min(count - 1, search(strip.scrollLeft + pageWidth * 2))
   if (last <= first) return whole()
 
   const node = strip.cloneNode(false) as HTMLElement
 
-  if (aligned < 0) {
-    // No boundary within reach, so hold the first kept child at its own height
-    // down the column with a blank block of exactly that height. Nearly always
-    // right; see `columnTop` for the case where it is not.
-    const spacer = document.createElement('div')
-    spacer.style.height = `${below(first)}px`
-    spacer.setAttribute('aria-hidden', 'true')
-    node.append(spacer)
-  }
-
   for (let i = first; i <= last; i += 1) {
     const child = children[i]!.cloneNode(true) as HTMLElement
-    // A top margin is truncated away at a column break, and it is already
-    // counted inside the spacer's height. Kept, it would push the copy's text
-    // down by that much and break its columns a line early.
-    if (i === first) child.style.marginTop = '0'
+    if (i === first) {
+      // A top margin is truncated away at a column break, and `first` is at one.
+      // Kept, it would push the copy's text down by that much and break its
+      // columns a line early.
+      child.style.marginTop = '0'
+      // The copy's first child has no previous sibling, and the paragraph
+      // indent is written as `.prose + .prose`. So the clone loses its indent,
+      // the first line starts 1.5em further left, and — because that line now
+      // has 1.5em more room — the paragraph can wrap a word early and take the
+      // rest of the page down with it. Carry the real indent across.
+      child.style.textIndent = getComputedStyle(children[i]!).textIndent
+    }
     node.append(child)
   }
 

@@ -64,6 +64,24 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The spacer is gone, and the copy keeps its paragraph indent** — 2026-08-15.
+  The reader saw the re-wrap on the original font as well as on a new one. The
+  font only moves where the paragraphs land, so the font was never the cause.
+  Two causes, both now removed.
+  - **The spacer fallback is deleted.** The search back for a column boundary
+    now has no limit. Child 0 is the top of the first column, so the search
+    always ends on a boundary and the copy always starts at one. A book with few
+    boundaries gives a longer copy and a slower turn, which is still bounded by
+    the whole strip — what the old fallback copied anyway.
+  - **The copy's first child lost its indent.** The indent rule is
+    `.prose + .prose`, and the copy's first child has no previous sibling. So
+    the first line started 1.5em further left, had 1.5em more room, and could
+    wrap a word early — which moves every line after it. The clone now carries
+    the real computed `text-indent`.
+
+  Checked at five scroll positions in both directions: same words, same left,
+  same top. One line on a scaled forward sheet is 1 px out, which cannot change
+  a wrap. The copy stays at 11 children out of 6,001.
 - **The copy starts at a column boundary, and a fast flick turns the page** —
   2026-08-15. Two faults, reported together from the phone.
   - **The sheet pulled a line in from the page before.** A spacer of the right

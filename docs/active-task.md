@@ -208,6 +208,16 @@ already called the blank-back turn beautiful).
   spacer holds the first kept paragraph at its measured top, and that measurement
   is to the border box. The paragraph's own `margin-top` then applies a second
   time. It is set to 0 in the copy.
+- **A cut copy loses every `+` rule on its first child.** The paragraph indent
+  is `.prose + .prose`, so the copy's first child came out flush, its first line
+  had 1.5em more room, and it could wrap a word early — which moves every line
+  after it. Carry the computed `text-indent` onto the clone. Check any other
+  sibling rule before adding one.
+- **Compare the copy against the real page in the page's own band.** The copy is
+  moved by a transform, so its `getBoundingClientRect().left` is not where its
+  visible column is. Read both fingerprints from the strip's rect, or the check
+  compares the page against the copy's column 0 and reports a fault that is not
+  there.
 - **Matching the height above a column break does not match the break.**
   `orphans` and `widows` count the lines on both sides of it, and a spacer is
   not lines. So a copy that starts with a spacer can break one line out and pull
