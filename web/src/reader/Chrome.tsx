@@ -34,6 +34,8 @@ import type { SectionRef } from './navigation.ts'
 import type { Anchor, Manifest } from '../structure/index.ts'
 import type { ReaderSettings } from './readerSettings.ts'
 import { TextSettings } from './TextSettings.tsx'
+import { BookmarksPanel, type BookmarkRow } from './BookmarksPanel.tsx'
+import { NotesPanel, type NoteRow } from './NotesPanel.tsx'
 import { FocusLamp } from './FocusLamp.tsx'
 import styles from './Chrome.module.css'
 
@@ -57,22 +59,11 @@ const SHEET_TITLES: Record<SheetTab, string> = {
 }
 
 /**
- * A bookmark as this component needs it — an id, where it points, what it is
- * called, and which chapter it falls in so the list can group by chapter without
- * re-parsing anchors here.
- *
- * Structural rather than importing `StoredBookmark`: Chrome is presentational
- * and has no business knowing what the database keeps. `chapter` is worked out
- * by the reading page, which already has the manifest open.
+ * The two big panels live in files of their own — they are the size of a screen
+ * each, with state of their own (which row is unfurled, which chip is chosen),
+ * and inlining them is what made this file's Aa sheet a hundred lines of form.
  */
-export interface BookmarkRow {
-  id: string
-  anchor: Anchor
-  label: string
-  chapter: number
-  /** The chapter's own title, for the heading above a run of marks. */
-  chapterTitle: string
-}
+export type { BookmarkRow } from './BookmarksPanel.tsx'
 
 export interface ChromeProps {
   bookTitle: string
@@ -120,6 +111,11 @@ export interface ChromeProps {
   onJumpToBookmark: (anchor: Anchor) => void
   onRenameBookmark: (id: string, label: string) => void
   onDeleteBookmark: (id: string) => void
+
+  /** Every note in this book, yours and the tutor's, in the book's order. */
+  notes: readonly NoteRow[]
+  /** Go to the paragraph a note is about. */
+  onJumpToNote: (anchor: Anchor) => void
 
   /** Whether the search panel is up. */
   searchOpen: boolean
@@ -178,6 +174,8 @@ export function Chrome({
   onJumpToBookmark,
   onRenameBookmark,
   onDeleteBookmark,
+  notes,
+  onJumpToNote,
   searchOpen,
   query,
   results,
@@ -533,88 +531,18 @@ export function Chrome({
             </nav>
           )}
 
-          {/*
-            The marks, under the chapter each one falls in.
-
-            Grouped rather than a flat list because the chapter is the thing a
-            reader remembers ("it was somewhere in the breathing chapter"), and
-            because a run of six marks in one chapter with the chapter repeated
-            six times is six lines of noise. The heading is printed when the
-            chapter changes, which — since `inBookOrder` has already sorted them
-            — is exactly once per chapter.
-          */}
+          {/* The marks, as page-edge tabs. See `BookmarksPanel.tsx`. */}
           {sheetTab === 'bookmarks' && (
-            <div className={styles.sheetPanel}>
-              {bookmarks.length === 0 ? (
-                <p className={styles.empty}>
-                  No bookmarks yet. Tap the top right corner of the page to mark where
-                  you are, the way you’d fold a corner down.
-                </p>
-              ) : (
-                <ul>
-                  {bookmarks.map((bookmark, index) => (
-                    <li key={bookmark.id}>
-                      {bookmark.chapter !== bookmarks[index - 1]?.chapter && (
-                        <p className={styles.bookmarkChapter}>{bookmark.chapterTitle}</p>
-                      )}
-
-                      <div className={styles.bookmarkRow}>
-                        <button
-                          type="button"
-                          className={styles.bookmarkItem}
-                          onClick={() => onJumpToBookmark(bookmark.anchor)}
-                        >
-                          {bookmark.label}
-                        </button>
-
-                        {/*
-                          Rename through the browser's own prompt, deliberately.
-                          An inline editing field inside a sheet that closes on
-                          every navigation is a lot of state to get wrong for a
-                          thing done rarely, and `prompt` is the one dialog that
-                          is already keyboard-accessible, already dismissible,
-                          and already familiar. A cancelled prompt returns null,
-                          which must not be mistaken for "clear the name" — an
-                          empty string is handled by the reading page, which
-                          falls back to the paragraph's opening words.
-                        */}
-                        <button
-                          type="button"
-                          className={styles.bookmarkAction}
-                          aria-label={`Rename ${bookmark.label}`}
-                          onClick={() => {
-                            const named = window.prompt('Name this bookmark', bookmark.label)
-                            if (named !== null) onRenameBookmark(bookmark.id, named)
-                          }}
-                        >
-                          <span aria-hidden="true">✎</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className={styles.bookmarkAction}
-                          aria-label={`Remove ${bookmark.label}`}
-                          onClick={() => onDeleteBookmark(bookmark.id)}
-                        >
-                          <span aria-hidden="true">✕</span>
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <BookmarksPanel
+              bookmarks={bookmarks}
+              onJumpToBookmark={onJumpToBookmark}
+              onRenameBookmark={onRenameBookmark}
+              onDeleteBookmark={onDeleteBookmark}
+            />
           )}
 
-          {sheetTab === 'notes' && (
-            <div className={styles.sheetPanel}>
-              <p className={styles.empty}>
-                Notes and highlights arrive with the tutor — anything you ask about gets
-                saved here, filed by chapter.
-              </p>
-            </div>
-          )}
-
+          {/* The notes, on a ruled sheet. See `NotesPanel.tsx`. */}
+          {sheetTab === 'notes' && <NotesPanel notes={notes} onJumpToNote={onJumpToNote} />}
         </div>
       )}
 

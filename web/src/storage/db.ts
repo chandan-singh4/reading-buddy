@@ -196,6 +196,39 @@ export interface StoredBookmark {
   addedAt: string
 }
 
+/**
+ * Who wrote a note. Two authors, and the reader can always tell which is which.
+ *
+ * Kept as a stored field rather than worked out from the text, because the
+ * whole point of the distinction is that it must not be guessable: a note the
+ * reader wrote and a note the tutor wrote look nothing alike on screen, and a
+ * heuristic that got it wrong would put words in someone's mouth.
+ */
+export type NoteAuthor = 'you' | 'claude'
+
+/**
+ * A note against one paragraph — the reader's own, or the tutor's answer.
+ *
+ * Anchored, not paged, for the reason written out at length on `StoredBookmark`:
+ * the page a note sits on changes with the type size, and the paragraph does
+ * not. Chapter and section come back out of the anchor the same way too, so
+ * they are not copied here.
+ *
+ * Device-local for now. The cloud backend has no notes table, so `Repository`
+ * is deliberately untouched — see `storage/notes.ts` for the whole of that
+ * decision.
+ */
+export interface StoredNote {
+  bookId: BookId
+  id: string
+  /** The paragraph the note is about. */
+  anchor: Anchor
+  author: NoteAuthor
+  text: string
+  /** ISO 8601 — shown on the note, not used for ordering. */
+  createdAt: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -215,6 +248,7 @@ export type ReadingBuddyDB = Dexie & {
   quotes: Table<StoredQuote, [BookId, string]>
   folders: Table<StoredFolder, string>
   bookmarks: Table<StoredBookmark, [BookId, string]>
+  notes: Table<StoredNote, [BookId, string]>
 }
 
 /**
@@ -327,6 +361,10 @@ function defineSchema(db: Dexie): void {
   // bookmarks, which is true of every book there has ever been.
   db.version(10).stores({
     bookmarks: '[bookId+id], bookId',
+  })
+
+  db.version(11).stores({
+    notes: '[bookId+id], bookId',
   })
 }
 

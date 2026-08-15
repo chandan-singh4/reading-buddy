@@ -25,6 +25,15 @@ export type { RunningHeadProps } from './RunningHead.tsx'
 export { bookmarkOn, inBookOrder, labelFor } from './bookmarks.ts'
 export type { BookmarkLike } from './bookmarks.ts'
 
+export { BookmarksPanel } from './BookmarksPanel.tsx'
+export type { BookmarkColor, BookmarksPanelProps } from './BookmarksPanel.tsx'
+
+export { NotesPanel } from './NotesPanel.tsx'
+export type { NoteRow, NotesPanelProps } from './NotesPanel.tsx'
+
+export { groupByChapter, inNoteOrder, NOTE_FILTERS, notesUnder } from './notes.ts'
+export type { NoteFilter, NoteGroup, NoteLike } from './notes.ts'
+
 export { MAX_HITS, MIN_QUERY, searchBook } from './search.ts'
 export type { SearchHit, SearchOutcome } from './search.ts'
 

@@ -1,0 +1,241 @@
+/*
+ * The bookmarks page, after the reader's own prototype.
+ *
+ * The measurements, the colours and the timings are the prototype's, kept to
+ * the number. The one thing changed on purpose: the palette below is declared
+ * *here*, on the panel, rather than on `:root`. These are the tokens of a
+ * paper-coloured page, and the app's own tokens change with the reading theme —
+ * putting them on the root would either fight the theme or quietly become part
+ * of it. Scoped to this panel, they colour this panel and nothing else.
+ */
+
+.panel {
+  --ink: #2b2621;
+  --ink-soft: #6f665c;
+  --ink-faint: #a89e91;
+  --accent: #8a6d3b;
+  --rule: #d8cebd;
+  --paper2: #f4eee2;
+  --hl: rgb(224 183 86 / 45%);
+  --ribbon-a: #9c3b34;
+  --ribbon-b: #3f7d78;
+  --ribbon-c: #8a6d3b;
+  --ribbon-d: #6a4a6e;
+
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 16px 20px;
+  color: var(--ink);
+  font-family: var(--font-reading);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.empty {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/*
+ * A resting row is the edge of a page with a tab clipped to it: bordered on
+ * three sides, square on the right, so the flag reads as sticking out of the
+ * book rather than sitting on a card.
+ */
+.bk {
+  position: relative;
+  overflow: visible;
+  margin: 0 0 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--rule);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  background: var(--paper2);
+  transition:
+    padding-left 0.35s ease,
+    background 0.2s ease;
+}
+
+.bk:hover {
+  background: #efe8d9;
+}
+
+/*
+ * The row is a container and the *head* is the button, rather than the whole
+ * row being one. A button cannot legally hold the Go and Remove buttons that
+ * open inside it, and nesting them anyway is the kind of markup a screen
+ * reader reads back as one unreachable control.
+ */
+.bkHead {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bkHead:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.flag {
+  position: absolute;
+  top: 12px;
+  right: -1px;
+}
+
+.flag span {
+  display: block;
+  padding: 4px 9px 4px 12px;
+  border-radius: 0 4px 4px 0;
+  clip-path: polygon(16% 0, 100% 0, 100% 100%, 16% 100%, 0 50%);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  transition: opacity 0.18s ease;
+}
+
+.fa { background: var(--ribbon-a); }
+.fb { background: var(--ribbon-b); }
+.fc { background: var(--ribbon-c); }
+.fd { background: var(--ribbon-d); }
+
+/*
+ * The ribbon grows down out of the top edge as the row opens — the tail is a
+ * clip-path rather than two triangles, so it stays one element at any height.
+ */
+.ribbon {
+  position: absolute;
+  top: -1px;
+  left: 16px;
+  width: 20px;
+  height: 0;
+  border-radius: 2px 2px 0 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  transform-origin: top;
+  transition: height 0.38s cubic-bezier(0.34, 1.2, 0.44, 1);
+}
+
+.ra { background: var(--ribbon-a); }
+.rb { background: var(--ribbon-b); }
+.rc { background: var(--ribbon-c); }
+.rd { background: var(--ribbon-d); }
+
+.eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.snip {
+  display: block;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.hl {
+  padding: 0.5px 2px;
+  border-radius: 1px;
+  background-color: var(--hl);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.more {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height 0.38s ease,
+    opacity 0.3s ease;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.go {
+  display: inline-block;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.action {
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.go:focus-visible,
+.action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.meta2 {
+  margin: 8px 0 0;
+  color: var(--ink-faint);
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+}
+
+.bk[data-open='true'] {
+  padding-left: 52px;
+  background: #f6f0e2;
+}
+
+.bk[data-open='true'] .flag span {
+  opacity: 0;
+}
+
+.bk[data-open='true'] .ribbon {
+  height: 74px;
+}
+
+.bk[data-open='true'] .more {
+  max-height: 200px;
+  opacity: 1;
+}
+
+/*
+ * Reduced motion snaps rather than slows. The open state is the same shape
+ * either way; only the journey to it is dropped.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .bk,
+  .bkHead,
+  .ribbon,
+  .more,
+  .flag span {
+    transition: none;
+  }
+}

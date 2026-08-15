@@ -16,16 +16,21 @@ import { repository as deviceRepository, type Repository } from './repository.ts
 
 export { DB_NAME, createDb } from './db.ts'
 export type {
+  NoteAuthor,
   ReadingBuddyDB,
   ReadingPosition,
   StoredAsset,
   StoredBookmark,
   StoredChapterIndex,
   StoredFolder,
+  StoredNote,
   StoredQuote,
   StoredSection,
   StoredSource,
 } from './db.ts'
+
+export { createNoteStore, noteStore } from './notes.ts'
+export type { NewNote } from './notes.ts'
 
 export { COVER_ASSET_PATH, FETCHED_COVER_ASSET_PATH, createRepository } from './repository.ts'
 export type { BookAsset, ParsedBook, Repository } from './repository.ts'

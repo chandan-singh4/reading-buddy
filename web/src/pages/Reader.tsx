@@ -10,7 +10,10 @@ import {
   chapterPages,
   chapterTitle,
   inBookOrder,
+  inNoteOrder,
   labelFor,
+  pagesOf,
+  type NoteRow,
   searchBook,
   PageDecks,
   PageSpine,
@@ -73,7 +76,7 @@ import {
 } from '../reader/index.ts'
 import { catchUpOnOpen } from '../app/bookCatchUp.ts'
 import { knownBook, noteReading } from '../app/shelvesAhead.ts'
-import { repository, type StoredBookmark } from '../storage/index.ts'
+import { noteStore, repository, type StoredBookmark, type StoredNote } from '../storage/index.ts'
 import { tryParseAnchor } from '../structure/index.ts'
 import type {
   Anchor,
@@ -459,6 +462,9 @@ export default function Reader() {
    * only ever changed at the same moment the database is.
    */
   const [bookmarks, setBookmarks] = useState<StoredBookmark[]>([])
+
+  /** The notes on this book — yours and the tutor's. Loaded once, like marks. */
+  const [notes, setNotes] = useState<StoredNote[]>([])
 
   // There was an `ends` state here — whether this section had pages left either
   // way — and it existed solely to grey out the Previous and Next buttons. With
@@ -893,6 +899,28 @@ export default function Reader() {
    * rebuilt each time the reader turns a page.
    */
   const chapterStartPages = useMemo(() => (spine ? chapterPages(spine) : null), [spine])
+
+  /**
+   * The page a bookmark or a note sits on — the number on a bookmark's flag.
+   *
+   * **Section-granular, and knowingly so.** The exact page needs the words
+   * *inside* the section counted up to that paragraph, and that needs the
+   * section's text loaded. A reader with marks in nine chapters would have the
+   * app fetch nine chapters to draw one list. So this answers with the page the
+   * mark's section opens on: right in a book whose chapters are one section
+   * each, and a page or two early in a long one. The mark itself is unaffected
+   * — it is an anchor, and tapping it lands on the exact paragraph.
+   *
+   * `null` for a book with no word counts, and for an anchor that cannot be
+   * parsed. The panels then simply show no number.
+   */
+  const pageOfAnchor = useCallback(
+    (parts: { chapter: number; section: number } | null | undefined): number | null => {
+      if (!spine || !parts) return null
+      return pagesOf(spine, { chapter: parts.chapter, section: parts.section }).page
+    },
+    [spine],
+  )
 
   /**
    * Go to a paragraph — what following a link does.
@@ -1916,16 +1944,65 @@ export default function Reader() {
   const bookmarkRows: BookmarkRow[] = useMemo(() => {
     if (frame.status !== 'ready') return []
     return inBookOrder(bookmarks).map((row) => {
-      const chapter = tryParseAnchor(row.anchor)?.chapter ?? 0
+      const parts = tryParseAnchor(row.anchor)
+      const chapter = parts?.chapter ?? 0
       return {
         id: row.id,
         anchor: row.anchor,
         label: row.label,
         chapter,
         chapterTitle: chapterTitle(frame.manifest, chapter) ?? 'Elsewhere',
+        page: pageOfAnchor(parts),
+        savedAt: row.addedAt,
       }
     })
-  }, [bookmarks, frame])
+  }, [bookmarks, frame, pageOfAnchor])
+
+  /*
+   * ## Notes (WP-25, ahead of the tutor)
+   *
+   * Loaded once per book, exactly as the marks are, and for the same reason:
+   * the list belongs to the book, not to the section on screen.
+   *
+   * They come from `noteStore` rather than `repository` — see
+   * `storage/notes.ts` for why the cloud backend does not carry them yet.
+   */
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+
+    void noteStore
+      .listNotes(id)
+      .then((rows) => {
+        if (!cancelled) setNotes(rows)
+      })
+      .catch(() => {
+        // An empty page is the honest fallback. Reading carries on regardless.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  /** The notes as the panel wants them: in the book's order, placed and named. */
+  const noteRows: NoteRow[] = useMemo(() => {
+    if (frame.status !== 'ready') return []
+    return inNoteOrder(notes).map((row) => {
+      const parts = tryParseAnchor(row.anchor)
+      const chapter = parts?.chapter ?? 0
+      return {
+        id: row.id,
+        anchor: row.anchor,
+        author: row.author,
+        text: row.text,
+        chapter,
+        chapterTitle: chapterTitle(frame.manifest, chapter) ?? 'Elsewhere',
+        page: pageOfAnchor(parts),
+        createdAt: row.createdAt,
+      }
+    })
+  }, [notes, frame, pageOfAnchor])
 
   /*
    * ## In-book search (WP-14)
@@ -2109,6 +2186,8 @@ export default function Reader() {
             onJumpToBookmark={jumpToAnchor}
             onRenameBookmark={renameBookmark}
             onDeleteBookmark={deleteBookmark}
+            notes={noteRows}
+            onJumpToNote={jumpToAnchor}
             searchOpen={searchOpen}
             query={query}
             results={results}

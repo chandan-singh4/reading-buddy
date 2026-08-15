@@ -150,6 +150,22 @@ function turnFocusOn() {
   fireEvent.click(screen.getByRole('button', { name: 'Focus mode' }))
 }
 
+/**
+ * A bookmark row, by the passage it holds.
+ *
+ * A resting row reads "The Beginning · p.1 · The opening words." — the place
+ * and then the passage — so the name has to be matched at its end. Matching the
+ * passage alone would also catch the row's own Rename and Remove buttons.
+ */
+function markRow(passage: string) {
+  return screen.getByRole('button', { name: new RegExp(`p\\.\\d+\\s*${passage}$`) })
+}
+
+/** Unfurl a row, which is what puts Go, Rename and Remove on screen. */
+function openMark(passage: string) {
+  fireEvent.click(markRow(passage))
+}
+
 /** The sheet showing a named panel, for scoping a query inside it. */
 function sheet(name: string) {
   return within(screen.getByRole('dialog', { name }))
@@ -524,7 +540,7 @@ describe('the top bar and its menu', () => {
     expect(screen.getByText(/top right corner/)).toBeTruthy()
 
     openSheetAt('Notes')
-    expect(screen.getByText(/Notes and highlights arrive/)).toBeTruthy()
+    expect(screen.getByText(/No notes yet/)).toBeTruthy()
 
     // The chapter list must still be reachable to come back to.
     openSheetAt('Contents')
@@ -584,9 +600,11 @@ describe('bookmarks', () => {
     // Scoped to the panel: the chapter title is also printed elsewhere on the
     // reading screen, and an unscoped match would pass without the list.
     const panel = sheet('Bookmarks')
-    expect(panel.getByRole('button', { name: 'The opening words.' })).toBeTruthy()
-    // Filed under the chapter it falls in, not listed loose.
-    expect(panel.getByText('The Beginning')).toBeTruthy()
+    // The row says where it is and what it says: the chapter, the page the
+    // mark falls on, and the passage itself.
+    expect(
+      panel.getByRole('button', { name: /The Beginning · p\.1\s*The opening words\.$/ }),
+    ).toBeTruthy()
   })
 
   it('takes the mark off again when the ribbon is tapped twice', async () => {
@@ -614,7 +632,7 @@ describe('bookmarks', () => {
     await screen.findByText('The opening words.')
 
     openSheetAt('Bookmarks')
-    expect(await screen.findByRole('button', { name: 'The opening words.' })).toBeTruthy()
+    expect(markRow('The opening words.')).toBeTruthy()
   })
 
   it('goes to the marked place when the mark is tapped', async () => {
@@ -633,7 +651,9 @@ describe('bookmarks', () => {
     await screen.findByText('The opening words.')
 
     openSheetAt('Bookmarks')
-    fireEvent.click(screen.getByRole('button', { name: 'The second chapter begins.' }))
+    // Unfurl the row, then take the way back it offers.
+    openMark('The second chapter begins.')
+    fireEvent.click(screen.getByRole('button', { name: /^Go to page/ }))
 
     expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
   })
@@ -646,19 +666,21 @@ describe('bookmarks', () => {
 
     openSheetAt('Bookmarks')
 
+    openMark('The opening words.')
+
     const prompt = vi.spyOn(window, 'prompt').mockReturnValue('Where I stopped')
     fireEvent.click(screen.getByRole('button', { name: /^Rename/ }))
-    expect(await screen.findByRole('button', { name: 'Where I stopped' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /p\.\d+\s*Where I stopped$/ })).toBeTruthy()
 
     // Cleared, not cancelled: the reader wants the default back, not a blank row.
     prompt.mockReturnValue('   ')
     fireEvent.click(screen.getByRole('button', { name: /^Rename/ }))
-    expect(await screen.findByRole('button', { name: 'Where I stopped' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /p\.\d+\s*Where I stopped$/ })).toBeTruthy()
 
     // Cancelled: nothing changes at all.
     prompt.mockReturnValue(null)
     fireEvent.click(screen.getByRole('button', { name: /^Rename/ }))
-    expect(screen.getByRole('button', { name: 'Where I stopped' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /p\.\d+\s*Where I stopped$/ })).toBeTruthy()
     prompt.mockRestore()
   })
 

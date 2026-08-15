@@ -184,6 +184,48 @@
     format('woff2-variations');
 }
 
+/* --- Caveat --------------------------------------------------------------- */
+/*
+ * The handwriting on the notes page. Not a reading face and never offered as
+ * one: it sets the reader's *own* notes, so that a note they wrote and a note
+ * the tutor wrote can never be mistaken for each other at a glance.
+ *
+ * Latin only, as everywhere here — the package also carries Cyrillic.
+ * SIL Open Font License 1.1; the licence ships in the package.
+ */
+
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('@fontsource-variable/caveat/files/caveat-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+/* --- Kalam ---------------------------------------------------------------- */
+/*
+ * The second hand, for the small chapter tag above a note — a marker rather
+ * than a pen, so the tag reads as an annotation and not as part of the note.
+ * Static, so 400 and 700 are two files. SIL Open Font License 1.1.
+ */
+
+@font-face {
+  font-family: 'Kalam';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@fontsource/kalam/files/kalam-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Kalam';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('@fontsource/kalam/files/kalam-latin-700-normal.woff2') format('woff2');
+}
+
 /* --- Libre Caslon Text --------------------------------------------------- */
 /*
  * Caslon is the face English books were set in for two centuries — the one the

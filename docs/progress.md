@@ -64,6 +64,26 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **Bookmarks and Notes are real panels now** — 2026-08-15, build green, **1335
+  tests across 77 files**. Both come from the prototype `bookmarks_notes_v2.html`.
+  - `reader/BookmarksPanel.tsx` — each mark rests as a page-edge tab with a
+    coloured number flag. One tap unfurls it: the flag fades, a ribbon grows
+    down, and the row shows the passage, `Go to page N`, Rename and Remove.
+    Only one row opens at a time. `prefers-reduced-motion` snaps instead.
+  - `reader/NotesPanel.tsx` — a ruled sheet. Your notes are handwriting in
+    Caveat. Claude's notes are a typeset slip taped on the page. The two can
+    never be confused. Chips filter: All, Yours, Claude, By chapter. **By
+    chapter groups, it does not hide.**
+  - Both mount in `reader/Chrome.tsx`, in the browse page, behind the existing
+    tab row. No other screen changed and no design token changed.
+  - `reader/notes.ts` holds the pure decisions: book order, chip filters and
+    chapter grouping. Tested on its own.
+  - **Notes needed a store; there was none.** `repository.setNotes` is one free
+    text field on the book. A `notes` table went in at Dexie `version(11)`,
+    behind `storage/notes.ts`. It is **device-local only** — the cloud backend
+    has no notes table, so `Repository` stays untouched.
+  - Caveat and Kalam are self-hosted woff2 from `@fontsource`. No CDN. The OFL
+    text is in `web/public/licenses/fonts.md`.
 - **Contents, Bookmarks and Notes are a page now, with page numbers** —
   2026-08-15, proven by tests. The ⋮ opened a dropdown, and the dropdown opened
   a sheet two thirds of a screen tall. It opens the page directly at Contents.

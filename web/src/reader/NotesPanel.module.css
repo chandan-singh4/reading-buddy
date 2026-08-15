@@ -1,0 +1,227 @@
+/*
+ * The notes page, after the reader's own prototype: a ruled sheet with a red
+ * margin line, your handwriting on the rules, and the tutor's answers taped on
+ * as printed slips.
+ *
+ * The two authors must never be confusable, and that is the whole design. Your
+ * notes are a pen on paper — Caveat, blue ink, sitting on the rules. Claude's
+ * are a printed slip stuck to the page — lilac, boxed, tape at the top, a
+ * label. There is no state in which one could be mistaken for the other, at any
+ * size, in any theme.
+ *
+ * The palette is declared on the panel rather than on `:root` — same reasoning
+ * as `BookmarksPanel.module.css`.
+ */
+
+.panel {
+  --ink: #2b2621;
+  --ink-soft: #6f665c;
+  --ink-faint: #a89e91;
+  --accent: #8a6d3b;
+  --rule: #d8cebd;
+  --paper2: #f4eee2;
+  --pen: #26407a;
+  --pen2: #9c3b34;
+  --claude: #7a5cc0;
+
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--ink);
+}
+
+/* --- The chips ------------------------------------------------------------ */
+
+.filter {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 14px 10px;
+  font-family: var(--font-ui);
+}
+
+.chip {
+  padding: 5px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: var(--paper2);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- The sheet ------------------------------------------------------------ */
+
+/*
+ * The rules are a repeating gradient rather than drawn elements, so a note of
+ * any length sits on them without anything having to count lines. 32px is the
+ * line height the handwriting is set to; the two must stay equal or the ink
+ * drifts off the rule down the page.
+ */
+.sheet {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 20px 46px;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 31px, rgb(120 140 190 / 22%) 31px 32px),
+    #fbf7ee;
+}
+
+.sheet::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 32px;
+  width: 1.5px;
+  background: rgb(180 70 60 / 50%);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.empty {
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.note {
+  margin-bottom: 20px;
+}
+
+.tag {
+  display: block;
+  color: var(--pen2);
+  font-family: Kalam, cursive;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* --- Your hand ------------------------------------------------------------ */
+
+.hand {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--pen);
+  font-family: Caveat, cursive;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 31px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* --- Claude's slip -------------------------------------------------------- */
+
+.slip {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 6px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid #ddd3f0;
+  border-left: 3px solid var(--claude);
+  border-radius: 3px;
+  background: #f2eef8;
+  box-shadow: 1px 2px 6px rgb(60 48 28 / 10%);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The tape. */
+.slip::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 22px;
+  width: 46px;
+  height: 14px;
+  background: rgb(255 255 255 / 55%);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  transform: rotate(-3deg);
+}
+
+.slip:focus-visible {
+  outline: 2px solid var(--claude);
+  outline-offset: 2px;
+}
+
+.who {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--claude);
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.txt {
+  display: block;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* --- Chapter dividers ----------------------------------------------------- */
+
+/*
+ * Only drawn in "By chapter" mode. Set in the interface face and not the hand,
+ * so a heading can never be read as something someone wrote.
+ */
+.divider {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+.group {
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
