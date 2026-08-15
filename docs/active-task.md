@@ -8,77 +8,68 @@
 
 ---
 
-## In flight — the page curl, rebuilt on a bitmap
+## Done, awaiting the phone — the page curl, rebuilt so it cannot stall
 
-**The reader has asked for this explicitly** (2026-08-15): put the finger-tracked
-curl back, built so it cannot stall the phone. Everything below the "The math"
-heading is already written, shipped and tested — this task is *only* about what
-the sixteen strips are made of.
+**The reader asked for this explicitly** (2026-08-15): put the finger-tracked
+curl back, built so it cannot stall the phone. It is built, measured and shipped.
+`DRAG_TURNS` is gone — the curl is simply on. What is left is the reader's own
+eyes on a phone, which is the only place a gesture can be judged.
 
-### What is already done and must not be re-derived
+### What was wrong, measured rather than reasoned
 
-- **The paper darkening is shipped and signed off.** `#e6ded1` on
-  `:root[data-theme='paper']`. Closed.
-- **`pageCurl.ts` and its tests are shipped and correct.** The geometry, the
-  shading, the release physics — all of it. Do not touch the maths.
-- **The curl is switched off, not removed.** `DRAG_TURNS = false` in
-  `Reader.tsx`. Every handler, `beginDrag`, `settleDrag`, `dropDrag` and the
-  safety nets are wired and working behind that one boolean.
-- **Two bugs from the first attempt are fixed and shipped**: `clearSheets` plus
-  `setTimeout` backstops on both teardowns (`3992b8e`), and the reopen-early bug
-  (`12df7e1` — `settleOn` now follows the layout until `scrollWidth` holds still,
-  which the reader has confirmed on the phone).
-
-### The one thing wrong, measured
-
-`beginDrag` builds the sheet from `STRIPS` (16) copies, and a copy is
+`beginDrag` built the sheet from `STRIPS` (16) copies, and a copy was
 `cloneNode(true)` of the **whole laid-out section** — the entire chapter as a
-multi-column strip thousands of columns wide. Each copy must be laid out before
-it can be drawn, so a drag costs one full section layout × 16, synchronously, on
-the first millimetre of the swipe.
+multi-column strip thousands of columns wide.
 
-Measured in a real browser, on a single-section book of 6,003 nodes / 2,542
-pages: **one clone 1,923 ms; one drag start 24,583 ms** of blocked main thread
-and **102,300 DOM nodes**. Heap grew 0.6 MB, so it is layout and render, not
-objects. Sixteen × 1,923 ≈ 30,763 — exactly linear, so lowering `STRIPS` divides
-the problem rather than solving it. On the phone this is the "Aw, Snap!" renderer
-OOM the reader hit on a 1,583-page atlas, and it is why taps did nothing: they
+On a single-section book of 6,003 nodes / 2,542 pages: **one drag = 24,583 ms**
+of blocked main thread and **102,300 DOM nodes**. On the phone that is the
+"Aw, Snap!" renderer OOM the reader hit, and it is why taps did nothing — they
 were queued behind a thread that never came back.
 
-### The rebuild
+**The bitmap route was considered and rejected.** A split experiment settled it:
+`cloneNode(true)` of the whole section costs **7 ms**; inserting it and laying it
+out costs **1,529 ms**. Copying was never the expense, so replacing the copy with
+a raster would have solved the cheap half. The expense is *how much* gets laid
+out, and the fix is to lay out less.
 
-Snapshot the visible page **once** to a bitmap, then give the sixteen bands that
-same image at sixteen `background-position` offsets. One rasterise, one decode,
-**no layout and no DOM clones** — the cost stops depending on the section's size,
-which is the whole point.
+### What was built
 
-The strips then carry `background-image` instead of children; every transform,
-angle, blank and shadow value comes from `pageCurl.ts` unchanged.
+Three changes, in the order they were found:
 
-**Done when:**
-- Starting a drag on the 2,542-page test book blocks the main thread for **under
-  50 ms** (it is 24,583 ms today). Measure it, do not assume it.
-- `DRAG_TURNS` is `true` and deleted as a flag.
-- Every acceptance line from the original task, below, still holds.
+1. **`pageCopy` cuts the copy down** to the pages around the one on screen —
+   typically 7 children out of 6,001. A binary search over the children's left
+   edges finds the window, a spacer holds the first one at its true height, and
+   `shift` records how many content pixels were cut so the scroll position still
+   lands on the right page. Editing a detached node is free; the browser lays out
+   nothing until it is inserted. Whole-strip fallback whenever anything is
+   unmeasurable, so jsdom and a zero-width strip both still work.
+2. **`measureSheet` reads every rectangle once**, before the first sheet exists,
+   and `place` is handed the answer instead of asking for it. Sixteen bands used
+   to interleave sixteen reads with sixteen insertions, and each read forced a
+   full relayout.
+3. **The copy is moved with a transform, not a scroll.** This was the big one and
+   it was not the one predicted: `scrollLeft` on sixteen copies cost **165 ms of
+   the remaining 200 ms**. A scroll is a write the browser must lay out to
+   honour, and it cannot batch sixteen. A transform is not a layout at all. The
+   copy is `overflow: visible` now and the sheet around it clips.
 
-### Decide early, before writing the snapshot
+### Measured after, on the same 2,542-page book
 
-`html2canvas`-style rasterising in JS would be as slow as the clones. The cheap
-routes, in the order worth trying:
+| | before | after |
+|---|---|---|
+| drag start, main thread | 24,583 ms | **56–76 ms** (incl. a forced full flush) |
+| DOM nodes added | 102,300 | ~90 |
 
-1. **Reuse one clone, not sixteen.** Strictly: build the existing copy *once*,
-   then have the sixteen bands be sixteen `clip-path`/`overflow` windows onto
-   that single element. This is a much smaller change than a bitmap and drops the
-   cost 16× on its own (~1.9 s — still too slow on this book, but it proves the
-   direction and may be enough on ordinary books).
-2. **`element.getBoundingClientRect` + an SVG `foreignObject` data-URI** — one
-   serialise, one decode, then sixteen `background-position`s off the one image.
-   Watch for tainted canvases with the atlas's images.
-3. Snapshot **only the visible page**, never the section. This is the real lever
-   in every variant: the reader can only see one column.
+**360× faster**, and nothing leaks — the node count returns to 6,074 after five
+consecutive drags. The <50 ms target is narrowly missed; what is left is the
+binary search's own first rectangle read (~15 ms) and one real layout of the
+sixteen small sheets. Both scale with the *page*, not the chapter, which was the
+invariant that mattered.
 
-Whichever wins, the invariant to hold onto: **cost must not scale with section
-length.** If a candidate still reads the whole chapter, it is the same bug.
+### What still needs the reader
+
+- The curl on a real phone: the shape, the shadow, the snap-back, the tempo.
+- The 1,583-page atlas that crashed. It is the proof this is closed.
 
 ### The original acceptance criteria, unchanged
 
@@ -165,26 +156,25 @@ Completion is an ease-out to 1; snap-back is a critically damped spring
 
 ### Files in scope
 
-- `web/src/reader/pageTurn.ts` — **the only file that really changes.** `place()`
-  (~147) is the `cloneNode(true)` to replace; `fillSheet` and `beginDrag` are its
-  callers. `copyOf`, the furniture concealment, `clearSheets` and both backstops
-  stay exactly as they are.
-- `web/src/reader/pageCurl.ts` — **read, do not edit.** Pure maths, fully tested;
-  the rebuild consumes it unchanged.
-- `web/src/pages/Reader.tsx` — `DRAG_TURNS` (~top of file) and the pointer
-  handlers on the `<article>`. Nothing else should need touching.
-- `web/src/reader/index.ts` — the barrel, if the snapshot gains an export.
-- `web/src/reader/pageTurn.test.ts` — the sheet-contents and sweep tests; a
-  bitmap sheet has no text in it, so the "carries the page number with it" test
-  will need re-stating in terms of what the sheet is now made of.
-- `web/src/pages/Reader.module.css` — only if the bands need new painting rules.
+- `web/src/reader/pageTurn.ts` — where all of it lives. `pageCopy` (the cut),
+  `measureSheet` (the rectangles), `place` (the transform), `fillSheet` and
+  `beginDrag` (the callers). `clearSheets` and both `setTimeout` backstops stay
+  exactly as they are.
+- `web/src/reader/pageCurl.ts` — **read, do not edit.** Pure maths, fully tested,
+  consumed unchanged.
+- `web/src/pages/Reader.tsx` — the pointer handlers on the `<article>` and
+  `settleOn`. `DRAG_TURNS` is deleted; a comment says why it existed.
+- `web/src/reader/pageTurn.test.ts` — sheet contents, the sweep backstops, and
+  the two new tests for the cut and the transform.
+- `web/src/pages/Reader.module.css` — `touch-action: none`, and only if the bands
+  need new painting rules.
 
-**Known, real, and deliberately not in this task:** `withinHere` never reaches
-the page number — `pages` is derived from `wordsAt(..., anchorHere)` alone
-(`Reader.tsx` ~804). So reading deep into one long paragraph leaves the number
-standing still even though the app knows you have moved. The fix changes what
-the page slider *means* (base + offset, which the slider then can't round-trip
-exactly), so it wants its own task and the reader's opinion, not a quiet patch.
+**Also fixed in this thread and no longer open:** `withinHere` now reaches the
+page number. `wordsAt` takes it as `pagesInto` and converts at `WORDS_PER_PAGE`,
+which is exact rather than approximate because in this model that constant *is*
+the definition of a page. The offset goes into the word total, not onto the
+finished page number, so the page, the percentage and the chapter countdown all
+move together instead of disagreeing.
 
 Out of scope: the maths, the other nine themes, Stats, and mirrored show-through
 text on the back of the sheet (the back stays blank paper — the reader has
@@ -209,6 +199,12 @@ already called the blank-back turn beautiful).
   section of 8 nodes / 2 pages and looked instant. Import a deliberately large
   single-section book — 6,000 paragraphs, ~2.5 M characters — and time
   `beginDrag` with `performance.now()` before believing any of it.
+- **Setting `scrollLeft` is a layout, and sixteen of them is sixteen layouts.**
+  This was 165 ms of a 200 ms turn and it was found by decomposition, not by
+  reading the code — the theory going in blamed the rectangle reads, which turned
+  out to be a tenth of it. **Insertion looks free and is not**: the browser defers
+  the layout, so the cost lands on whatever reads or scrolls next. Time a forced
+  `document.body.getBoundingClientRect()` or the number is fiction.
 - **Do not measure a leak in the preview pane.** It delivers zero frames, so
   every sheet strands there and it cannot tell a real leak from its own artefact.
   This cost a round and nearly shipped a wrong root cause.
@@ -452,5 +448,3 @@ so a future session recognises them as decisions rather than loose ends.
 - **Never import a `@fontsource` package's own CSS.** It pulls every alphabet it
   ships into `dist/`, and the service worker then precaches all of it. Name the
   Latin `.woff2` by hand in `styles/fonts.css`, as the existing faces do.
-</content>
-</invoke>

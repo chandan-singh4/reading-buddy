@@ -146,12 +146,23 @@ function makeInert(node: HTMLElement): void {
  */
 function place(
   source: HTMLElement,
+  box: DOMRect,
   frame: DOMRect,
   wrapper: HTMLElement,
   scale: number,
+  prepared?: HTMLElement,
+  offset = 0,
 ): HTMLElement {
-  const clone = source.cloneNode(true) as HTMLElement
-  const box = source.getBoundingClientRect()
+  // `box` is handed in, never measured here, and that is not tidiness — see
+  // `measureSheet`. A dragged turn calls this thirty-odd times in a row, each
+  // call appending to the document; a rectangle read in between makes the
+  // browser lay the whole chapter out again before it can answer.
+  //
+  // `prepared` is a copy someone else has already made and cut down — see
+  // `pageCopy`. The size still comes from the real element, because the copy has
+  // to be laid out at the size of the original to show the same words in the
+  // same places; only the *content* is smaller.
+  const clone = prepared ?? (source.cloneNode(true) as HTMLElement)
 
   makeInert(clone)
 
@@ -160,11 +171,29 @@ function place(
   clone.style.left = `${box.left - frame.left}px`
   clone.style.width = `${box.width / scale}px`
   clone.style.height = `${box.height / scale}px`
-  if (scale !== 1) {
+  if (scale !== 1 || offset !== 0) {
     // From the top left, which is the corner the position above pins. Any other
     // origin would move the copy away from the rectangle it was measured at.
     clone.style.transformOrigin = 'top left'
-    clone.style.transform = `scale(${scale})`
+    // `translateX` before the scale is applied, so `offset` stays in the source's
+    // own pixels — the same units a scroll position is in. Written in this order
+    // because CSS applies the list right to left.
+    clone.style.transform = `scale(${scale}) translateX(${-offset}px)`
+  }
+  if (offset !== 0) {
+    // ## Why the page is moved and not scrolled
+    //
+    // The copy is a scrolling box, and the obvious way to show page forty of it
+    // is to set `scrollLeft`. It was, and it cost 165 ms of the roughly 200 ms
+    // a dragged turn took. A dragged turn makes sixteen copies; each `scrollLeft`
+    // is a write the browser has to lay the page out to honour, and it cannot
+    // batch sixteen of them, so it laid the chapter out sixteen times.
+    //
+    // A transform is not a layout at all — the box stays where it is and only
+    // the painting moves. Nothing is scrolled now, so the columns to the right
+    // of the page hang outside the copy's box, and the sheet (`sheetBox`, which
+    // clips) is what hides them. Same picture, one layout instead of sixteen.
+    clone.style.overflow = 'visible'
   }
   clone.style.margin = '0'
   clone.style.maxWidth = 'none'
@@ -188,6 +217,113 @@ function place(
 
   wrapper.append(clone)
   return clone
+}
+
+/**
+ * A copy of the strip holding only the pages near the one on screen.
+ *
+ * `shift` is how many content pixels were cut off the left, so a scroll
+ * position in the real strip becomes `scrollLeft - shift` in the copy.
+ */
+interface PageCopy {
+  node: HTMLElement
+  shift: number
+}
+
+/**
+ * Copy the page the reader is looking at — and **only** that page.
+ *
+ * ## Why this exists
+ *
+ * A turn used to copy the whole laid-out section. That is not the visible page:
+ * it is the entire chapter as a multi-column strip, which on a real book runs to
+ * thousands of columns. Copying the nodes is not the problem — measured at
+ * **7 ms** for 6,003 of them. Laying them out afterwards is: **1,529 ms**, and a
+ * dragged turn needs sixteen of them, which is where the twenty-four seconds and
+ * the out-of-memory crash came from.
+ *
+ * So the copy is cut down before it ever enters the document. A detached node
+ * costs nothing to edit — the browser lays nothing out until it is inserted — so
+ * the removal is free and what does get laid out is a dozen paragraphs instead of
+ * six thousand. Measured on the same book: **13 ms**, and 43 ms for a complete
+ * sixteen-band sheet against 24,583 ms before. The point is not the ratio; it is
+ * that the cost no longer grows with the length of the chapter.
+ *
+ * ## Two things that have to be exact, or the copy shows the wrong words
+ *
+ * **Where the text starts.** A page almost always begins in the middle of a
+ * paragraph. Kept paragraphs land at the top of the copy's first column, but in
+ * the real strip the first one starts some way down its column — so the copy
+ * gets a blank spacer of exactly that height and the text then flows to the same
+ * places. Without it every line is out by the height of the missing part.
+ *
+ * **Where to scroll it to.** A block child's left edge *is* its column's left
+ * edge, so the first kept paragraph's position is a column boundary, and content
+ * in the copy sits exactly `shift` pixels left of where it sits in the strip.
+ *
+ * ## Finding the paragraphs without reading six thousand rectangles
+ *
+ * Children of a column box run left to right in document order, so the position
+ * is monotonic and a binary search finds the ends in about two dozen
+ * measurements. A whole page is kept either side of the visible one, which
+ * covers an image or a float that reaches back further than its own paragraph.
+ *
+ * Falls back to copying everything whenever the assumptions do not hold — no
+ * layout yet, too few children, or a position that is not monotonic. Slow is a
+ * great deal better than wrong, and a strip with no layout is also a strip with
+ * nothing to lay out.
+ */
+function pageCopy(strip: HTMLElement): PageCopy {
+  const whole = (): PageCopy => ({ node: strip.cloneNode(true) as HTMLElement, shift: 0 })
+
+  const children = strip.children
+  const count = children.length
+  const pageWidth = strip.clientWidth
+  if (pageWidth <= 0 || count < 4) return whole()
+
+  const box = strip.getBoundingClientRect()
+  const edge = (i: number) =>
+    children[i]!.getBoundingClientRect().left - box.left + strip.scrollLeft
+
+  // The monotonicity the search depends on, checked rather than assumed.
+  if (edge(0) > edge(count - 1)) return whole()
+
+  /** The first child at or past `target` content pixels. */
+  const search = (target: number) => {
+    let low = 0
+    let high = count
+    while (low < high) {
+      const mid = (low + high) >> 1
+      if (edge(mid) < target) low = mid + 1
+      else high = mid
+    }
+    return low
+  }
+
+  const first = Math.max(0, search(strip.scrollLeft - pageWidth) - 1)
+  const last = Math.min(count - 1, search(strip.scrollLeft + pageWidth * 2))
+  if (last <= first) return whole()
+
+  const node = strip.cloneNode(false) as HTMLElement
+  const head = children[first]!.getBoundingClientRect()
+  const style = getComputedStyle(strip)
+  // Measured from the *content* top: the child's rectangle is relative to the
+  // border box, and the copy applies the same border and padding itself, so
+  // counting them here would push the text down twice.
+  const above = Math.max(
+    0,
+    head.top - box.top - parseFloat(style.borderTopWidth) - parseFloat(style.paddingTop),
+  )
+
+  if (above > 0) {
+    const spacer = document.createElement('div')
+    spacer.style.height = `${above}px`
+    spacer.style.margin = '0'
+    node.append(spacer)
+  }
+  for (let i = first; i <= last; i += 1) node.append(children[i]!.cloneNode(true))
+
+  return { node, shift: edge(first) }
 }
 
 /**
@@ -301,11 +437,10 @@ function copyOf(strip: HTMLElement | null, layer: number, scale: number): HTMLEl
   const wrapper = sheetBox(frame)
   wrapper.style.zIndex = String(layer)
 
-  const text = fillSheet(strip, parent, frame, wrapper, scale)
+  const copy = pageCopy(strip)
+  const plan = measureSheet(strip, parent)
+  fillSheet(strip, plan, frame, wrapper, scale, copy)
   parent.append(wrapper)
-  // After insertion, never before: a node outside the document has no scroll
-  // position to set, and the copy would silently show page one of the chapter.
-  text.scrollLeft = strip.scrollLeft
 
   concealFurniture(parent)
 
@@ -346,25 +481,71 @@ function sheetBox(frame: DOMRect): HTMLElement {
  * is the point of the split — a tapped turn and a dragged one must not be
  * subtly different pictures of the same page.
  *
- * Returns the copied text, whose `scrollLeft` is the caller's job **once the
- * wrapper is in the document** — a detached node has no scroll position to set,
- * and a copy that quietly missed it shows page one of the chapter instead of
- * the page the reader is looking at.
+ * Returns the copied text, already showing the page the reader is on. It used
+ * to be the caller's job to scroll it there after insertion; it is now a
+ * transform applied here, which needs no document and no layout — see the note
+ * on `offset` in `place`.
  */
 function fillSheet(
   strip: HTMLElement,
-  parent: HTMLElement,
+  plan: SheetPlan,
   frame: DOMRect,
   wrapper: HTMLElement,
   scale: number,
+  copy: PageCopy,
 ): HTMLElement {
-  const text = place(strip, frame, wrapper, scale)
+  // One `pageCopy` per turn, cloned per sheet. Cloning the cut-down copy is a
+  // dozen nodes; cutting it down again per sheet would repeat the search for
+  // no gain, and cloning the *strip* again is the cost this all exists to avoid.
+  // Less `shift`, because the copy starts at a later paragraph than the strip
+  // does — see `pageCopy`. It is 0 when nothing was cut, so the whole-strip
+  // fallback still lands on the same page it always did.
+  const text = place(
+    strip,
+    plan.strip,
+    frame,
+    wrapper,
+    scale,
+    copy.node.cloneNode(true) as HTMLElement,
+    strip.scrollLeft - copy.shift,
+  )
   // The furniture is outside the box that shrinks — it holds its size while the
   // text steps back — so its copy is placed at 1, not at the text's scale.
-  for (const item of Array.from(parent.querySelectorAll<HTMLElement>(FURNITURE))) {
-    place(item, frame, wrapper, 1)
+  for (const item of plan.furniture) {
+    place(item.node, item.box, frame, wrapper, 1)
   }
   return text
+}
+
+/**
+ * Every rectangle a sheet needs, read once, before anything is added.
+ *
+ * ## Why this is a separate step
+ *
+ * A dragged turn builds sixteen sheets, and each sheet places the text plus
+ * every piece of furniture. Each `place` used to measure its own source. That
+ * is a read of the layout after the previous sheet was added to the document,
+ * and the browser cannot answer a read with unapplied changes waiting, so it
+ * lays out the page again first. On a long chapter — 1.38 million pixels of
+ * columns — one turn did that thirty-odd times and took about 200 ms.
+ *
+ * Nothing being measured moves during a turn. The real page is still, and the
+ * sheets go on top of it. So the numbers are all read here, before the first
+ * sheet exists, and each `place` gets the answer instead of asking for it.
+ */
+interface SheetPlan {
+  strip: DOMRect
+  furniture: { node: HTMLElement; box: DOMRect }[]
+}
+
+function measureSheet(strip: HTMLElement, parent: HTMLElement): SheetPlan {
+  return {
+    strip: strip.getBoundingClientRect(),
+    furniture: Array.from(parent.querySelectorAll<HTMLElement>(FURNITURE)).map((node) => ({
+      node,
+      box: node.getBoundingClientRect(),
+    })),
+  }
 }
 
 /**
@@ -674,7 +855,13 @@ export function beginDrag(
 
   const step = frame.width / STRIPS
   const bands: Band[] = []
-  const texts: HTMLElement[] = []
+
+  // Once, before the loop. This is the whole fix: sixteen bands used to mean
+  // sixteen copies of the entire chapter, each one laid out in full.
+  const copy = pageCopy(strip)
+  // Likewise once. Every rectangle the sixteen sheets need, read while the
+  // document is still untouched — see `measureSheet`.
+  const plan = measureSheet(strip, parent)
 
   for (let i = 0; i < STRIPS; i += 1) {
     const root = document.createElement('div')
@@ -701,7 +888,7 @@ export function beginDrag(
     sheet.style.left = `${-i * step}px`
     sheet.style.pointerEvents = 'none'
     root.append(sheet)
-    texts.push(fillSheet(strip, parent, frame, sheet, scale))
+    fillSheet(strip, plan, frame, sheet, scale, copy)
 
     const back = wash(root, 'var(--color-bg)')
     const dark = wash(root, '#000')
@@ -722,10 +909,6 @@ export function beginDrag(
 
   parent.append(cast)
   parent.append(stage)
-
-  // After insertion, never before — see `fillSheet`. Every band has to be
-  // scrolled to the same page or the sheet shows different words in each slice.
-  for (const text of texts) text.scrollLeft = strip.scrollLeft
 
   concealFurniture(parent)
 

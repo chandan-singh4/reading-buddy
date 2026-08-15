@@ -15,7 +15,7 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1290 tests across 73 files** (2026-08-15).
+  **1296 tests across 73 files** (2026-08-15).
 - **The frozen-page report is answered but not explained.** The floor under it is
   in and proven; the *cause* is not confirmed. If a page ever freezes again, the
   question to ask first is whether one touch clears it — if it does, a teardown
@@ -25,12 +25,11 @@ Get that loop working before building any breadth.
   the preview tree has no book on its shelf, so no drag has ever been dragged.
   **This one is provable on the phone or not at all** — a synthetic pointer is
   not a thumb.
-- **The 16 DOM clones a drag builds at `pointerdown` are unmeasured.** Each band
-  is a full `copyOf` of the laid-out section. Layout is forced up front so the
-  cost lands on the frame the gesture starts rather than mid-swing, and
-  **`STRIPS` in `web/src/reader/pageCurl.ts` is the one lever** — lower it and
-  the sheet degrades gracefully toward the old rigid flip. If the phone hitches
-  on the first millimetre of a swipe, that is this.
+- **The 16 DOM clones a drag builds at `pointerdown` are measured and fixed.**
+  They cost 24,583 ms on a 2,542-page book — the "Aw, Snap!" crash. A drag now
+  costs 56–76 ms. See *A dragged page turn no longer clones the chapter*, below.
+  `STRIPS` in `pageCurl.ts` is still the lever if a phone hitches, but the cost
+  no longer scales with the chapter, so it should not need pulling.
 - **The reading page's new furniture has never been *seen*.** The Browser pane
   would not composite frames all session, so the paper themes, the running head,
   the gutter shadow and the decks were verified numerically (computed tokens
@@ -65,6 +64,31 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **A dragged page turn no longer clones the chapter** — 2026-08-15, measured in
+  a real browser, **not yet under a thumb**. A drag built sixteen sheets, and each
+  sheet was a copy of the whole laid-out section: 24,583 ms of blocked thread and
+  102,300 nodes on a 2,542-page book, which on the phone is the renderer running
+  out of memory. Three fixes, only one of them the one predicted:
+  - **The copy is cut to the pages around the one on screen** — 7 children out of
+    6,001, found by binary search over their left edges, with a spacer holding the
+    first at its true height and a `shift` so the scroll still lands right.
+  - **Every rectangle is read once**, before the first sheet is inserted.
+  - **The copy is moved by transform, not by `scrollLeft`** — and this was 165 ms
+    of the last 200. A scroll is a layout the browser cannot batch; a transform is
+    not a layout at all.
+
+  A split experiment killed the bitmap plan before it was written: `cloneNode` of
+  the whole section is **7 ms**, inserting and laying it out is **1,529 ms**.
+  Copying was never the cost. Now **56–76 ms**, no leaked nodes over five drags,
+  `DRAG_TURNS` deleted, and the curl is simply on.
+- **The page number moves through a long paragraph** — 2026-08-15. `withinHere`
+  was written to the database and used to restore the place, but never reached
+  the number on screen, so reading forty pages through one unbroken closing
+  paragraph moved nothing. `wordsAt` now takes it as `pagesInto` and converts at
+  `WORDS_PER_PAGE`. Exactly, not approximately: that constant is the definition
+  of a page here, and it is the same one `pagesAt` divides by coming back out.
+  The offset goes into the word *total* on purpose — every figure on that bar is
+  derived from the one total, which is what stops them disagreeing.
 - **A book reopens on the page it closed on** — 2026-08-15, **confirmed fixed on
   the phone.** Closed on `ch04-s01-p027`, reopened showing `ch04-s01-p023`. The
   save was never at fault — `p027` was written down correctly, `within` and all.

@@ -98,6 +98,52 @@ describe('the sheet that turns', () => {
 })
 
 /*
+ * A sheet used to be a copy of the whole chapter — every paragraph of it, laid
+ * out again, sixteen times over for a dragged turn. On a long book that blocked
+ * the phone for twenty-four seconds and read as a crash. Two things fixed it:
+ * the copy now holds only the pages near the one on screen, and it is moved to
+ * the right page with a transform instead of a scroll.
+ *
+ * jsdom cannot measure anything, so it always takes the "cut nothing" path. That
+ * is the branch worth pinning here anyway: the cut is an optimisation, and a
+ * copy that shows the wrong words is a bug whether it was cut or not.
+ */
+describe('the sheet holds the page the reader is on', () => {
+  it('copies the whole strip when nothing can be measured', () => {
+    const { strip } = readingScreen()
+    for (let i = 0; i < 8; i += 1) {
+      const paragraph = document.createElement('p')
+      paragraph.append(document.createTextNode(`paragraph ${i}`))
+      strip.append(paragraph)
+    }
+
+    const held = holdOutgoing(strip, 1)
+
+    // No rectangles, no safe cut. Every paragraph comes across, which is what
+    // the screen did before the cut existed.
+    expect(held!.node.querySelectorAll('p')).toHaveLength(8)
+  })
+
+  it('moves the copy to the page with a transform, not a scroll', () => {
+    const { strip } = readingScreen()
+    // jsdom pins `scrollLeft` at 0 because it lays nothing out. The page turn
+    // reads it to know which page to show, so the test supplies one.
+    Object.defineProperty(strip, 'scrollLeft', { value: 1088, writable: true })
+
+    const held = holdOutgoing(strip, 1)
+    const copy = held!.node.querySelector('article')!
+
+    // A scroll is a layout the browser cannot batch, and a dragged turn asks for
+    // sixteen of them. A transform is not a layout at all.
+    expect(copy.style.transform).toContain('translateX(-1088px)')
+    expect(copy.scrollLeft).toBe(0)
+    // Nothing is scrolled now, so the rest of the chapter hangs outside the copy
+    // and the sheet around it is what clips.
+    expect(copy.style.overflow).toBe('visible')
+  })
+})
+
+/*
  * The failure these guard against is the worst one this screen has: a copy that
  * outlives its turn is an opaque photograph of an old page, so the book looks
  * frozen even though every gesture underneath still works. Both mechanisms that
