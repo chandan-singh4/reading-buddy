@@ -218,13 +218,16 @@ already called the blank-back turn beautiful).
   visible column is. Read both fingerprints from the strip's rect, or the check
   compares the page against the copy's column 0 and reports a fault that is not
   there.
-- **Matching the height above a column break does not match the break.**
-  `orphans` and `widows` count the lines on both sides of it, and a spacer is
-  not lines. So a copy that starts with a spacer can break one line out and pull
-  a line of the page before onto the page. Start the copy at a child that
-  already starts a column, and there is nothing to make up. Keep the spacer only
-  as the fallback, because the other fallback — copying the whole chapter — is
-  the 24 s stall.
+- **The spacer in the cut copy is correct. Do not delete it again.** It was
+  blamed for the re-wrap on a theory about `orphans` and `widows`. Forcing every
+  turn down the spacer path gives the same fingerprint as the aligned path, to
+  the pixel. The real cause was the lost `text-indent` above. Deleting it cost a
+  round and put the stall back, because the search back for a column boundary
+  then had no bound, and a book of long paragraphs has no boundary for a very
+  long way.
+- **Test a fallback by forcing it, not by reading it.** Set `REACH` to 0, run
+  the fingerprint, set it back. The rare path is the one that reaches the reader
+  on a book that is not the test book.
 - **A flick can deliver one move, and the browser joins the rest into it.**
   Count the release point as a move, or a fast swipe never reaches the speed
   that completes the turn. Seed a speed average with its first reading too: an

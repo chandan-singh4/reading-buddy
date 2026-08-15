@@ -68,11 +68,13 @@ Get that loop working before building any breadth.
   The reader saw the re-wrap on the original font as well as on a new one. The
   font only moves where the paragraphs land, so the font was never the cause.
   Two causes, both now removed.
-  - **The spacer fallback is deleted.** The search back for a column boundary
-    now has no limit. Child 0 is the top of the first column, so the search
-    always ends on a boundary and the copy always starts at one. A book with few
-    boundaries gives a longer copy and a slower turn, which is still bounded by
-    the whole strip — what the old fallback copied anyway.
+  - **The spacer is kept, and it is now measured.** Deleting it was wrong. With
+    no limit on the search back, a book of long paragraphs has no column
+    boundary for a very long way, so the copy started at the chapter and the
+    stall came straight back — which is what the reader saw next. The search
+    stops after 64 children again. Forcing the spacer path for every turn gives
+    the same fingerprint as the aligned path, to the pixel. The spacer was never
+    the fault.
   - **The copy's first child lost its indent.** The indent rule is
     `.prose + .prose`, and the copy's first child has no previous sibling. So
     the first line started 1.5em further left, had 1.5em more room, and could
