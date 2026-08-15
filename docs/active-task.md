@@ -8,30 +8,82 @@
 
 ---
 
-## In flight — the finger-tracked page curl
+## In flight — the page curl, rebuilt on a bitmap
 
-The reader has seen the book furniture on the phone and signed it off. Two things
-came back, and this task is both of them.
+**The reader has asked for this explicitly** (2026-08-15): put the finger-tracked
+curl back, built so it cannot stall the phone. Everything below the "The math"
+heading is already written, shipped and tested — this task is *only* about what
+the sixteen strips are made of.
 
-**Stats (WP-59 step 4) is deliberately parked** — the plan for it is preserved at
-the bottom of this file. Do not start it without the reader asking.
+### What is already done and must not be re-derived
 
-### 1. The paper, one notch darker
+- **The paper darkening is shipped and signed off.** `#e6ded1` on
+  `:root[data-theme='paper']`. Closed.
+- **`pageCurl.ts` and its tests are shipped and correct.** The geometry, the
+  shading, the release physics — all of it. Do not touch the maths.
+- **The curl is switched off, not removed.** `DRAG_TURNS = false` in
+  `Reader.tsx`. Every handler, `beginDrag`, `settleDrag`, `dropDrag` and the
+  safety nets are wired and working behind that one boolean.
+- **Two bugs from the first attempt are fixed and shipped**: `clearSheets` plus
+  `setTimeout` backstops on both teardowns (`3992b8e`), and the reopen-early bug
+  (`12df7e1` — `settleOn` now follows the layout until `scrollWidth` holds still,
+  which the reader has confirmed on the phone).
 
-`--color-bg` on `:root[data-theme='paper']` in `styles/theme.css`, `#f1e9db` →
-`#e6ded1`: every channel × 0.955, so the hue is untouched and only the luminance
-moves (~4.5%). One line, deliberately one line — the reader will look at it on
-the phone and say *more* or *stop*, and the next nudge is the same edit again.
+### The one thing wrong, measured
 
-Only Paper moves. The other nine themes were each chosen as a whole and are not
-this reader's complaint.
+`beginDrag` builds the sheet from `STRIPS` (16) copies, and a copy is
+`cloneNode(true)` of the **whole laid-out section** — the entire chapter as a
+multi-column strip thousands of columns wide. Each copy must be laid out before
+it can be drawn, so a drag costs one full section layout × 16, synchronously, on
+the first millimetre of the swipe.
 
-### 2. The flip follows the thumb
+Measured in a real browser, on a single-section book of 6,003 nodes / 2,542
+pages: **one clone 1,923 ms; one drag start 24,583 ms** of blocked main thread
+and **102,300 DOM nodes**. Heap grew 0.6 MB, so it is layout and render, not
+objects. Sixteen × 1,923 ≈ 30,763 — exactly linear, so lowering `STRIPS` divides
+the problem rather than solving it. On the phone this is the "Aw, Snap!" renderer
+OOM the reader hit on a 1,583-page atlas, and it is why taps did nothing: they
+were queued behind a thread that never came back.
 
-Replace the threshold swipe — which fires a fixed 118° animation on release —
-with a curl the finger scrubs in real time, anchored at the **left screen edge**.
-The reader's call: single-column portrait, so the sheet peels off the whole
-screen right-to-left. No central spine.
+### The rebuild
+
+Snapshot the visible page **once** to a bitmap, then give the sixteen bands that
+same image at sixteen `background-position` offsets. One rasterise, one decode,
+**no layout and no DOM clones** — the cost stops depending on the section's size,
+which is the whole point.
+
+The strips then carry `background-image` instead of children; every transform,
+angle, blank and shadow value comes from `pageCurl.ts` unchanged.
+
+**Done when:**
+- Starting a drag on the 2,542-page test book blocks the main thread for **under
+  50 ms** (it is 24,583 ms today). Measure it, do not assume it.
+- `DRAG_TURNS` is `true` and deleted as a flag.
+- Every acceptance line from the original task, below, still holds.
+
+### Decide early, before writing the snapshot
+
+`html2canvas`-style rasterising in JS would be as slow as the clones. The cheap
+routes, in the order worth trying:
+
+1. **Reuse one clone, not sixteen.** Strictly: build the existing copy *once*,
+   then have the sixteen bands be sixteen `clip-path`/`overflow` windows onto
+   that single element. This is a much smaller change than a bitmap and drops the
+   cost 16× on its own (~1.9 s — still too slow on this book, but it proves the
+   direction and may be enough on ordinary books).
+2. **`element.getBoundingClientRect` + an SVG `foreignObject` data-URI** — one
+   serialise, one decode, then sixteen `background-position`s off the one image.
+   Watch for tainted canvases with the atlas's images.
+3. Snapshot **only the visible page**, never the section. This is the real lever
+   in every variant: the reader can only see one column.
+
+Whichever wins, the invariant to hold onto: **cost must not scale with section
+length.** If a candidate still reads the whole chapter, it is the same bug.
+
+### The original acceptance criteria, unchanged
+
+Anchored at the **left screen edge** — single-column portrait, so the sheet peels
+off the whole screen right-to-left. No central spine.
 
 **Done when:**
 - Dragging left curls the page continuously. Stop the thumb and the sheet **holds
@@ -113,25 +165,30 @@ Completion is an ease-out to 1; snap-back is a critically damped spring
 
 ### Files in scope
 
-- `web/src/reader/pageCurl.ts` — **new.** All of the above as pure functions. No
-  DOM, so jsdom can prove the math even though it cannot prove the gesture.
-- `web/src/reader/pageCurl.test.ts` — **new.**
-- `web/src/reader/pageTurn.ts` — already owns `copyOf`, the furniture concealment
-  and the sheet metaphor. Gains the slicing and the live drag; `playFlip` stays
-  for the tap and key routes.
-- `web/src/reader/index.ts` — the barrel; new exports.
-- `web/src/pages/Reader.tsx` — `turnPage` (~782) and the `onTouchStart` /
-  `onTouchEnd` pair on the `<article>` (~1830), which become pointer handlers.
-  The structural change: the strip scrolls to the destination at gesture *start*,
-  not at commit, so the next page is under the sheet the whole way.
-- `web/src/pages/Reader.module.css` — `perspective` and `transform-style` on the
-  frame; `touch-action` on the page.
-- `web/src/reader/motion.ts` — `prefersReducedMotion`, `MOVE_TIMING`.
-- `web/src/styles/theme.css` — the one-line darkening.
+- `web/src/reader/pageTurn.ts` — **the only file that really changes.** `place()`
+  (~147) is the `cloneNode(true)` to replace; `fillSheet` and `beginDrag` are its
+  callers. `copyOf`, the furniture concealment, `clearSheets` and both backstops
+  stay exactly as they are.
+- `web/src/reader/pageCurl.ts` — **read, do not edit.** Pure maths, fully tested;
+  the rebuild consumes it unchanged.
+- `web/src/pages/Reader.tsx` — `DRAG_TURNS` (~top of file) and the pointer
+  handlers on the `<article>`. Nothing else should need touching.
+- `web/src/reader/index.ts` — the barrel, if the snapshot gains an export.
+- `web/src/reader/pageTurn.test.ts` — the sheet-contents and sweep tests; a
+  bitmap sheet has no text in it, so the "carries the page number with it" test
+  will need re-stating in terms of what the sheet is now made of.
+- `web/src/pages/Reader.module.css` — only if the bands need new painting rules.
 
-Out of scope: the other nine themes, Stats, and mirrored show-through text on the
-back of the sheet (the back stays blank paper — the reader has already called the
-current blank-back turn beautiful).
+**Known, real, and deliberately not in this task:** `withinHere` never reaches
+the page number — `pages` is derived from `wordsAt(..., anchorHere)` alone
+(`Reader.tsx` ~804). So reading deep into one long paragraph leaves the number
+standing still even though the app knows you have moved. The fix changes what
+the page slider *means* (base + offset, which the slider then can't round-trip
+exactly), so it wants its own task and the reader's opinion, not a quiet patch.
+
+Out of scope: the maths, the other nine themes, Stats, and mirrored show-through
+text on the back of the sheet (the back stays blank paper — the reader has
+already called the blank-back turn beautiful).
 
 ### Traps this task walks straight into
 
@@ -148,6 +205,13 @@ current blank-back turn beautiful).
   code so the next reader doesn't wire it in.
 - **A hidden preview pane runs no rAF.** The Browser pane cannot observe this at
   all. Verify the math in tests and the look on the phone.
+- **A small test book proves nothing here.** The first attempt was tested on a
+  section of 8 nodes / 2 pages and looked instant. Import a deliberately large
+  single-section book — 6,000 paragraphs, ~2.5 M characters — and time
+  `beginDrag` with `performance.now()` before believing any of it.
+- **Do not measure a leak in the preview pane.** It delivers zero frames, so
+  every sheet strands there and it cannot tell a real leak from its own artefact.
+  This cost a round and nearly shipped a wrong root cause.
 
 ---
 
@@ -197,14 +261,11 @@ Not waiting on the reader's taste — waiting on a file or a chore.
 - **Migration `0008`, agreed and deferred:** drop `subject`, `type`,
   `type_overridden`, `title_overridden`; remove `repository.renameBook` (no UI)
   and the `healTitles` override skip.
-- **Apply `supabase/migrations/0003_finished_at.sql` in the Supabase SQL
-  editor.** Until it runs, finishing a book on the cloud backend errors — caught,
-  so nothing breaks — and no finish date is stored. The boot backfill fills them
-  in afterwards from the 100% positions, so nothing is lost by the delay.
-- **Apply `supabase/migrations/0006_position_within.sql` in the Supabase SQL
-  editor.** Until it runs, the reopen offset works on the device but is dropped
-  on sync — no worse than before it existed, since a missing column reads as
-  "no offset".
+- ~~Apply `0003_finished_at.sql` and `0006_position_within.sql`.~~ **Both have
+  been run** — confirmed by the reader on 2026-08-15, who checked the `positions`
+  table and watched `within` change live. This file and `progress.md` both said
+  they were outstanding, and that stale note sent one round of diagnosis at the
+  wrong bug entirely. **A migration listed here is a claim, not a fact — ask.**
 - **Run Library → Update** to pull covers forward to `PARSER_VERSION` 9. If
   *Beyond Mindfulness in Plain English* still shows a placeholder afterwards,
   **ask for the epub before diagnosing** — all four cover rules are unit-tested.

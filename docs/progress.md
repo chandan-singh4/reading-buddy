@@ -47,14 +47,10 @@ Get that loop working before building any breadth.
 - **Steps 2 and 3 of the Google Books arc are shipped.** Only **step 4, Stats**,
   is left. Migration `0007` has been run.
 - **Two older Supabase migrations still need pasting into the SQL editor** —
-  `0003_finished_at.sql` and `0006_position_within.sql`. Both fail softly — and
-  `0006` failing softly is the **"reopens a few pages back"** bug. `within` (how
-  many pages into the saved paragraph the reader was) round-trips correctly
-  through Dexie and through every cloud layer, but a project without that column
-  gets rows back with no `within` key at all (`rows.ts:153`), which
-  `rows.ts:421` reads as `undefined` → 0 → the book reopens at the page where
-  that paragraph *started*. Exactly the reported symptom. No code change fixes
-  it; the migration has to be pasted in.
+  `0003_finished_at.sql` and `0006_position_within.sql`. **Both have since been
+  run** — confirmed by the reader on 2026-08-15. This note stood stale long
+  enough to send a whole round of diagnosis at the wrong bug; the real cause of
+  "reopens a few pages back" was the landing, not the save. See below.
 - **Nothing is waiting on the reader. The queue is empty as of 2026-08-10** —
   the first time it has been, and worth not quietly refilling.
   - **The greyed-out offline shelf was seen and approved on the phone**, along
@@ -69,6 +65,27 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **A book reopens on the page it closed on** — 2026-08-15, **confirmed fixed on
+  the phone.** Closed on `ch04-s01-p027`, reopened showing `ch04-s01-p023`. The
+  save was never at fault — `p027` was written down correctly, `within` and all.
+  The landing was. `settleOn` asks `columnOf()` which column the saved paragraph
+  is in, and on open it asks too early: a book of full-page pictures lays out
+  with every image at zero height, so every paragraph reports a lower column
+  number than it will finally have. We scroll there, the images decode, forty
+  pages of columns slide rightwards, and the reader lands paragraphs early.
+  - The code already guarded against this — it re-checked on the next **two
+    frames**, about 32 ms. Long enough for a font swap, nowhere near long enough
+    for an image to decode.
+  - The correction now **follows the layout** instead of counting frames:
+    `scrollWidth` changes on every reflow, so correct each frame until it has
+    held still for three. `SETTLE_MS` caps it at 3 s, and the existing `moveSeq`
+    check still abandons the chase the instant the reader scrolls themselves.
+  - This also explains why the anchor stopped updating in the database on open:
+    nothing had scrolled, so nothing told it to.
+  - **Three wrong theories preceded this one** — a stranded page-turn copy, then
+    a missing migration, then the page number ignoring `within`. What ended it
+    was the reader noting the anchor before closing and after opening. Ask for
+    that datum first next time; it separates save from restore in one step.
 - **The finger-tracked turn is switched off, and why** — 2026-08-15. The book
   did not freeze and it did not leak; the main thread was simply never free to
   answer. `beginDrag` builds the sheet out of `STRIPS` (16) copies, and a copy is
