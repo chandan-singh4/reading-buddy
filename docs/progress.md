@@ -15,7 +15,12 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1296 tests across 73 files** (2026-08-15).
+  **1335 tests across 77 files** (2026-08-15).
+- **The new Bookmarks and Notes panels have never been seen.** The Browser pane
+  has no book on its shelf, so both were proved by tests, not by eye. **Worth a
+  minute on the phone.** Watch the ribbon grow down when a bookmark unfurls.
+- **The Notes tab reads a table that nothing writes.** It shows its empty state
+  until something makes a note. That is the next task — see `active-task.md`.
 - **The frozen-page report is answered but not explained.** The floor under it is
   in and proven; the *cause* is not confirmed. If a page ever freezes again, the
   question to ask first is whether one touch clears it — if it does, a teardown
@@ -477,6 +482,12 @@ type is imported.
   worker problem. Don't raise it again.
 
 ### Next up
+**Finish WP-25: something that writes a note.** The Notes tab reads a table that
+nothing fills. Written out in `active-task.md`, with one question to settle
+first: device-local or cloud. Device-local is the smaller step.
+
+Then, still open:
+
 **Google Books metadata, then the Stats tab** — the arc the reader chose on
 2026-08-10, written out step by step in `active-task.md`. Import reads only
 **title and author** today; everything Stats wants (page count, categories,

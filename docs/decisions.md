@@ -1000,3 +1000,13 @@ sign-in screen.
 - **A section break is a labelled block, never a new `BlockKind`.** Same reason
   as `subheading`: anchors are permanent and a new block kind would shift every
   anchor after it, moving the highlights pinned to them. — 2026-08-14
+- **Notes live in their own Dexie table, not on `Repository`.** `repository.setNotes`
+  is one free-text field on the book, not a list. A method on `Repository` would
+  force a Supabase table, a cached read, an outbox entry and a remote migration
+  in the same breath, so `storage/notes.ts` owns the table at v11 and notes stay
+  device-local until the cloud side is built. — 2026-08-15
+- **A note says who wrote it by how it looks, not by a label alone.** Your notes
+  are handwriting on the rules; Claude's are a typeset slip taped on the page.
+  A reader must never mistake the machine's words for their own. — 2026-08-15
+- **"By chapter" groups; it does not filter.** A chip that hid notes would lose
+  work the reader can see under "All", so the mode only adds headings. — 2026-08-15

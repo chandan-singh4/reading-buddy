@@ -382,7 +382,11 @@
   reader's own simplification, and the reason there is deliberately no
   reading-events log. A part-read book shows an approximation, percent × page
   count · *after 11; step 1 done, step 2 needs no API at all*
-- [ ] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
+- [~] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
+  — the **view** is built (2026-08-15): the Notes tab of the browse page, with a
+  `notes` table at Dexie v11 behind `storage/notes.ts`. Left to do: something
+  that **writes** a note, highlights, and a cloud path (the table is
+  device-local, because `Repository` has no notes)
 - [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*
 - [ ] **WP-28 Books-stay-separate guard** — no cross-book memory/lookups · *after 18,22*
