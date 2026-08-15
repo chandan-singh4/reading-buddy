@@ -64,6 +64,28 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The copy starts at a column boundary, and a fast flick turns the page** —
+  2026-08-15. Two faults, reported together from the phone.
+  - **The sheet pulled a line in from the page before.** A spacer of the right
+    height is not the same start as the real text above it. `orphans` and
+    `widows` count the lines on both sides of a column break, and they count a
+    spacer differently. So the copy broke its columns one line out. The copy now
+    prefers to begin at a child that already begins a column in the strip: no
+    height to make up, and every break after it is decided from the same state.
+    Where no such child is within 64 children, it still uses the spacer. It
+    never copies the whole chapter for this reason, because that is the 24 s
+    stall.
+  - **A fast swipe did not turn the page.** Two causes. The speed average
+    blended the first reading against the zero the gesture starts at, which
+    reported about a third of the real speed on a flick of two or three moves;
+    the first reading is now taken whole. And the browser joins the moves of a
+    flick into one event, so the release could arrive with no move after the one
+    that started the drag; `pointerup` now counts its own position as a move.
+
+  Checked in a browser by geometry at seven scroll positions in both
+  directions — every line of the real page and of the sheet at the same
+  `left,top`. The cut stays live: 9–11 children out of 6,001, 66–150 ms. The
+  flick itself is only provable under a thumb.
 - **The turning sheet shows the page it left, not a page further on** —
   2026-08-15. The reader swiped and the page changed to text they had not
   reached, in both directions. The cut copy was at fault, in two ways, and both

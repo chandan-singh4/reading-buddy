@@ -208,6 +208,17 @@ already called the blank-back turn beautiful).
   spacer holds the first kept paragraph at its measured top, and that measurement
   is to the border box. The paragraph's own `margin-top` then applies a second
   time. It is set to 0 in the copy.
+- **Matching the height above a column break does not match the break.**
+  `orphans` and `widows` count the lines on both sides of it, and a spacer is
+  not lines. So a copy that starts with a spacer can break one line out and pull
+  a line of the page before onto the page. Start the copy at a child that
+  already starts a column, and there is nothing to make up. Keep the spacer only
+  as the fallback, because the other fallback — copying the whole chapter — is
+  the 24 s stall.
+- **A flick can deliver one move, and the browser joins the rest into it.**
+  Count the release point as a move, or a fast swipe never reaches the speed
+  that completes the turn. Seed a speed average with its first reading too: an
+  average that starts at zero reports about a third of a short flick.
 - **Prove a copy by comparing geometry, not by looking.** Print every visible
   fragment as `text@left,top` for the real page and for the sheet and compare the
   strings. Six scroll positions × both directions caught what one screenshot did

@@ -1028,7 +1028,14 @@ export default function Reader() {
     const gap = now - dragLast.current.at
     if (gap > 0) {
       const moved = (held.by === 1 ? dragLast.current.x - at : at - dragLast.current.x) / gap
-      dragSpeed.current = dragSpeed.current * (1 - RUN_ON) + moved * RUN_ON
+      // The first reading is taken whole, not averaged against the zero the
+      // gesture starts at. A flick is over in two or three moves, and blending
+      // from zero reported about a third of its real speed — so the fastest
+      // swipes, the ones most obviously meant to turn the page, were the ones
+      // that sprang back. Averaging only makes sense once there is something to
+      // average with.
+      dragSpeed.current =
+        dragSpeed.current === 0 ? moved : dragSpeed.current * (1 - RUN_ON) + moved * RUN_ON
       dragLast.current = { x: at, at: now }
     }
   }, [])
@@ -2143,6 +2150,12 @@ export default function Reader() {
 
               if (drag.current) {
                 touchStart.current = null
+                // The release point is a real reading and the last one there
+                // will be. A flick can be over in a single move — the browser
+                // coalesces the rest — and without this the sheet was settled
+                // from a position and a speed taken before the fastest part of
+                // the stroke had happened.
+                moveDrag(event.clientX)
                 endDrag()
                 return
               }

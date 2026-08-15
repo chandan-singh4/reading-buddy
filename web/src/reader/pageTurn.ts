@@ -105,6 +105,16 @@ export function holdOutgoing(
 const FURNITURE = '[data-page-furniture]'
 
 /**
+ * How many children `pageCopy` will look back through for a column boundary.
+ *
+ * Generous, because looking is cheap once the strip is laid out and the answer
+ * is almost always one or two children back — a book breaks a column every few
+ * paragraphs. It exists to stop the search walking six thousand children in the
+ * one case where there is no boundary to find.
+ */
+const REACH = 64
+
+/**
  * A picture, not a page: nothing in a copy may be tapped, focused, found by a
  * search or read out by a screen reader, all of which would be describing
  * something the reader can no longer see. Ids go too — the reading screen looks
@@ -251,11 +261,11 @@ interface PageCopy {
  *
  * ## Two things that have to be exact, or the copy shows the wrong words
  *
- * **Where the text starts.** A page almost always begins in the middle of a
- * paragraph. Kept paragraphs land at the top of the copy's first column, but in
- * the real strip the first one starts some way down its column — so the copy
- * gets a blank spacer of exactly that height and the text then flows to the same
- * places. Without it every line is out by the height of the missing part.
+ * **Where the text starts.** The copy prefers to begin at a child that begins a
+ * column in the strip, so its own first column begins in the same state and
+ * every break after it falls in the same place. Where no such child is within
+ * reach it begins anywhere and makes up the height with a spacer. See
+ * `columnTop` for the difference between the two.
  *
  * **Where to scroll it to.** A block child's left edge *is* its column's left
  * edge, so the first kept paragraph's position is a column boundary, and content
@@ -316,33 +326,67 @@ function pageCopy(strip: HTMLElement): PageCopy {
     return low
   }
 
-  const first = Math.max(0, search(strip.scrollLeft - pageWidth) - 1)
+  /** How far down its column a child starts, in content pixels. */
+  const style = getComputedStyle(strip)
+  const inset = parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop)
+  const below = (i: number) => startOf(children[i]!).top - box.top - inset
+
+  /**
+   * The last child at or before `from` that begins at the top of a column.
+   *
+   * ## Why the copy is not allowed to start anywhere else
+   *
+   * The copy has to break its columns in exactly the places the strip breaks
+   * its own, or it shows the same paragraphs re-wrapped — a line of the page
+   * before pushed onto the top of the page, every line after it moved down one,
+   * and a reader mid-swipe watching the page they are leaving turn into a page
+   * they have never seen. That was the reported fault.
+   *
+   * The first attempt started the copy at any child and held it in place with a
+   * blank spacer of the measured height. It is nearly right, and nearly is no
+   * use: a column break is not decided by height alone. `orphans` and `widows`
+   * count the lines available on both sides of the break, and those counts
+   * change when the flow above the break is a spacer instead of the real text.
+   *
+   * Starting at a column boundary needs no spacer and no arithmetic. The child
+   * sits at the top of the copy's first column exactly as it sits at the top of
+   * its own, and every break decision after it is made from the same state.
+   *
+   * Returns -1 when there is no such child within `REACH`, and the copy then
+   * falls back to the spacer. A book can go a long way without a paragraph that
+   * happens to land on a boundary, and copying the whole chapter instead is the
+   * stall this work exists to remove.
+   */
+  const columnTop = (from: number) => {
+    for (let i = from; i >= 0 && from - i < REACH; i -= 1) {
+      if (Math.abs(below(i)) < 1) return i
+    }
+    return -1
+  }
+
+  const candidate = Math.max(0, search(strip.scrollLeft - pageWidth) - 1)
+  const aligned = columnTop(candidate)
+  const first = aligned < 0 ? candidate : aligned
   const last = Math.min(count - 1, search(strip.scrollLeft + pageWidth * 2))
   if (last <= first) return whole()
 
   const node = strip.cloneNode(false) as HTMLElement
-  const head = startOf(children[first]!)
-  const style = getComputedStyle(strip)
-  // Measured from the *content* top: the child's rectangle is relative to the
-  // border box, and the copy applies the same border and padding itself, so
-  // counting them here would push the text down twice.
-  const above = Math.max(
-    0,
-    head.top - box.top - parseFloat(style.borderTopWidth) - parseFloat(style.paddingTop),
-  )
 
-  if (above > 0) {
+  if (aligned < 0) {
+    // No boundary within reach, so hold the first kept child at its own height
+    // down the column with a blank block of exactly that height. Nearly always
+    // right; see `columnTop` for the case where it is not.
     const spacer = document.createElement('div')
-    spacer.style.height = `${above}px`
-    spacer.style.margin = '0'
+    spacer.style.height = `${below(first)}px`
+    spacer.setAttribute('aria-hidden', 'true')
     node.append(spacer)
   }
+
   for (let i = first; i <= last; i += 1) {
     const child = children[i]!.cloneNode(true) as HTMLElement
-    // The first one is pinned by the spacer, and its own top margin would push
-    // it down past that. `above` was measured to the paragraph's border box, so
-    // the margin has already been accounted for; left in, it is applied twice
-    // and every column break after it lands a few pixels early.
+    // A top margin is truncated away at a column break, and it is already
+    // counted inside the spacer's height. Kept, it would push the copy's text
+    // down by that much and break its columns a line early.
     if (i === first) child.style.marginTop = '0'
     node.append(child)
   }
