@@ -29,6 +29,58 @@
   padding: calc(var(--safe-top) + var(--space-4)) 0
     calc(var(--safe-bottom) + var(--space-4));
   /*
+   * The sheet of paper itself.
+   *
+   * Eight layers, topmost first, every one of them a gradient or a noise tile —
+   * there is no image file here, and deliberately: an asset would be another
+   * download, another entry in the offline cache, and one fixed resolution to
+   * stretch across every screen size there is. What each layer is for, and why
+   * a dark theme gets one too, is written out in `styles/theme.css`; the
+   * colours are all tokens, so this rule never learns which theme is on.
+   *
+   * It sits on `.reader` rather than on `.page`, and that is the difference
+   * between paper and wallpaper. `.page` is the strip of columns that slides
+   * sideways when you turn — texture painted on that would drag across the
+   * screen with the words, which is not something paper does. Here it holds
+   * still and the text moves over it, exactly as ink on a sheet would. It also
+   * costs nothing per turn: this box never scrolls, so the whole thing is
+   * painted once and left alone.
+   *
+   * Everything is sized in percentages, so a phone and a wide desktop window
+   * each get a whole page rather than a crop of the same one.
+   */
+  background-color: var(--color-bg);
+  background-image:
+    /* Grain, twice. One tile repeating is a pattern the eye picks out within
+       seconds; two at sizes with no common factor never line up again. */
+    var(--paper-grain), var(--paper-grain),
+    /* The spine down the left, and the outer edge opposite it. */
+    linear-gradient(
+      90deg,
+      var(--paper-spine),
+      transparent 5%,
+      transparent 95.5%,
+      var(--paper-edge)
+    ),
+    /* Head and foot, where the sheet lifts off the ones underneath. */
+    linear-gradient(
+      180deg,
+      var(--paper-edge),
+      transparent 2.5%,
+      transparent 97%,
+      var(--paper-edge)
+    ),
+    /* Lit from in front: the middle of a page is always brighter than its
+       corners. Centred a little above the middle, where a held page catches
+       the light. */
+    radial-gradient(125% 95% at 50% 42%, transparent 46%, var(--paper-vignette)),
+    /* Fibre — the layer that stops it being a flat fill. Odd positions on
+       purpose; anything symmetrical reads as a gradient rather than as paper. */
+    radial-gradient(58% 44% at 17% 21%, var(--paper-fibre-a), transparent 70%),
+    radial-gradient(52% 48% at 84% 66%, var(--paper-fibre-b), transparent 72%),
+    radial-gradient(68% 38% at 38% 94%, var(--paper-fibre-a), transparent 75%);
+  background-size: 120px 120px, 79px 79px, auto, auto, auto, auto, auto, auto;
+  /*
    * No entry animation on the reading screen itself.
    *
    * There used to be one — a fade, added because opening a book was a hard cut.

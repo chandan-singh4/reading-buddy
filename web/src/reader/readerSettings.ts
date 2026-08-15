@@ -15,6 +15,7 @@
 
 export type Theme =
   | 'auto'
+  | 'paper'
   | 'light'
   | 'dark'
   | 'sepia'
@@ -40,6 +41,7 @@ export type ReadingFont =
  * here and writing its tokens in `theme.css`, and nothing else.
  */
 export const THEMES: readonly { value: Theme; label: string }[] = [
+  { value: 'paper', label: 'Paper' },
   { value: 'auto', label: 'Auto' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -79,7 +81,15 @@ export interface ReaderSettings {
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
-  theme: 'auto',
+  /*
+   * Paper, not `auto`. The app's job is a book, and a book is not white — a
+   * reader who never opens the Aa tab should get the page the reading screen
+   * was designed around rather than the plainest thing available.
+   *
+   * Only ever seen by someone who has not chosen: a saved setting is read back
+   * before this is consulted, so nobody's theme changes under them.
+   */
+  theme: 'paper',
   font: 'serif',
   textStep: 3,
   spacing: 'normal',

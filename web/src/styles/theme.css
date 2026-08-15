@@ -322,6 +322,163 @@
 }
 
 /*
+ * Paper — the default theme, and the one the reading screen was designed
+ * around. Warmer and softer than `light`, a shade lighter and less yellow than
+ * `sepia`: the colour of a decent trade paperback rather than of a photocopy
+ * that has been left in a window.
+ *
+ * It is the default because the app's job is a book, and a book is not white.
+ * A reader who has chosen a theme keeps it — this only changes what someone who
+ * has never opened the Aa tab sees.
+ */
+:root[data-theme='paper'] {
+  --color-bg: #f1e9db;
+  --color-surface: #f7f1e6;
+  --color-surface-raised: #e8dfcd;
+  --color-text: #2a241c;
+  --color-text-muted: #6e6355;
+  --color-border: #dcd1bc;
+  --color-accent: #8a6a45;
+  --color-accent-contrast: #fffdf8;
+  --color-focus: #3b6ea5;
+
+  --shadow-raised: 0 1px 3px rgb(60 42 20 / 0.1), 0 1px 2px rgb(60 42 20 / 0.05);
+
+  color-scheme: light;
+}
+
+/*
+ * The sheet of paper.
+ *
+ * The reading screen used to be one flat fill edge to edge, and a flat fill is
+ * the one thing paper never is. Held next to a real page it read as a screen
+ * with words on it — which is what it was.
+ *
+ * What follows is a page built out of gradients and a grain tile, with no image
+ * file anywhere: an asset would be another thing to download, another thing in
+ * the offline cache, and a fixed resolution to stretch on whatever screen it
+ * landed on. Four things stack up to make it, and each is doing a job a real
+ * sheet does:
+ *
+ * - **Fibre.** Two or three very large, very soft washes at deliberately odd
+ *   positions. This is the layer that kills "flat": paper is never quite the
+ *   same colour twice across a page, and the eye notices the absence of that
+ *   long before it could name it.
+ * - **Vignette.** A page is lit from in front, so its middle is always a little
+ *   brighter than its corners.
+ * - **Edges.** A darker band down the left for the spine the page is bound
+ *   into, a fainter one down the right and along the head and foot where the
+ *   sheet lifts away from the ones beneath it.
+ * - **Grain.** A noise tile, laid down twice at two different sizes so the
+ *   repeat never becomes a pattern you can see.
+ *
+ * ## Every theme gets one
+ *
+ * The tokens below are what each theme sets; `pages/Reader.module.css` stacks
+ * them and knows nothing about which theme is on. So a dark theme gets paper
+ * too — pale grain instead of dark, a black vignette instead of a brown one —
+ * and the screen stops being a flat rectangle in every theme rather than one.
+ *
+ * High contrast is the exception, and turns the whole thing off. That theme
+ * exists for readers who need every scrap of contrast the screen can give, and
+ * texture is contrast spent on something other than the words.
+ */
+:root {
+  /*
+   * The grain, as data rather than a file. Two of them, because grey noise
+   * *darkens* a pale page and *lightens* a dark one, and one tile cannot do
+   * both. Their strength is baked into the SVG rather than left to a CSS
+   * `opacity`, so the whole page stays one paint with no blend layer over it.
+   *
+   * `stitchTiles='stitch'` is what makes the tile seamless; without it every
+   * repeat shows its own seams in a grid. The `#` inside the filter reference
+   * has to be written `%23` — it is a URL, and a bare `#` there would end it.
+   */
+  --grain-ink: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='120' height='120' filter='url(%23g)' opacity='0.045'/></svg>");
+  --grain-glow: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncR type='linear' slope='1' intercept='0.7'/><feFuncG type='linear' slope='1' intercept='0.66'/><feFuncB type='linear' slope='1' intercept='0.6'/></feComponentTransfer></filter><rect width='120' height='120' filter='url(%23g)' opacity='0.05'/></svg>");
+
+  /* Light's own sheet: warm, and restrained — this theme's whole point is that
+     it is the plain one. */
+  --paper-grain: var(--grain-ink);
+  --paper-fibre-a: rgb(122 92 56 / 0.05);
+  --paper-fibre-b: rgb(150 128 96 / 0.045);
+  --paper-vignette: rgb(92 70 44 / 0.07);
+  --paper-spine: rgb(80 58 34 / 0.08);
+  --paper-edge: rgb(80 58 34 / 0.05);
+}
+
+/*
+ * The dark sheets. Pale grain, and a vignette of plain black — a *tinted*
+ * shadow on a dark page reads as a smudge on the screen rather than as depth.
+ *
+ * This block comes *first* among the overrides, and that ordering is load
+ * bearing. `:not([data-theme='light'])` matches every theme but one, including
+ * the pale ones, and it has exactly the same specificity as a
+ * `[data-theme='sepia']` — so whichever is written last wins. Put below the
+ * light themes it silently handed cream paper a black vignette on any phone
+ * whose OS is set to dark, which is most of them.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper-grain: var(--grain-glow);
+    --paper-fibre-a: rgb(255 240 214 / 0.022);
+    --paper-fibre-b: rgb(214 226 255 / 0.018);
+    --paper-vignette: rgb(0 0 0 / 0.3);
+    --paper-spine: rgb(0 0 0 / 0.34);
+    --paper-edge: rgb(0 0 0 / 0.22);
+  }
+}
+
+/* Paper leans into it: this is the theme the texture was drawn for. */
+:root[data-theme='paper'] {
+  --paper-grain: var(--grain-ink);
+  --paper-fibre-a: rgb(148 110 60 / 0.1);
+  --paper-fibre-b: rgb(120 96 62 / 0.075);
+  --paper-vignette: rgb(94 66 32 / 0.15);
+  --paper-spine: rgb(76 52 26 / 0.19);
+  --paper-edge: rgb(76 52 26 / 0.1);
+}
+
+:root[data-theme='sepia'] {
+  --paper-grain: var(--grain-ink);
+  --paper-fibre-a: rgb(140 106 56 / 0.09);
+  --paper-fibre-b: rgb(118 94 58 / 0.065);
+  --paper-vignette: rgb(96 70 34 / 0.13);
+  --paper-spine: rgb(80 56 28 / 0.16);
+  --paper-edge: rgb(80 56 28 / 0.09);
+}
+
+:root[data-theme='slate'] {
+  --paper-grain: var(--grain-ink);
+  --paper-fibre-a: rgb(70 92 120 / 0.05);
+  --paper-fibre-b: rgb(96 118 142 / 0.045);
+  --paper-vignette: rgb(40 60 82 / 0.08);
+  --paper-spine: rgb(34 52 72 / 0.09);
+  --paper-edge: rgb(34 52 72 / 0.05);
+}
+
+:root[data-theme='dark'],
+:root[data-theme='dim'],
+:root[data-theme='forest'] {
+  --paper-grain: var(--grain-glow);
+  --paper-fibre-a: rgb(255 240 214 / 0.022);
+  --paper-fibre-b: rgb(214 226 255 / 0.018);
+  --paper-vignette: rgb(0 0 0 / 0.3);
+  --paper-spine: rgb(0 0 0 / 0.34);
+  --paper-edge: rgb(0 0 0 / 0.22);
+}
+
+/* No texture at all. Every drop of contrast goes to the words. */
+:root[data-theme='contrast'] {
+  --paper-grain: none;
+  --paper-fibre-a: transparent;
+  --paper-fibre-b: transparent;
+  --paper-vignette: transparent;
+  --paper-spine: transparent;
+  --paper-edge: transparent;
+}
+
+/*
  * Reading font family (WP-14's Aa tab). `--font-reading` is touched only here
  * and in `Reader.module.css`/`blocks.module.css` — nothing on the shelf or
  * elsewhere reads it — so switching it is safe to do globally rather than
