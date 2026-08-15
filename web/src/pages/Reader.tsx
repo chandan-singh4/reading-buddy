@@ -1245,6 +1245,23 @@ export default function Reader() {
     }
   }, [focusMode])
 
+  /**
+   * The same trick for the browse page.
+   *
+   * The status line is fixed to the screen and sits *above* the overlay on
+   * purpose, so a full-screen list of chapters cannot cover it from inside the
+   * overlay. It has to be told to stand down. See `theme.css`.
+   */
+  const browsing = sheetOpen && sheetTab !== 'aa'
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.browsing = browsing ? 'on' : 'off'
+    return () => {
+      delete root.dataset.browsing
+    }
+  }, [browsing])
+
   useEffect(() => {
     writeReaderSettings(settings)
   }, [settings])

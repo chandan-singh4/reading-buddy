@@ -24,8 +24,10 @@
  *   paper, not in the toolbar.
  */
 
+import { useRef } from 'react'
 import { Link } from 'react-router'
 
+import { stepThrough, swipeOf, type Touch } from './swipe.ts'
 import { progressOf, type Pages } from './progress.ts'
 import { MIN_QUERY, type SearchOutcome } from './search.ts'
 import type { SectionRef } from './navigation.ts'
@@ -196,6 +198,17 @@ export function Chrome({
    * there is no word, leave.
    */
   const clears = query.length > 0
+
+  /**
+   * Where a swipe across the browse page began.
+   *
+   * The tab row is three targets at the top of a phone, and the page under it
+   * is the whole screen. A swipe is the cheaper gesture — the same one the book
+   * itself answers to — so the tabs answer to it too. `stepThrough` stops at the
+   * ends rather than cycling: the row visibly does not loop, so wrapping from
+   * Notes back to Contents would contradict what the eye just saw.
+   */
+  const swipeFrom = useRef<Touch | null>(null)
 
   return (
     /* `inert` rather than unmounted: the overlay keeps its scroll position in
@@ -397,7 +410,31 @@ export function Chrome({
         comparison one tap instead of a trip back through the menu.
       */}
       {sheetOpen && sheetTab !== 'aa' && (
-        <div className={styles.browse} role="dialog" aria-label={SHEET_TITLES[sheetTab]}>
+        <div
+          className={styles.browse}
+          role="dialog"
+          aria-label={SHEET_TITLES[sheetTab]}
+          onTouchStart={(event) => {
+            const touch = event.touches[0]
+            swipeFrom.current = touch ? { x: touch.clientX, y: touch.clientY } : null
+          }}
+          onTouchEnd={(event) => {
+            const from = swipeFrom.current
+            const touch = event.changedTouches[0]
+            swipeFrom.current = null
+            if (!from || !touch) return
+
+            // `swipeOf` returns null for a tap, a scroll, or a wobble, and
+            // `stepThrough` hands back the same tab for null — so a list
+            // scrolled with a thumb never changes tab by accident.
+            const next = stepThrough(
+              MENU_PANELS,
+              sheetTab,
+              swipeOf(from, { x: touch.clientX, y: touch.clientY }),
+            )
+            if (next !== sheetTab) onOpenSheet(next)
+          }}
+        >
           <div className={styles.browseHead}>
             <button
               type="button"

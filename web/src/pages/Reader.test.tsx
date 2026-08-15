@@ -133,6 +133,18 @@ function openSheetAt(panel: 'Contents' | 'Bookmarks' | 'Notes') {
   fireEvent.click(screen.getByRole('tab', { name: panel }))
 }
 
+/**
+ * Swipe across the browse page. 120 px of travel and none of drift, which is
+ * comfortably past what `swipeOf` asks for.
+ */
+function swipeBrowsePage(way: 'left' | 'right') {
+  const page = screen.getByRole('dialog')
+  const to = way === 'left' ? 80 : 320
+
+  fireEvent.touchStart(page, { touches: [{ clientX: 200, clientY: 300 }] })
+  fireEvent.touchEnd(page, { changedTouches: [{ clientX: to, clientY: 300 }] })
+}
+
 /** Focus Mode has its own button on the top bar, where the ⋮ used to be. */
 function turnFocusOn() {
   fireEvent.click(screen.getByRole('button', { name: 'Focus mode' }))
@@ -433,6 +445,44 @@ describe('the top bar and its menu', () => {
     openSheetAt('Contents')
     expect(screen.getByText('page 3')).toBeTruthy()
     expect(screen.getByText('currently on page 1')).toBeTruthy()
+  })
+
+  it('swipes from one tab to the next, and stops at the ends', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+    openSheetAt('Contents')
+
+    // Leftwards is forwards, the same as pushing a page aside.
+    swipeBrowsePage('left')
+    expect(screen.getByRole('dialog', { name: 'Bookmarks' })).toBeTruthy()
+
+    swipeBrowsePage('left')
+    expect(screen.getByRole('dialog', { name: 'Notes' })).toBeTruthy()
+
+    // The row does not loop, so neither does the swipe.
+    swipeBrowsePage('left')
+    expect(screen.getByRole('dialog', { name: 'Notes' })).toBeTruthy()
+
+    swipeBrowsePage('right')
+    expect(screen.getByRole('dialog', { name: 'Bookmarks' })).toBeTruthy()
+  })
+
+  it('quiets the page number while the browse page is open', async () => {
+    // The status line is fixed above the overlay so it stays readable under the
+    // toolbar. Over a list of chapters it is a caption for a hidden page.
+    openReader()
+    await screen.findByText('The opening words.')
+    expect(document.documentElement.dataset.browsing).toBe('off')
+
+    openSheetAt('Contents')
+    expect(document.documentElement.dataset.browsing).toBe('on')
+
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Contents' })).getByRole('button', {
+        name: 'Close',
+      }),
+    )
+    expect(document.documentElement.dataset.browsing).toBe('off')
   })
 
   it('closes itself once you have jumped', async () => {

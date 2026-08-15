@@ -817,6 +817,20 @@
   opacity: 0;
 }
 
+/*
+ * The same furniture, hidden for a different reason: the browse page.
+ *
+ * Contents, Bookmarks and Notes cover the whole screen, but the status line is
+ * `z-index: 11` — deliberately above the overlay, so the page number stays
+ * readable while the toolbar is up. That is right over the book and wrong over
+ * a list of chapters, where "Page 4 of 13 · 31%" is a caption for a page nobody
+ * can see. Hidden rather than lowered: the z-index is load-bearing for the case
+ * it was written for.
+ */
+:root[data-browsing='on'] [data-page-furniture] {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root[data-focus='on'] body::after {
     animation: none;

@@ -76,6 +76,12 @@ Get that loop working before building any breadth.
     you are in says `currently on page N` instead — your page, not its first.
   - `chapterPages(spine)` in `progress.ts` works the figure out from the first
     section of each chapter. No layout, no measuring, nothing loaded.
+  - **Swipe left and right to change tab.** `stepThrough` in `swipe.ts` already
+    did this job and had no caller. It stops at the ends; the row does not loop.
+  - **The page number hides while the page is open.** The status line is
+    `z-index: 11`, above the overlay on purpose, so a full-screen list could not
+    cover it. `<html>` now carries `data-browsing`, and `theme.css` fades the
+    page furniture out while it is on.
 - **The ⋮ moved to the slider, and Focus Mode took its place** — 2026-08-15,
   browser-checked at phone size. The ⋮ now sits at the left-hand end of the
   bottom row, before the slider. It still opens Contents, Bookmarks and Notes.
