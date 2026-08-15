@@ -21,16 +21,16 @@ describe('how dark the paper goes', () => {
 describe('the drag on the deck', () => {
   const height = 800
 
-  it('darkens the page as the finger goes up', () => {
-    expect(dimAfterDrag(0, 100, height)).toBeGreaterThan(0)
+  it('brightens the page as the finger goes up', () => {
+    expect(dimAfterDrag(0.5, 100, height)).toBeLessThan(0.5)
   })
 
-  it('lightens the page as the finger goes down', () => {
-    expect(dimAfterDrag(0.5, -100, height)).toBeLessThan(0.5)
+  it('darkens the page as the finger goes down', () => {
+    expect(dimAfterDrag(0, -100, height)).toBeGreaterThan(0)
   })
 
   it('covers the whole range over its share of the screen', () => {
-    expect(dimAfterDrag(0, height * DIM_TRAVEL, height)).toBeCloseTo(MAX_DIM, 5)
+    expect(dimAfterDrag(0, -height * DIM_TRAVEL, height)).toBeCloseTo(MAX_DIM, 5)
   })
 
   it('returns to where it began when the finger does', () => {
@@ -40,15 +40,15 @@ describe('the drag on the deck', () => {
   })
 
   it('does the same thing on a tall screen as on a short one', () => {
-    expect(dimAfterDrag(0, 400 * DIM_TRAVEL, 400)).toBeCloseTo(
-      dimAfterDrag(0, 1200 * DIM_TRAVEL, 1200),
+    expect(dimAfterDrag(0, -400 * DIM_TRAVEL, 400)).toBeCloseTo(
+      dimAfterDrag(0, -1200 * DIM_TRAVEL, 1200),
       5,
     )
   })
 
   it('holds at the ends rather than running past them', () => {
-    expect(dimAfterDrag(0, 5000, height)).toBe(MAX_DIM)
-    expect(dimAfterDrag(0.1, -5000, height)).toBe(0)
+    expect(dimAfterDrag(0, -5000, height)).toBe(MAX_DIM)
+    expect(dimAfterDrag(0.1, 5000, height)).toBe(0)
   })
 
   it('answers a screen with no height rather than dividing by it', () => {

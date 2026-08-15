@@ -66,7 +66,8 @@ Get that loop working before building any breadth.
 ### Recently done
 - **Drag the right deck to turn the paper down** — 2026-08-15, browser-checked,
   **not yet under a thumb**. A finger dragged up on the right-hand block of
-  paper darkens the page; dragged down, it lightens it. There is no slider and
+  paper brightens the page; dragged down, it darkens it — the same way round as
+  the phone's own brightness control. There is no slider and
   nothing appears while you do it. The setting is saved with the theme and the
   font, and applies at boot.
   - The band that listens is 44 px along the right edge, not the 11 px the deck
@@ -80,7 +81,7 @@ Get that loop working before building any breadth.
     containing block, and this screen is full of `position: fixed`.
   - Black, so a theme keeps its own colour. Stops at 0.72, so the darkest page
     is still a page.
-  - Checked in a browser: up darkens, down lightens, neither moves the page; a
+  - Checked in a browser: up brightens, down darkens, neither moves the page; a
     horizontal drag mid-page still turns; a vertical drag mid-page changes
     nothing. The value survives a reload.
 - **The spacer is gone, and the copy keeps its paragraph indent** — 2026-08-15.

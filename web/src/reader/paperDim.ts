@@ -10,9 +10,9 @@
  *
  * So there is no control to find. The right-hand block of paper — the deck that
  * already tells you how much book is left — takes a finger dragged up and down.
- * Up is darker, the way turning a lamp down is a downward motion of light; down
- * is lighter. Nothing is drawn for it, and nothing appears while you do it
- * except the page itself changing.
+ * Up is brighter and down is darker, the way every volume and brightness
+ * control on the phone already works. Nothing is drawn for it, and nothing
+ * appears while you do it except the page itself changing.
  *
  * ## Why the reachable zone is wider than the deck
  *
@@ -69,13 +69,15 @@ export function clampDim(value: number): number {
  * screen's height, so the same stroke does the same thing on a small phone and
  * on a tablet.
  *
+ * Note the sign: `up` *subtracts* darkness. Upwards is brighter.
+ *
  * Reckoned from `start` and the *whole* travel rather than accumulated move by
  * move: a finger that goes up, changes its mind and comes back down again ends
  * exactly where it began, which is what a physical control does.
  */
 export function dimAfterDrag(start: number, up: number, height: number): number {
   if (height <= 0) return clampDim(start)
-  return clampDim(start + (up / (height * DIM_TRAVEL)) * MAX_DIM)
+  return clampDim(start - (up / (height * DIM_TRAVEL)) * MAX_DIM)
 }
 
 /** Whether a touch at `x` is on the deck's band, given the screen's width. */
