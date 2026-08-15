@@ -11,21 +11,6 @@
      then the page number printed on that sheet. */
   z-index: 7;
   pointer-events: none;
-  /*
-   * How hard the decks are drawn, set by dragging up and down on the right-hand
-   * one — `deckShade.ts` has the reasoning and the sums. 1 is exactly what the
-   * theme asks for; below 1 is darker, above 1 is paler.
-   *
-   * A filter rather than a set of colour tokens, because it is one number
-   * against every part of the drawing at once: the body, the sheet lines and
-   * the lit edge all move together and keep their relationship. Written as
-   * tokens, each theme would need three more values and they could drift apart.
-   *
-   * Safe here in a way it would not be on the page: this element has no
-   * `position: fixed` descendants — its two children are absolute inside it —
-   * so the containing block a filter creates costs nothing.
-   */
-  filter: brightness(var(--deck-shade, 1));
 }
 
 /*

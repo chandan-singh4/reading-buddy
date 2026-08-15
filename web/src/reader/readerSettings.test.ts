@@ -13,7 +13,7 @@ import {
   writeReaderSettings,
   type ReaderSettings,
 } from './readerSettings.ts'
-import { DECK_MIN } from './deckShade.ts'
+import { MAX_DIM } from './paperDim.ts'
 
 afterEach(() => {
   localStorage.clear()
@@ -31,15 +31,15 @@ describe('readReaderSettings', () => {
       textStep: 4,
       spacing: 'relaxed',
       margins: 'wide',
-      deck: 0.6,
+      dim: 0.4,
     }
     writeReaderSettings(settings)
     expect(readReaderSettings()).toEqual(settings)
   })
 
-  it('clamps a saved deck shade into the range that now exists', () => {
-    localStorage.setItem('reading-buddy:reader-settings', JSON.stringify({ deck: 0 }))
-    expect(readReaderSettings().deck).toBe(DECK_MIN)
+  it('clamps a saved darkness into the range that now exists', () => {
+    localStorage.setItem('reading-buddy:reader-settings', JSON.stringify({ dim: 5 }))
+    expect(readReaderSettings().dim).toBe(MAX_DIM)
   })
 
   it('falls back field-by-field when storage holds something malformed', () => {
