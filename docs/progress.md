@@ -65,13 +65,24 @@ Get that loop working before building any breadth.
 
 ### Recently done
 - **The ⋮ moved to the slider, and Focus Mode took its place** — 2026-08-15,
-  browser-checked at phone size. The ⋮ now sits at the right-hand end of the
-  bottom row, beside the slider. It still opens Contents, Bookmarks and Notes.
+  browser-checked at phone size. The ⋮ now sits at the left-hand end of the
+  bottom row, before the slider. It still opens Contents, Bookmarks and Notes.
   The menu grows upwards out of it.
   - Focus Mode has the top-right corner the ⋮ held. It was a line inside the
     menu, which is two taps to ask for less chrome.
-  - **The button is a placeholder, by agreement.** It says the word "Focus" and
-    carries `aria-pressed`. The next thread gives it its proper treatment.
+  - **The button is a reading lamp now** — `FocusLamp.tsx`. Off, it is line art
+    in `currentColor`. On, the shade and the bulb fill amber, a cone of light
+    falls on the page, and a 40 px radial halo sits behind the glyph. One
+    drawing in both states, so the lamp does not move when it lights.
+  - **Focus Mode does something at last.** It was a stored boolean that changed
+    nothing but its own button. Now `<html>` carries `data-focus`, and
+    `theme.css` gives it two effects: a 7% amber wash over the canvas, and the
+    running head and status line faded out. Both take 0.4 s.
+  - The wash is one layer, not ten warm themes. Ten variants would drift, and
+    the four dark themes have no parchment to go to.
+  - `data-focus` is removed when the reading page unmounts. A library that had
+    turned sepia, with its only switch two screens away inside a book, is a
+    trap. The setting itself still persists.
   - `.footRow` is a new flex row inside the bottom bar. The bar itself stays a
     column, because it once stacked a slider over a row of buttons.
 - **Drag the right deck to turn the paper down** — 2026-08-15, browser-checked,

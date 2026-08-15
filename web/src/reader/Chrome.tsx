@@ -33,6 +33,7 @@ import type { SectionRef } from './navigation.ts'
 import type { Anchor, Manifest } from '../structure/index.ts'
 import type { ReaderSettings } from './readerSettings.ts'
 import { TextSettings } from './TextSettings.tsx'
+import { FocusLamp } from './FocusLamp.tsx'
 import styles from './Chrome.module.css'
 
 /**
@@ -246,17 +247,17 @@ export function Chrome({
           not have to open the chrome to ask for. The ⋮ went to the foot, beside
           the slider.
 
-          A plain word for now. This is a placeholder by agreement: the next
-          round gives it its proper treatment.
+          The lamp is the control: unlit line art when Focus Mode is off, lit
+          with a halo around it when it is on. See `FocusLamp.tsx`.
         */}
         <button
           type="button"
-          className={styles.iconControl}
+          className={`${styles.iconControl} ${styles.focusControl}`}
           aria-pressed={focusMode}
           aria-label="Focus mode"
           onClick={onToggleFocus}
         >
-          <span aria-hidden="true">Focus</span>
+          <FocusLamp on={focusMode} />
         </button>
       </header>
 
@@ -527,6 +528,17 @@ export function Chrome({
       */}
       <footer className={styles.bar}>
         <div className={styles.footRow}>
+          <button
+            type="button"
+            className={styles.iconControl}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-label="More"
+            onClick={onToggleMenu}
+          >
+            <span aria-hidden="true">⋮</span>
+          </button>
+
           {/*
             The slider moves one page at a time when the book knows its length,
             and falls back to the coarse chapter slider when it doesn't — WP-13's
@@ -557,17 +569,6 @@ export function Chrome({
               onChange={(event) => onJumpToChapter(Number(event.target.value))}
             />
           )}
-
-          <button
-            type="button"
-            className={styles.iconControl}
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            aria-label="More"
-            onClick={onToggleMenu}
-          >
-            <span aria-hidden="true">⋮</span>
-          </button>
         </div>
       </footer>
     </div>

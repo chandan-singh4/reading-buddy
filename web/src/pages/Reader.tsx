@@ -1225,6 +1225,25 @@ export default function Reader() {
     writeFocusMode(focusMode)
   }, [focusMode])
 
+  /*
+   * Focus Mode, told to the whole document.
+   *
+   * On `<html>` rather than on this page's own root, because what it changes —
+   * the warm wash over the canvas — is a property of the surface the app is
+   * drawn on, not of one component. `theme.css` holds what it does.
+   *
+   * Cleared when the reading page unmounts. The setting itself persists and
+   * comes back with the next book; the *appearance* does not follow the reader
+   * out to the library, where there would be no lamp to turn it off with.
+   */
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.focus = focusMode ? 'on' : 'off'
+    return () => {
+      delete root.dataset.focus
+    }
+  }, [focusMode])
+
   useEffect(() => {
     writeReaderSettings(settings)
   }, [settings])

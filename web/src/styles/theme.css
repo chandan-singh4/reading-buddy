@@ -763,3 +763,66 @@
 :root[data-reading-font='dyslexic'] {
   --font-reading: var(--face-dyslexic);
 }
+
+/*
+ * Focus Mode's effect on the page around the book.
+ *
+ * `data-focus` is set on `<html>` by the reading page while it is open, and
+ * removed when the reader leaves it. App-wide while you are reading, gone the
+ * moment you are not — a library that had quietly turned sepia, with the only
+ * switch for it two screens away inside a book, would be a trap.
+ */
+
+/*
+ * The warm canvas.
+ *
+ * A wash laid over everything rather than a new set of colour tokens. Ten
+ * themes would need ten warm variants, they would drift, and the four dark
+ * ones have no parchment to go to. One amber layer at 7% warms all ten and
+ * keeps each one recognisably itself. It sits above the page and below every
+ * control, and it never takes a tap.
+ */
+:root[data-focus='on'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: #e8c98a;
+  opacity: 0.07;
+  animation: focus-warm 0.4s ease-in-out;
+}
+
+@keyframes focus-warm {
+  from {
+    opacity: 0;
+  }
+}
+
+/*
+ * The furniture that steps back: the running head at the top of the page and
+ * the status line at its foot. Both already carry `data-page-furniture`,
+ * because both belong to the page rather than to the app — which makes it
+ * exactly the right list of things to quiet when a reader asks for the page
+ * and nothing else.
+ *
+ * Faded, not removed. The layout must not move: a page that reflows when the
+ * lamp comes on has lost the reader's line.
+ */
+[data-page-furniture] {
+  transition: opacity 0.4s ease-in-out;
+}
+
+:root[data-focus='on'] [data-page-furniture] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-focus='on'] body::after {
+    animation: none;
+  }
+
+  [data-page-furniture] {
+    transition: none;
+  }
+}
