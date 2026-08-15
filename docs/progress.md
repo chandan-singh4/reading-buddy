@@ -64,6 +64,16 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The ⋮ moved to the slider, and Focus Mode took its place** — 2026-08-15,
+  browser-checked at phone size. The ⋮ now sits at the right-hand end of the
+  bottom row, beside the slider. It still opens Contents, Bookmarks and Notes.
+  The menu grows upwards out of it.
+  - Focus Mode has the top-right corner the ⋮ held. It was a line inside the
+    menu, which is two taps to ask for less chrome.
+  - **The button is a placeholder, by agreement.** It says the word "Focus" and
+    carries `aria-pressed`. The next thread gives it its proper treatment.
+  - `.footRow` is a new flex row inside the bottom bar. The bar itself stays a
+    column, because it once stacked a slider over a row of buttons.
 - **Drag the right deck to turn the paper down** — 2026-08-15, browser-checked,
   **not yet under a thumb**. A finger dragged up on the right-hand block of
   paper brightens the page; dragged down, it darkens it — the same way round as

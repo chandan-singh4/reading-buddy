@@ -239,15 +239,24 @@ export function Chrome({
           <span aria-hidden="true">Aa</span>
         </button>
 
+        {/*
+          Focus mode has the corner the ⋮ used to hold. It was a line in the
+          menu, which is two taps and a decision for the one control a reader
+          reaches for *because* they want the chrome gone — a thing you should
+          not have to open the chrome to ask for. The ⋮ went to the foot, beside
+          the slider.
+
+          A plain word for now. This is a placeholder by agreement: the next
+          round gives it its proper treatment.
+        */}
         <button
           type="button"
           className={styles.iconControl}
-          aria-expanded={menuOpen}
-          aria-haspopup="menu"
-          aria-label="More"
-          onClick={onToggleMenu}
+          aria-pressed={focusMode}
+          aria-label="Focus mode"
+          onClick={onToggleFocus}
         >
-          <span aria-hidden="true">⋮</span>
+          <span aria-hidden="true">Focus</span>
         </button>
       </header>
 
@@ -274,16 +283,6 @@ export function Chrome({
                 {SHEET_TITLES[panel]}
               </button>
             ))}
-
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menuItem}
-              aria-pressed={focusMode}
-              onClick={onToggleFocus}
-            >
-              {focusMode ? 'Focus on' : 'Focus off'}
-            </button>
           </div>
         </>
       )}
@@ -517,42 +516,59 @@ export function Chrome({
       )}
 
       {/*
-        The bottom is the slider and nothing else now. Everything that used to
-        sit beside it opens from the top bar instead — see the note at the head
-        of this file for why the foot of a phone screen is the wrong place for
-        anything you are not deliberately dragging.
+        The bottom carries the slider and the ⋮ beside it.
+
+        The rule at the head of this file still holds — the foot of a phone is
+        where a thumb rests, so it is the wrong place for anything you are not
+        deliberately reaching for. The ⋮ earns its seat by sharing the row a
+        reader is already reaching into: you drag the slider to move through the
+        book, and contents, bookmarks and notes are the other three ways of
+        doing the same thing. They belong together.
       */}
       <footer className={styles.bar}>
-        {/*
-          The slider moves one page at a time when the book knows its length,
-          and falls back to the coarse chapter slider when it doesn't — WP-13's
-          behaviour, kept as the floor rather than deleted.
-        */}
-        {pages ? (
-          <input
-            className={styles.slider}
-            type="range"
-            min={1}
-            max={pages.pageCount}
-            value={pages.page}
-            aria-label="Move through the book"
-            aria-valuetext={`Page ${pages.page} of ${pages.pageCount}`}
-            disabled={pages.pageCount <= 1}
-            onChange={(event) => onJumpToPage(Number(event.target.value))}
-          />
-        ) : (
-          <input
-            className={styles.slider}
-            type="range"
-            min={1}
-            max={Math.max(chapterCount, 1)}
-            value={chapter}
-            aria-label="Move through the book"
-            aria-valuetext={`Chapter ${chapter} of ${chapterCount}`}
-            disabled={chapterCount <= 1}
-            onChange={(event) => onJumpToChapter(Number(event.target.value))}
-          />
-        )}
+        <div className={styles.footRow}>
+          {/*
+            The slider moves one page at a time when the book knows its length,
+            and falls back to the coarse chapter slider when it doesn't — WP-13's
+            behaviour, kept as the floor rather than deleted.
+          */}
+          {pages ? (
+            <input
+              className={styles.slider}
+              type="range"
+              min={1}
+              max={pages.pageCount}
+              value={pages.page}
+              aria-label="Move through the book"
+              aria-valuetext={`Page ${pages.page} of ${pages.pageCount}`}
+              disabled={pages.pageCount <= 1}
+              onChange={(event) => onJumpToPage(Number(event.target.value))}
+            />
+          ) : (
+            <input
+              className={styles.slider}
+              type="range"
+              min={1}
+              max={Math.max(chapterCount, 1)}
+              value={chapter}
+              aria-label="Move through the book"
+              aria-valuetext={`Chapter ${chapter} of ${chapterCount}`}
+              disabled={chapterCount <= 1}
+              onChange={(event) => onJumpToChapter(Number(event.target.value))}
+            />
+          )}
+
+          <button
+            type="button"
+            className={styles.iconControl}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-label="More"
+            onClick={onToggleMenu}
+          >
+            <span aria-hidden="true">⋮</span>
+          </button>
+        </div>
       </footer>
     </div>
   )

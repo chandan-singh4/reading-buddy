@@ -132,10 +132,9 @@ function openSheetAt(panel: 'Contents' | 'Bookmarks' | 'Notes') {
   fireEvent.click(screen.getByRole('menuitem', { name: panel }))
 }
 
-/** Focus Mode moved into the menu with everything else that isn't a bar button. */
+/** Focus Mode has its own button on the top bar, where the ⋮ used to be. */
 function turnFocusOn() {
-  fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Focus off' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Focus mode' }))
 }
 
 /** The sheet showing a named panel, for scoping a query inside it. */
@@ -811,10 +810,10 @@ describe('Focus Mode', () => {
     fireEvent.click(text)
 
     expect(chromeShown(container)).toBe(true)
-    // And the way out of Focus Mode is still there to be found — in the menu,
-    // saying it is on.
-    fireEvent.click(screen.getByRole('button', { name: MENU_BUTTON }))
-    expect(screen.getByRole('menuitem', { name: 'Focus on' })).toBeTruthy()
+    // And the way out of Focus Mode is still there to be found — the bar's own
+    // button, saying it is on.
+    const focus = screen.getByRole('button', { name: 'Focus mode' })
+    expect(focus.getAttribute('aria-pressed')).toBe('true')
   })
 
   it('leaves the book turnable — reading never loses its controls', async () => {

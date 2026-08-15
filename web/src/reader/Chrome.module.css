@@ -136,20 +136,37 @@
   white-space: nowrap;
 }
 
+/*
+ * The foot's one row: the slider, and the ⋮ at the end of it.
+ *
+ * The bar itself is a column, because it once stacked a slider over a row of
+ * buttons. It still needs to be, so this row is a child rather than the bar
+ * changing direction.
+ */
+.footRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .slider {
-  width: 100%;
+  /* `flex: 1` rather than `width: 100%`: the slider gives up exactly the 44px
+     the ⋮ needs and keeps the rest. */
+  flex: 1;
+  min-width: 0;
   min-height: 44px;
   accent-color: var(--color-accent);
   cursor: pointer;
 }
 
 /*
- * The three-dot menu, hung under the right-hand end of the top bar.
+ * The three-dot menu, standing on the right-hand end of the bottom bar.
  *
- * Anchored to the corner it was opened from rather than centred or risen from
- * the bottom, because a menu that appears somewhere other than under the button
- * you pressed makes you find it again. `--safe-top` plus the bar's own height is
- * where the bar ends; the menu starts there.
+ * Anchored to the corner it was opened from rather than centred, because a menu
+ * that appears somewhere other than at the button you pressed makes you find it
+ * again. The ⋮ now sits at the foot, so the menu grows upwards out of it: its
+ * bottom edge is the top of the bottom bar, which is the safe area, the bar's
+ * own height and the status line below it.
  */
 .menuScrim {
   position: absolute;
@@ -160,7 +177,7 @@
 
 .menu {
   position: absolute;
-  top: calc(var(--safe-top) + var(--reader-bar-top));
+  bottom: calc(var(--safe-bottom) + var(--reader-bar-bottom) + var(--status-line));
   right: var(--space-3);
   z-index: 4;
   pointer-events: auto;
