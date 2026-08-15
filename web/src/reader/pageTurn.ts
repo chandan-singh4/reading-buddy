@@ -282,8 +282,24 @@ function pageCopy(strip: HTMLElement): PageCopy {
   if (pageWidth <= 0 || count < 4) return whole()
 
   const box = strip.getBoundingClientRect()
-  const edge = (i: number) =>
-    children[i]!.getBoundingClientRect().left - box.left + strip.scrollLeft
+
+  /**
+   * Where a child *starts*, which is not what its bounding box says.
+   *
+   * A paragraph long enough to break across a column boundary is drawn in two
+   * pieces, and `getBoundingClientRect` hands back the box around both of them:
+   * top at the top of the continued piece, left at the left of the first. So its
+   * `top` is the top of the *column*, not the top of the paragraph, and the copy
+   * built from it began the text a whole column too high — every line after it
+   * moved up, the column breaks fell somewhere else, and the sheet showed words
+   * from further down the chapter than the page it was supposed to be a picture
+   * of. `getClientRects()[0]` is the first piece, which is the one that answers
+   * "where does this begin".
+   */
+  const startOf = (node: Element): DOMRect =>
+    node.getClientRects()[0] ?? node.getBoundingClientRect()
+
+  const edge = (i: number) => startOf(children[i]!).left - box.left + strip.scrollLeft
 
   // The monotonicity the search depends on, checked rather than assumed.
   if (edge(0) > edge(count - 1)) return whole()
@@ -305,7 +321,7 @@ function pageCopy(strip: HTMLElement): PageCopy {
   if (last <= first) return whole()
 
   const node = strip.cloneNode(false) as HTMLElement
-  const head = children[first]!.getBoundingClientRect()
+  const head = startOf(children[first]!)
   const style = getComputedStyle(strip)
   // Measured from the *content* top: the child's rectangle is relative to the
   // border box, and the copy applies the same border and padding itself, so
@@ -321,7 +337,15 @@ function pageCopy(strip: HTMLElement): PageCopy {
     spacer.style.margin = '0'
     node.append(spacer)
   }
-  for (let i = first; i <= last; i += 1) node.append(children[i]!.cloneNode(true))
+  for (let i = first; i <= last; i += 1) {
+    const child = children[i]!.cloneNode(true) as HTMLElement
+    // The first one is pinned by the spacer, and its own top margin would push
+    // it down past that. `above` was measured to the paragraph's border box, so
+    // the margin has already been accounted for; left in, it is applied twice
+    // and every column break after it lands a few pixels early.
+    if (i === first) child.style.marginTop = '0'
+    node.append(child)
+  }
 
   return { node, shift: edge(first) }
 }

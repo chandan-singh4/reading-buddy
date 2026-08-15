@@ -199,6 +199,20 @@ already called the blank-back turn beautiful).
   section of 8 nodes / 2 pages and looked instant. Import a deliberately large
   single-section book — 6,000 paragraphs, ~2.5 M characters — and time
   `beginDrag` with `performance.now()` before believing any of it.
+- **`getBoundingClientRect` lies about a paragraph that breaks across a column.**
+  It gives the box around *all* the pieces, so `top` is the top of the continued
+  piece and not the top of the paragraph. The cut copy used it, started the text
+  a column too high, and showed the reader a page of words they had not reached.
+  Use `getClientRects()[0]` for "where does this begin".
+- **A copy must reproduce margin collapsing, or the columns break early.** The
+  spacer holds the first kept paragraph at its measured top, and that measurement
+  is to the border box. The paragraph's own `margin-top` then applies a second
+  time. It is set to 0 in the copy.
+- **Prove a copy by comparing geometry, not by looking.** Print every visible
+  fragment as `text@left,top` for the real page and for the sheet and compare the
+  strings. Six scroll positions × both directions caught what one screenshot did
+  not. jsdom cannot do this — it has no layout, so it always takes the
+  copy-everything fallback.
 - **Setting `scrollLeft` is a layout, and sixteen of them is sixteen layouts.**
   This was 165 ms of a 200 ms turn and it was found by decomposition, not by
   reading the code — the theory going in blamed the rectangle reads, which turned

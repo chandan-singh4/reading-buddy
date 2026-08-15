@@ -64,6 +64,24 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The turning sheet shows the page it left, not a page further on** —
+  2026-08-15. The reader swiped and the page changed to text they had not
+  reached, in both directions. The cut copy was at fault, in two ways, and both
+  are the same mistake: the copy did not reproduce the original layout exactly.
+  - `getBoundingClientRect` on a paragraph that breaks across a column gives the
+    box around **both** pieces. Its `top` is the top of the continued piece, so
+    the copy began the text a column too high. `getClientRects()[0]` is the
+    piece that answers "where does this begin".
+  - The spacer holds the first kept paragraph at its measured top, and that
+    measurement is to the border box. The paragraph's own `margin-top` then
+    applied a second time and every column break landed a few pixels early. It
+    is now set to 0 in the copy.
+
+  Proved by geometry, not by eye: every visible fragment printed as
+  `text@left,top` for the real page and for the sheet, compared as strings, at
+  six scroll positions in both directions. All identical. The two that produce
+  no sheet are the first page turning back and the last page turning on, which
+  is correct. Timing is unchanged at 54–84 ms.
 - **A dragged page turn no longer clones the chapter** — 2026-08-15, measured in
   a real browser, **not yet under a thumb**. A drag built sixteen sheets, and each
   sheet was a copy of the whole laid-out section: 24,583 ms of blocked thread and
