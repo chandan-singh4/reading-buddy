@@ -12,11 +12,29 @@
   gap: var(--space-2);
 }
 
+/*
+ * The greeting, and only the greeting.
+ *
+ * A high-contrast serif here and nowhere else: this is the one line on the
+ * front door that is addressed to a person rather than describing a control,
+ * and the display face is what separates the two. The tab headings in
+ * `page.module.css` deliberately no longer match it — they are labels, not a
+ * salutation.
+ *
+ * Playfair Display is named first but is not bundled, so in practice
+ * Merriweather renders (it is a real `@font-face` in `fonts.css`). Adding
+ * Playfair means a `@fontsource` package, another woff2 on the critical path,
+ * and a face used by exactly one line — not obviously worth it.
+ *
+ * 1.15 is tight on purpose. A greeting that wraps to two lines should read as
+ * one block of address, not as two stacked headings.
+ */
 .greetingTitle {
-  font-size: var(--text-2xl);
+  font-family: 'Playfair Display', 'Merriweather', Georgia, serif;
+  font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  line-height: 1.15;
   color: var(--color-accent);
 }
 
@@ -433,5 +451,11 @@
     max-width: 46rem;
     margin-inline: auto;
     width: 100%;
+  }
+
+  /* The greeting grows with the column. 28px on a phone, 32px once there is
+     room for it. */
+  .greetingTitle {
+    font-size: 2rem;
   }
 }
