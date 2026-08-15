@@ -49,6 +49,9 @@ import {
   previousSection,
   readFocusMode,
   applyStoredTheme,
+  DIM_FROM,
+  dimAfterDrag,
+  inDimZone,
   gutterOf,
   leadingOf,
   measureOf,
@@ -564,6 +567,39 @@ export default function Reader() {
 
   /** Where the finger went down, for the swipe that turns a page. */
   const touchStart = useRef<Touch | null>(null)
+
+  /**
+   * The brightness drag on the right-hand deck, once it has been claimed.
+   *
+   * `y` is where it was claimed and `from` is how dark the page was at that
+   * moment, so every move is reckoned from the start of the stroke rather than
+   * added up — see `dimAfterDrag`. Null means no such gesture is running.
+   */
+  const dimDrag = useRef<{ y: number; from: number } | null>(null)
+
+  /**
+   * Whether this stroke began on the deck's band at all.
+   *
+   * Decided once, at `pointerdown`, and then left alone. A stroke that starts
+   * in the middle of the page cannot become a brightness drag by wandering
+   * over to the edge, and a stroke that starts on the band cannot turn a page
+   * once it has gone vertical. That is the direction gate: one question, asked
+   * once, in each direction.
+   */
+  const dimZone = useRef(false)
+
+  /**
+   * Write the darkness straight to `<html>` while the finger is down.
+   *
+   * Not through React. This runs on every pointer move, and re-rendering the
+   * reading screen — a section of six thousand paragraphs — to change one
+   * number is how a smooth drag becomes a slideshow. The value is committed to
+   * the setting once, on release, and the effect that applies the setting then
+   * writes the same number it already holds.
+   */
+  const showDim = useCallback((value: number) => {
+    document.documentElement.style.setProperty('--reader-dim', String(value))
+  }, [])
 
   /**
    * The turn currently under the reader's thumb.
@@ -2101,6 +2137,8 @@ export default function Reader() {
 
               touchStart.current = { x: event.clientX, y: event.clientY }
               dragSpeed.current = 0
+              // Asked here and nowhere else. See `dimZone`.
+              dimZone.current = inDimZone(event.clientX, window.innerWidth)
             }}
             onPointerMove={(event) => {
               if (!event.isPrimary) return
@@ -2110,11 +2148,34 @@ export default function Reader() {
                 return
               }
 
+              if (dimDrag.current) {
+                const { y, from: was } = dimDrag.current
+                showDim(dimAfterDrag(was, y - event.clientY, window.innerHeight))
+                return
+              }
+
               const from = touchStart.current
               if (!from) return
 
               const across = event.clientX - from.x
               const down = event.clientY - from.y
+
+              // The brightness gesture, claimed before the page turn gets a
+              // look in. It needs both halves of the gate: the stroke started
+              // on the deck's band, and it is going up or down rather than
+              // across. Clearing `touchStart` is what stops the page from
+              // turning for the rest of the stroke — the turn has no other way
+              // in — and the capture is what guarantees the release arrives
+              // when the finger slides off the edge of the screen, which a
+              // gesture on the last 44 px does constantly.
+              if (dimZone.current && Math.abs(down) >= DIM_FROM && Math.abs(down) > Math.abs(across)) {
+                dimDrag.current = { y: event.clientY, from: settings.dim }
+                touchStart.current = null
+                swiped.current = true
+                event.currentTarget.setPointerCapture(event.pointerId)
+                return
+              }
+
               if (Math.abs(across) < DRAG_FROM) return
 
               // A finger that is mostly going up or down is not turning a page.
@@ -2148,6 +2209,18 @@ export default function Reader() {
             onPointerUp={(event) => {
               if (!event.isPrimary) return
 
+              if (dimDrag.current) {
+                const { y, from: was } = dimDrag.current
+                dimDrag.current = null
+                // Committed once, here. The screen already shows this number —
+                // `showDim` has been writing it all along — so the only thing
+                // the state change does is save it.
+                const value = dimAfterDrag(was, y - event.clientY, window.innerHeight)
+                showDim(value)
+                setSettings((current) => ({ ...current, dim: value }))
+                return
+              }
+
               if (drag.current) {
                 touchStart.current = null
                 // The release point is a real reading and the last one there
@@ -2174,6 +2247,15 @@ export default function Reader() {
             }}
             onPointerCancel={() => {
               touchStart.current = null
+              // The system took the gesture mid-drag — a call, an edge swipe. A
+              // stroke that was interrupted is not a decision, so the page goes
+              // back to the darkness that is actually saved. Left as it stood,
+              // it would show a value nothing holds and would jump the next
+              // time anything re-rendered.
+              if (dimDrag.current) {
+                dimDrag.current = null
+                showDim(settings.dim)
+              }
               // The system has taken the gesture — a phone call, an edge swipe,
               // a second finger. There is no release coming, so the sheet is
               // settled from where it stands rather than left over the page.
@@ -2289,6 +2371,7 @@ export default function Reader() {
           <PageDecks percent={pages?.percent ?? null} />
           <PageSpine />
 
+
           <StatusLine
             manifest={frame.manifest}
             here={here}
@@ -2332,6 +2415,25 @@ export default function Reader() {
                 already says both what it is and what tapping it will do. */}
             <span className={styles.ribbonMark} aria-hidden="true" />
           </button>
+
+          {/*
+            The lamp turned down. Above the page, the decks, the spine, the
+            running head and the bookmark — everything that is the book — and
+            below the overlay and the status line, which are controls you have
+            deliberately called up and should be able to read while you use
+            them.
+
+            Last of the things at `z-index: 9`, and that is why it is written
+            here rather than up beside the decks where it belongs by subject.
+            Layers at the same level are painted in document order, and a
+            bookmark left glowing on a page turned right down looks like a
+            fault rather than a bookmark.
+
+            A veil rather than `filter: brightness()` on the page: a filter
+            makes a containing block, and everything on this screen that is
+            `position: fixed` is fixed to the screen on purpose.
+          */}
+          <div className={styles.veil} aria-hidden="true" />
 
           {/*
             The way back from a followed link. Shown only after one has been
