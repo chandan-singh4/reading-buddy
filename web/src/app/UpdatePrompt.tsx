@@ -45,6 +45,29 @@ export function UpdatePrompt() {
 
   useEffect(() => onUpdateReady(() => setPhase({ kind: 'app' })), [])
 
+  /*
+   * "Later" means later, not never.
+   *
+   * This is the bug behind "I never see the changes". Deferring used to last as
+   * long as the page did — and an installed app's page can last for days, since
+   * closing it only suspends it. The build sat waiting behind a panel that had
+   * already been dismissed and could not come back: `onNeedRefresh` fires on the
+   * worker *becoming* ready, and a worker that is already waiting never becomes
+   * ready a second time. The reader tapped Later once and was frozen on that
+   * build until something happened to reload the page.
+   *
+   * So the deferral is lifted when the reader comes back to the app — the same
+   * moment `updates.ts` checks for a new build, and a moment when nobody is
+   * mid-sentence.
+   */
+  useEffect(() => {
+    const again = () => {
+      if (document.visibilityState === 'visible') setDismissed(false)
+    }
+    document.addEventListener('visibilitychange', again)
+    return () => document.removeEventListener('visibilitychange', again)
+  }, [])
+
   const showing = phase.kind !== 'none' && !dismissed
   // While the new build is being fetched there is no way out — the page is
   // about to reload underneath the panel either way.
@@ -73,9 +96,12 @@ export function UpdatePrompt() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="update-title"
-      // Tapping the blur defers too — the same answer as Escape and "Later",
-      // so every way out of the panel means the same thing.
-      onClick={() => !locked && setDismissed(true)}
+      // The blur is not a way out. It was, and on a phone that made the panel
+      // far too easy to lose: this app teaches you to tap the page — to raise
+      // the toolbar, to turn a page — and the panel arrives under a thumb that
+      // is already tapping. Dismissing an update by accident is how a reader
+      // ends up on an old build without ever deciding to. "Later" and Escape
+      // are the ways out, and both are deliberate.
     >
       <div className={styles.panel} onClick={(event) => event.stopPropagation()}>
         <div className={styles.mark} aria-hidden="true">

@@ -69,16 +69,17 @@ describe('the update panel', () => {
     expect(ready.applied).toBe(0)
   })
 
-  it('defers when the blur behind it is tapped', () => {
+  it('stays when the blur behind it is tapped', () => {
+    // This app teaches you to tap the page, so the panel arrives under a thumb
+    // that is already tapping. Losing an update to a stray tap is how a reader
+    // ends up on an old build without deciding to.
     render(<UpdatePrompt />)
     announce()
     fireEvent.click(screen.getByRole('dialog'))
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeTruthy()
   })
 
   it('does not defer when the panel itself is tapped', () => {
-    // The panel sits inside the scrim, so without stopping the tap there,
-    // pressing anything on it would dismiss the whole thing.
     render(<UpdatePrompt />)
     announce()
     fireEvent.click(screen.getByText(/A fresh version/))
@@ -100,6 +101,19 @@ describe('the update panel', () => {
     fireEvent.click(screen.getByText('Later'))
     announce()
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('asks again when the reader comes back to the app', () => {
+    // The bug behind "I never see the changes". An installed app is suspended,
+    // not closed, so its page can live for days — and a deferral that lasted
+    // that long left a build waiting behind a panel that could not come back.
+    render(<UpdatePrompt />)
+    announce()
+    fireEvent.click(screen.getByText('Later'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent(document, new Event('visibilitychange'))
+    expect(screen.queryByRole('dialog')).toBeTruthy()
   })
 
   it('puts focus on the panel so the keyboard is not left behind the blur', () => {
