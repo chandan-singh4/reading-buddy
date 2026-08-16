@@ -62,9 +62,13 @@ export function Highlights({ highlights, root, onPick }: HighlightsProps) {
       const rects = [...range.getClientRects()]
         .filter((rect) => rect.width > 0 && rect.height > 0)
         // A paragraph on another page is laid out off to the side, and its
-        // boxes are off the screen. Drawing those would smear colour down the
-        // margins of the page the reader is actually looking at.
-        .filter((rect) => rect.right > 0 && rect.left < window.innerWidth)
+        // boxes are off the screen. The *middle* has to be on screen, not just
+        // an edge of it: a box hanging off the left of the page would otherwise
+        // paint a stripe of colour down the margin of the page being read.
+        .filter((rect) => {
+          const middle = (rect.left + rect.right) / 2
+          return middle > 0 && middle < window.innerWidth
+        })
         .map((rect) => ({
           top: rect.top,
           left: rect.left,
@@ -92,17 +96,36 @@ export function Highlights({ highlights, root, onPick }: HighlightsProps) {
 
     // A turn scrolls the strip; a font or width change resizes it. Both move
     // every box on the page, and neither one tells React anything.
-    const again = () => requestAnimationFrame(measure)
+    // One measure per frame however many events arrive. A page turn and a
+    // section load both fire these in bursts.
+    let pending = 0
+    const again = () => {
+      if (pending) return
+      pending = requestAnimationFrame(() => {
+        pending = 0
+        measure()
+      })
+    }
     root.addEventListener('scroll', again, { passive: true })
     window.addEventListener('resize', again)
 
-    const observer = new ResizeObserver(again)
-    observer.observe(root)
+    // Both observers are asked for rather than assumed. jsdom has neither, and
+    // a reading screen that throws in a test is worse than one that measures a
+    // little less often.
+    const size = typeof ResizeObserver === 'function' ? new ResizeObserver(again) : null
+    size?.observe(root)
+
+    // The section itself can be replaced — a chapter loaded, a link followed —
+    // which changes every paragraph under the column without resizing it.
+    const content = typeof MutationObserver === 'function' ? new MutationObserver(again) : null
+    content?.observe(root, { childList: true, subtree: true, characterData: true })
 
     return () => {
       root.removeEventListener('scroll', again)
       window.removeEventListener('resize', again)
-      observer.disconnect()
+      size?.disconnect()
+      content?.disconnect()
+      if (pending) cancelAnimationFrame(pending)
     }
   }, [measure, root])
 

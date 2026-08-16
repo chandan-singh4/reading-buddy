@@ -2278,11 +2278,16 @@ export default function Reader() {
   /**
    * The reading column as a *value*, so the highlights can react to it.
    *
-   * `strip` is a ref, and a ref changing tells React nothing. The element is set
-   * once, after the first render has put it in the DOM.
+   * `strip` is a ref, and a ref changing tells React nothing. A callback ref
+   * rather than a mount effect: the article is not on screen while the book is
+   * still loading, so on the first render there is nothing to read. This fires
+   * the moment the element does arrive, and again if it is ever replaced.
    */
   const [column, setColumn] = useState<HTMLElement | null>(null)
-  useEffect(() => setColumn(strip.current), [])
+  const holdStrip = useCallback((element: HTMLElement | null) => {
+    strip.current = element
+    setColumn(element)
+  }, [])
 
   /**
    * A tap on a highlight opens the menu over it.
@@ -2509,7 +2514,7 @@ export default function Reader() {
             a decision best made once there's a selection to test against.
           */}
           <article
-            ref={strip}
+            ref={holdStrip}
             className={styles.page}
             /*
               The page follows the thumb.
