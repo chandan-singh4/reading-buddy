@@ -23,6 +23,49 @@
   pointer-events: none;
 }
 
+/*
+ * The two grab points, replacing the phone's own.
+ *
+ * The bar sits on the end of the selection and the knob hangs off it, the way
+ * every platform draws this. The touch target is padded well past what is
+ * drawn — the finger is aiming at a 3px line, and it must not have to hit it.
+ */
+.handle {
+  position: fixed;
+  z-index: 11;
+  width: 3px;
+  margin-inline-start: -1px;
+  background: var(--color-accent);
+  touch-action: none;
+  cursor: ew-resize;
+}
+
+.handle::before {
+  /* The target: 44px wide and taller than the line, invisible. */
+  content: '';
+  position: absolute;
+  inset: -0.5rem -1.375rem;
+}
+
+.knob {
+  position: absolute;
+  inset-inline-start: 50%;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.handleStart .knob {
+  top: -0.625rem;
+  transform: translateX(-50%);
+}
+
+.handleEnd .knob {
+  bottom: -0.625rem;
+  transform: translateX(-50%);
+}
+
 .card {
   position: fixed;
   /* Above the overlay (10) and the status line (11): a menu that a panel can

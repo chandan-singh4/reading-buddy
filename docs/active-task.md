@@ -10,7 +10,7 @@
 
 ## Judge the chapter openings and the selection menu on the phone
 
-Nothing is mid-edit. Build green, **1379 tests across 79 files** (2026-08-16).
+Nothing is mid-edit. Build green, **1363 tests across 78 files** (2026-08-16).
 
 Two features landed. The Browser pane has no book on its shelf, so neither was
 proved by eye.

@@ -13,10 +13,18 @@
  * closes, and every item is reachable and visibly focused.
  */
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
 
-import { HIGHLIGHT_COLOURS, type ReaderSelection } from './selection.ts'
+import { HIGHLIGHT_COLOURS, type ReaderSelection, type SelectionEdge } from './selection.ts'
 import styles from './SelectionMenu.module.css'
 
 /** What the reader asked for. The Reader decides what any of it means. */
@@ -36,6 +44,8 @@ export interface SelectionMenuProps {
   selection: ReaderSelection
   onAction: (action: SelectionAction) => void
   onDismiss: () => void
+  /** One end of the selection dragged to a point on screen. */
+  onExtend: (edge: SelectionEdge, x: number, y: number) => void
 }
 
 /** How far the card stays from the edge of the screen, and from the selection. */
@@ -75,8 +85,15 @@ const ICONS = {
   chevron: 'M9 6l6 6-6 6',
 }
 
-export function SelectionMenu({ selection, onAction, onDismiss }: SelectionMenuProps) {
+export function SelectionMenu({
+  selection,
+  onAction,
+  onDismiss,
+  onExtend,
+}: SelectionMenuProps) {
   const card = useRef<HTMLDivElement | null>(null)
+  /** Which handle is under a finger, if either. */
+  const [dragging, setDragging] = useState<SelectionEdge | null>(null)
   const [place, setPlace] = useState<{ top: number; left: number; above: boolean } | null>(null)
   const [colours, setColours] = useState(false)
   const [asking, setAsking] = useState(true)
@@ -121,6 +138,8 @@ export function SelectionMenu({ selection, onAction, onDismiss }: SelectionMenuP
   useEffect(() => {
     const onDown = (event: PointerEvent) => {
       if (card.current?.contains(event.target as Node)) return
+      // A handle is not the card, but grabbing one is not a tap outside either.
+      if ((event.target as HTMLElement | null)?.closest?.(`.${styles.handle}`)) return
       onDismiss()
     }
     // `pointerdown` rather than `click`: a tap outside clears the selection
@@ -164,6 +183,57 @@ export function SelectionMenu({ selection, onAction, onDismiss }: SelectionMenuP
   }
 
   /*
+   * The two grab points, one on each end of the selection.
+   *
+   * The phone's own handles left with the phone's own menu, so these replace
+   * them. The pointer is captured on the way down, which means every move goes
+   * to this element even after the finger has left it — a handle you can only
+   * drag while staying on top of a 12px dot is a handle nobody can use.
+   */
+  function handleFor(edge: SelectionEdge) {
+    const rects = selection.rects
+    const rect = edge === 'start' ? rects[0] : rects[rects.length - 1]
+    if (!rect) return null
+
+    const x = edge === 'start' ? rect.left : rect.left + rect.width
+
+    function onPointerDown(event: ReactPointerEvent<HTMLSpanElement>) {
+      event.preventDefault()
+      event.stopPropagation()
+      event.currentTarget.setPointerCapture(event.pointerId)
+      setDragging(edge)
+    }
+
+    function onPointerMove(event: ReactPointerEvent<HTMLSpanElement>) {
+      if (dragging !== edge) return
+      event.preventDefault()
+      // Read a little above the finger: the text being aimed at is the text the
+      // fingertip is covering, not the pixel under its centre.
+      onExtend(edge, event.clientX, event.clientY - rect.height / 2)
+    }
+
+    function onPointerUp(event: ReactPointerEvent<HTMLSpanElement>) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+      setDragging(null)
+    }
+
+    return (
+      <span
+        key={edge}
+        className={`${styles.handle} ${edge === 'start' ? styles.handleStart : styles.handleEnd}`}
+        aria-hidden="true"
+        style={{ top: `${rect.top}px`, left: `${x}px`, height: `${rect.height}px` }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        <span className={styles.knob} />
+      </span>
+    )
+  }
+
+  /*
    * Both the marks and the card go through a portal onto `<body>`.
    *
    * `position: fixed` is measured against the nearest transformed ancestor, not
@@ -192,14 +262,18 @@ export function SelectionMenu({ selection, onAction, onDismiss }: SelectionMenuP
         />
       ))}
 
+      {handleFor('start')}
+      {handleFor('end')}
+
       <div
         ref={card}
       className={`${styles.card} ${place?.above ? styles.above : styles.below}`}
       style={{
         top: place ? `${place.top}px` : 0,
         left: place ? `${place.left}px` : 0,
-        // Hidden until measured, so it is never seen in the wrong place.
-        visibility: place ? 'visible' : 'hidden',
+        // Hidden until measured, so it is never seen in the wrong place. Hidden
+        // again during a drag: the card would sit over the words being chosen.
+        visibility: place && !dragging ? 'visible' : 'hidden',
       }}
       role="menu"
       aria-label="Selected text"

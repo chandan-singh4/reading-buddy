@@ -51,7 +51,18 @@ export interface ReaderSelection {
    * gets drawn. See `SelectionMenu.tsx`.
    */
   rects: SelectionRect[]
+  /**
+   * The range itself, so the reader can stretch it.
+   *
+   * The phone's own drag handles went with the phone's own menu, and a reader
+   * who can only ever select one word has been given a worse deal than the
+   * browser offered. `extendSelection` moves one end of this.
+   */
+  range: Range
 }
+
+/** Which end of a selection a finger is dragging. */
+export type SelectionEdge = 'start' | 'end'
 
 /** One line of a selection, in viewport coordinates. */
 export interface SelectionRect {
@@ -59,6 +70,67 @@ export interface SelectionRect {
   left: number
   width: number
   height: number
+}
+
+/**
+ * The text position under a point on screen.
+ *
+ * Two names for one thing. `caretRangeFromPoint` is what Chrome and Safari
+ * have — which is every browser this app is read in — and
+ * `caretPositionFromPoint` is the standard one Firefox implements. Neither is
+ * in the DOM types, hence the casts.
+ */
+function caretAt(x: number, y: number): { node: Node; offset: number } | null {
+  const doc = document as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+  }
+
+  const range = doc.caretRangeFromPoint?.(x, y)
+  if (range) return { node: range.startContainer, offset: range.startOffset }
+
+  const position = doc.caretPositionFromPoint?.(x, y)
+  if (position) return { node: position.offsetNode, offset: position.offset }
+
+  return null
+}
+
+/**
+ * One end of the selection dragged to a point on screen.
+ *
+ * The other end holds still. A drag that would turn the selection inside out —
+ * the start pulled past the end — is refused rather than flipped, because a
+ * selection that swaps ends under a finger is a selection nobody can aim.
+ *
+ * Returns `null` when the point is not on text inside `root`, which the caller
+ * should read as "keep what you had".
+ */
+export function extendSelection(
+  current: ReaderSelection,
+  edge: SelectionEdge,
+  x: number,
+  y: number,
+  root: HTMLElement | null,
+): ReaderSelection | null {
+  if (!root) return null
+
+  const caret = caretAt(x, y)
+  if (!caret || !root.contains(caret.node)) return null
+
+  const range = current.range.cloneRange()
+  const moved = document.createRange()
+  moved.setStart(caret.node, caret.offset)
+
+  if (edge === 'end') {
+    // Past the start, or there is nothing left to select.
+    if (moved.compareBoundaryPoints(Range.START_TO_START, range) <= 0) return null
+    range.setEnd(caret.node, caret.offset)
+  } else {
+    if (moved.compareBoundaryPoints(Range.START_TO_END, range) >= 0) return null
+    range.setStart(caret.node, caret.offset)
+  }
+
+  return describe(range, root)
 }
 
 /** `ch02-s03-p013` — the shape `elementIdOf` makes out of an anchor. */
@@ -85,7 +157,11 @@ export function selectionInReader(root: HTMLElement | null): ReaderSelection | n
   const selection = window.getSelection()
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null
 
-  const range = selection.getRangeAt(0)
+  return describe(selection.getRangeAt(0), root)
+}
+
+/** Everything the app keeps about a range. `null` if the range is no good. */
+function describe(range: Range, root: HTMLElement): ReaderSelection | null {
   if (!root.contains(range.commonAncestorContainer)) return null
 
   const text = range.toString().replace(/\s+/g, ' ').trim()
@@ -103,6 +179,7 @@ export function selectionInReader(root: HTMLElement | null): ReaderSelection | n
   return {
     text,
     anchor,
+    range: range.cloneRange(),
     rect: {
       top: Math.min(...box.map((rect) => rect.top)),
       bottom: Math.max(...box.map((rect) => rect.bottom)),

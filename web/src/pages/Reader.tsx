@@ -7,9 +7,11 @@ import {
   Chrome,
   NoteComposer,
   SelectionMenu,
+  extendSelection,
   selectionInReader,
   type ReaderSelection,
   type SelectionAction,
+  type SelectionEdge,
   anchorAtPage,
   bookmarkOn,
   buildSpine,
@@ -2182,8 +2184,8 @@ export default function Reader() {
      * way to ask it not to. Dropping the selection takes that menu away, and
      * the words are drawn again by `SelectionMenu` so nothing looks lost.
      *
-     * The cost is honest and worth naming: the drag handles go with it, so a
-     * selection is adjusted by making it again rather than by nudging an end.
+     * The phone's drag handles go with it, so the app draws its own — see
+     * `stretchSelection` and the handles in `SelectionMenu`.
      */
     const capture = () => {
       const found = selectionInReader(strip.current)
@@ -2249,6 +2251,16 @@ export default function Reader() {
    * gesture. This is what tells that click it has already done its job.
    */
   const dismissed = useRef(false)
+
+  /**
+   * A handle dragged to a point. Keep what we had if it lands off the text.
+   *
+   * The app owns the selection now, so stretching it is arithmetic on a range
+   * rather than anything the browser does for us.
+   */
+  const stretchSelection = useCallback((edge: SelectionEdge, x: number, y: number) => {
+    setSelected((at) => (at ? (extendSelection(at, edge, x, y, strip.current) ?? at) : at))
+  }, [])
 
   /** Put the menu away and let go of the words. */
   const dropSelection = useCallback(() => {
@@ -2782,6 +2794,7 @@ export default function Reader() {
               selection={selected}
               onAction={onSelectionAction}
               onDismiss={dropSelection}
+              onExtend={stretchSelection}
             />
           )}
 
