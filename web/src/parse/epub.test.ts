@@ -836,3 +836,98 @@ describe('parseEpub — the ISBN', () => {
     expect(isbn).toBe('9780241988770')
   })
 })
+
+describe('the book states its own structure', () => {
+  // The reported shape: a converted book with no <h1> anywhere, whose titles
+  // exist only as styled paragraphs, and which carries a proper nav document.
+  const CSS = `
+    p { font-size: 1em; text-indent: 1.2em; }
+    p.part { font-size: 2em; font-weight: bold; text-align: center; text-indent: 0; }
+    p.chap { font-size: 1.4em; font-weight: bold; text-indent: 0; }
+    p.ded { font-size: 1.2em; text-align: center; text-indent: 0; }
+  `
+
+  const NAV = `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body>
+    <nav epub:type="toc">
+      <ol>
+        <li><a href="front.xhtml#ded">Dedication</a></li>
+        <li><a href="front.xhtml#pre">Preface</a></li>
+        <li><a href="body.xhtml#part1">Planting Sweetgrass</a>
+          <ol>
+            <li><a href="body.xhtml#sky">Skywoman Falling</a></li>
+            <li><a href="body.xhtml#pecans">The Council of Pecans</a></li>
+          </ol>
+        </li>
+      </ol>
+    </nav>
+  </body>
+</html>`
+
+  const epub = makeEpub({
+    manifest: [
+      '<item id="css" href="style.css" media-type="text/css"/>',
+      '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+      '<item id="f" href="front.xhtml" media-type="application/xhtml+xml"/>',
+      '<item id="b" href="body.xhtml" media-type="application/xhtml+xml"/>',
+    ].join(''),
+    spine: '<itemref idref="f"/><itemref idref="b"/>',
+    files: {
+      'OEBPS/style.css': CSS,
+      'OEBPS/nav.xhtml': NAV,
+      'OEBPS/front.xhtml': chapterDoc(
+        `<link rel="stylesheet" href="style.css"/>
+         <p class="ded" id="ded">my daughters</p>
+         <p class="ded">and my grandchildren</p>
+         <p class="ded">yet to join us in this beautiful place</p>
+         <p class="chap" id="pre">Preface</p>
+         <p>Hold out your hands and let me lay upon them a sheaf of sweetgrass, loose and flowing.</p>`,
+      ),
+      'OEBPS/body.xhtml': chapterDoc(
+        `<link rel="stylesheet" href="style.css"/>
+         <p class="part" id="part1">Planting Sweetgrass</p>
+         <p>Sweetgrass is best planted not by seed, but by putting roots in the ground.</p>
+         <p class="chap" id="sky">Skywoman Falling</p>
+         <p>In winter, when the green earth lies resting beneath a blanket of snow.</p>
+         <p class="chap" id="pecans">The Council of Pecans</p>
+         <p>Nuts fell that year in numbers nobody in the valley could remember.</p>`,
+      ),
+    },
+  })
+
+  it('lists the Preface as a division of the book', async () => {
+    const book = await parseEpub(epub, meta())
+    const titles = book.chapters.flatMap((chapter) => [
+      chapter.title,
+      ...chapter.sections.map((section) => section.title),
+    ])
+    expect(titles).toContain('Preface')
+  })
+
+  it('names every division the navigation names', async () => {
+    const book = await parseEpub(epub, meta())
+    const titles = book.chapters.flatMap((chapter) => [
+      chapter.title,
+      ...chapter.sections.map((section) => section.title),
+    ])
+    for (const wanted of ['Dedication', 'Preface', 'Planting Sweetgrass', 'Skywoman Falling']) {
+      expect(titles).toContain(wanted)
+    }
+  })
+
+  it('does not turn the dedication’s three lines into three chapters', async () => {
+    const book = await parseEpub(epub, meta())
+    const titles = book.chapters.map((chapter) => chapter.title)
+    expect(titles).not.toContain('and my grandchildren')
+    expect(titles).not.toContain('yet to join us in this beautiful place')
+  })
+
+  it('keeps those lines in the text, still set apart', async () => {
+    const book = await parseEpub(epub, meta())
+    const text = book.sections
+      .flatMap((section) => section.paragraphs)
+      .map((paragraph) => paragraph.text)
+    expect(text).toContain('and my grandchildren')
+  })
+})

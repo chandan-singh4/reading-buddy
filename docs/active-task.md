@@ -10,9 +10,28 @@
 
 ## Re-import a book and judge the parser on the phone
 
-Nothing is mid-edit. Build green, **1394 tests across 81 files** (2026-08-16).
+Nothing is mid-edit. Build green, **1404 tests across 81 files** (2026-08-16).
 
-The parser now reads the book's own stylesheet. Before this it judged structure
+The parser now takes the book's structure from the book's own navigation. Every
+epub ships a `toc.ncx` or a `nav.xhtml`. In it the author states the divisions:
+their titles, their nesting, and the exact place each one starts. We read that
+file before, but kept only a title per document. We dropped the positions and
+the nesting. So the parser guessed a structure the file already stated.
+
+Both formats are read now. Each entry finds its block and makes it a heading at
+the depth the navigation gives it. A heading the navigation does not name goes
+back to a paragraph set apart. This is what stops a dedication of three short
+lines from becoming three chapters. The styling rules below are now the fallback
+for a file with no usable navigation.
+
+The navigation decides the structure. The markup keeps its own words. So a real
+`<h1>NOTES</h1>` is not renamed to match a contents line that reads "Notes".
+
+The book's printed contents page is kept. An earlier rule dropped it. That rule
+was wrong twice. The page belongs to the book. And the rule could not tell where
+the list ended, so it also ate the "PREFACE" title. That was the missing Preface.
+
+The parser also reads the book's own stylesheet. Before this it judged structure
 from tag names only. Almost no ebook is written as HTML. Converters make them,
 and converters do not write `<h1>`. They write `<p class="chaphead">CONTENTS</p>`
 and put the size and the weight in a CSS file. The parser never opened that file.
@@ -27,10 +46,7 @@ A line becomes a heading on two signals, not one. Some books set all their text
 in bold, or centre every line. One signal would turn such a book into one long
 heading.
 
-A contents page with no `<nav>` is now dropped. The app builds its own contents
-screen, and the printed page numbers do not apply here.
-
-`PARSER_VERSION` is **21**. Books on the shelf keep their old text until you
+`PARSER_VERSION` is **23**. Books on the shelf keep their old text until you
 accept the re-parse the shelf offers.
 
 The browser paints the highlights now. `CSS.highlights` holds one live range per
@@ -91,7 +107,8 @@ has not done:
 | `web/src/reader/NotesPanel.tsx` | Shows a highlight's colour. |
 | `web/src/parse/styles.ts` | Reads the book's CSS. Gives each block its look. |
 | `web/src/parse/html.ts` | Turns markup into blocks. Holds both heading rules. |
-| `web/src/parse/epub.ts` | Finds the stylesheets and passes them to `htmlToBlocks`. |
+| `web/src/parse/epub.ts` | Reads `toc.ncx`/`nav.xhtml`, and finds the stylesheets. |
+| `web/src/parse/assemble.ts` | Blocks into divisions. Holds the `guessed` flag. |
 | `web/src/parse/version.ts` | `PARSER_VERSION`. Bump it when a book parses differently. |
 
 ### Out of scope

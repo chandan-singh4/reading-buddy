@@ -112,29 +112,33 @@ describe('htmlToBlocks with the book’s own stylesheet', () => {
     expect(blocks[0]).toMatchObject({ kind: 'heading', text: 'Skywoman Falling' })
   })
 
-  it('drops a contents page that carries no nav', () => {
+  it('keeps the book’s own contents page', () => {
+    // The reader asked for this page. It belongs to the book, the same as a
+    // dedication or an epigraph does. The app's Contents tab is a separate
+    // thing, built from the navigation, and it does not replace this page.
     const blocks = htmlToBlocks(`
       <p class="chaphead">Contents</p>
       <p>Preface</p>
       <p>Planting Sweetgrass</p>
       <p>Skywoman Falling</p>
     `, readStyles([css]))
-    expect(blocks.every((block) => block.kind === 'furniture')).toBe(true)
+    const text = blocks.map((block) => block.text)
+    expect(text).toContain('Contents')
+    expect(text).toContain('Preface')
+    expect(text).toContain('Skywoman Falling')
   })
 
-  it('stops at the chapter that follows the contents', () => {
+  it('keeps the chapter title that follows a contents page', () => {
+    // The rule this replaces read forward from "Contents" and turned every
+    // short line into furniture. "Preface" is exactly that shape, so the book
+    // lost its Preface entirely.
     const blocks = htmlToBlocks(`
       <p class="chaphead">Contents</p>
-      <p>Preface</p>
+      <p class="chaphead">Preface</p>
       <p>She fell like a maple seed, pirouetting on an autumn breeze.</p>
-      <p>Winter is the time for telling stories, and the elders say so.</p>
-      <p>The story goes that she came from Skyworld above.</p>
     `, readStyles([css]))
-    expect(blocks.filter((block) => block.kind === 'prose').map((block) => block.text)).toEqual([
-      'She fell like a maple seed, pirouetting on an autumn breeze.',
-      'Winter is the time for telling stories, and the elders say so.',
-      'The story goes that she came from Skyworld above.',
-    ])
+    expect(blocks.map((block) => block.text)).toContain('Preface')
+    expect(blocks.some((block) => block.kind === 'furniture')).toBe(false)
   })
 
   describe('promoting styled headings to real ones', () => {

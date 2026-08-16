@@ -624,6 +624,8 @@ function promoteStyledHeadings(
       kind: 'heading',
       level: ranked.indexOf(entry.size) + 1,
       text: block.text,
+      // Flagged as inference, so an epub's own navigation can overrule it.
+      guessed: true,
     }
     // Carried over because a heading is what a contents page links to, and the
     // ids were the paragraph's before it became one.
@@ -632,60 +634,25 @@ function promoteStyledHeadings(
   })
 }
 
-/** The lines that open a contents page, in the books that spell it out. */
-const CONTENTS_TITLE = /^(table of )?contents$/i
-
-/** How long a line can be and still pass as an entry on a contents page. */
-const CONTENTS_ENTRY_MAX = 90
-
-/**
- * Turn a contents page into furniture, even when the file gives no sign it is one.
+/*
+ * A printed contents page was briefly turned into furniture here, on the
+ * reasoning that the app builds its own contents screen and the paper page
+ * numbers mean nothing on a phone. Both halves of that are true and the rule
+ * was still wrong twice over.
  *
- * A well-made epub marks its contents with `<nav>` or `epub:type="toc"`, and the
- * walk above already drops those. A converted one gives us a page of bare `<p>`s
- * whose only distinguishing feature is that a human can see what they are. They
- * were arriving as body prose: a screenful of chapter names run together as
- * though they were sentences, which is exactly what the reader reported.
+ * It dropped a page the reader wanted. The app's contents screen is for
+ * navigating; the printed one is part of the book, and belongs where the
+ * publisher put it.
  *
- * It is dropped rather than styled because the app builds its own contents
- * screen from the book's structure. The printed one is a copy of that, made for
- * a medium with fixed page numbers, and the page numbers it carries are wrong
- * here by definition.
+ * And it could not tell where the contents ended. It ran forward from the word
+ * "Contents" taking every short line as another entry, and "PREFACE" — short,
+ * and not ending like a sentence — is exactly that shape. So the book's first
+ * chapter title was dropped as furniture, and the Preface vanished from the
+ * contents screen. That is the failure the rule existed to prevent.
  *
- * Bounded deliberately. It starts only at a line that says "Contents", and it
- * stops at the second line in a row that does not read like an entry — so a
- * chapter that happens to follow the contents in the same file keeps its text.
- * Where a book has no such heading, nothing happens and we are no worse off.
+ * Kept as a note rather than deleted quietly, because the idea will look
+ * reasonable again to whoever reads this next.
  */
-function dropContentsPage(blocks: Block[]): Block[] {
-  const start = blocks.findIndex(
-    (block) =>
-      (block.kind === 'heading' || block.kind === 'prose') && CONTENTS_TITLE.test(block.text.trim()),
-  )
-  if (start < 0) return blocks
-
-  const out = [...blocks]
-  out[start] = { kind: 'furniture', text: out[start]!.text }
-
-  let missed = 0
-  for (let i = start + 1; i < out.length; i += 1) {
-    const block = out[i]!
-    if (block.kind !== 'prose' && block.kind !== 'heading') break
-
-    const text = block.text.trim()
-    const entry = text.length > 0 && text.length <= CONTENTS_ENTRY_MAX && !ENDS_LIKE_A_SENTENCE.test(text)
-    if (!entry) {
-      missed += 1
-      if (missed === 2) break
-      continue
-    }
-
-    missed = 0
-    out[i] = { kind: 'furniture', text: block.text }
-  }
-
-  return out
-}
 
 /**
  * A section break: the pause an author puts between two scenes inside one
@@ -936,12 +903,10 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
    * the contents page, and a contents page points at chapter openings — never
    * at the page furniture repeated above them.
    */
-  return dropContentsPage(
-    promoteStyledHeadings(blocks, styledHeadings).map((block) =>
-      (block.kind === 'prose' || block.kind === 'heading') && isRunningHead(block.text)
-        ? { kind: 'furniture' as const, text: block.text }
-        : block,
-    ),
+  return promoteStyledHeadings(blocks, styledHeadings).map((block) =>
+    (block.kind === 'prose' || block.kind === 'heading') && isRunningHead(block.text)
+      ? { kind: 'furniture' as const, text: block.text }
+      : block,
   )
 }
 

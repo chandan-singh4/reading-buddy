@@ -678,6 +678,226 @@ function readTocTitles(archive: Archive, packagePath: string): Map<string, strin
   return titles
 }
 
+// --- The book's own navigation -----------------------------------------------
+
+/**
+ * One line of the book's own table of contents.
+ *
+ * `path` is the archive path of the document it points into. `fragment` is the
+ * id inside that document, empty when the entry means "the start of this file".
+ * `depth` is 1 for a top-level entry, 2 for one nested inside it, and so on.
+ */
+interface NavEntry {
+  path: string
+  fragment: string
+  label: string
+  depth: number
+}
+
+/**
+ * Read the epub's navigation document — the structure the book states about
+ * itself, rather than the structure we infer from how it looks.
+ *
+ * This is the file that draws the chapter list in every other reader. It is
+ * authored, not derived: a person or a converter wrote down which lines are
+ * divisions, what they are called, and which ones sit inside which. Nothing we
+ * can measure from a stylesheet is as good, because appearance cannot separate
+ * a chapter title from a dedication set in the same type — and that is not a
+ * gap a better heuristic closes, it is a gap in the evidence.
+ *
+ * `readTocTitles` has read this file all along and kept one thing from it: a
+ * label per document. It dropped the fragment, so an entry pointing *into* a
+ * file collapsed to the file, and it dropped the nesting, so a part containing
+ * six chapters became six unrelated entries. Both of those are the structure.
+ *
+ * EPUB 3 states it as a nested `<ol>` inside `<nav epub:type="toc">`; EPUB 2
+ * states it as nested `<navPoint>`s in an `.ncx`. Both are read, and 3 wins
+ * where a book carries both, because a book carrying both is an EPUB 3 with a
+ * compatibility copy that is often the poorer of the two.
+ */
+function readNavigation(archive: Archive, packagePath: string): NavEntry[] {
+  let fromNcx: NavEntry[] = []
+  let fromNav: NavEntry[] = []
+
+  for (const name of Object.keys(archive)) {
+    const lower = name.toLowerCase()
+    const isNcx = lower.endsWith('.ncx')
+    const isNav = lower.endsWith('nav.xhtml') || lower.endsWith('toc.xhtml')
+    if (!isNcx && !isNav) continue
+
+    const source = readText(archive, name)
+    if (!source) continue
+
+    let doc: Document
+    try {
+      doc = parseXml(source, name)
+    } catch {
+      continue // A broken ToC is not worth failing an otherwise readable book.
+    }
+
+    const entries = isNcx ? readNcxPoints(doc, name) : readNavList(doc, name)
+    if (isNcx) fromNcx = entries.length > 0 ? entries : fromNcx
+    else fromNav = entries.length > 0 ? entries : fromNav
+  }
+
+  const chosen = fromNav.length > 0 ? fromNav : fromNcx
+  // The package file is not a chapter, whatever an entry claims.
+  return chosen.filter((entry) => entry.path !== packagePath)
+}
+
+/** EPUB 2: `<navPoint>`s, nested to show which division contains which. */
+function readNcxPoints(doc: Document, name: string): NavEntry[] {
+  const entries: NavEntry[] = []
+
+  for (const point of byLocalName(doc, 'navPoint')) {
+    const label = firstByLocalName(point, 'text')?.textContent?.trim()
+    const src = firstByLocalName(point, 'content')?.getAttribute('src')
+    if (!label || !src) continue
+
+    // Depth is how many navPoints this one sits inside. An ncx nests them
+    // directly, so counting ancestors is the whole of it.
+    let depth = 1
+    for (let parent = point.parentElement; parent; parent = parent.parentElement) {
+      if (parent.localName === 'navPoint') depth += 1
+    }
+
+    entries.push({ ...splitHref(name, src), label, depth })
+  }
+
+  return entries
+}
+
+/** EPUB 3: `<nav epub:type="toc">` holding a nested `<ol>` of links. */
+function readNavList(doc: Document, name: string): NavEntry[] {
+  const navs = byLocalName(doc, 'nav')
+  // A nav document may hold several lists — contents, a page list, a landmarks
+  // list. Only the contents describes the book's divisions.
+  const toc =
+    navs.find((nav) => (attr(nav, 'type') ?? '').split(/\s+/).includes('toc')) ?? navs[0] ?? null
+  if (!toc) return []
+
+  const entries: NavEntry[] = []
+
+  for (const anchor of byLocalName(toc, 'a')) {
+    const label = anchor.textContent?.trim()
+    const href = anchor.getAttribute('href')
+    if (!label || !href) continue
+
+    // Depth is how many lists this link sits inside, so a chapter under a part
+    // comes back as 2 and the part as 1.
+    let depth = 0
+    for (let parent = anchor.parentElement; parent && parent !== toc; parent = parent.parentElement) {
+      if (parent.localName === 'ol' || parent.localName === 'ul') depth += 1
+    }
+
+    entries.push({ ...splitHref(name, href), label, depth: Math.max(depth, 1) })
+  }
+
+  return entries
+}
+
+/** `chapter4.xhtml#part2` → the archive path, and the id inside it. */
+function splitHref(base: string, href: string): { path: string; fragment: string } {
+  const hash = href.indexOf('#')
+  return {
+    path: resolvePath(base, href),
+    fragment: hash < 0 ? '' : safeDecode(href.slice(hash + 1).trim()),
+  }
+}
+
+/**
+ * How many entries the navigation must carry before it is trusted to describe
+ * the whole book.
+ *
+ * Some files ship a token contents — "Cover, Start" — which states nothing and
+ * would silence a heuristic that was doing useful work. Three is low enough to
+ * accept a short book and high enough to reject a stub.
+ */
+const NAV_IS_AUTHORITATIVE = 3
+
+/**
+ * Rewrite the block stream so the book's divisions are the ones the book names.
+ *
+ * Three things happen, in this order, and each is smaller than it sounds.
+ *
+ * 1. **Every navigation entry becomes a heading**, at the position it points
+ *    at. Where it points at a line already read as a heading, that line takes
+ *    the navigation's title and level. Where it points at prose — which is what
+ *    a converted book gives, since its titles are only paragraphs — a heading
+ *    is put in front of it.
+ * 2. **Levels come from the nesting**, so a part contains its chapters.
+ * 3. **Guessed headings the navigation did not name are put back to prose**,
+ *    keeping the emphasis and losing the division. This is what stops a
+ *    dedication of three short centred lines from becoming three chapters: the
+ *    book's own contents does not call them chapters, and it is in a position
+ *    to know. A real `<h1>` is never touched, because the author wrote it.
+ *
+ * Does nothing at all when the file has no usable navigation, which leaves a
+ * bare or broken epub exactly where it was.
+ */
+function applyNavigation(
+  perDocument: readonly { path: string; blocks: Block[] }[],
+  nav: readonly NavEntry[],
+): boolean {
+  if (nav.length < NAV_IS_AUTHORITATIVE) return false
+
+  const byPath = new Map(perDocument.map((doc) => [doc.path, doc]))
+  const named = new Set<Block>()
+  const inserts = new Map<string, { at: number; entry: NavEntry }[]>()
+
+  for (const entry of nav) {
+    const doc = byPath.get(entry.path)
+    if (!doc) continue
+
+    // Ids were qualified with their document when the blocks were built, so a
+    // bare `#part2` has to be qualified the same way to be found again.
+    const wanted = `${entry.path}#${entry.fragment}`
+    const at = entry.fragment
+      ? doc.blocks.findIndex((block) => block.ids?.includes(wanted))
+      : doc.blocks.findIndex((block) => block.kind !== 'furniture')
+    if (at < 0) continue
+
+    const target = doc.blocks[at]!
+    if (target.kind === 'heading') {
+      // Structure comes from the navigation; the words stay the markup's own.
+      // A real `<h1>NOTES</h1>` and a contents line reading "Notes" are both
+      // the author speaking, and rewriting the heading to match the contents
+      // gains nothing while quietly changing the page. Only a guessed heading —
+      // which has no authority over its own text either — takes the label.
+      target.level = entry.depth
+      if (target.guessed) target.text = entry.label
+      delete target.guessed
+      named.add(target)
+      continue
+    }
+
+    const list = inserts.get(entry.path) ?? []
+    list.push({ at, entry })
+    inserts.set(entry.path, list)
+  }
+
+  for (const doc of perDocument) {
+    // A guess the book never called a division goes back to being a paragraph.
+    // It keeps `subheading`, so it still reads as a heading on the page.
+    for (const [i, block] of doc.blocks.entries()) {
+      if (block.kind === 'heading' && block.guessed && !named.has(block)) {
+        const { level: _level, guessed: _guessed, ...rest } = block
+        doc.blocks[i] = { ...rest, kind: 'prose', label: 'subheading' }
+      }
+    }
+
+    const list = inserts.get(doc.path)
+    if (!list) continue
+
+    // Back to front, so an earlier insertion cannot move a later index.
+    for (const { at, entry } of [...list].sort((a, b) => b.at - a.at)) {
+      doc.blocks.splice(at, 0, { kind: 'heading', level: entry.depth, text: entry.label })
+    }
+  }
+
+  return true
+}
+
 // --- Pictures ----------------------------------------------------------------
 
 /**
@@ -877,6 +1097,11 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
     return { path, blocks }
   })
 
+  // The book's own account of its structure, applied before anything is
+  // concatenated — while we still know which blocks belong to which file, which
+  // is what a navigation entry points at.
+  const navigated = applyNavigation(perDocument, readNavigation(archive, packagePath))
+
   const blocks: Block[] = []
   for (const doc of perDocument) {
     if (doc.blocks.length === 0) continue
@@ -906,8 +1131,11 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
      * the book, which is what level 1 means before `resolveLevels` rescales
      * everything to whatever the book actually uses.
      */
+    // Skipped once the navigation has spoken: it has already given every
+    // document it names a heading, in the right place and at the right level.
+    // Synthesising a second one here would title the document twice.
     const synthesised: Block[] = []
-    const hasHeading = doc.blocks.some((block) => block.kind === 'heading')
+    const hasHeading = navigated || doc.blocks.some((block) => block.kind === 'heading')
     if (!hasHeading) {
       const title = tocTitles.get(doc.path)
       if (title) synthesised.push({ kind: 'heading', level: 1, text: title })

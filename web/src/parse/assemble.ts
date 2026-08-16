@@ -83,6 +83,17 @@ interface BlockFields {
    * than a section split.
    */
   startsPage?: true
+
+  /**
+   * This heading was inferred from how the line looked, not read from the
+   * markup. Set by the style pass in `html.ts`.
+   *
+   * Recorded so a later, better source can overrule it. An epub states its own
+   * divisions in its navigation document, and where that exists it is fact and
+   * this is a guess — see `applyNavigation` in `epub.ts`. A real `<h1>` never
+   * carries this, so nothing the author wrote can be overruled by mistake.
+   */
+  guessed?: true
 }
 
 export interface HeadingBlock extends BlockFields {

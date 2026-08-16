@@ -221,5 +221,33 @@
  *   a re-parse rebuilds anchors in any case, notes carry their quote text, and
  *   the caution bought nothing while costing the reader the whole contents
  *   screen. Books parsed under 21 have the titles but none of the structure.
+ * - **23** — the book's own navigation decides the structure. Every epub ships
+ *   a `toc.ncx` or a `nav.xhtml` in which the author *states* the divisions:
+ *   their titles, their nesting, and the exact position of each one, as a
+ *   `#fragment` into a spine document. We read that file already, at
+ *   `readTocTitles`, and threw nearly all of it away — `resolvePath` splits the
+ *   fragment off, the nesting was never recorded, and what survived was a flat
+ *   path-to-label map used only to title a whole document. So the parser was
+ *   inferring, from type size and boldness, a structure the file had spelled
+ *   out. That is why 21 and 22 could never be right in principle: three short
+ *   centred lines of a dedication are, as evidence, identical to three chapter
+ *   titles.
+ *
+ *   Both formats are read now, EPUB 3 first, keeping the fragment and the
+ *   nesting depth. Each entry finds its block by anchor and makes it a heading
+ *   at the depth the navigation gives it. A heading the navigation does *not*
+ *   name, and which 22 only guessed at from styling, goes back to being a
+ *   paragraph set apart — which is what stops a dedication becoming three
+ *   chapters. The styling pass is now the fallback for a file with no usable
+ *   navigation, not the method. Structure comes from the navigation; the words
+ *   stay the markup's own, so a real `<h1>NOTES</h1>` is not rewritten to match
+ *   a contents line reading "Notes".
+ *
+ *   22 also dropped the book's printed contents page. That was wrong twice
+ *   over. The reader wants the page — it belongs to the book like a dedication
+ *   does, and the app's Contents tab is a separate thing that does not replace
+ *   it. And the rule could not tell where the list ended, so it read on into
+ *   "PREFACE" — short, no full stop — and ate it. That is the reported missing
+ *   Preface. The rule is gone.
  */
-export const PARSER_VERSION = 22
+export const PARSER_VERSION = 23
