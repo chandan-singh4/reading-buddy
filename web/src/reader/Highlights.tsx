@@ -33,6 +33,14 @@ export interface HighlightsProps {
   root: HTMLElement | null
   /** A tap on a highlight. The Reader reopens the menu over it. */
   onPick: (id: string, range: Range) => void
+  /**
+   * Anything that moves the page without changing its layout.
+   *
+   * The overlay shrinks the whole stage by a scale factor. That moves every
+   * word on screen, but it changes no size and fires no scroll, so none of the
+   * observers below hear about it. Hand the flag in and the marks follow.
+   */
+  watch?: unknown
 }
 
 interface Painted {
@@ -43,7 +51,7 @@ interface Painted {
   rects: SelectionRect[]
 }
 
-export function Highlights({ highlights, root, onPick }: HighlightsProps) {
+export function Highlights({ highlights, root, onPick, watch }: HighlightsProps) {
   const [painted, setPainted] = useState<Painted[]>([])
 
   const measure = useCallback(() => {
@@ -109,6 +117,11 @@ export function Highlights({ highlights, root, onPick }: HighlightsProps) {
     root.addEventListener('scroll', again, { passive: true })
     window.addEventListener('resize', again)
 
+    // The scale is animated, so `watch` alone would measure against the page
+    // as it was before the animation. This catches where it came to rest.
+    const stage = root.parentElement
+    stage?.addEventListener('transitionend', again)
+
     // Both observers are asked for rather than assumed. jsdom has neither, and
     // a reading screen that throws in a test is worse than one that measures a
     // little less often.
@@ -123,11 +136,12 @@ export function Highlights({ highlights, root, onPick }: HighlightsProps) {
     return () => {
       root.removeEventListener('scroll', again)
       window.removeEventListener('resize', again)
+      stage?.removeEventListener('transitionend', again)
       size?.disconnect()
       content?.disconnect()
       if (pending) cancelAnimationFrame(pending)
     }
-  }, [measure, root])
+  }, [measure, root, watch])
 
   if (painted.length === 0) return null
 

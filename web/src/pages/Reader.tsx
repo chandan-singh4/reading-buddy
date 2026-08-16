@@ -2828,7 +2828,12 @@ export default function Reader() {
             selection on purpose — see `composing` above.
           */}
           {/* The reader's own marks, found again in the page and painted. */}
-          <Highlights highlights={highlights} root={column} onPick={pickHighlight} />
+          <Highlights
+            highlights={highlights}
+            root={column}
+            onPick={pickHighlight}
+            watch={chromeShown}
+          />
 
           {selected && !composing && (
             <SelectionMenu
