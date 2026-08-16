@@ -37,7 +37,15 @@ export { NoteComposer } from './NoteComposer.tsx'
 export type { NoteComposerProps } from './NoteComposer.tsx'
 export { SelectionMenu } from './SelectionMenu.tsx'
 export type { SelectionAction, SelectionMenuProps } from './SelectionMenu.tsx'
-export { HIGHLIGHT_COLOURS, extendSelection, selectionInReader } from './selection.ts'
+export { Highlights } from './Highlights.tsx'
+export type { HighlightLike, HighlightsProps } from './Highlights.tsx'
+export {
+  HIGHLIGHT_COLOURS,
+  describeRange,
+  extendSelection,
+  rangeOfQuote,
+  selectionInReader,
+} from './selection.ts'
 export type { HighlightColour, ReaderSelection, SelectionEdge } from './selection.ts'
 
 export { NotesPanel } from './NotesPanel.tsx'

@@ -133,6 +133,64 @@ export function extendSelection(
   return describe(range, root)
 }
 
+/**
+ * A stored quote found again in the page.
+ *
+ * A highlight is filed as an anchor plus the words, never as a pair of DOM
+ * offsets — offsets do not survive a re-parse, a font change or a page turn,
+ * and the words do. So painting a highlight means looking its text up again in
+ * the paragraph it belongs to.
+ *
+ * Whitespace is the whole difficulty. The stored quote had its runs of space
+ * squeezed to one; the page's text nodes still hold the original. So the
+ * paragraph is flattened the same way, with a map back from each squeezed
+ * character to the text node and offset it came from.
+ *
+ * Returns `null` when the paragraph is not on screen, or when the words are no
+ * longer in it — a book re-parsed by a newer version, most often. A highlight
+ * that cannot be placed is not drawn, and nothing else about it is lost.
+ */
+export function rangeOfQuote(anchor: Anchor, quote: string): Range | null {
+  const element = document.getElementById(anchor.replace(/[[\]]/g, ''))
+  if (!element) return null
+
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let flat = ''
+  const from: { node: Text; offset: number }[] = []
+
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text
+    const raw = text.data
+    for (let i = 0; i < raw.length; i += 1) {
+      const space = /\s/.test(raw[i]!)
+      // A run of whitespace becomes one space, and a leading one is dropped —
+      // the same squeeze `describe` applies before storing.
+      if (space && (flat.length === 0 || flat.endsWith(' '))) continue
+      flat += space ? ' ' : raw[i]
+      from.push({ node: text, offset: i })
+    }
+  }
+
+  const wanted = quote.replace(/\s+/g, ' ').trim()
+  const at = flat.indexOf(wanted)
+  if (at < 0 || wanted.length === 0) return null
+
+  const start = from[at]
+  const end = from[at + wanted.length - 1]
+  if (!start || !end) return null
+
+  const range = document.createRange()
+  range.setStart(start.node, start.offset)
+  range.setEnd(end.node, end.offset + 1)
+  return range
+}
+
+/** Everything the app keeps about a range, for a range it did not select. */
+export function describeRange(range: Range, root: HTMLElement | null): ReaderSelection | null {
+  if (!root) return null
+  return describe(range, root)
+}
+
 /** `ch02-s03-p013` — the shape `elementIdOf` makes out of an anchor. */
 const ANCHOR_ID = /^ch\d+-s\d+-[a-z]\d+$/
 

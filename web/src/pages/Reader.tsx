@@ -7,6 +7,8 @@ import {
   Chrome,
   NoteComposer,
   SelectionMenu,
+  Highlights,
+  describeRange,
   extendSelection,
   selectionInReader,
   type ReaderSelection,
@@ -2052,6 +2054,17 @@ export default function Reader() {
     })
   }, [notes, frame, pageOfAnchor])
 
+  /**
+   * The notes that are also marks on the page: the ones with words and a colour.
+   *
+   * A note without a colour is a note the reader wrote; only a highlight asks to
+   * be painted back onto the paragraph it came from.
+   */
+  const highlights = useMemo(
+    () => notes.filter((row) => row.quote && row.colour),
+    [notes],
+  )
+
   /*
    * ## In-book search (WP-14)
    *
@@ -2260,6 +2273,26 @@ export default function Reader() {
    */
   const stretchSelection = useCallback((edge: SelectionEdge, x: number, y: number) => {
     setSelected((at) => (at ? (extendSelection(at, edge, x, y, strip.current) ?? at) : at))
+  }, [])
+
+  /**
+   * The reading column as a *value*, so the highlights can react to it.
+   *
+   * `strip` is a ref, and a ref changing tells React nothing. The element is set
+   * once, after the first render has put it in the DOM.
+   */
+  const [column, setColumn] = useState<HTMLElement | null>(null)
+  useEffect(() => setColumn(strip.current), [])
+
+  /**
+   * A tap on a highlight opens the menu over it.
+   *
+   * Before this, that tap fell through to the page and showed the overlay — the
+   * reader was asking about the words they had marked and got a page slider.
+   */
+  const pickHighlight = useCallback((_id: string, range: Range) => {
+    const found = describeRange(range, strip.current)
+    if (found) setSelected(found)
   }, [])
 
   /** Put the menu away and let go of the words. */
@@ -2789,6 +2822,9 @@ export default function Reader() {
             it would leave the words it points at. The composer outlives the
             selection on purpose — see `composing` above.
           */}
+          {/* The reader's own marks, found again in the page and painted. */}
+          <Highlights highlights={highlights} root={column} onPick={pickHighlight} />
+
           {selected && !composing && (
             <SelectionMenu
               selection={selected}

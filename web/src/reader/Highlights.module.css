@@ -1,0 +1,54 @@
+/*
+ * A highlight on the page.
+ *
+ * The colour is set inline, because it is the reader's, not the theme's — a
+ * reader who uses yellow for "important" and blue for "look this up" keeps
+ * those meanings through every theme.
+ */
+
+.mark {
+  position: fixed;
+  /* Under the selection menu (12) and its marks (11), over the page. */
+  z-index: 9;
+  /* `multiply` puts the wash under the words rather than over them, which is
+     what a real highlighter does, and it keeps the ink readable through any
+     colour the reader picks. */
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  border-radius: 2px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/*
+ * On a dark page the trick inverts: `multiply` there blots the words out, so
+ * the colour is screened on and held well back.
+ *
+ * The ordering below is the one `theme.css` explains at its dark-sheet block,
+ * and it is load bearing. `:not([data-theme='light'])` matches the pale themes
+ * too, so each of them says multiply again underneath, and the named dark
+ * themes say screen last for a reader whose phone is set to light.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .mark {
+    mix-blend-mode: screen;
+    opacity: 0.32;
+  }
+}
+
+:root[data-theme='paper'] .mark,
+:root[data-theme='vintage'] .mark,
+:root[data-theme='paperback'] .mark,
+:root[data-theme='sepia'] .mark,
+:root[data-theme='slate'] .mark,
+:root[data-theme='contrast'] .mark {
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+:root[data-theme='dark'] .mark,
+:root[data-theme='dim'] .mark,
+:root[data-theme='forest'] .mark {
+  mix-blend-mode: screen;
+  opacity: 0.32;
+}
