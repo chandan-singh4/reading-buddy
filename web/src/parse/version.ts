@@ -317,6 +317,9 @@
  *   Where a book says so, the number is kept on the paragraph that opens that
  *   page, as a string so roman front matter survives. Measured first: not one of
  *   the five books on the shelf carries a single marker, so this changes nothing
- *   for them. It is stored and not yet shown.
+ *   for them. It is stored and not yet shown. A marker is *replaced* by its
+ *   number only when it holds nothing but the number; the same attribute sitting
+ *   on a container that wraps a real page of prose is walked into like any other
+ *   element, so no text is lost to it.
  */
 export const PARSER_VERSION = 26

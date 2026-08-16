@@ -257,7 +257,7 @@ function textAndLinks(
       // A page-break marker is a position, not a word. Its number is read off
       // the element by the caller; letting its text through would drop a bare
       // "137" into the middle of the sentence it interrupts.
-      if (printedPageOf(el) !== null) continue
+      if (isBarePageMarker(el)) continue
 
       // What this span adds to whatever is already in force. Only departures
       // count: a `<span>` with no rule of its own resolves to `size: 1` and must
@@ -459,16 +459,32 @@ function matchesAny(haystack: string, needles: string[]): string | undefined {
  */
 const PAGE_ID = /^(?:page[_-]?)(.+)$/i
 
+/**
+ * The longest text a page-break marker can hold and still be only a marker.
+ *
+ * A marker is normally empty, and at most holds the page number it announces.
+ * Anything longer is a container that happens to carry the attribute, and
+ * skipping it would delete a page of the book to record a number about it. The
+ * number is still read; only the skipping is refused.
+ */
+const PAGE_MARKER_MAX = 12
+
+function isBarePageMarker(element: Element): boolean {
+  return printedPageOf(element) !== null && normalise(element.textContent).length <= PAGE_MARKER_MAX
+}
+
 function printedPageOf(element: Element): string | null {
   const semantics = semanticType(element)
   if (!semantics.includes('pagebreak') && !semantics.includes('doc-pagebreak')) return null
 
-  const stated =
-    element.getAttribute('title') ??
-    element.getAttribute('aria-label') ??
-    normalise(element.textContent) ??
-    ''
-  if (stated.trim()) return stated.trim()
+  const stated = (element.getAttribute('title') ?? element.getAttribute('aria-label') ?? '').trim()
+  if (stated) return stated
+
+  // The text is only a page number when it is short enough to be one. A
+  // container carrying the attribute holds a page of the book, and reading that
+  // as the page number would label the paragraph with its own first sentence.
+  const written = normalise(element.textContent)
+  if (written && written.length <= PAGE_MARKER_MAX) return written
 
   const fromId = PAGE_ID.exec(element.getAttribute('id') ?? '')?.[1]
   return fromId ?? null
@@ -961,7 +977,10 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
         // in the buffer too and flushes to nothing.
         const pending = inline.some((node) => normalise(node.textContent) !== '')
         pageAt.set(blocks.length + (pending ? 1 : 0), page)
-        continue
+        // Only a marker that holds nothing is *replaced* by its number. One that
+        // wraps real content is a container with the attribute on it, and is
+        // walked into like any other — a page number is never worth a page.
+        if (isBarePageMarker(element)) continue
       }
 
       if (INLINE.has(tag)) {

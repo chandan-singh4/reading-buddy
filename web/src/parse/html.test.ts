@@ -419,3 +419,16 @@ describe('the printed pages a book states', () => {
     expect(htmlToBlocks('<p>Ordinary prose.</p>')[0]!.printedPage).toBeUndefined()
   })
 })
+
+describe('a page-break attribute on something that is not a marker', () => {
+  it('keeps the content and still reads the number', () => {
+    // A marker is empty, or holds its own page number. An element that wraps a
+    // page of the book and happens to carry the attribute is a container, and
+    // skipping it would delete that page to record a number about it.
+    const blocks = htmlToBlocks(
+      '<div epub:type="pagebreak" id="page12"><p>A whole page of real prose that must survive.</p></div>',
+    )
+    expect(blocks.map((block) => block.text)).toEqual(['A whole page of real prose that must survive.'])
+    expect(blocks[0]!.printedPage).toBe('12')
+  })
+})
