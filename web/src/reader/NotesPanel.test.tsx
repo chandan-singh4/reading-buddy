@@ -57,7 +57,7 @@ describe('the notes tab', () => {
     expect(screen.queryByText('My thought 1')).toBeNull()
     expect(screen.getByText('Claude says 2')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Yours' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Quotes' }))
     expect(screen.getByText('My thought 1')).toBeTruthy()
     expect(screen.queryByText('Claude says 2')).toBeNull()
   })
@@ -81,7 +81,7 @@ describe('the notes tab', () => {
 
     fireEvent.keyDown(screen.getByRole('radio', { name: 'All' }), { key: 'ArrowRight' })
 
-    expect(screen.getByRole('radio', { name: 'Yours' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('radio', { name: 'Quotes' }).getAttribute('aria-checked')).toBe('true')
   })
 
   it('jumps to the paragraph a note is about', () => {

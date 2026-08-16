@@ -1010,3 +1010,32 @@ sign-in screen.
   A reader must never mistake the machine's words for their own. — 2026-08-15
 - **"By chapter" groups; it does not filter.** A chip that hid notes would lose
   work the reader can see under "All", so the mode only adds headings. — 2026-08-15
+- **What each of the four Notes tabs holds — the reader's own definition, set
+  2026-08-15.** The tab row is a set of four different *kinds* of record, not
+  four filters over one kind:
+  - **All** — every row below, in the book's order.
+  - **Quotes** — the passages the reader highlighted. Renamed from "Yours",
+    which named the author of the row and told the reader nothing about what was
+    in it. Nothing in this tab is written by the reader; it is all the book's own
+    words. The stored `author` stays `'you'`, because that fact is still true.
+  - **Claude** — every question the reader asked and the answer they got, kept
+    as a pair. A question with no answer beside it is not a record of anything.
+  - **By chapter** — two rows per chapter, and only these two: **one summary
+    written by Claude**, and **"what I learned"**, built from the questions the
+    reader asked in that chapter and the answers they got. The purpose is a
+    complete picture of the chapter to come back to, so this tab is a *digest*,
+    not a grouping of the other three. This reverses the 2026-08-15 line above
+    it — "By chapter groups; it does not filter" — which described the panel as
+    first built, before the reader said what the tab was for.
+
+  **Only Quotes and All are buildable today.** Claude and By chapter both need
+  the tutor loop (WP-17 → 20), because neither has a source of rows until the app
+  can be asked a question. They are written down here so the panel is built
+  towards them rather than around them. — 2026-08-15
+- **The system's edge band is not the book's to answer.** Android's back gesture
+  is an inward swipe from an edge, and the reading page answered a horizontal
+  swipe with its whole width — so leaving a book turned a page on the way out,
+  every time. A stroke that begins within 24 px of either edge cannot turn a
+  page. Asked once, at `pointerdown`, exactly as the brightness gate is: a stroke
+  that starts mid-page must not become a back gesture by *ending* at the edge,
+  which is what every completed forward turn does. — 2026-08-15

@@ -62,7 +62,7 @@ export type { Margins, ReaderSettings, ReadingFont, Spacing, Theme } from './rea
 
 export { useBackDismiss } from './useBackDismiss.ts'
 
-export { stepThrough, swipeOf } from './swipe.ts'
+export { inEdgeBand, stepThrough, swipeOf } from './swipe.ts'
 export type { Swipe, Touch } from './swipe.ts'
 
 export { offsetOfPage, pageAt, pageCountOf, turn } from './columns.ts'

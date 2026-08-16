@@ -46,6 +46,7 @@ import {
   pageAt,
   pageCountOf,
   turn,
+  inEdgeBand,
   swipeOf,
   nextSection,
   pathOf,
@@ -592,6 +593,15 @@ export default function Reader() {
    * once, in each direction.
    */
   const dimZone = useRef(false)
+
+  /**
+   * Whether this stroke began in the band the system's back gesture owns.
+   *
+   * Same gate as `dimZone`, asked at the same moment and for the same reason:
+   * swiping in from an edge to leave the book was also a horizontal swipe across
+   * the page, so every exit turned a page on the way out. See `inEdgeBand`.
+   */
+  const edgeZone = useRef(false)
 
   /**
    * Write the darkness straight to `<html>` while the finger is down.
@@ -2254,6 +2264,8 @@ export default function Reader() {
               dragSpeed.current = 0
               // Asked here and nowhere else. See `dimZone`.
               dimZone.current = inDimZone(event.clientX, window.innerWidth)
+              // Asked here and nowhere else. See `edgeZone`.
+              edgeZone.current = inEdgeBand(event.clientX, window.innerWidth)
             }}
             onPointerMove={(event) => {
               if (!event.isPrimary) return
@@ -2288,6 +2300,18 @@ export default function Reader() {
                 touchStart.current = null
                 swiped.current = true
                 event.currentTarget.setPointerCapture(event.pointerId)
+                return
+              }
+
+              // A horizontal stroke that began at an edge belongs to the system,
+              // not to the book — it is how the reader leaves. Clearing
+              // `touchStart` closes the page turn's only way in for the rest of
+              // the stroke, the same way the brightness gate does. It is asked
+              // after the brightness gate on purpose: a vertical stroke on the
+              // right-hand deck is still a brightness drag, even at the very
+              // edge, because the two gestures differ in direction.
+              if (edgeZone.current && Math.abs(across) >= DRAG_FROM) {
+                touchStart.current = null
                 return
               }
 

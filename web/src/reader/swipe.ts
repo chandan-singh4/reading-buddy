@@ -46,6 +46,34 @@ export function swipeOf(from: Touch, to: Touch): Swipe {
 }
 
 /**
+ * The band along either edge of the screen that the *system* owns.
+ *
+ * Android's back gesture is a swipe inwards from an edge, and the reading page
+ * answers to a horizontal swipe with its whole width — so closing a book turned
+ * a page on the way out, every single time. The two gestures are the same
+ * stroke; the only thing that separates them is where the finger touched down.
+ *
+ * 24 px is the width the platform itself uses for the gesture. Wider would start
+ * eating real page turns; narrower would leave the collision in place.
+ */
+const EDGE_BAND = 24
+
+/**
+ * Whether a touch began in the system's edge band, and so is not ours to answer.
+ *
+ * Asked once, at `pointerdown`, exactly as the brightness gate is — a stroke
+ * that starts in the middle of the page cannot become a back gesture by ending
+ * at the edge, which is what every completed forward turn does.
+ *
+ * Both edges, not only the right. The platform gesture works from either side,
+ * and a page turn loses nothing by it: a swipe can start anywhere in the
+ * remaining width of the screen.
+ */
+export function inEdgeBand(x: number, width: number): boolean {
+  return x <= EDGE_BAND || width - x <= EDGE_BAND
+}
+
+/**
  * Step through a list of choices, stopping at the ends.
  *
  * Deliberately not a cycle. Tabs are laid out in a row and a swipe is a spatial

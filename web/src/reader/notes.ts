@@ -29,10 +29,21 @@ export interface NoteLike {
  */
 export type NoteFilter = 'all' | 'you' | 'claude' | 'chapter'
 
-/** What each chip calls itself. */
+/**
+ * What each chip calls itself.
+ *
+ * **Quotes**, not "Yours". The chip shows the passages the reader picked out of
+ * the book — highlights — and every one of them is the book's own words. "Yours"
+ * named the *author* of the row, which is true and useless: it invited the
+ * reader to expect things they had written, and this tab holds nothing they
+ * wrote. The stored `author` is still `'you'`, because that is a fact about who
+ * made the row and it stays right whatever the chip is called.
+ *
+ * See `docs/decisions.md` for what each of the four is for.
+ */
 export const NOTE_FILTERS: { value: NoteFilter; label: string }[] = [
   { value: 'all', label: 'All' },
-  { value: 'you', label: 'Yours' },
+  { value: 'you', label: 'Quotes' },
   { value: 'claude', label: 'Claude' },
   { value: 'chapter', label: 'By chapter' },
 ]

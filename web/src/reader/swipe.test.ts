@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { stepThrough, swipeOf } from './swipe.ts'
+import { inEdgeBand, stepThrough, swipeOf } from './swipe.ts'
 
 const from = { x: 200, y: 300 }
 
@@ -33,6 +33,26 @@ describe('recognising a swipe', () => {
 
   it('ignores a finger that did not move', () => {
     expect(swipeOf(from, from)).toBeNull()
+  })
+})
+
+describe('the system edge band', () => {
+  // A 412 px phone, which is what the reader holds.
+  const width = 412
+
+  it('claims a touch that starts at either edge', () => {
+    expect(inEdgeBand(0, width)).toBe(true)
+    expect(inEdgeBand(width, width)).toBe(true)
+    expect(inEdgeBand(20, width)).toBe(true)
+    expect(inEdgeBand(width - 20, width)).toBe(true)
+  })
+
+  it('leaves the rest of the page to the book', () => {
+    // Where a page turn actually starts. The band must not eat these, or
+    // closing the collision would cost the gesture it was protecting.
+    expect(inEdgeBand(width / 2, width)).toBe(false)
+    expect(inEdgeBand(40, width)).toBe(false)
+    expect(inEdgeBand(width - 40, width)).toBe(false)
   })
 })
 
