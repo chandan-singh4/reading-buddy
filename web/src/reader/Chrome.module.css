@@ -547,7 +547,11 @@
   padding: var(--space-2) 0;
   text-align: left;
   font-family: inherit;
-  font-size: var(--text-base);
+  /* A size up from the interface. This page is read at arm's length like a
+     book's own contents, not scanned like a menu, and the section rows below
+     are set one step under it — so the chapter has to leave room beneath
+     itself and still stay comfortable. */
+  font-size: var(--text-lg);
   color: var(--color-text);
   background: transparent;
   /* No rule between rows. The dots already carry the eye across, and a border
@@ -601,7 +605,14 @@
  * always used: an indent, and slightly smaller type. No second heading level and
  * no rules — a reader scanning for a chapter must be able to skip the indented
  * lines without reading them, and weight is what the eye skips by. The chapter
- * rows keep the base size, so they still read as the spine of the list.
+ * rows sit one step above, so they still read as the spine of the list.
+ *
+ * One step, and the floor is the body size. These rows were set below it and
+ * were too small to read — which defeats them, because a section title is the
+ * line you actually read to decide where to go, while a chapter title is often
+ * one you already know and are only looking for. The smaller of the two sizes
+ * has the more careful reading to survive, so it is the one that sets the floor
+ * and the chapter size follows from it.
  *
  * The indent is on the row and not on the title, so the dot leader starts inside
  * it too. A leader that began at the chapter's left edge would tie the section's
@@ -614,7 +625,7 @@
  */
 .contentsSub .contentsItem {
   padding-left: var(--space-6);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--color-text-muted);
 }
 
