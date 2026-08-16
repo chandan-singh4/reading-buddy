@@ -523,6 +523,22 @@
   );
 }
 
+/*
+ * No markers.
+ *
+ * A printed contents page has never had bullets. It does not need them: every
+ * line already begins at the same left edge and ends at a page number, which is
+ * all a list marker exists to say. Here they cost more than that — a column of
+ * dots down the left that the eye must pass on the way to every title, and, once
+ * sections are indented, a second column of dots that lands close enough under
+ * the first to blur the one distinction the indent is drawing.
+ */
+.contentsList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .contentsItem {
   width: 100%;
   min-height: 44px;
@@ -590,9 +606,14 @@
  * The indent is on the row and not on the title, so the dot leader starts inside
  * it too. A leader that began at the chapter's left edge would tie the section's
  * page number to the line above it.
+ *
+ * `--space-6` and not less. With the list markers gone the indent is the only
+ * thing left holding the hierarchy, and a chapter title here often wraps to two
+ * lines — so the step has to be legible against a ragged left edge above it, not
+ * just against a single tidy line.
  */
 .contentsSub .contentsItem {
-  padding-left: var(--space-4);
+  padding-left: var(--space-6);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }

@@ -494,7 +494,7 @@ export function Chrome({
                 <span className={styles.contentsRule}>✦</span>
               </div>
 
-              <ul>
+              <ul className={styles.contentsList}>
                 {outline.map((entry) => {
                   /*
                     The one row that is *you*, and it must be exactly one.
