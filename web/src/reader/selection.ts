@@ -185,6 +185,41 @@ export function rangeOfQuote(anchor: Anchor, quote: string): Range | null {
   return range
 }
 
+/**
+ * The highlight under a point on screen, if a finger landed on one.
+ *
+ * A highlight painted by the browser's own highlight API is ink, not an
+ * element: there is nothing under the finger to receive a click, and
+ * `elementFromPoint` will only ever name the paragraph. So the hit test is done
+ * the other way round — find the text position under the point, then ask each
+ * highlight's range whether that position is inside it.
+ *
+ * The last match wins, so the newest highlight is the one a reader gets when
+ * two overlap.
+ */
+export function highlightAt<T extends { anchor: Anchor; quote?: string }>(
+  x: number,
+  y: number,
+  highlights: readonly T[],
+): { highlight: T; range: Range } | null {
+  const caret = caretAt(x, y)
+  if (!caret) return null
+
+  let found: { highlight: T; range: Range } | null = null
+  for (const highlight of highlights) {
+    if (!highlight.quote) continue
+    const range = rangeOfQuote(highlight.anchor, highlight.quote)
+    if (!range) continue
+    // `isPointInRange` throws if the node is in another document.
+    try {
+      if (range.isPointInRange(caret.node, caret.offset)) found = { highlight, range }
+    } catch {
+      continue
+    }
+  }
+  return found
+}
+
 /** Everything the app keeps about a range, for a range it did not select. */
 export function describeRange(range: Range, root: HTMLElement | null): ReaderSelection | null {
   if (!root) return null

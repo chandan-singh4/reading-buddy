@@ -66,6 +66,17 @@ export function createNoteStore(database: ReadingBuddyDB = defaultDb) {
       return database.notes.where('bookId').equals(bookId).toArray()
     },
 
+    /**
+     * Change a highlight's colour, keeping the note it is part of.
+     *
+     * A recolour is not a new highlight. Deleting and adding would give the
+     * same words a new id and a new date, and move them to the end of the
+     * Quotes list — the reader changed a colour, not the passage.
+     */
+    async setNoteColour(bookId: BookId, id: string, colour: string): Promise<void> {
+      await database.notes.update([bookId, id], { colour })
+    },
+
     async deleteNote(bookId: BookId, id: string): Promise<void> {
       await database.notes.delete([bookId, id])
     },

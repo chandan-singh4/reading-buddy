@@ -37,12 +37,13 @@ export { NoteComposer } from './NoteComposer.tsx'
 export type { NoteComposerProps } from './NoteComposer.tsx'
 export { SelectionMenu } from './SelectionMenu.tsx'
 export type { SelectionAction, SelectionMenuProps } from './SelectionMenu.tsx'
-export { Highlights } from './Highlights.tsx'
+export { Highlights, canPaintHighlights } from './Highlights.tsx'
 export type { HighlightLike, HighlightsProps } from './Highlights.tsx'
 export {
   HIGHLIGHT_COLOURS,
   describeRange,
   extendSelection,
+  highlightAt,
   rangeOfQuote,
   selectionInReader,
 } from './selection.ts'

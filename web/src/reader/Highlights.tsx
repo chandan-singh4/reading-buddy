@@ -1,23 +1,28 @@
 /**
- * The highlights, drawn on the page.
+ * The highlights, painted into the page by the browser.
  *
- * A highlight is stored as an anchor, the words, and a colour — never as DOM
- * offsets, which do not survive a re-parse. So drawing one means finding the
- * words again in their paragraph and measuring where they landed. See
- * `rangeOfQuote`.
+ * The first version of this drew a coloured box over each line, measured in
+ * screen coordinates. That is the wrong model, and it showed: every time the
+ * page moved — the overlay shrinking the stage, a font changed, a page turned —
+ * the colour had to chase the words, and you could see it arrive. A highlight
+ * in a real book is ink on the paper. It does not chase anything.
  *
- * The marks go through a portal onto `<body>` for the same reason the selection
- * menu does: `position: fixed` is measured against the nearest transformed
- * ancestor, and the page sits inside one. They are measured again whenever the
- * page moves under them — a turn scrolls the strip, a font change resizes it.
+ * So the browser paints it instead, through the CSS custom highlight API: a
+ * `Highlight` holds live ranges, `::highlight(name)` says what colour to paint
+ * them, and the text is painted with that colour underneath it for the rest of
+ * its life on screen. Reflow, rescale, re-layout — the range is part of the
+ * document, so the colour goes where the words go, in the same frame. There is
+ * nothing to measure and nothing to keep in step.
+ *
+ * One rule is registered per colour in use, written into a stylesheet of this
+ * module's own, because a reader's custom colour is not something a static
+ * stylesheet can know in advance.
  */
 
-import { useCallback, useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect } from 'react'
 
 import type { Anchor } from '../structure/index.ts'
-import styles from './Highlights.module.css'
-import { rangeOfQuote, type SelectionRect } from './selection.ts'
+import { rangeOfQuote } from './selection.ts'
 
 /** One stored highlight: enough to find it and enough to paint it. */
 export interface HighlightLike {
@@ -29,153 +34,114 @@ export interface HighlightLike {
 
 export interface HighlightsProps {
   highlights: readonly HighlightLike[]
-  /** The reading column. Nothing is drawn until it exists. */
+  /** The reading column. Nothing is painted until it exists. */
   root: HTMLElement | null
-  /** A tap on a highlight. The Reader reopens the menu over it. */
-  onPick: (id: string, range: Range) => void
   /**
-   * Anything that moves the page without changing its layout.
+   * Anything that replaces the words on the page — the section, the font.
    *
-   * The overlay shrinks the whole stage by a scale factor. That moves every
-   * word on screen, but it changes no size and fires no scroll, so none of the
-   * observers below hear about it. Hand the flag in and the marks follow.
+   * Not the things that merely *move* them: the browser handles those on its
+   * own now. This is only about ranges going stale because the text nodes they
+   * point into have been thrown away.
    */
   watch?: unknown
 }
 
-interface Painted {
-  id: string
-  anchor: Anchor
-  quote: string
-  colour: string
-  rects: SelectionRect[]
+/** Whether this browser paints custom highlights. Chrome 105, Safari 17.2. */
+export function canPaintHighlights(): boolean {
+  return typeof CSS !== 'undefined' && 'highlights' in CSS
 }
 
-export function Highlights({ highlights, root, onPick, watch }: HighlightsProps) {
-  const [painted, setPainted] = useState<Painted[]>([])
+/** A CSS ident per colour, and the stylesheet that gives each one its rule. */
+const NAMES = new Map<string, string>()
+let sheet: HTMLStyleElement | null = null
 
-  const measure = useCallback(() => {
-    if (!root) {
-      setPainted([])
-      return
-    }
+function nameFor(colour: string): string {
+  const known = NAMES.get(colour)
+  if (known) return known
 
-    const next: Painted[] = []
+  const name = `rb-highlight-${NAMES.size}`
+  NAMES.set(colour, name)
+
+  if (!sheet) {
+    sheet = document.createElement('style')
+    sheet.dataset.reason = 'reader highlights'
+    document.head.append(sheet)
+  }
+  // `::highlight` takes background-color and colour and little else, which is
+  // all a highlight needs. The ink is left alone deliberately: recolouring the
+  // text as well is what makes a highlighted passage harder to read, not
+  // easier.
+  sheet.append(document.createTextNode(`::highlight(${name}){background-color:${colour};}`))
+  return name
+}
+
+export function Highlights({ highlights, root, watch }: HighlightsProps) {
+  const paint = useCallback(() => {
+    if (!root || !canPaintHighlights()) return () => {}
+
+    const ranges = new Map<string, Range[]>()
     for (const highlight of highlights) {
       if (!highlight.quote || !highlight.colour) continue
-
       const range = rangeOfQuote(highlight.anchor, highlight.quote)
       if (!range || !root.contains(range.commonAncestorContainer)) continue
 
-      const rects = [...range.getClientRects()]
-        .filter((rect) => rect.width > 0 && rect.height > 0)
-        // A paragraph on another page is laid out off to the side, and its
-        // boxes are off the screen. The *middle* has to be on screen, not just
-        // an edge of it: a box hanging off the left of the page would otherwise
-        // paint a stripe of colour down the margin of the page being read.
-        .filter((rect) => {
-          const middle = (rect.left + rect.right) / 2
-          return middle > 0 && middle < window.innerWidth
-        })
-        .map((rect) => ({
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        }))
-
-      if (rects.length > 0) {
-        next.push({
-          id: highlight.id,
-          anchor: highlight.anchor,
-          quote: highlight.quote,
-          colour: highlight.colour,
-          rects,
-        })
-      }
+      const found = ranges.get(highlight.colour)
+      if (found) found.push(range)
+      else ranges.set(highlight.colour, [range])
     }
 
-    setPainted(next)
+    const painted: string[] = []
+    for (const [colour, group] of ranges) {
+      const name = nameFor(colour)
+      CSS.highlights.set(name, new Highlight(...group))
+      painted.push(name)
+    }
+
+    return () => {
+      for (const name of painted) CSS.highlights.delete(name)
+    }
   }, [highlights, root])
 
   useEffect(() => {
-    measure()
     if (!root) return
 
-    // A turn scrolls the strip; a font or width change resizes it. Both move
-    // every box on the page, and neither one tells React anything.
-    // One measure per frame however many events arrive. A page turn and a
-    // section load both fire these in bursts.
+    let drop = paint()
+
+    /*
+     * The one thing a live range cannot survive: the words themselves being
+     * replaced.
+     *
+     * A range holds text nodes, not text. React throws those nodes away and
+     * makes new ones whenever the page is re-rendered — a section change, a new
+     * font, a re-parse — and a range left holding the old ones points at
+     * nothing and paints nothing. Movement is fine, and is why this component
+     * exists in this shape; replacement is not, and this is the watch for it.
+     *
+     * Nothing here is measured, so this waits on a timer rather than on a
+     * frame: a re-render's worth of mutations still folds into one pass, and it
+     * still runs in a tab that is painting no frames at all.
+     */
     let pending = 0
-    const again = () => {
+    const soon = () => {
       if (pending) return
-      pending = requestAnimationFrame(() => {
+      pending = window.setTimeout(() => {
         pending = 0
-        measure()
-      })
+        drop()
+        drop = paint()
+      }, 0)
     }
-    root.addEventListener('scroll', again, { passive: true })
-    window.addEventListener('resize', again)
 
-    // The scale is animated, so `watch` alone would measure against the page
-    // as it was before the animation. This catches where it came to rest.
-    const stage = root.parentElement
-    stage?.addEventListener('transitionend', again)
-
-    // Both observers are asked for rather than assumed. jsdom has neither, and
-    // a reading screen that throws in a test is worse than one that measures a
-    // little less often.
-    const size = typeof ResizeObserver === 'function' ? new ResizeObserver(again) : null
-    size?.observe(root)
-
-    // The section itself can be replaced — a chapter loaded, a link followed —
-    // which changes every paragraph under the column without resizing it.
-    const content = typeof MutationObserver === 'function' ? new MutationObserver(again) : null
-    content?.observe(root, { childList: true, subtree: true, characterData: true })
+    const changes =
+      typeof MutationObserver === 'function' ? new MutationObserver(soon) : null
+    changes?.observe(root, { childList: true, subtree: true, characterData: true })
 
     return () => {
-      root.removeEventListener('scroll', again)
-      window.removeEventListener('resize', again)
-      stage?.removeEventListener('transitionend', again)
-      size?.disconnect()
-      content?.disconnect()
-      if (pending) cancelAnimationFrame(pending)
+      if (pending) window.clearTimeout(pending)
+      changes?.disconnect()
+      drop()
     }
-  }, [measure, root, watch])
+  }, [paint, root, watch])
 
-  if (painted.length === 0) return null
-
-  return createPortal(
-    <>
-      {painted.map((highlight) =>
-        highlight.rects.map((rect, index) => (
-          <span
-            key={`${highlight.id}-${index}`}
-            className={styles.mark}
-            style={{
-              top: `${rect.top}px`,
-              left: `${rect.left}px`,
-              width: `${rect.width}px`,
-              height: `${rect.height}px`,
-              background: highlight.colour,
-            }}
-            role="button"
-            tabIndex={-1}
-            aria-label="Highlight"
-            onPointerDown={(event) => {
-              // Taken before the page sees it: a tap on a highlight is a tap on
-              // the highlight, not the tap that shows the overlay.
-              event.preventDefault()
-              event.stopPropagation()
-              // Measured again rather than kept: the range these boxes came
-              // from was thrown away, and the page may have moved since.
-              const range = rangeOfQuote(highlight.anchor, highlight.quote)
-              if (range) onPick(highlight.id, range)
-            }}
-          />
-        )),
-      )}
-    </>,
-    document.body,
-  )
+  // Nothing to render. The page carries the colour itself.
+  return null
 }

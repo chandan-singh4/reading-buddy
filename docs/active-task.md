@@ -10,7 +10,14 @@
 
 ## Judge the chapter openings and the selection menu on the phone
 
-Nothing is mid-edit. Build green, **1363 tests across 78 files** (2026-08-16).
+Nothing is mid-edit. Build green, **1370 tests across 79 files** (2026-08-16).
+
+The browser paints the highlights now. `CSS.highlights` holds one live range per
+highlight, and `::highlight(...)` gives each colour its rule. Nothing is
+measured, so the colour cannot move away from the words. A tap on a highlight is
+found by `highlightAt`, because painted ink receives no clicks. Tapping a
+highlight opens the menu with the colours open, a ring on the colour it has, and
+a **Remove** button.
 
 Two features landed. The Browser pane has no book on its shelf, so neither was
 proved by eye.
@@ -46,7 +53,8 @@ has not done:
 | `web/src/reader/SelectionMenu.module.css` | Its look, and where the tutor block sits. |
 | `web/src/reader/NoteComposer.tsx` | The box a note is written in. |
 | `web/src/pages/Reader.tsx` | Mounts all of the above; holds the actions. |
-| `web/src/storage/notes.ts` | `addNote`, now with `quote` and `colour`. |
+| `web/src/reader/Highlights.tsx` | The highlights, painted by the browser. |
+| `web/src/storage/notes.ts` | `addNote`, `setNoteColour`, `deleteNote`. |
 | `web/src/storage/db.ts` | `StoredNote`. Both new fields are unindexed. |
 | `web/src/reader/NotesPanel.tsx` | Shows a highlight's colour. |
 

@@ -30,6 +30,7 @@ import styles from './SelectionMenu.module.css'
 /** What the reader asked for. The Reader decides what any of it means. */
 export type SelectionAction =
   | { kind: 'highlight'; colour: string }
+  | { kind: 'unhighlight' }
   | { kind: 'note' }
   | { kind: 'copy' }
   | { kind: 'save' }
@@ -46,6 +47,15 @@ export interface SelectionMenuProps {
   onDismiss: () => void
   /** One end of the selection dragged to a point on screen. */
   onExtend: (edge: SelectionEdge, x: number, y: number) => void
+  /**
+   * The highlight already on these words, if there is one.
+   *
+   * It changes what "Highlight" means. On plain text it adds one; on words that
+   * are already highlighted it changes the colour, and a way to take the
+   * highlight off appears beside the swatches. Without this the same sentence
+   * could be highlighted again and again, once per tap.
+   */
+  highlighted?: { id: string; colour: string } | null
 }
 
 /** How far the card stays from the edge of the screen, and from the selection. */
@@ -90,12 +100,15 @@ export function SelectionMenu({
   onAction,
   onDismiss,
   onExtend,
+  highlighted = null,
 }: SelectionMenuProps) {
   const card = useRef<HTMLDivElement | null>(null)
   /** Which handle is under a finger, if either. */
   const [dragging, setDragging] = useState<SelectionEdge | null>(null)
   const [place, setPlace] = useState<{ top: number; left: number; above: boolean } | null>(null)
-  const [colours, setColours] = useState(false)
+  // Open already when the words carry a highlight: the reader who tapped one is
+  // there to change it or take it off, and both live in this panel.
+  const [colours, setColours] = useState(highlighted !== null)
   const [asking, setAsking] = useState(true)
   const askId = useId()
 
@@ -346,6 +359,8 @@ export function SelectionMenu({
               className={styles.swatch}
               style={{ background: colour.value }}
               aria-label={`Highlight ${colour.label.toLowerCase()}`}
+              aria-current={highlighted?.colour === colour.value || undefined}
+              data-current={highlighted?.colour === colour.value || undefined}
               onClick={() => act({ kind: 'highlight', colour: colour.value })}
             />
           ))}
@@ -361,6 +376,20 @@ export function SelectionMenu({
               onChange={(event) => act({ kind: 'highlight', colour: event.target.value })}
             />
           </label>
+
+          {/* Only when there is one to take off. A "remove" that removes
+              nothing is a button that teaches the reader to doubt the menu. */}
+          {highlighted && (
+            <button
+              type="button"
+              data-item
+              role="menuitem"
+              className={styles.remove}
+              onClick={() => act({ kind: 'unhighlight' })}
+            >
+              Remove
+            </button>
+          )}
         </div>
       )}
 

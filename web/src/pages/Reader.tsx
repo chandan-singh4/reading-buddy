@@ -10,6 +10,7 @@ import {
   Highlights,
   describeRange,
   extendSelection,
+  highlightAt,
   selectionInReader,
   type ReaderSelection,
   type SelectionAction,
@@ -2294,11 +2295,40 @@ export default function Reader() {
    *
    * Before this, that tap fell through to the page and showed the overlay — the
    * reader was asking about the words they had marked and got a page slider.
+   *
+   * The browser paints highlights as ink now, not as elements, so there is
+   * nothing under the finger to receive the tap. `highlightAt` works backwards
+   * from the point instead. Returns whether it caught the tap.
    */
-  const pickHighlight = useCallback((_id: string, range: Range) => {
-    const found = describeRange(range, strip.current)
-    if (found) setSelected(found)
-  }, [])
+  const pickHighlight = useCallback(
+    (x: number, y: number) => {
+      const hit = highlightAt(x, y, highlights)
+      if (!hit) return false
+
+      const found = describeRange(hit.range, strip.current)
+      if (!found) return false
+
+      setSelected(found)
+      return true
+    },
+    [highlights],
+  )
+
+  /**
+   * The highlight the open menu is sitting on, if it is sitting on one.
+   *
+   * Worked out from the words rather than remembered, so it is right however
+   * the selection was made: tapped on the highlight, or selected by hand over
+   * the same sentence. It is what turns a second highlight of one passage into
+   * a recolour of the first, and what puts "Remove" in the menu.
+   */
+  const touched = useMemo(() => {
+    if (!selected) return null
+    const found = highlights.find(
+      (row) => row.anchor === selected.anchor && row.quote === selected.text,
+    )
+    return found ? { id: found.id, colour: found.colour ?? '' } : null
+  }, [selected, highlights])
 
   /** Put the menu away and let go of the words. */
   const dropSelection = useCallback(() => {
@@ -2323,6 +2353,26 @@ export default function Reader() {
     [id],
   )
 
+  /** Change the colour of a highlight already on the page. */
+  const recolour = useCallback(
+    (noteId: string, colour: string) => {
+      if (!id) return
+      void noteStore.setNoteColour(id, noteId, colour)
+      setNotes((rows) => rows.map((row) => (row.id === noteId ? { ...row, colour } : row)))
+    },
+    [id],
+  )
+
+  /** Take a highlight off the page, and its row out of Quotes with it. */
+  const dropNote = useCallback(
+    (noteId: string) => {
+      if (!id) return
+      void noteStore.deleteNote(id, noteId)
+      setNotes((rows) => rows.filter((row) => row.id !== noteId))
+    },
+    [id],
+  )
+
   const onSelectionAction = useCallback(
     (action: SelectionAction) => {
       const at = selected
@@ -2330,9 +2380,25 @@ export default function Reader() {
 
       switch (action.kind) {
         case 'highlight':
-          // The text *is* the highlight: the Quotes tab lists the book's own
-          // words, and the colour rides along beside them.
-          void keepNote({ text: at.text, quote: at.text, anchor: at.anchor, colour: action.colour })
+          if (touched) {
+            // Already highlighted: this is a change of colour, not a second
+            // highlight. Without this the same sentence could be marked over
+            // and over, once per tap, each one its own row under Quotes.
+            recolour(touched.id, action.colour)
+          } else {
+            // The text *is* the highlight: the Quotes tab lists the book's own
+            // words, and the colour rides along beside them.
+            void keepNote({
+              text: at.text,
+              quote: at.text,
+              anchor: at.anchor,
+              colour: action.colour,
+            })
+          }
+          break
+
+        case 'unhighlight':
+          if (touched) dropNote(touched.id)
           break
 
         case 'note':
@@ -2384,7 +2450,7 @@ export default function Reader() {
       if (action.kind !== 'note') dropSelection()
       else setSelected(null)
     },
-    [selected, keepNote, id, openSearch, dropSelection],
+    [selected, touched, keepNote, recolour, dropNote, id, openSearch, dropSelection],
   )
 
   const title =
@@ -2698,6 +2764,11 @@ export default function Reader() {
                 return
               }
 
+              // A tap on the reader's own highlight belongs to that highlight,
+              // wherever on the page it falls. It is tried before the edges,
+              // because a highlight in the margin third is still a highlight.
+              if (pickHighlight(event.clientX, event.clientY)) return
+
               // The outer thirds turn a page; the middle shows the overlay.
               // Edge taps are what a reader's thumb already rests on, and they
               // are the one control that works with the overlay hidden.
@@ -2828,12 +2899,7 @@ export default function Reader() {
             selection on purpose — see `composing` above.
           */}
           {/* The reader's own marks, found again in the page and painted. */}
-          <Highlights
-            highlights={highlights}
-            root={column}
-            onPick={pickHighlight}
-            watch={chromeShown}
-          />
+          <Highlights highlights={highlights} root={column} watch={here.section} />
 
           {selected && !composing && (
             <SelectionMenu
@@ -2841,6 +2907,7 @@ export default function Reader() {
               onAction={onSelectionAction}
               onDismiss={dropSelection}
               onExtend={stretchSelection}
+              highlighted={touched}
             />
           )}
 

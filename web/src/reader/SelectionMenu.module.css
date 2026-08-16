@@ -166,6 +166,25 @@
   cursor: pointer;
 }
 
+/* The colour these words already carry, ringed so it is findable at a glance. */
+.swatch[data-current] {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent);
+}
+
+/* Pushed to the far end, away from the swatches: it is the one control here
+   that takes something away, and it must not be hit by a finger aiming near. */
+.remove {
+  margin-inline-start: auto;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
 .custom {
   position: relative;
   width: 1.75rem;
@@ -285,6 +304,7 @@
  */
 .quickButton:focus-visible,
 .swatch:focus-visible,
+.remove:focus-visible,
 .row:focus-visible,
 .askHeader:focus-visible,
 .customInput:focus-visible {
