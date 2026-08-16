@@ -24,13 +24,21 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 
-import { HIGHLIGHT_COLOURS, type ReaderSelection, type SelectionEdge } from './selection.ts'
+import {
+  HIGHLIGHT_COLOURS,
+  pivotFor,
+  type ReaderSelection,
+  type SelectionEdge,
+  type SelectionGrain,
+  type SelectionPivot,
+} from './selection.ts'
 import styles from './SelectionMenu.module.css'
 
 /** What the reader asked for. The Reader decides what any of it means. */
 export type SelectionAction =
   | { kind: 'highlight'; colour: string }
   | { kind: 'unhighlight' }
+  | { kind: 'select'; grain: SelectionGrain }
   | { kind: 'note' }
   | { kind: 'copy' }
   | { kind: 'save' }
@@ -45,8 +53,15 @@ export interface SelectionMenuProps {
   selection: ReaderSelection
   onAction: (action: SelectionAction) => void
   onDismiss: () => void
-  /** One end of the selection dragged to a point on screen. */
-  onExtend: (edge: SelectionEdge, x: number, y: number) => void
+  /**
+   * One end of the selection dragged to a point on screen.
+   *
+   * The pivot is the end that is *not* moving. Passing it rather than the edge
+   * being dragged is what lets a handle cross the other one: once the finger is
+   * on the far side, the pivot is still the pivot, and the two boundaries are
+   * simply put back in order.
+   */
+  onExtend: (pivot: SelectionPivot, x: number, y: number) => void
   /**
    * The highlight already on these words, if there is one.
    *
@@ -56,6 +71,14 @@ export interface SelectionMenuProps {
    * could be highlighted again and again, once per tap.
    */
   highlighted?: { id: string; colour: string } | null
+  /**
+   * Which "select the whole…" buttons are worth offering.
+   *
+   * The Reader works this out, because only it can: the answer is in the page,
+   * and a button that is already satisfied — "Select paragraph" on a selection
+   * that is the paragraph — teaches the reader to doubt the menu.
+   */
+  canSelect?: { sentence: boolean; paragraph: boolean }
 }
 
 /** How far the card stays from the edge of the screen, and from the selection. */
@@ -91,6 +114,7 @@ const ICONS = {
   translate: 'M3 6h9M7.5 6v-2M9 6c0 4-3 8-6 8m2-4c2 3 4 4 6 4m1 6 4-10 4 10m-6.5-3h5',
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm5 12 4 4',
   speak: 'M4 10v4h3l4 4V6l-4 4zm11-1a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12',
+  widen: 'M6 5v14M18 5v14M9.5 12h5m-5 0 2-2m-2 2 2 2m3-4 2 2m-2 2 2-2',
   spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
   chevron: 'M9 6l6 6-6 6',
 }
@@ -101,10 +125,20 @@ export function SelectionMenu({
   onDismiss,
   onExtend,
   highlighted = null,
+  canSelect = { sentence: true, paragraph: true },
 }: SelectionMenuProps) {
   const card = useRef<HTMLDivElement | null>(null)
-  /** Which handle is under a finger, if either. */
-  const [dragging, setDragging] = useState<SelectionEdge | null>(null)
+  /**
+   * The drag in progress, if there is one.
+   *
+   * Held in a ref as well as in state. State is what hides the card, and React
+   * commits it on its own schedule — a move that arrives in the same task as the
+   * `pointerdown` reads the *old* value and gets thrown away. On a fast flick
+   * that is the whole first half of the gesture, which felt exactly like a
+   * handle that would not move.
+   */
+  const drag = useRef<{ pointerId: number; pivot: SelectionPivot; lift: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
   const [place, setPlace] = useState<{ top: number; left: number; above: boolean } | null>(null)
   // Open already when the words carry a highlight: the reader who tapped one is
   // there to change it or take it off, and both live in this panel.
@@ -202,6 +236,12 @@ export function SelectionMenu({
    * them. The pointer is captured on the way down, which means every move goes
    * to this element even after the finger has left it — a handle you can only
    * drag while staying on top of a 12px dot is a handle nobody can use.
+   *
+   * A move is answered on the strength of the captured pointer alone, never on
+   * which handle the event started from. The two ends can cross, and when they
+   * do the finger is holding the handle drawn at the *other* end of the
+   * selection; asking "is this the end handle?" would stop the drag dead at the
+   * moment it crossed.
    */
   function handleFor(edge: SelectionEdge) {
     const rects = selection.rects
@@ -213,21 +253,42 @@ export function SelectionMenu({
     function onPointerDown(event: ReactPointerEvent<HTMLSpanElement>) {
       event.preventDefault()
       event.stopPropagation()
-      event.currentTarget.setPointerCapture(event.pointerId)
-      setDragging(edge)
+      // Recorded before the capture is asked for, not after. Capture can throw
+      // — the pointer can be gone by the time this runs — and a drag that dies
+      // in its first line is a handle that does not move at all. Capture only
+      // makes the drag easier; it is not what makes it work.
+      //
+      // The lift reads a little above the finger: the text being aimed at is
+      // the text the fingertip covers, not the pixel under its centre.
+      drag.current = {
+        pointerId: event.pointerId,
+        pivot: pivotFor(selection, edge),
+        lift: rect.height / 2,
+      }
+      setDragging(true)
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        // Without capture the moves stop when the finger leaves the handle.
+        // Worse, not broken.
+      }
     }
 
     function onPointerMove(event: ReactPointerEvent<HTMLSpanElement>) {
-      if (dragging !== edge) return
+      const held = drag.current
+      if (!held || held.pointerId !== event.pointerId) return
       event.preventDefault()
-      // Read a little above the finger: the text being aimed at is the text the
-      // fingertip is covering, not the pixel under its centre.
-      onExtend(edge, event.clientX, event.clientY - rect.height / 2)
+      onExtend(held.pivot, event.clientX, event.clientY - held.lift)
     }
 
     function onPointerUp(event: ReactPointerEvent<HTMLSpanElement>) {
-      event.currentTarget.releasePointerCapture?.(event.pointerId)
-      setDragging(null)
+      try {
+        event.currentTarget.releasePointerCapture?.(event.pointerId)
+      } catch {
+        // Never captured, or already released. Either way the drag is over.
+      }
+      drag.current = null
+      setDragging(false)
     }
 
     return (
@@ -391,6 +452,34 @@ export function SelectionMenu({
             </button>
           )}
         </div>
+      )}
+
+      {/* Widen the selection rather than act on it. Kept above the rest and
+          ruled off, because these two change what the menu is about. */}
+      {(canSelect.sentence || canSelect.paragraph) && (
+        <ul className={`${styles.rows} ${styles.widen}`}>
+          {(
+            [
+              ['sentence', 'Select sentence', canSelect.sentence],
+              ['paragraph', 'Select paragraph', canSelect.paragraph],
+            ] as const
+          )
+            .filter(([, , offered]) => offered)
+            .map(([grain, label]) => (
+              <li key={grain}>
+                <button
+                  type="button"
+                  data-item
+                  role="menuitem"
+                  className={styles.row}
+                  onClick={() => act({ kind: 'select', grain })}
+                >
+                  <Icon path={ICONS.widen} />
+                  <span>{label}</span>
+                </button>
+              </li>
+            ))}
+        </ul>
       )}
 
       <ul className={styles.rows}>

@@ -56,7 +56,7 @@ export interface ReaderSelection {
    *
    * The phone's own drag handles went with the phone's own menu, and a reader
    * who can only ever select one word has been given a worse deal than the
-   * browser offered. `extendSelection` moves one end of this.
+   * browser offered. `selectionBetween` moves one end of this.
    */
   range: Range
 }
@@ -95,19 +95,38 @@ function caretAt(x: number, y: number): { node: Node; offset: number } | null {
   return null
 }
 
+/** The end that holds still while the other one is dragged. */
+export interface SelectionPivot {
+  node: Node
+  offset: number
+}
+
+/** The end a drag leaves alone: grab the start, and the end is the pivot. */
+export function pivotFor(selection: ReaderSelection, edge: SelectionEdge): SelectionPivot {
+  const range = selection.range
+  return edge === 'start'
+    ? { node: range.endContainer, offset: range.endOffset }
+    : { node: range.startContainer, offset: range.startOffset }
+}
+
 /**
- * One end of the selection dragged to a point on screen.
+ * The selection between a pivot and a point on screen.
  *
- * The other end holds still. A drag that would turn the selection inside out —
- * the start pulled past the end — is refused rather than flipped, because a
- * selection that swaps ends under a finger is a selection nobody can aim.
+ * The two handles are independent: either one can be dragged anywhere, past the
+ * other one included. This used to refuse a crossing drag on the grounds that a
+ * selection swapping ends under a finger is hard to aim. In practice it read as
+ * a handle that had jammed — a reader who starts mid-sentence and then wants the
+ * line above could not get there, and nothing on screen said why.
  *
- * Returns `null` when the point is not on text inside `root`, which the caller
- * should read as "keep what you had".
+ * So a crossing is allowed, and handled the way a phone handles it: the pivot
+ * stays where it is, and the two boundaries are simply put back in document
+ * order. Whichever side the finger is on becomes that side of the selection.
+ *
+ * Returns `null` when the point is not on text inside `root`, or when it lands
+ * on the pivot itself — the caller should read that as "keep what you had".
  */
-export function extendSelection(
-  current: ReaderSelection,
-  edge: SelectionEdge,
+export function selectionBetween(
+  pivot: SelectionPivot,
   x: number,
   y: number,
   root: HTMLElement | null,
@@ -117,20 +136,148 @@ export function extendSelection(
   const caret = caretAt(x, y)
   if (!caret || !root.contains(caret.node)) return null
 
-  const range = current.range.cloneRange()
+  const held = document.createRange()
+  held.setStart(pivot.node, pivot.offset)
   const moved = document.createRange()
   moved.setStart(caret.node, caret.offset)
 
-  if (edge === 'end') {
-    // Past the start, or there is nothing left to select.
-    if (moved.compareBoundaryPoints(Range.START_TO_START, range) <= 0) return null
-    range.setEnd(caret.node, caret.offset)
-  } else {
-    if (moved.compareBoundaryPoints(Range.START_TO_END, range) >= 0) return null
-    range.setStart(caret.node, caret.offset)
+  const before = moved.compareBoundaryPoints(Range.START_TO_START, held) < 0
+  const range = document.createRange()
+  range.setStart(before ? caret.node : pivot.node, before ? caret.offset : pivot.offset)
+  range.setEnd(before ? pivot.node : caret.node, before ? pivot.offset : caret.offset)
+
+  if (range.collapsed) return null
+  return describe(range, root)
+}
+
+/** Where one squeezed character came from. */
+interface Source {
+  node: Text
+  offset: number
+}
+
+/**
+ * A paragraph's text with its spaces squeezed, plus a map back to the page.
+ *
+ * A paragraph is not one string: it is a run of text nodes with italics and
+ * links between them, and its whitespace is whatever the source file had. Every
+ * job here — finding a stored quote again, finding where a sentence ends — is
+ * easier on one tidy string, and impossible to act on without a way back. So
+ * each character of `flat` has an entry in `from` saying which text node and
+ * which offset it came from.
+ */
+function flatten(element: Element): { flat: string; from: Source[] } {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+  let flat = ''
+  const from: Source[] = []
+
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text
+    const raw = text.data
+    for (let i = 0; i < raw.length; i += 1) {
+      const space = /\s/.test(raw[i]!)
+      // A run of whitespace becomes one space, and a leading one is dropped —
+      // the same squeeze `describe` applies before storing.
+      if (space && (flat.length === 0 || flat.endsWith(' '))) continue
+      flat += space ? ' ' : raw[i]
+      from.push({ node: text, offset: i })
+    }
   }
 
-  return describe(range, root)
+  return { flat, from }
+}
+
+/** A range over `flat[at .. end)`, in page terms. */
+function rangeOfSpan(from: Source[], at: number, end: number): Range | null {
+  const start = from[at]
+  const last = from[end - 1]
+  if (!start || !last) return null
+
+  const range = document.createRange()
+  range.setStart(start.node, start.offset)
+  range.setEnd(last.node, last.offset + 1)
+  return range
+}
+
+/** How much of the page a reader wants in one tap. */
+export type SelectionGrain = 'sentence' | 'paragraph'
+
+/**
+ * The whole sentence, or the whole paragraph, around what is already selected.
+ *
+ * Dragging two handles over seven lines to catch one sentence is work the app
+ * can do instead. The reader touches any word in the sentence and asks for the
+ * sentence; the boundaries are the browser's own, through `Intl.Segmenter`,
+ * which follows the Unicode rules — a closing quote or bracket after the full
+ * stop belongs to the sentence, an ellipsis does not end one, and the rules
+ * change with the language rather than with our guesses.
+ *
+ * It is not perfect: ICU breaks after an abbreviation, so "Mr. Bennet" is two
+ * sentences to it. That is a wrong answer a reader can fix with one drag, and
+ * the alternative is a list of abbreviations that is wrong in a new way for
+ * every book.
+ *
+ * The paragraph is simply everything inside the anchored element, which is what
+ * an anchor names.
+ *
+ * Returns `null` when there is nothing to do — the words asked for are already
+ * exactly what is selected — so the caller can leave the button out rather than
+ * offer one that does nothing.
+ */
+export function selectAround(
+  selection: ReaderSelection,
+  grain: SelectionGrain,
+  root: HTMLElement | null,
+): ReaderSelection | null {
+  if (!root) return null
+
+  const element = document.getElementById(selection.anchor.replace(/[[\]]/g, ''))
+  if (!element) return null
+
+  const { flat, from } = flatten(element)
+  if (from.length === 0) return null
+
+  const range = grain === 'paragraph' ? rangeOfSpan(from, 0, from.length) : sentenceIn(flat, from, selection)
+  if (!range) return null
+
+  const grown = describe(range, root)
+  // Nothing gained. The selection already covers it.
+  if (!grown || grown.text === selection.text) return null
+  return grown
+}
+
+/** The sentence holding the start of `selection`. */
+function sentenceIn(flat: string, from: Source[], selection: ReaderSelection): Range | null {
+  const at = flatIndexOf(from, selection.range.startContainer, selection.range.startOffset)
+  if (at < 0) return null
+
+  const segmenter =
+    typeof Intl !== 'undefined' && 'Segmenter' in Intl
+      ? new Intl.Segmenter(undefined, { granularity: 'sentence' })
+      : null
+  // No Segmenter: the paragraph is the honest answer, not a guess at full stops.
+  if (!segmenter) return rangeOfSpan(from, 0, from.length)
+
+  for (const piece of segmenter.segment(flat)) {
+    const end = piece.index + piece.segment.length
+    if (at < end) {
+      // Trailing space belongs to the sentence for the segmenter, not for a
+      // reader looking at a highlight.
+      const trimmed = piece.segment.replace(/\s+$/, '').length
+      return rangeOfSpan(from, piece.index, piece.index + trimmed)
+    }
+  }
+  return null
+}
+
+/** Where a page position lands in the squeezed text. `-1` if it is not in it. */
+function flatIndexOf(from: Source[], node: Node, offset: number): number {
+  for (let i = 0; i < from.length; i += 1) {
+    const source = from[i]!
+    if (source.node === node && source.offset >= offset) return i
+  }
+  // An element boundary, or a position in whitespace that was squeezed away.
+  return from.length > 0 && node.contains?.(from[0]!.node) ? 0 : -1
 }
 
 /**
@@ -154,22 +301,7 @@ export function rangeOfQuote(anchor: Anchor, quote: string): Range | null {
   const element = document.getElementById(anchor.replace(/[[\]]/g, ''))
   if (!element) return null
 
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-  let flat = ''
-  const from: { node: Text; offset: number }[] = []
-
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const text = node as Text
-    const raw = text.data
-    for (let i = 0; i < raw.length; i += 1) {
-      const space = /\s/.test(raw[i]!)
-      // A run of whitespace becomes one space, and a leading one is dropped —
-      // the same squeeze `describe` applies before storing.
-      if (space && (flat.length === 0 || flat.endsWith(' '))) continue
-      flat += space ? ' ' : raw[i]
-      from.push({ node: text, offset: i })
-    }
-  }
+  const { flat, from } = flatten(element)
 
   const wanted = quote.replace(/\s+/g, ' ').trim()
   const at = flat.indexOf(wanted)

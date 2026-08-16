@@ -42,12 +42,20 @@ export type { HighlightLike, HighlightsProps } from './Highlights.tsx'
 export {
   HIGHLIGHT_COLOURS,
   describeRange,
-  extendSelection,
+  selectAround,
   highlightAt,
+  pivotFor,
   rangeOfQuote,
+  selectionBetween,
   selectionInReader,
 } from './selection.ts'
-export type { HighlightColour, ReaderSelection, SelectionEdge } from './selection.ts'
+export type {
+  HighlightColour,
+  ReaderSelection,
+  SelectionEdge,
+  SelectionGrain,
+  SelectionPivot,
+} from './selection.ts'
 
 export { NotesPanel } from './NotesPanel.tsx'
 export type { NoteRow, NotesPanelProps } from './NotesPanel.tsx'

@@ -9,12 +9,13 @@ import {
   SelectionMenu,
   Highlights,
   describeRange,
-  extendSelection,
+  selectAround,
   highlightAt,
+  selectionBetween,
   selectionInReader,
   type ReaderSelection,
   type SelectionAction,
-  type SelectionEdge,
+  type SelectionPivot,
   anchorAtPage,
   bookmarkOn,
   buildSpine,
@@ -2272,8 +2273,8 @@ export default function Reader() {
    * The app owns the selection now, so stretching it is arithmetic on a range
    * rather than anything the browser does for us.
    */
-  const stretchSelection = useCallback((edge: SelectionEdge, x: number, y: number) => {
-    setSelected((at) => (at ? (extendSelection(at, edge, x, y, strip.current) ?? at) : at))
+  const stretchSelection = useCallback((pivot: SelectionPivot, x: number, y: number) => {
+    setSelected((at) => (at ? (selectionBetween(pivot, x, y, strip.current) ?? at) : at))
   }, [])
 
   /**
@@ -2329,6 +2330,21 @@ export default function Reader() {
     )
     return found ? { id: found.id, colour: found.colour ?? '' } : null
   }, [selected, highlights])
+
+  /**
+   * Whether widening the selection would do anything.
+   *
+   * Asked once per selection, not once per render: it reads the paragraph out
+   * of the page and cuts it into sentences, which is not work to repeat while a
+   * handle is under a finger.
+   */
+  const canSelect = useMemo(
+    () => ({
+      sentence: selected !== null && selectAround(selected, 'sentence', strip.current) !== null,
+      paragraph: selected !== null && selectAround(selected, 'paragraph', strip.current) !== null,
+    }),
+    [selected],
+  )
 
   /** Put the menu away and let go of the words. */
   const dropSelection = useCallback(() => {
@@ -2400,6 +2416,14 @@ export default function Reader() {
         case 'unhighlight':
           if (touched) dropNote(touched.id)
           break
+
+        case 'select': {
+          // The one action that leaves the menu open: the reader asked for more
+          // words, not for something to happen to them.
+          const wider = selectAround(at, action.grain, strip.current)
+          if (wider) setSelected(wider)
+          return
+        }
 
         case 'note':
           setComposing(at)
@@ -2908,6 +2932,7 @@ export default function Reader() {
               onDismiss={dropSelection}
               onExtend={stretchSelection}
               highlighted={touched}
+              canSelect={canSelect}
             />
           )}
 

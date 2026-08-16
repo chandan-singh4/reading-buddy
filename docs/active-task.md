@@ -10,7 +10,7 @@
 
 ## Judge the chapter openings and the selection menu on the phone
 
-Nothing is mid-edit. Build green, **1370 tests across 79 files** (2026-08-16).
+Nothing is mid-edit. Build green, **1379 tests across 80 files** (2026-08-16).
 
 The browser paints the highlights now. `CSS.highlights` holds one live range per
 highlight, and `::highlight(...)` gives each colour its rule. Nothing is
@@ -18,6 +18,17 @@ measured, so the colour cannot move away from the words. A tap on a highlight is
 found by `highlightAt`, because painted ink receives no clicks. Tapping a
 highlight opens the menu with the colours open, a ring on the colour it has, and
 a **Remove** button.
+
+The two selection handles are independent. A drag no longer moves "the start" or
+"the end": it holds the other end still and puts the two boundaries back in
+order. So either handle can cross the other one, and the selection follows the
+finger. The drag is kept in a ref, because React commits state too late for the
+first move of a fast gesture.
+
+The menu also offers **Select sentence** and **Select paragraph**. The sentence
+boundaries come from `Intl.Segmenter`. Note that ICU breaks after an
+abbreviation, so "Mr. Bennet" is two sentences to it. A button is left out when
+it would change nothing.
 
 Two features landed. The Browser pane has no book on its shelf, so neither was
 proved by eye.

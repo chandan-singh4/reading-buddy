@@ -251,6 +251,12 @@
   box-shadow: inset 0 1px 0 var(--color-border);
 }
 
+/* "Select sentence" and "Select paragraph" change what is selected rather than
+   act on it, so they are ruled off from the rows that follow. */
+.widen {
+  border-block-end: 1px solid var(--color-border);
+}
+
 /* --- Ask Claude ------------------------------------------------------------ */
 
 .ask {
