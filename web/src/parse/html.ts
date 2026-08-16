@@ -23,6 +23,7 @@ import type { ParsedBook } from '../storage/index.ts'
 import type { BookMeta, FigureImage } from '../structure/index.ts'
 import { assembleBook, type Block, type ContentBlock, type RawLink } from './assemble.ts'
 import { isRunningHead } from './runningHead.ts'
+import { appearanceOf, baselineOf, NO_STYLES, type Appearance, type StyleSheet } from './styles.ts'
 
 /** Presentational or non-prose — never contributes text to a book. */
 const SKIP = new Set([
@@ -498,9 +499,7 @@ const ENDS_WITH_A_PAGE_NUMBER = /\s\d{1,4}$/
  * it apart, which is all the reader actually asked for.
  */
 function isBoldHeading(element: Element, text: string): boolean {
-  if (text.length === 0 || text.length > BOLD_HEADING_MAX) return false
-  if (ENDS_LIKE_A_SENTENCE.test(text)) return false
-  if (ENDS_WITH_A_PAGE_NUMBER.test(text)) return false
+  if (!couldBeAHeading(text)) return false
 
   const bold = [...element.querySelectorAll('b, strong')]
   if (bold.length === 0) return false
@@ -508,6 +507,111 @@ function isBoldHeading(element: Element, text: string): boolean {
   // emphasised in it is prose, and this is the test that says so.
   const bolded = normalise(bold.map((node) => node.textContent ?? '').join(' '))
   return bolded === text
+}
+
+/** The shape tests every heading rule shares, whatever the evidence for it. */
+function couldBeAHeading(text: string): boolean {
+  if (text.length === 0 || text.length > BOLD_HEADING_MAX) return false
+  if (ENDS_LIKE_A_SENTENCE.test(text)) return false
+  if (ENDS_WITH_A_PAGE_NUMBER.test(text)) return false
+  return true
+}
+
+/**
+ * How much larger than the book's body text a line must be set before size
+ * alone marks it as a heading.
+ *
+ * 1.15 rather than something rounder because that is about where a difference
+ * stops being a typographic nicety and becomes a signal. Converters routinely
+ * set body text at 1em and a chapter title at 1.2em or more; a pull-quote or a
+ * first-line flourish sits under this, and stays prose.
+ */
+const HEADING_SIZE_RATIO = 1.15
+
+/**
+ * Whether the book's own stylesheet says this paragraph is a heading.
+ *
+ * This is the half `isBoldHeading` could never reach. That rule needs a literal
+ * `<b>` around the whole line, which only some converters emit. The rest put
+ * the very same intent in CSS — `font-weight: bold`, a larger `font-size`, or a
+ * centred line with no first-line indent — and the markup is left saying
+ * nothing at all. The result was a chapter title, a dedication and a line of
+ * prose arriving as three identical paragraphs.
+ *
+ * Judged against `baseline`, the size *this book* sets its body text in, never
+ * against a fixed number. See the note in `styles.ts`: books disagree about
+ * what 1em means, but no book disagrees with itself.
+ *
+ * Two signals are required, not one, and this is the load-bearing part of the
+ * rule. Whole books are set bold, or centred, or in a larger face; any single
+ * signal on its own would turn such a book entirely into headings. A line that
+ * is *both* louder than its neighbours in size and set apart by weight or
+ * position is one the author separated on purpose.
+ */
+function looksStyledAsHeading(style: Appearance, baseline: number, text: string): boolean {
+  if (!couldBeAHeading(text)) return false
+  // Running prose is indented on the first line; a title never is. When the
+  // book says this line is indented, it is telling us it is a paragraph.
+  if (style.indented) return false
+
+  const larger = style.size >= baseline * HEADING_SIZE_RATIO
+  const signals = [larger, style.bold, style.centred].filter(Boolean).length
+  return larger ? signals >= 1 : signals >= 2
+}
+
+/** The lines that open a contents page, in the books that spell it out. */
+const CONTENTS_TITLE = /^(table of )?contents$/i
+
+/** How long a line can be and still pass as an entry on a contents page. */
+const CONTENTS_ENTRY_MAX = 90
+
+/**
+ * Turn a contents page into furniture, even when the file gives no sign it is one.
+ *
+ * A well-made epub marks its contents with `<nav>` or `epub:type="toc"`, and the
+ * walk above already drops those. A converted one gives us a page of bare `<p>`s
+ * whose only distinguishing feature is that a human can see what they are. They
+ * were arriving as body prose: a screenful of chapter names run together as
+ * though they were sentences, which is exactly what the reader reported.
+ *
+ * It is dropped rather than styled because the app builds its own contents
+ * screen from the book's structure. The printed one is a copy of that, made for
+ * a medium with fixed page numbers, and the page numbers it carries are wrong
+ * here by definition.
+ *
+ * Bounded deliberately. It starts only at a line that says "Contents", and it
+ * stops at the second line in a row that does not read like an entry — so a
+ * chapter that happens to follow the contents in the same file keeps its text.
+ * Where a book has no such heading, nothing happens and we are no worse off.
+ */
+function dropContentsPage(blocks: Block[]): Block[] {
+  const start = blocks.findIndex(
+    (block) =>
+      (block.kind === 'heading' || block.kind === 'prose') && CONTENTS_TITLE.test(block.text.trim()),
+  )
+  if (start < 0) return blocks
+
+  const out = [...blocks]
+  out[start] = { kind: 'furniture', text: out[start]!.text }
+
+  let missed = 0
+  for (let i = start + 1; i < out.length; i += 1) {
+    const block = out[i]!
+    if (block.kind !== 'prose' && block.kind !== 'heading') break
+
+    const text = block.text.trim()
+    const entry = text.length > 0 && text.length <= CONTENTS_ENTRY_MAX && !ENDS_LIKE_A_SENTENCE.test(text)
+    if (!entry) {
+      missed += 1
+      if (missed === 2) break
+      continue
+    }
+
+    missed = 0
+    out[i] = { kind: 'furniture', text: block.text }
+  }
+
+  return out
 }
 
 /**
@@ -537,10 +641,42 @@ function isSectionBreak(text: string): boolean {
   return ORNAMENT_ONLY.test(text.replace(/\s+/g, ''))
 }
 
-export function htmlToBlocks(html: string): Block[] {
+export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block[] {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const blocks: Block[] = []
   let inline: string[] = []
+
+  // Resolving a style walks every rule, and the walk below asks about the same
+  // element the baseline pass already asked about. Memoised so each element is
+  // costed once whatever the size of the book's stylesheet.
+  const styles = new Map<Element, Appearance>()
+  function styleOf(element: Element): Appearance {
+    let style = styles.get(element)
+    if (!style) {
+      style = appearanceOf(element, sheet)
+      styles.set(element, style)
+    }
+    return style
+  }
+
+  /*
+   * The size this document sets its body text in, measured before anything is
+   * classified. It has to come first: "is this line bigger than the others" is
+   * not a question a single pass over the document can answer, because the
+   * others have not been seen yet.
+   */
+  // Only the innermost ones. A `<div>` wrapping the whole chapter holds every
+  // paragraph's text as well as its own, and counting it would let one wrapper
+  // outweigh the book it contains.
+  const paragraphs = [...doc.body.querySelectorAll('p, div')].filter(
+    (element) => element.querySelector('p, div') === null,
+  )
+  const baseline = baselineOf(
+    paragraphs.map((element) => ({
+      size: styleOf(element).size,
+      length: normalise(element.textContent).length,
+    })),
+  )
 
   /**
    * Emit whatever inline text has accumulated. Runs of text and inline elements
@@ -677,7 +813,7 @@ export function htmlToBlocks(html: string): Block[] {
           ? { kind: 'note', text, label: noteType }
           : displayType
             ? { kind: 'prose', text, label: displayType }
-            : isBoldHeading(element, text)
+            : isBoldHeading(element, text) || looksStyledAsHeading(styleOf(element), baseline, text)
               ? { kind: 'prose', text, label: 'subheading' }
               : { kind: 'prose', text }
         if (links.length > 0) block.links = links
@@ -720,10 +856,12 @@ export function htmlToBlocks(html: string): Block[] {
    * the contents page, and a contents page points at chapter openings — never
    * at the page furniture repeated above them.
    */
-  return blocks.map((block) =>
-    (block.kind === 'prose' || block.kind === 'heading') && isRunningHead(block.text)
-      ? { kind: 'furniture' as const, text: block.text }
-      : block,
+  return dropContentsPage(
+    blocks.map((block) =>
+      (block.kind === 'prose' || block.kind === 'heading') && isRunningHead(block.text)
+        ? { kind: 'furniture' as const, text: block.text }
+        : block,
+    ),
   )
 }
 

@@ -30,6 +30,7 @@ import { COVER_ASSET_PATH, type BookAsset, type ParsedBook } from '../storage/in
 import type { BookMeta } from '../structure/index.ts'
 import { assembleBook, type Block } from './assemble.ts'
 import { htmlToBlocks } from './html.ts'
+import { NO_STYLES, readStyles, type StyleSheet } from './styles.ts'
 
 export class EpubError extends Error {
   constructor(message: string) {
@@ -771,6 +772,52 @@ function readCoverAsset(archive: Archive, coverPath: string | undefined): BookAs
  * text warrants), but pdf and docx genuinely are async, and the importer in
  * WP-11 should be able to `await` every format the same way.
  */
+/**
+ * The CSS that applies to one chapter document: its `<link>`ed stylesheets, in
+ * order, then any `<style>` block inside it.
+ *
+ * Opened at all because the structure of a converted book lives in here and
+ * nowhere else. See the note at the top of `styles.ts`: a converter writes
+ * `<p class="chaphead">CONTENTS</p>` and puts every visible difference between
+ * that line and a sentence of prose into a stylesheet. Reading tags alone, we
+ * could not tell them apart, and no amount of class-name guessing would have
+ * fixed it for the next book.
+ *
+ * `seen` caches by archive path across the whole spine. An epub shares one
+ * stylesheet between every chapter, so without it a four-hundred-file book
+ * unzips and re-parses the same CSS four hundred times.
+ *
+ * A missing or unreadable stylesheet is skipped, not fatal. The parse then
+ * behaves exactly as it did before this existed, which is a worse result but
+ * never a broken one.
+ */
+function stylesFor(
+  archive: Archive,
+  path: string,
+  doc: Document,
+  seen: Map<string, string>,
+): StyleSheet {
+  const sources: string[] = []
+
+  for (const link of doc.querySelectorAll('link')) {
+    const rel = (link.getAttribute('rel') ?? '').toLowerCase()
+    const href = link.getAttribute('href')
+    if (!href || !rel.includes('stylesheet')) continue
+
+    const target = resolvePath(path, href)
+    let css = seen.get(target)
+    if (css === undefined) {
+      css = readText(archive, target) ?? ''
+      seen.set(target, css)
+    }
+    if (css) sources.push(css)
+  }
+
+  for (const style of doc.querySelectorAll('style')) sources.push(style.textContent ?? '')
+
+  return sources.length > 0 ? readStyles(sources) : NO_STYLES
+}
+
 export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta): Promise<ParsedBook> {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
 
@@ -785,11 +832,19 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
   const spine = readSpine(archive, packagePath)
   const tocTitles = readTocTitles(archive, packagePath)
 
+  const stylesheets = new Map<string, string>()
+
   const perDocument = spine.documents.map((path) => {
     const source = readText(archive, path)
     // A spine entry pointing at a missing file is corruption, but the rest of
     // the book is still worth reading — skip it rather than refuse the import.
-    const blocks = source ? htmlToBlocks(source) : []
+    // The chapter is parsed twice: once here to find which stylesheets it
+    // claims, and again inside `htmlToBlocks`. Cheap next to unzipping, and it
+    // keeps `htmlToBlocks` taking a string, so docx and plain HTML still work.
+    const sheet = source
+      ? stylesFor(archive, path, new DOMParser().parseFromString(source, 'text/html'), stylesheets)
+      : NO_STYLES
+    const blocks = source ? htmlToBlocks(source, sheet) : []
 
     // Figure sources are relative to the chapter that referenced them. Resolve
     // them to archive paths here, while we still know which file that was — by

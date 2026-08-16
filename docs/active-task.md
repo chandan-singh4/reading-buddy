@@ -8,9 +8,30 @@
 
 ---
 
-## Judge the chapter openings and the selection menu on the phone
+## Re-import a book and judge the parser on the phone
 
-Nothing is mid-edit. Build green, **1379 tests across 80 files** (2026-08-16).
+Nothing is mid-edit. Build green, **1394 tests across 81 files** (2026-08-16).
+
+The parser now reads the book's own stylesheet. Before this it judged structure
+from tag names only. Almost no ebook is written as HTML. Converters make them,
+and converters do not write `<h1>`. They write `<p class="chaphead">CONTENTS</p>`
+and put the size and the weight in a CSS file. The parser never opened that file.
+So a chapter title and a sentence arrived as the same thing.
+
+`web/src/parse/styles.ts` is new. It reads the CSS and gives each element a size,
+a weight, a slant and an alignment. The size is a multiple of the size **this
+book** sets its body text in. This is the rule that makes the fix general. Books
+do not agree on what 1em means. No book disagrees with itself.
+
+A line becomes a heading on two signals, not one. Some books set all their text
+in bold, or centre every line. One signal would turn such a book into one long
+heading.
+
+A contents page with no `<nav>` is now dropped. The app builds its own contents
+screen, and the printed page numbers do not apply here.
+
+`PARSER_VERSION` is **21**. Books on the shelf keep their old text until you
+accept the re-parse the shelf offers.
 
 The browser paints the highlights now. `CSS.highlights` holds one live range per
 highlight, and `::highlight(...)` gives each colour its rule. Nothing is
@@ -68,6 +89,10 @@ has not done:
 | `web/src/storage/notes.ts` | `addNote`, `setNoteColour`, `deleteNote`. |
 | `web/src/storage/db.ts` | `StoredNote`. Both new fields are unindexed. |
 | `web/src/reader/NotesPanel.tsx` | Shows a highlight's colour. |
+| `web/src/parse/styles.ts` | Reads the book's CSS. Gives each block its look. |
+| `web/src/parse/html.ts` | Turns markup into blocks. Holds both heading rules. |
+| `web/src/parse/epub.ts` | Finds the stylesheets and passes them to `htmlToBlocks`. |
+| `web/src/parse/version.ts` | `PARSER_VERSION`. Bump it when a book parses differently. |
 
 ### Out of scope
 

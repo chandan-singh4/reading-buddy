@@ -180,5 +180,23 @@
  *   asked per document. A document that has a heading is untouched, so the
  *   original worry — a synthesised title competing with a real one and splitting
  *   a chapter — cannot happen.
+ * - **21** — the parser opens the book's stylesheet. Until now it judged
+ *   structure from tags alone, and almost no ebook in circulation is written as
+ *   HTML: it is converted, and converters do not emit `<h1>`. They emit
+ *   `<p class="chaphead">CONTENTS</p>` and put the size, the weight and the
+ *   centring in a CSS file the parser never opened. Every visible difference
+ *   between a chapter title and a sentence was in that file, so a contents page
+ *   arrived as a wall of identical paragraphs — which is exactly what was
+ *   reported. An epub's stylesheets are now read and resolved per element, and a
+ *   line is called a heading when it is set louder than *this book's own body
+ *   text*, never against a fixed size: books disagree about what 1em means, but
+ *   no book disagrees with itself. Two signals are required, so a book set
+ *   entirely in bold or entirely centred does not become one long heading. A
+ *   contents page with no `<nav>` to mark it is recognised from its own
+ *   "Contents" line and dropped, because the app builds that screen itself and
+ *   the printed page numbers are meaningless here. Nothing in the rule knows a
+ *   single class name — that is the point, and the reason it should not need
+ *   adjusting for the next book. Books parsed under 1–20 keep the flattened
+ *   version.
  */
-export const PARSER_VERSION = 20
+export const PARSER_VERSION = 21
