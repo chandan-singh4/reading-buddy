@@ -348,5 +348,36 @@
  *   differ, the page carries a real second heading under the chapter's name
  *   ("Chapter 12" over "NATURAL LAWS, MATHEMATICS, AND THE WORLD OF IDEALS"),
  *   and it is kept as a subheading instead of being erased.
+ * - **28** — three faults found by reading a book beside the same book in Google
+ *   Books. Each one is a place the parser wrote something the publisher did not.
+ *
+ *   A heading was read with `textContent`, while a paragraph got the full
+ *   extractor — the last corner of the split 26 closed everywhere else. A
+ *   heading is a place a book breaks its own line, and the number over the name
+ *   is the commonest title in print: *The Gay Science* writes it
+ *   `<h2><strong>3</strong><br/><em>Emerson</em></h2>`. `textContent` has no
+ *   concept of a line, so it arrived as "3Emerson". Headings now read through the
+ *   one extractor, which keeps the break and also skips a bare page marker sitting
+ *   inside a heading instead of reading its number as part of the title.
+ *
+ *   CSS pseudo-elements were read as if they styled the element. `::first-letter`
+ *   is the drop cap every publisher opens a chapter with, and *Determined* sets
+ *   it at 5em, after the plain body rule — so the rule won on source order and
+ *   the whole first paragraph of every chapter was set five times body size. It
+ *   also gave `baselineOf` a 5em paragraph to weigh, which moves what the rest of
+ *   the book is measured against. A rule whose rightmost compound carries a
+ *   pseudo-element is now dropped. Pseudo-*classes* are deliberately kept: they
+ *   select the element itself and only narrow which ones.
+ *
+ *   A contents entry labelled "Page 360" was read as a division. *The Mountains
+ *   of My Life* gathers each chapter's footnotes into a file of their own and
+ *   lists them under the chapter, one entry per note, labelled with the page the
+ *   note was printed on — pointing at the footnote paragraph, in a file with no
+ *   heading anywhere. So a title was invented for each: the reader met a page
+ *   headed "Page 360" above a footnote, and the contents listed them among the
+ *   chapters. The label is now read as what it says — this block opens printed
+ *   page 360 — and goes no further. Measured across all 32 books, exactly one row
+ *   moves: that book loses 28 invented section titles and gains the 28 printed
+ *   page numbers, and no other book changes at all.
  */
-export const PARSER_VERSION = 27
+export const PARSER_VERSION = 28

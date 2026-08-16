@@ -12,6 +12,26 @@
   margin-bottom: var(--space-5);
 }
 
+/*
+ * A title keeps the line break the book wrote into it. A numeral over a name is
+ * the commonest title in print, and a publisher writes it as one heading with a
+ * break inside:
+ *
+ *     <h2 class="section"><strong>3</strong><br/><em>Emerson</em></h2>
+ *
+ * The parser holds that break as a newline. Without this, the default collapses
+ * it back to a space and the two lines land as one. `text-wrap: balance` still
+ * decides where a *long* line folds; this only protects the break the book
+ * chose. The contents list is deliberately left alone — collapsing to a space is
+ * the right thing in a row that has one line to give.
+ */
+.minimalTitle,
+.numeralTitle,
+.ornamentalTitle,
+.plateTitle {
+  white-space: pre-line;
+}
+
 /* --- 1. Modern minimal ---------------------------------------------------- */
 
 .minimalLabel {

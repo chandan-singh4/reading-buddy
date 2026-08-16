@@ -32,6 +32,21 @@ describe('htmlToBlocks', () => {
     ])
   })
 
+  it('keeps the line break a heading writes into itself', () => {
+    // *The Gay Science* sets its sections as a numeral over a name, in one
+    // heading with a `<br/>` between the halves. Read through `textContent` the
+    // break disappears and the two arrive pasted together as "3Emerson".
+    expect(htmlToBlocks('<h2><strong>3</strong><br/><em>Emerson</em></h2>')).toEqual([
+      { kind: 'heading', level: 2, text: '3\nEmerson' },
+    ])
+  })
+
+  it('skips a bare page marker sitting inside a heading', () => {
+    expect(
+      htmlToBlocks('<h2>Alpha<span epub:type="pagebreak" title="41"></span></h2>'),
+    ).toMatchObject([{ kind: 'heading', level: 2, text: 'Alpha' }])
+  })
+
   it('keeps an inline-marked sentence as one paragraph', () => {
     expect(texts('<p>The <em>real</em> question is <strong>why</strong>.</p>')).toEqual([
       'The real question is why.',

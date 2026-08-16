@@ -816,6 +816,42 @@ function splitHref(base: string, href: string): { path: string; fragment: string
 const NAV_IS_AUTHORITATIVE = 3
 
 /**
+ * A navigation label that names a printed page instead of naming a division.
+ *
+ * Real files put these in the contents. *The Mountains of My Life* gathers each
+ * chapter's footnotes into a file of their own and lists them under the chapter
+ * they belong to, one entry per note, labelled with the page the note was
+ * printed on:
+ *
+ *     <navPoint>
+ *       <navLabel><text>Page 360</text></navLabel>
+ *       <content src="xhtml/chapter025-fn.xhtml#ch25fn002"/>
+ *     </navPoint>
+ *
+ * The target is the footnote paragraph itself — ordinary prose, with no heading
+ * anywhere in the file. Read as a division, each one had a title invented for it
+ * and inserted into the text, so the reader met a page headed "Page 360" above a
+ * footnote, and the contents listed fourteen of them among the chapters. The
+ * publisher never wrote that heading; we did.
+ *
+ * So it is read as what it says it is: this block opens printed page 360. That
+ * is the same fact `<span epub:type="pagebreak">` states inside a chapter, and
+ * it is worth keeping — the reader shows the printed page, and for this book the
+ * contents is the only place the file states one.
+ *
+ * Deliberately tight. The whole label has to be the reference and nothing else,
+ * so a chapter actually called "Page One" — or any title with words in it — is
+ * untouched. Roman numerals are allowed because front matter is paginated that
+ * way.
+ */
+const PAGE_REFERENCE = /^(?:page|pg|p)\s*\.?\s*([0-9]+|[ivxlcdm]+)$/i
+
+/** `Page 360` → `360`, or `null` when the label names something real. */
+function pageReferenceIn(label: string): string | null {
+  return PAGE_REFERENCE.exec(label.trim())?.[1] ?? null
+}
+
+/**
  * The share of a book a whole navigation level may hold and still be read as
  * signposts rather than as chapters.
  *
@@ -868,6 +904,11 @@ const PART_LEVEL_SHARE = 0.05
  * them vote the chapters away. Measured by text held they are worth a few
  * hundred characters against a hundred thousand, and they cannot move the
  * answer. A malformed contents degrades instead of destroying.
+ *
+ * Note, since 28: those fourteen entries no longer reach this function at all —
+ * `PAGE_REFERENCE` takes them out earlier, as the printed pages they are. The
+ * reasoning above still holds and is still why totals are used; it just no
+ * longer has that example to point at. Any other malformed contents will.
  *
  * Entries with no children are left out. Front matter — Cover, Title Page,
  * Copyright — is short by nature and sits at the same level as the parts in
@@ -999,6 +1040,21 @@ function applyNavigation(
       ? doc.blocks.findIndex((block) => block.ids?.includes(wanted))
       : doc.blocks.findIndex((block) => block.kind !== 'furniture')
     if (at < 0) continue
+
+    // A page reference is a position, not a division. Its number is kept on the
+    // block it points at and the entry is taken no further — it never becomes a
+    // heading, never consumes a level, and never counts as the navigation
+    // having described this document. See `PAGE_REFERENCE`.
+    const page = pageReferenceIn(entry.label)
+    if (page !== null) {
+      const target = doc.blocks[at]!
+      // A marker inside the document itself is the better evidence: it sits
+      // exactly where the page turned, where a contents entry points at the
+      // whole note.
+      target.printedPage ??= page
+      continue
+    }
+
     spokenFor.add(entry.path)
 
     let position = startOf.get(doc.path) ?? 0

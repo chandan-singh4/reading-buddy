@@ -392,6 +392,51 @@ describe('parseEpub — books with no headings in the markup', () => {
     expect(book.chapters.map((c) => c.title)).toEqual(['The Beginning', 'The End'])
   })
 
+  it('reads a "Page 360" contents entry as a printed page, not as a title', async () => {
+    // *The Mountains of My Life* gathers each chapter's footnotes into a file of
+    // their own and lists them under the chapter, one entry per note, labelled
+    // with the page the note was printed on. Read as divisions, each one had a
+    // title invented for it, so the reader met a page headed "Page 360" above a
+    // footnote and the contents listed fourteen of them among the chapters.
+    const ncx = `<?xml version="1.0"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+  <navPoint id="n1"><navLabel><text>The Ascent</text></navLabel><content src="ch1.xhtml"/></navPoint>
+  <navPoint id="n2"><navLabel><text>Page 360</text></navLabel><content src="fn1.xhtml#fn002"/></navPoint>
+  <navPoint id="n3"><navLabel><text>Page One</text></navLabel><content src="ch2.xhtml"/></navPoint>
+</navMap></ncx>`
+
+    const epub = makeEpub({
+      manifest: [
+        '<item id="toc" href="toc.ncx" media-type="application/x-dtbncx+xml"/>',
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="f1" href="fn1.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="c2" href="ch2.xhtml" media-type="application/xhtml+xml"/>',
+      ].join(''),
+      spine: '<itemref idref="c1"/><itemref idref="f1"/><itemref idref="c2"/>',
+      files: {
+        'OEBPS/toc.ncx': ncx,
+        'OEBPS/ch1.xhtml': chapterDoc('<p>We left camp before dawn.</p>'),
+        'OEBPS/fn1.xhtml': chapterDoc(
+          '<div class="footnote_page"><p id="fn002" class="fn">The rope was new.</p></div>',
+        ),
+        'OEBPS/ch2.xhtml': chapterDoc('<p>The descent took two days.</p>'),
+      },
+    })
+
+    const book = await parseEpub(epub, meta())
+    const titles = [...book.chapters.map((c) => c.title), ...book.sections.map((s) => s.title)]
+
+    // The page reference never becomes a division.
+    expect(titles).not.toContain('Page 360')
+    // Its number is kept on the block it pointed at, which is the fact it states.
+    const footnote = book.sections
+      .flatMap((s) => s.paragraphs)
+      .find((p) => p.text.includes('The rope was new'))
+    expect(footnote?.printedPage).toBe('360')
+    // A real title with words in it is untouched, however much it looks alike.
+    expect(titles).toContain('Page One')
+  })
+
   it('titles a headless chapter even when other documents have headings', async () => {
     // The shape of a real book: chapter titles set as artwork, so the chapter
     // documents hold no heading, while the back matter carries ordinary ones.

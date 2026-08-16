@@ -103,6 +103,10 @@
 
 .heading {
   margin-top: var(--space-6);
+  /* A heading is a place a book breaks its own line, and the number over the
+     name is the commonest title in print. The parser keeps that break; this is
+     where it survives to the page. */
+  white-space: pre-line;
   font-family: var(--font-ui);
   /* Scaled off the reading text size, not fixed at --text-lg — otherwise a
      reader who sizes body text up sees in-book headings shrink below it. */

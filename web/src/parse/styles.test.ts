@@ -251,4 +251,28 @@ describe('a selector that asks for an ancestor', () => {
     const both = readStyles(['p { font-size: 1em } .pref p { font-size: 2em }'])
     expect(appearanceOf(deepest('<div class="pref"><p data-target>x</p></div>'), both).size).toBe(2)
   })
+
+  it('ignores a rule that styles a pseudo-element, not the element', () => {
+    // The drop cap every publisher opens a chapter with. *Determined* sets it at
+    // 5em, after the plain `p.body` rule — so read as an ordinary rule it wins
+    // on source order and the whole first paragraph is set five times body size.
+    const cap = readStyles([
+      'p.body { font-size: 1em }',
+      'p.body::first-letter { font-size: 5em }',
+    ])
+    expect(appearanceOf(deepest('<p class="body" data-target>x</p>'), cap).size).toBe(1)
+  })
+
+  it('drops the legacy single-colon spelling too', () => {
+    const old = readStyles(['p { font-size: 1em }', 'p:first-letter { font-size: 5em }'])
+    expect(appearanceOf(deepest('<p data-target>x</p>'), old).size).toBe(1)
+  })
+
+  it('still reads a pseudo-class, which selects the element itself', () => {
+    // `:first-child` only narrows *which* paragraphs. Ignoring the qualifier
+    // matches a little too widely, which is the relaxation this file already
+    // makes for `>` — not the wrong element entirely.
+    const first = readStyles(['p:first-child { font-style: italic }'])
+    expect(appearanceOf(deepest('<div><p data-target>x</p></div>'), first).italic).toBe(true)
+  })
 })

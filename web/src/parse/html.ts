@@ -1057,7 +1057,19 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
 
       const heading = HEADING.exec(tag)
       if (heading) {
-        const text = normalise(element.textContent)
+        // Read the same way a paragraph is, rather than through `textContent`.
+        // A heading is a place a book breaks its own line — the number over the
+        // name is the commonest title in print — and it writes that break as
+        // `<br/>`:
+        //
+        //     <h2 class="section"><strong>3</strong><br/><em>Emerson</em></h2>
+        //
+        // `textContent` has no concept of a line, so the two halves arrived
+        // pasted together as "3Emerson". `textAndLinks` keeps the break as a
+        // newline, exactly as it already did for prose, and skips a bare page
+        // marker sitting inside the heading instead of reading its number as
+        // part of the title.
+        const { text } = textAndLinks(element, styleOf)
         if (!text) continue
         const block: Block = { kind: 'heading', level: Number(heading[1]), text }
         // Headings are the commonest link target in a book: every entry in an

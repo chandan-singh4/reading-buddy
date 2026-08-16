@@ -173,11 +173,39 @@ function specificity(compound: Compound): number {
   return (compound.id ? 100 : 0) + compound.classes.length * 10 + (compound.tag ? 1 : 0)
 }
 
+/**
+ * A pseudo-element: `::first-letter`, `::before`, and the four legacy
+ * single-colon spellings that mean the same thing.
+ *
+ * These have to be dropped whole, and it is not a nicety. A pseudo-element
+ * styles a *part* of an element that CSS invents — the first letter, a piece of
+ * generated content — never the element itself. Read as an ordinary rule, the
+ * drop cap every publisher opens a chapter with
+ *
+ *     p.x03-CO-Body-Text::first-letter { font-size: 5em }
+ *
+ * says the whole first paragraph of every chapter is set five times body size.
+ * It then outranks the plain `p.x03-CO-Body-Text { font-size: 1em }` above it on
+ * source order, so the reader met each chapter as a page of enormous type — and
+ * `baselineOf` had a 5em paragraph to weigh, which moves what the *rest* of the
+ * book is measured against.
+ *
+ * Pseudo-*classes* (`:first-child`, `:hover`) are deliberately not matched here.
+ * They select the element itself and only narrow which ones, so ignoring the
+ * qualifier matches a little too widely — the same relaxation this file already
+ * makes for `>` — rather than describing the wrong thing entirely.
+ */
+const PSEUDO_ELEMENT = /::[\w-]+|:(?:first-letter|first-line|before|after)\b/i
+
 /** `.chap h1.title` → the compound it targets, what must be above it, and a specificity. */
 function readSelector(selector: string, order: number, declarations: Partial<Appearance>): Rule | null {
   const parts = selector.trim().split(/\s+|>/).filter(Boolean)
   const last = parts.pop()
   if (!last) return null
+
+  // A pseudo-element can only sit on the rightmost compound, which is the one
+  // this rule would be taken to describe.
+  if (PSEUDO_ELEMENT.test(last)) return null
 
   const target = readCompound(last)
   if (!target) return null
