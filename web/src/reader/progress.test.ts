@@ -187,6 +187,29 @@ describe('the contents, to the depth the book has', () => {
     expect(outline.every((row) => row.page === 1)).toBe(true)
   })
 
+  it("leaves out an endnote subheading that repeats a chapter's title", () => {
+    // A NOTES division names each chapter it holds notes for, so the notes can
+    // be found and linked back to. Those are cross-references, not destinations.
+    const outline = contentsOutline(
+      manifestOf(['Robots That Think', 'From Meditation to Action', 'NOTES']),
+      indexes([
+        {
+          chapter: 3,
+          sections: ['ROBOTS THAT THINK', 'FROM MEDITATION TO ACTION', 'A Note on Sources'],
+        },
+      ]),
+      spine,
+    )
+
+    // Punctuation and case differ from the chapter headings and must not matter.
+    expect(outline.map((row) => row.title)).toEqual([
+      'Robots That Think',
+      'From Meditation to Action',
+      'NOTES',
+      'A Note on Sources',
+    ])
+  })
+
   it('names an untitled chapter rather than printing a blank line', () => {
     expect(contentsOutline(manifestOf(['']), [], spine)[0]).toEqual({
       chapter: 1,

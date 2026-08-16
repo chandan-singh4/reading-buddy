@@ -1062,6 +1062,17 @@ sign-in screen.
   section when the list names it, the chapter when it does not. Marking both
   would print the line twice, a few lines apart, which reads as the list
   contradicting itself. — 2026-08-15
+- **A section named after a chapter is left out of Contents.** A book's NOTES
+  division repeats each chapter's title as a subheading, so its notes can be
+  found and so each note can link back to the chapter. Those subheadings are
+  cross-references and not places to go. Printed as outline rows they read as a
+  second, wrong copy of the contents list: the same chapter names again, out of
+  order, several sharing one page number, and every one of them landing in the
+  endnotes instead of in the chapter it names. The chapter's own row is already
+  in the list and goes to the right place. Titles are compared by their letters
+  and digits with case ignored, because the endnote heading is set from the same
+  words as the chapter heading but rarely from the same characters. This is a
+  render rule, so no book has to re-parse. — 2026-08-15
 - **A missing title is asked per document, not per book.** `parse/epub.ts` can
   take a chapter's title from the epub's own contents when the chapter's markup
   has no heading. Many books need this: the title is set as artwork, so the file

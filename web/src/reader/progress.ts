@@ -405,6 +405,24 @@ export interface OutlineEntry {
  * contents page does not indent a line under itself: the row would repeat what
  * is directly above it and add a page number equal to it.
  */
+/**
+ * A title reduced to what a reader would say out loud: its letters and digits,
+ * case ignored. `CHAPTER 15. FROM MEDITATION TO ACTION` and
+ * `Chapter 15 - From Meditation to Action` are the same title in two houses'
+ * punctuation, and the endnote heading is set from the same words as the
+ * chapter heading but rarely from the same characters.
+ *
+ * The twin of `sameLine` in `parse/assemble.ts`, which compares titles the same
+ * way for a different reason. Written out again rather than imported: the reader
+ * does not depend on the parser, and that is worth more than five shared lines.
+ */
+function titleKey(title: string): string {
+  return title
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .toLowerCase()
+}
+
 export function contentsOutline(
   manifest: Manifest,
   chapterIndexes: readonly ChapterIndex[],
@@ -430,6 +448,11 @@ export function contentsOutline(
   const byChapter = new Map(chapterIndexes.map((index) => [index.chapter, index]))
   const rows: OutlineEntry[] = []
 
+  // Every chapter title the list already prints, as comparison keys.
+  const chapterTitles = new Set(
+    manifest.chapters.map((chapter) => titleKey(chapter.title ?? '')).filter((key) => key.length > 0),
+  )
+
   for (const chapter of manifest.chapters) {
     rows.push({
       chapter: chapter.chapter,
@@ -444,6 +467,17 @@ export function contentsOutline(
     for (const section of sections) {
       // Untitled sections are the parser's, not the book's. Nothing to print.
       if (!section.title) continue
+
+      // A section named after a chapter is a cross-reference, not a place to go.
+      // Endnotes are the case that matters: a book's NOTES division repeats each
+      // chapter's title as a subheading, so its notes can be found and so each
+      // note can link back. Printed as outline rows they read as a second, wrong
+      // copy of the contents list — the same chapter names again, out of order,
+      // several of them sharing one page number, all of them landing in the
+      // endnotes rather than in the chapter they name. The chapter's own row is
+      // directly above and goes to the right place.
+      if (chapterTitles.has(titleKey(section.title))) continue
+
       rows.push({
         chapter: chapter.chapter,
         section: section.section,
