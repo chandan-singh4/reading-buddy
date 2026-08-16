@@ -2185,15 +2185,60 @@ export default function Reader() {
      * The cost is honest and worth naming: the drag handles go with it, so a
      * selection is adjusted by making it again rather than by nudging an end.
      */
-    const onSelected = () => {
+    const capture = () => {
       const found = selectionInReader(strip.current)
       if (!found) return
       setSelected(found)
       window.getSelection()?.removeAllRanges()
     }
 
-    document.addEventListener('pointerup', onSelected)
-    return () => document.removeEventListener('pointerup', onSelected)
+    /*
+     * Why `selectionchange` as well as `pointerup`.
+     *
+     * A long press on Android is how a phone selects a word, and the gesture is
+     * taken over by the system's own selection UI — the release never reaches
+     * the page as a `pointerup`. So the first selection of a reading session
+     * raised the phone's menu and not ours, and only a later stray tap, which
+     * *did* deliver a `pointerup`, brought ours up over a selection made a
+     * minute earlier. That was the whole of the report.
+     *
+     * `selectionchange` always fires. It fires on every character too, so the
+     * capture waits for it to go quiet, and waits again while a finger is still
+     * down — a reader dragging a handle has not finished choosing.
+     */
+    let timer = 0
+    const holding = { down: false }
+
+    const settle = () => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        if (holding.down) {
+          settle()
+          return
+        }
+        capture()
+      }, 300)
+    }
+
+    const onDown = () => {
+      holding.down = true
+    }
+    const onUp = () => {
+      holding.down = false
+      capture()
+    }
+
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onUp)
+    document.addEventListener('selectionchange', settle)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onUp)
+      document.removeEventListener('selectionchange', settle)
+    }
   }, [])
 
   /**
