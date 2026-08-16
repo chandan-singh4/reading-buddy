@@ -1062,6 +1062,16 @@ sign-in screen.
   section when the list names it, the chapter when it does not. Marking both
   would print the line twice, a few lines apart, which reads as the list
   contradicting itself. — 2026-08-15
+- **Contents opens at the reader, not at page one.** A long book's list is
+  hundreds of rows. A reader on page 260 opens it to ask what comes next, and a
+  list that opens at the top answers by making them scroll past everything they
+  have read to find themselves first. The row they are on is set a third of the
+  way down, not centred, because the question is what comes *next* — so the room
+  belongs below the row. The list is left alone when that row is already on the
+  first screenful: scrolling would push the ornament and the word CONTENTS out of
+  sight and gain nothing. Done with `scrollTop` in a layout effect, not
+  `scrollIntoView`, which can scroll the overlay around the list as well. —
+  2026-08-16
 - **A section named after a chapter is left out of Contents.** A book's NOTES
   division repeats each chapter's title as a subheading, so its notes can be
   found and so each note can link back to the chapter. Those subheadings are

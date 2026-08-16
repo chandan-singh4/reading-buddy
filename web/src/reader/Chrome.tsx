@@ -24,7 +24,7 @@
  *   paper, not in the toolbar.
  */
 
-import { useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router'
 
 import { stepThrough, swipeOf, type Touch } from './swipe.ts'
@@ -205,6 +205,11 @@ export function Chrome({
    */
   const swipeFrom = useRef<Touch | null>(null)
 
+  /* The scrolling list, and the one row inside it that is the reader. Both are
+     needed to open the contents where they are — see the layout effect below. */
+  const contentsBox = useRef<HTMLElement | null>(null)
+  const readingRow = useRef<HTMLLIElement | null>(null)
+
   /**
    * Whether the contents list names the section the reader is actually in.
    *
@@ -219,6 +224,37 @@ export function Chrome({
       entry.chapter === here.chapter &&
       entry.section === here.section,
   )
+
+  /*
+   * Open the contents at the reader, not at page one.
+   *
+   * A long book's list is hundreds of rows. A reader on page 260 opens it to ask
+   * what is next, and a list that opens at the top answers by making them scroll
+   * past everything they have already read to find themselves first. The place
+   * they are is the only row they are certainly interested in, so it is where the
+   * list should already be.
+   *
+   * Set a third down rather than centred: the question is what comes *next*, so
+   * the room belongs below the row and not above it.
+   *
+   * `scrollTop` and not `scrollIntoView` — the latter can scroll ancestors as
+   * well, and this list sits inside an overlay that must not move. In a layout
+   * effect so it lands before the paint; the reader never sees the top of the
+   * list, so there is no jump to notice.
+   */
+  useLayoutEffect(() => {
+    if (!shown || sheetTab !== 'contents') return
+    const list = contentsBox.current
+    const row = readingRow.current
+    if (!list || !row) return
+
+    const top = row.offsetTop - list.offsetTop
+    // Already on the first screenful. Scrolling would only push the ornament and
+    // the word CONTENTS out of sight to gain nothing.
+    if (top < list.clientHeight) return
+
+    list.scrollTop = top - list.clientHeight / 3
+  }, [shown, sheetTab, outline])
 
   return (
     /* `inert` rather than unmounted: the overlay keeps its scroll position in
@@ -487,7 +523,7 @@ export function Chrome({
             chapter belongs to, so they would have to be invented.
           */}
           {sheetTab === 'contents' && (
-            <nav className={styles.contents} aria-label="Contents">
+            <nav className={styles.contents} aria-label="Contents" ref={contentsBox}>
               <div className={styles.contentsHead} aria-hidden="true">
                 <span className={styles.contentsFlower}>❁</span>
                 <p className={styles.contentsWord}>Contents</p>
@@ -518,6 +554,7 @@ export function Chrome({
                          reads the list as a hierarchy without a second heading
                          level to scan past. */
                       className={entry.section === undefined ? undefined : styles.contentsSub}
+                      ref={reading ? readingRow : undefined}
                     >
                       <button
                         type="button"
