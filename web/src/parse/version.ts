@@ -198,5 +198,28 @@
  *   single class name — that is the point, and the reason it should not need
  *   adjusting for the next book. Books parsed under 1–20 keep the flattened
  *   version.
+ * - **22** — 21 found the titles and then did not use them. A styled heading
+ *   was *labelled*, not promoted, so it looked right on the page and counted
+ *   for nothing: the assembler builds divisions from `heading` blocks, and the
+ *   contents screen is built from divisions. A converted book therefore came
+ *   out as one undivided run of text with bold lines in it, and Contents listed
+ *   three entries for a book with thirty. That was reported, with the titles
+ *   plainly visible in the reading screen and absent from Contents in the same
+ *   session. They are promoted now, and their levels come from ranking the
+ *   distinct sizes the document uses — largest is level 1 — so a part title
+ *   nests the chapters beneath it without the parser knowing anything about how
+ *   this converter scales its type. Two guards: a document with real
+ *   `<h1>`–`<h6>` of its own is left alone, because the author has already said
+ *   what the structure is; and a long document that comes back mostly headings
+ *   is disbelieved and kept as prose, since a chapter cut into fifty divisions
+ *   is worse than flat emphasis. The share is not weighed on a short document —
+ *   an epub gives a part its own file holding one line, and that file is all
+ *   heading and entirely correct.
+ *
+ *   21 held back from promoting on the grounds that a heading is consumed as a
+ *   division title and shifts every anchor after it. True, and the wrong trade:
+ *   a re-parse rebuilds anchors in any case, notes carry their quote text, and
+ *   the caution bought nothing while costing the reader the whole contents
+ *   screen. Books parsed under 21 have the titles but none of the structure.
  */
-export const PARSER_VERSION = 21
+export const PARSER_VERSION = 22

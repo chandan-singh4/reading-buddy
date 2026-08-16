@@ -85,7 +85,8 @@ describe('htmlToBlocks with the book’s own stylesheet', () => {
 
   it('sets it apart once the CSS is given', () => {
     const blocks = htmlToBlocks(html, readStyles([css]))
-    expect(blocks[0]).toMatchObject({ label: 'subheading', text: 'Skywoman Falling' })
+    expect(blocks[0]).toMatchObject({ kind: 'heading', text: 'Skywoman Falling' })
+    expect(blocks[1]!.kind).toBe('prose')
     expect(blocks[1]!.label).toBeUndefined()
   })
 
@@ -108,7 +109,7 @@ describe('htmlToBlocks with the book’s own stylesheet', () => {
       '<p class="t">Skywoman Falling</p><p>She fell like a maple seed on the wind.</p>',
       big,
     )
-    expect(blocks[0]!.label).toBe('subheading')
+    expect(blocks[0]).toMatchObject({ kind: 'heading', text: 'Skywoman Falling' })
   })
 
   it('drops a contents page that carries no nav', () => {
@@ -134,6 +135,60 @@ describe('htmlToBlocks with the book’s own stylesheet', () => {
       'Winter is the time for telling stories, and the elders say so.',
       'The story goes that she came from Skyworld above.',
     ])
+  })
+
+  describe('promoting styled headings to real ones', () => {
+    // The shape of the reported book: a part title set larger than the chapter
+    // titles under it, and not one <h1> in the file.
+    const book = readStyles([
+      'p { font-size: 1em; text-indent: 1.2em; }',
+      'p.part { font-size: 2em; font-weight: bold; text-align: center; text-indent: 0; }',
+      'p.chap { font-size: 1.4em; font-weight: bold; text-indent: 0; }',
+    ])
+    const markup = `
+      <p class="part">Planting Sweetgrass</p>
+      <p>Sweetgrass is best planted not by seed, but by putting roots in the ground.</p>
+      <p class="chap">Skywoman Falling</p>
+      <p>In winter, when the green earth lies resting beneath a blanket of snow.</p>
+      <p class="chap">The Council of Pecans</p>
+      <p>Nuts fell that year in numbers nobody in the valley could remember.</p>
+    `
+
+    it('makes them headings, so the book has divisions to list', () => {
+      const blocks = htmlToBlocks(markup, book)
+      expect(blocks.filter((block) => block.kind === 'heading').map((block) => block.text)).toEqual([
+        'Planting Sweetgrass',
+        'Skywoman Falling',
+        'The Council of Pecans',
+      ])
+    })
+
+    it('ranks the larger title above the ones beneath it', () => {
+      const levels = htmlToBlocks(markup, book)
+        .filter((block) => block.kind === 'heading')
+        .map((block) => block.level)
+      expect(levels).toEqual([1, 2, 2])
+    })
+
+    it('leaves a document that states its own structure alone', () => {
+      const blocks = htmlToBlocks(`<h1>Skywoman Falling</h1>${markup}`, book)
+      // One real heading, and the styled lines stay labelled prose beneath it.
+      expect(blocks.filter((block) => block.kind === 'heading')).toHaveLength(1)
+      expect(blocks.filter((block) => block.label === 'subheading')).toHaveLength(3)
+    })
+
+    it('refuses when most of a long document came back a heading', () => {
+      // Ten short styled lines and nothing else. A rule has matched too widely,
+      // and cutting a chapter into ten divisions is worse than flat emphasis.
+      const many = Array.from({ length: 10 }, (_, i) => `<p class="chap">Line ${i}</p>`).join('')
+      expect(htmlToBlocks(many, book).some((block) => block.kind === 'heading')).toBe(false)
+    })
+
+    it('still promotes the one line on a part-title page', () => {
+      // An epub gives a part its own file. It is 100% heading, and correct.
+      const blocks = htmlToBlocks('<p class="part">Planting Sweetgrass</p>', book)
+      expect(blocks[0]).toMatchObject({ kind: 'heading', text: 'Planting Sweetgrass' })
+    })
   })
 
   it('leaves a book with no contents page alone', () => {

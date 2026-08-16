@@ -559,6 +559,79 @@ function looksStyledAsHeading(style: Appearance, baseline: number, text: string)
   return larger ? signals >= 1 : signals >= 2
 }
 
+/**
+ * The most of a document that may be headings before the finding is disbelieved.
+ *
+ * A safety rail, not a rule. If a third of a chapter is coming back as titles,
+ * the stylesheet has been read wrongly — a rule matched far more widely than it
+ * looked, most likely — and the honest response is to keep the text as prose.
+ * Wrong emphasis is a blemish; a chapter chopped into fifty divisions is a book
+ * the reader cannot navigate.
+ *
+ * Weighed only on a document long enough for the share to mean anything. An
+ * epub gives a part its own file, holding one line — "PLANTING SWEETGRASS" —
+ * and that file is 100% heading and entirely correct. Judging it by proportion
+ * would throw out the very titles that divide the book into parts.
+ */
+const HEADING_SHARE_MAX = 0.34
+const HEADING_SHARE_FLOOR = 8
+
+/**
+ * Turn style-detected headings into real headings, and give them levels.
+ *
+ * Detecting them was only half the job. A labelled paragraph *looks* like a
+ * heading and is nothing else: the assembler builds the book's divisions from
+ * `heading` blocks, and the contents screen is built from those divisions. So a
+ * converted book — which has no `<h1>` anywhere — came out as one undivided
+ * run of text with bold lines in it, and the contents screen had almost nothing
+ * to list. That was the state the reader reported: every title visible on the
+ * page, and none of them in Contents.
+ *
+ * ## Levels come from ranking, not from the sizes themselves
+ *
+ * A book has no absolute idea of "level 1". It has an order: its part titles
+ * are set larger than its chapter titles, which are set larger than anything
+ * below. Sorting the distinct sizes found in the document and using the
+ * position gives exactly that, and gives it without knowing a single thing
+ * about how this particular converter names or scales its type. Ranked
+ * descending, so the largest is level 1.
+ *
+ * ## Only where the document has no headings of its own
+ *
+ * A file with real `<h1>`–`<h6>` has already said what its structure is, and
+ * that statement always wins — a guess competing with it could split one
+ * chapter in two. Asked per document rather than per book, for the reason
+ * recorded at `PARSER_VERSION` 20: a book with headings in its endnotes and
+ * nowhere else must not have the fallback switched off for every chapter.
+ */
+function promoteStyledHeadings(
+  blocks: Block[],
+  found: Map<Block, { size: number; ids: string[] }>,
+): Block[] {
+  if (found.size === 0) return blocks
+  if (blocks.some((block) => block.kind === 'heading')) return blocks
+  if (blocks.length >= HEADING_SHARE_FLOOR && found.size > blocks.length * HEADING_SHARE_MAX) {
+    return blocks
+  }
+
+  const ranked = [...new Set([...found.values()].map((entry) => entry.size))].sort((a, b) => b - a)
+
+  return blocks.map((block) => {
+    const entry = found.get(block)
+    if (!entry) return block
+
+    const promoted: Block = {
+      kind: 'heading',
+      level: ranked.indexOf(entry.size) + 1,
+      text: block.text,
+    }
+    // Carried over because a heading is what a contents page links to, and the
+    // ids were the paragraph's before it became one.
+    if (entry.ids.length > 0) promoted.ids = entry.ids
+    return promoted
+  })
+}
+
 /** The lines that open a contents page, in the books that spell it out. */
 const CONTENTS_TITLE = /^(table of )?contents$/i
 
@@ -650,6 +723,7 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
   // element the baseline pass already asked about. Memoised so each element is
   // costed once whatever the size of the book's stylesheet.
   const styles = new Map<Element, Appearance>()
+  const styledHeadings = new Map<Block, { size: number; ids: string[] }>()
   function styleOf(element: Element): Appearance {
     let style = styles.get(element)
     if (!style) {
@@ -817,6 +891,12 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
               ? { kind: 'prose', text, label: 'subheading' }
               : { kind: 'prose', text }
         if (links.length > 0) block.links = links
+        // Remembered so `promoteStyledHeadings` can rank these by size later.
+        // A level cannot be settled here: "is this bigger than the other
+        // headings" needs all of them, and only two have been seen so far.
+        if (block.label === 'subheading') {
+          styledHeadings.set(block, { size: styleOf(element).size, ids: idsIn(element) })
+        }
         blocks.push(withLinks(block, element))
         continue
       }
@@ -857,7 +937,7 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
    * at the page furniture repeated above them.
    */
   return dropContentsPage(
-    blocks.map((block) =>
+    promoteStyledHeadings(blocks, styledHeadings).map((block) =>
       (block.kind === 'prose' || block.kind === 'heading') && isRunningHead(block.text)
         ? { kind: 'furniture' as const, text: block.text }
         : block,

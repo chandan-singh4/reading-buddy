@@ -301,16 +301,23 @@ describe('running heads the print edition left behind', () => {
 })
 
 describe('a heading the book only set in bold', () => {
-  it('labels a wholly bold paragraph as a subheading', () => {
+  it('reads a wholly bold paragraph as a heading', () => {
     // The real markup from a calibre conversion of print.
     const [block] = htmlToBlocks('<p class="calibre1"><b class="calibre4">The Three Projects</b></p>')
-    expect(block.kind).toBe('prose')
-    expect(block.label).toBe('subheading')
+    expect(block.kind).toBe('heading')
+    expect(block.text).toBe('The Three Projects')
   })
 
   it('takes <strong> as readily as <b>', () => {
     const [block] = htmlToBlocks('<p><strong>Cultural Constraints to Intimacy</strong></p>')
-    expect(block.label).toBe('subheading')
+    expect(block.kind).toBe('heading')
+  })
+
+  it('keeps it a labelled paragraph where the document states its own structure', () => {
+    // A real heading is the author speaking, and it always wins. The bold line
+    // beneath it is a section of that chapter, not a rival division.
+    const blocks = htmlToBlocks('<h1>Chapter One</h1><p><b>The Three Projects</b></p>')
+    expect(blocks[1]).toMatchObject({ kind: 'prose', label: 'subheading' })
   })
 
   it('leaves a sentence with a bolded phrase in it', () => {
