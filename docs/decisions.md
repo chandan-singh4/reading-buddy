@@ -1141,3 +1141,43 @@ sign-in screen.
   rather than derived because readers put meaning in it — yellow for important,
   blue for look this up — and a theme change must not rewrite what they meant.
   Unindexed, so no schema version was needed. — 2026-08-16
+
+- **A book's own navigation decides its structure; the styling is the fallback.**
+  Every epub ships a `toc.ncx` or a `nav.xhtml` in which the author states the
+  divisions, their titles, their nesting and the exact position of each one. We
+  read that file before and kept only a title per document, so the parser was
+  inferring what the file had spelled out. Inference cannot win here: three short
+  centred lines of a dedication are, as evidence, identical to three chapter
+  titles. The stylesheet pass stays, as the answer for a file whose navigation is
+  missing or unusable. — 2026-08-16
+
+- **Silence in a navigation is not denial.** A navigation that lists the front
+  matter and then one late chapter has said nothing about the chapters between,
+  not that they are prose. So the navigation is authoritative only over the
+  documents it points into. A document it never reaches keeps the headings the
+  styling pass found. Reading silence as denial emptied a whole book's contents
+  on the word of a file that had given up. — 2026-08-16
+
+- **The navigation decides structure; the markup keeps its own words.** A real
+  `<h1>NOTES</h1>` is not rewritten to "Notes" because the contents page spells
+  it that way. Both are the author, and only one of them is on the page. A
+  guessed heading has no authority over its own text, so it does take the label.
+  — 2026-08-16
+
+- **The book's printed contents page stays in the book.** The app's Contents tab
+  is built from the navigation and is a separate thing; it does not replace a
+  page that belongs to the book as a dedication does. The rule that dropped it
+  also could not tell where the list ended, so it ate the "PREFACE" title after
+  it — one reason of two, and either would be enough. — 2026-08-16
+
+- **A trailing number marks a contents entry only after a title of two words or
+  more.** "An Example of Growing Toward Self-Leadership 130" is a contents line.
+  "Chapter 1" and "Part 1" are the commonest chapter titles in print and have the
+  same shape. A contents line names something and so has a name to give; a
+  numbered title is a label and a figure. This needs no list of label words. —
+  2026-08-16
+
+- **A numbered section opens like a chapter.** Where a book is cut into parts,
+  the part becomes the division and "Chapter 1" arrives as a section — the words
+  print gives a full opening to. Only when the title carries a number: a full
+  opening on every subdivision would be relentless. — 2026-08-16

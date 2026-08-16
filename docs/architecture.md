@@ -61,7 +61,15 @@ web/src/parse/
 ├─ html.ts        HTML → Block[] via the browser's DOMParser (no dependency)
 ├─ markdown.ts    markdown → Block[]
 ├─ txt.ts         plain text → Block[]
+├─ styles.ts      the book's own CSS → an Appearance per element. Sizes are a
+│                 multiple of *this book's* body text, so no absolute threshold
+│                 is needed. Used where a converted file states its structure
+│                 only in a stylesheet.
 ├─ epub.ts        ZIP + OPF spine → per-chapter HTML → Block[]   (fflate)
+│                 Also reads the book's own navigation (`toc.ncx`, `nav.xhtml`),
+│                 which is the source of the divisions, their titles and their
+│                 nesting. It is authoritative only over the documents it points
+│                 into; elsewhere the styling pass stands.
 ├─ docx.ts        Word styles → HTML → Block[]                   (mammoth, lazy)
 ├─ pdf.ts         pdf.js wrapper — glyph geometry only           (pdfjs, lazy)
 ├─ pdf-layout.ts  pure geometry: lines, columns, furniture, headings

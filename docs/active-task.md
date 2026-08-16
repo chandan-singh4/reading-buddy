@@ -10,7 +10,21 @@
 
 ## Re-import a book and judge the parser on the phone
 
-Nothing is mid-edit. Build green, **1404 tests across 81 files** (2026-08-16).
+Nothing is mid-edit. Build green, **1407 tests across 81 files** (2026-08-16).
+
+**This is the task: re-parse two books and look at them. No code.** The parser
+went through four rounds this session and only the phone can say if they landed.
+
+1. Open the shelf. Accept the re-parse it offers for *Braiding Sweetgrass* and
+   for *The Mountains of My Life*.
+2. Open the Contents tab of each. Chapters must nest under their parts. The
+   Preface must be listed. Nothing between chapter 1 and chapter 26 may be
+   missing.
+3. Read the first pages. The book's own printed contents page must still be
+   there. A chapter with a number must open with the large numeral.
+
+If something is still wrong, the first question is whether that book's own
+navigation names it. That decides which of the two paths is at fault.
 
 The parser now takes the book's structure from the book's own navigation. Every
 epub ships a `toc.ncx` or a `nav.xhtml`. In it the author states the divisions:
@@ -46,7 +60,20 @@ A line becomes a heading on two signals, not one. Some books set all their text
 in bold, or centre every line. One signal would turn such a book into one long
 heading.
 
-`PARSER_VERSION` is **23**. Books on the shelf keep their old text until you
+Two later corrections, both from one reported book:
+
+- **The navigation rules only the documents it points into.** A navigation that
+  lists the front matter and then chapter 26 has said nothing about the chapters
+  between. It has not called them prose. A document it never reaches keeps the
+  headings the styling pass found.
+- **A trailing number marks a contents entry only after a title of two words or
+  more.** "Chapter 1" and "Part 1" end in a space and a number too. The old rule
+  refused every numbered chapter title in print.
+
+In the reader, a numbered section now opens like a chapter. Where a book is cut
+into parts, the part becomes the division and "Chapter 1" arrives as a section.
+
+`PARSER_VERSION` is **24**. Books on the shelf keep their old text until you
 accept the re-parse the shelf offers.
 
 The browser paints the highlights now. `CSS.highlights` holds one live range per
@@ -109,6 +136,7 @@ has not done:
 | `web/src/parse/html.ts` | Turns markup into blocks. Holds both heading rules. |
 | `web/src/parse/epub.ts` | Reads `toc.ncx`/`nav.xhtml`, and finds the stylesheets. |
 | `web/src/parse/assemble.ts` | Blocks into divisions. Holds the `guessed` flag. |
+| `web/src/reader/chapterHeading.ts` | Reads a number off a title. Picks the opening. |
 | `web/src/parse/version.ts` | `PARSER_VERSION`. Bump it when a book parses differently. |
 
 ### Out of scope

@@ -15,7 +15,18 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1335 tests across 77 files** (2026-08-15).
+  **1407 tests across 81 files** (2026-08-16).
+- **`PARSER_VERSION` is 24, and two books are waiting on a re-parse.** The
+  reader should open the shelf and accept the rebuild for *Braiding Sweetgrass*
+  and *The Mountains of My Life*, then check the Contents tab of each. Expected:
+  chapters nested under their parts, the Preface listed, the book's own printed
+  contents page still in the text, and a numbered chapter opening with the large
+  numeral.
+- **The page-flip seam is still open, and the reader chose to defer it.** The
+  animation shows on some turns and not others. Cause is known: `turn()` returns
+  `null` at a strip's end and `startDrag` refuses a turn that crosses a section,
+  because the destination is not laid out yet. The fix is to lay the next
+  section out ahead of time.
 - **The new Bookmarks and Notes panels have never been seen.** The Browser pane
   has no book on its shelf, so both were proved by tests, not by eye. **Worth a
   minute on the phone.** Watch the ribbon grow down when a bookmark unfurls.
@@ -69,6 +80,51 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The parser reads the book instead of guessing at it** — 2026-08-16, four
+  commits (`f407641`, `9cb387c`, `2a3f5cb`, `7a69627`), build green, **1407
+  tests across 81 files**. The reader's brief: "We have parsed at least 20
+  times, I want it to be done with once and for all." Four faults, each one
+  under the last.
+  - **The parser never opened the book's stylesheet.** It judged structure from
+    tag names only. Almost no ebook is written as HTML — converters make them,
+    and a converter writes `<p class="chaphead">CONTENTS</p>` and puts the size
+    and the weight in a CSS file. So a chapter title and a sentence arrived as
+    the same thing. `parse/styles.ts` is new. It reads the CSS and gives each
+    element a size, a weight, a slant and an alignment.
+  - **The size is a multiple of the size *this book* sets its body text in.**
+    This is the rule that makes the fix general. Books do not agree on what 1em
+    means. No book disagrees with itself. A line needs two signals, not one,
+    because some books set all their text bold or centre every line.
+  - **Version 21 found the titles and did not use them.** They were labelled,
+    not promoted, so the assembler built no divisions and Contents listed three
+    entries for a book with thirty. `promoteStyledHeadings` makes them real, with
+    levels from ranking the distinct sizes largest first.
+  - **The book's own navigation is the source of truth now.** Every epub ships a
+    `toc.ncx` or a `nav.xhtml` in which the author *states* the divisions, their
+    nesting and the exact position of each. We read that file already and threw
+    nearly all of it away — `resolvePath` split the `#fragment` off, the nesting
+    was never recorded, and one flat title per document survived. That is why
+    inference could never be right in principle: three short centred lines of a
+    dedication are, as evidence, identical to three chapter titles.
+  - **Silence is not denial.** Version 23 let the navigation speak for the whole
+    book, so a file listing its front matter and then chapter 26 discarded every
+    heading the styling pass had correctly found. A document the navigation never
+    points into now keeps its own guesses. The fallback takes over exactly where
+    the file goes quiet.
+  - **A rule threw out every numbered chapter title in print.** It rejected any
+    line ending in a space and a number, to keep a contents entry from reading
+    as the heading it is set to look like. "Chapter 1" and "Part 1" have that
+    shape. The page number must now follow a title of more than one word.
+  - **The printed contents page is kept, and the Preface is back.** Version 22
+    dropped the page, which was wrong twice: the reader wants it, and the rule
+    could not tell where the list ended so it ate the "PREFACE" title too.
+  - **A numbered section opens like a chapter in the reader.** Where a book is
+    cut into parts, the part becomes the division and "Chapter 1" lands as a
+    section — the words print gives a full opening to.
+  - **One rule was tried and withdrawn**, and it is written down in the code so
+    it is not re-invented: keep a guess that *looks like* one the navigation
+    named nearby. A navigation names a dedication by pointing at its first line,
+    so the lines under it look endorsed and become chapters again.
 - **Bookmarks and Notes are real panels now** — 2026-08-15, build green, **1335
   tests across 77 files**. Both come from the prototype `bookmarks_notes_v2.html`.
   - `reader/BookmarksPanel.tsx` — each mark rests as a page-edge tab with a
@@ -462,8 +518,8 @@ Get that loop working before building any breadth.
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (1290, 73 files), `npm run typecheck`, `npm run build` — all
-passing as of 2026-08-15. Precache 34 entries / 1172.01 KiB. **Two tests flaked
+**Gates:** `npm test` (1407, 81 files), `npm run typecheck`, `npm run build` — all
+passing as of 2026-08-16. Precache 34 entries / 1172.01 KiB. **Two tests flaked
 once under parallel load** (`Reader › goes to the next section`, `Library ›
 unfiles a book…`) and passed on re-run and in isolation — timing, not a
 regression, but they exist. **Run the suite as `npm test --workspace web`** — from the repo root it misses `web/`'s Vite config
@@ -482,6 +538,13 @@ type is imported.
   worker problem. Don't raise it again.
 
 ### Next up
+**Judge the parser on the phone.** Re-parse the two books and check the Contents
+tab of each. This needs no code. It is the only way to know if the four parser
+rounds have landed.
+
+**Then the page-flip seam**, which the reader deferred twice. Lay the next
+section out ahead of time so a drag can cross a section boundary.
+
 **Finish WP-25: something that writes a note.** The Notes tab reads a table that
 nothing fills. Written out in `active-task.md`, with one question to settle
 first: device-local or cloud. Device-local is the smaller step.
