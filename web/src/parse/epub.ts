@@ -816,6 +816,112 @@ function splitHref(base: string, href: string): { path: string; fragment: string
 const NAV_IS_AUTHORITATIVE = 3
 
 /**
+ * The share of a book a whole navigation level may hold and still be read as
+ * signposts rather than as chapters.
+ *
+ * Measured on the books in hand, and the two answers are not close. The level
+ * that holds the parts of *The Mountains of My Life* holds 0.4% of its text;
+ * the level below, its chapters, holds 12%. In *Be As You Are* it is 0.7%
+ * against 86%. Five per cent sits in an empty gap three orders of magnitude
+ * wide, so the exact number is not doing any delicate work.
+ */
+const PART_LEVEL_SHARE = 0.05
+
+/**
+ * Turn the navigation's nesting into the two levels the book is stored in.
+ *
+ * This is the fix for the fault that cost *The Mountains of My Life* nineteen of
+ * its twenty-eight chapters. The navigation's `depth` used to be written into
+ * `level` directly, so a book that nests its chapters under parts put every
+ * chapter at depth 3; `resolveLevels` keeps only the two shallowest levels
+ * present, and everything at 3 was flattened into prose. The book's structure
+ * was destroyed precisely *because* the book stated it clearly.
+ *
+ * The rule is about what a division holds, not how deep it sits:
+ *
+ * - A navigation **level** whose entries hold almost no text of their own is a
+ *   level of **parts**. It does not consume a book level; a part is a signpost
+ *   standing beside the chapters it names, which is how a reader meets it and
+ *   how a printed contents sets it.
+ * - Every other level is chapters, and their children are sections.
+ *
+ * So an entry's level counts only the ancestors that hold text. A chapter
+ * nested three deep under two parts still comes out as a chapter.
+ *
+ * **The judgement is per level, not per entry, and that is the whole of it.**
+ * Judged alone, *The Mountains of My Life* cannot be read: its Chapter 7 holds
+ * 933 characters before its first subheading, which is less than the 3,493 its
+ * Part 2 holds before its first chapter. No threshold separates those two.
+ *
+ * A level, though, separates easily — because the question to ask of a level is
+ * not how big its entries are but **how much of the book it holds**. Every
+ * chapter level holds nearly the whole book between its titles, by definition:
+ * that is where the text is. Every part level holds almost none of it, because
+ * a part title is followed immediately by its first chapter title. In the two
+ * books this fixes the two levels sit at 0.4% against 12%, and 0.7% against
+ * 86%.
+ *
+ * Totals rather than averages, and that is deliberate. This book's contents
+ * also carries a footnote list — fourteen entries reading "Page 7", "Page 51",
+ * nested one level too deep because the file forgets two closing tags. They
+ * outnumber the real chapters at their level, so any per-entry average lets
+ * them vote the chapters away. Measured by text held they are worth a few
+ * hundred characters against a hundred thousand, and they cannot move the
+ * answer. A malformed contents degrades instead of destroying.
+ *
+ * Entries with no children are left out. Front matter — Cover, Title Page,
+ * Copyright — is short by nature and sits at the same level as the parts in
+ * some books; counting it would call every top level a part level. A division
+ * is only evidence about what a division holds.
+ *
+ * Parts landing at the same level as chapters is deliberate, not a compromise.
+ * The anchor grammar is two deep and permanent, so a third tier cannot be added
+ * without renumbering every book ever imported. A part that reads as its own
+ * short entry in the contents — which is what the page itself is — costs
+ * nothing and keeps the grammar.
+ */
+function levelsFromNavigation(
+  entries: readonly { entry: NavEntry; position: number }[],
+): Map<NavEntry, number> {
+  const levels = new Map<NavEntry, number>()
+
+  // How much text the divisions at each navigation level hold before their own
+  // first child starts. A division with no children says nothing either way.
+  const ownText = new Map<number, number>()
+
+  for (const [index, { entry, position }] of entries.entries()) {
+    const child = entries[index + 1]
+    if (!child || child.entry.depth <= entry.depth) continue
+    const own = Math.max(child.position - position, 0)
+    ownText.set(entry.depth, (ownText.get(entry.depth) ?? 0) + own)
+  }
+
+  // The whole book, as the navigation can see it: the last entry's position is
+  // as far as any of this reasoning reaches.
+  const book = entries.length > 0 ? entries[entries.length - 1]!.position : 0
+
+  const partDepths = new Set<number>()
+  if (book > 0) {
+    for (const [depth, held] of ownText) {
+      if (held / book <= PART_LEVEL_SHARE) partDepths.add(depth)
+    }
+  }
+
+  // The stack of divisions this entry sits inside, innermost last. Held in nav
+  // order rather than position order: nesting is what the navigation states,
+  // and an entry whose href points backwards must not restructure the book.
+  const open: number[] = []
+
+  for (const { entry } of entries) {
+    while (open.length > 0 && open[open.length - 1]! >= entry.depth) open.pop()
+    levels.set(entry, 1 + open.filter((depth) => !partDepths.has(depth)).length)
+    open.push(entry.depth)
+  }
+
+  return levels
+}
+
+/**
  * Rewrite the block stream so the book's divisions are the ones the book names.
  *
  * Three things happen, in this order, and each is smaller than it sounds.
@@ -868,6 +974,20 @@ function applyNavigation(
   // be said to have described.
   const spokenFor = new Set<string>()
 
+  // Where each document starts, counted in characters of the book's own text,
+  // so "how much text lies between these two entries" can be asked across a
+  // document boundary. A part that is its own spine file and a part that shares
+  // a file with its first chapter are the same book decision, and both books in
+  // hand do it a different way.
+  const startOf = new Map<string, number>()
+  let running = 0
+  for (const doc of perDocument) {
+    startOf.set(doc.path, running)
+    for (const block of doc.blocks) running += block.text?.length ?? 0
+  }
+
+  const resolved: { entry: NavEntry; position: number }[] = []
+
   for (const entry of nav) {
     const doc = byPath.get(entry.path)
     if (!doc) continue
@@ -881,6 +1001,22 @@ function applyNavigation(
     if (at < 0) continue
     spokenFor.add(entry.path)
 
+    let position = startOf.get(doc.path) ?? 0
+    for (const block of doc.blocks.slice(0, at)) position += block.text?.length ?? 0
+    resolved.push({ entry, position })
+  }
+
+  const levels = levelsFromNavigation(resolved)
+
+  for (const { entry } of resolved) {
+    const doc = byPath.get(entry.path)!
+    const wanted = `${entry.path}#${entry.fragment}`
+    const at = entry.fragment
+      ? doc.blocks.findIndex((block) => block.ids?.includes(wanted))
+      : doc.blocks.findIndex((block) => block.kind !== 'furniture')
+    if (at < 0) continue
+
+    const level = levels.get(entry) ?? 1
     const target = doc.blocks[at]!
     if (target.kind === 'heading') {
       // Structure comes from the navigation; the words stay the markup's own.
@@ -888,7 +1024,7 @@ function applyNavigation(
       // the author speaking, and rewriting the heading to match the contents
       // gains nothing while quietly changing the page. Only a guessed heading —
       // which has no authority over its own text either — takes the label.
-      target.level = entry.depth
+      target.level = level
       if (target.guessed) target.text = entry.label
       delete target.guessed
       named.add(target)
@@ -920,7 +1056,7 @@ function applyNavigation(
 
     // Back to front, so an earlier insertion cannot move a later index.
     for (const { at, entry } of [...list].sort((a, b) => b.at - a.at)) {
-      doc.blocks.splice(at, 0, { kind: 'heading', level: entry.depth, text: entry.label })
+      doc.blocks.splice(at, 0, { kind: 'heading', level: levels.get(entry) ?? 1, text: entry.label })
     }
   }
 

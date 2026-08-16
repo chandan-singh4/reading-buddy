@@ -8,139 +8,69 @@
 
 ---
 
-## Re-import a book and judge the parser on the phone
+## Re-import the books and judge PARSER_VERSION 25 on the phone
 
-Nothing is mid-edit. Build green, **1407 tests across 81 files** (2026-08-16).
+Nothing is mid-edit. Build green, **1423 tests across 81 files** (2026-08-16).
 
-**This is the task: re-parse two books and look at them. No code.** The parser
-went through four rounds this session and only the phone can say if they landed.
+**This is the task: re-parse the books and look at them. No code.**
 
-1. Open the shelf. Accept the re-parse it offers for *Braiding Sweetgrass* and
-   for *The Mountains of My Life*.
-2. Open the Contents tab of each. Chapters must nest under their parts. The
-   Preface must be listed. Nothing between chapter 1 and chapter 26 may be
-   missing.
-3. Read the first pages. The book's own printed contents page must still be
-   there. A chapter with a number must open with the large numeral.
+1. Open the shelf. Accept the re-parse it offers for every book.
+2. Open the Contents tab of *The Mountains of My Life*. Chapters 1 to 27 must
+   all be there, with PART 1, PART 2 and PART 3 standing beside them.
+3. Open the Contents tab of *Be As You Are*. Chapters 1 to 21 must all be
+   there, with Parts Two to Six beside them.
+4. Read a few pages of each. Italic phrases must be in italics. A centred line
+   must be centred. A display line must be larger than the body text.
 
-If something is still wrong, the first question is whether that book's own
-navigation names it. That decides which of the two paths is at fault.
+### What changed in 25
 
-The parser now takes the book's structure from the book's own navigation. Every
-epub ships a `toc.ncx` or a `nav.xhtml`. In it the author states the divisions:
-their titles, their nesting, and the exact place each one starts. We read that
-file before, but kept only a title per document. We dropped the positions and
-the nesting. So the parser guessed a structure the file already stated.
+Two faults, both of them the same mistake in different places: the parser
+measured something true about the book and then threw the measurement away.
 
-Both formats are read now. Each entry finds its block and makes it a heading at
-the depth the navigation gives it. A heading the navigation does not name goes
-back to a paragraph set apart. This is what stops a dedication of three short
-lines from becoming three chapters. The styling rules below are now the fallback
-for a file with no usable navigation.
+**Emphasis is kept.** The stylesheet engine always computed a full appearance
+for every element — size, weight, slant, alignment, indent — then reduced it to
+one yes-or-no question and discarded the rest. Now a paragraph carries `marks`
+(runs of characters the book set apart) and `appearance` (how the book set the
+whole line), and the reader draws both. Two books needed two different carriers
+to be read alike: one marks italics with `<em>`, the other with a class and a
+CSS rule. Only reading the CSS finds both.
 
-The navigation decides the structure. The markup keeps its own words. So a real
-`<h1>NOTES</h1>` is not renamed to match a contents line that reads "Notes".
+**Parts no longer eat chapters.** Navigation depth was written straight into the
+heading level, and only the two shallowest levels survive. A book that nests
+chapters under parts put every chapter at depth 3 and lost all of them.
+*Mountains* came back with 9 chapters of 28. A navigation level is now judged by
+how much of the book it holds: a level of parts holds under 1%, a level of
+chapters holds nearly all of it. A part stands beside the chapters it names
+rather than above them, so the anchor grammar stays two deep.
 
-The book's printed contents page is kept. An earlier rule dropped it. That rule
-was wrong twice. The page belongs to the book. And the rule could not tell where
-the list ended, so it also ate the "PREFACE" title. That was the missing Preface.
+### Still open — measured, not fixed
 
-The parser also reads the book's own stylesheet. Before this it judged structure
-from tag names only. Almost no ebook is written as HTML. Converters make them,
-and converters do not write `<h1>`. They write `<p class="chaphead">CONTENTS</p>`
-and put the size and the weight in a CSS file. The parser never opened that file.
-So a chapter title and a sentence arrived as the same thing.
-
-`web/src/parse/styles.ts` is new. It reads the CSS and gives each element a size,
-a weight, a slant and an alignment. The size is a multiple of the size **this
-book** sets its body text in. This is the rule that makes the fix general. Books
-do not agree on what 1em means. No book disagrees with itself.
-
-A line becomes a heading on two signals, not one. Some books set all their text
-in bold, or centre every line. One signal would turn such a book into one long
-heading.
-
-Two later corrections, both from one reported book:
-
-- **The navigation rules only the documents it points into.** A navigation that
-  lists the front matter and then chapter 26 has said nothing about the chapters
-  between. It has not called them prose. A document it never reaches keeps the
-  headings the styling pass found.
-- **A trailing number marks a contents entry only after a title of two words or
-  more.** "Chapter 1" and "Part 1" end in a space and a number too. The old rule
-  refused every numbered chapter title in print.
-
-In the reader, a numbered section now opens like a chapter. Where a book is cut
-into parts, the part becomes the division and "Chapter 1" arrives as a section.
-
-`PARSER_VERSION` is **24**. Books on the shelf keep their old text until you
-accept the re-parse the shelf offers.
-
-The browser paints the highlights now. `CSS.highlights` holds one live range per
-highlight, and `::highlight(...)` gives each colour its rule. Nothing is
-measured, so the colour cannot move away from the words. A tap on a highlight is
-found by `highlightAt`, because painted ink receives no clicks. Tapping a
-highlight opens the menu with the colours open, a ring on the colour it has, and
-a **Remove** button.
-
-The two selection handles are independent. A drag no longer moves "the start" or
-"the end": it holds the other end still and puts the two boundaries back in
-order. So either handle can cross the other one, and the selection follows the
-finger. The drag is kept in a ref, because React commits state too late for the
-first move of a fast gesture.
-
-The menu also offers **Select sentence** and **Select paragraph**. The sentence
-boundaries come from `Intl.Segmenter`. Note that ICU breaks after an
-abbreviation, so "Mr. Bennet" is two sentences to it. A button is left out when
-it would change nothing.
-
-Two features landed. The Browser pane has no book on its shelf, so neither was
-proved by eye.
-
-### 1. Judge on the phone (no code needed)
-
-- **The chapter opening.** Open a chapter and look at its title. Four settings
-  exist. A religious or spiritual book gets the ornament. Fiction gets the
-  ruled nameplate. A numbered chapter gets the large figure. Everything else
-  gets the plain setting.
-- **The selection menu.** Select some words. Check the card lands near them, and
-  flips above the selection near the foot of the screen.
-- **Highlights and notes.** Both write a row into the Notes tab under *Quotes*.
-  A highlight keeps its colour as a bar beside it.
-
-### 2. Then: the tutor, and the two lookups
-
-Six actions in the menu say "not built yet" when tapped. They need work this app
-has not done:
-
-- **Ask Claude** (four actions) needs the tutor loop — WP-17 onward.
-- **Define** needs a dictionary. **Translate** needs a translator.
+- **Kundalini is missing chapters Three, Eleven and Fourteen.** Measured cause:
+  the file states nothing about them. `<p class="calibre1">Chapter Three</p>`,
+  where `.calibre1` is the class every body paragraph uses, and the contents
+  omits those three entries. A text rule was written and withdrawn: it did not
+  fire in that book (the promotion pass stops early when a document has no
+  styled headings at all) and it added three false chapters to another book.
+- **A part page does not get its own page.** The CSS `page-break` properties are
+  still unread. Measured: *Mountains* defines `.pgbrk` and never uses it, so a
+  page-break rule alone would not have fixed that book either.
+- **Mountains lists 14 footnote entries as chapters.** Its `toc.ncx` forgets two
+  closing `</navPoint>` tags, so the footnote list nests a level too deep. These
+  are real entries in the book's own contents; they are noise, not loss.
+- **The source is not stored aside yet.** Re-parsing still needs the original
+  file.
 
 ### Files in scope
 
-| Path | Why |
-|---|---|
-| `web/src/reader/chapterHeading.ts` | Which of the four settings a chapter takes. Pure. |
-| `web/src/reader/ChapterOpening.tsx` | Draws the four settings. |
-| `web/src/reader/ChapterOpening.module.css` | Their type and spacing. |
-| `web/src/reader/selection.ts` | A DOM selection turned into text plus an anchor. |
-| `web/src/reader/SelectionMenu.tsx` | The menu itself. |
-| `web/src/reader/SelectionMenu.module.css` | Its look, and where the tutor block sits. |
-| `web/src/reader/NoteComposer.tsx` | The box a note is written in. |
-| `web/src/pages/Reader.tsx` | Mounts all of the above; holds the actions. |
-| `web/src/reader/Highlights.tsx` | The highlights, painted by the browser. |
-| `web/src/storage/notes.ts` | `addNote`, `setNoteColour`, `deleteNote`. |
-| `web/src/storage/db.ts` | `StoredNote`. Both new fields are unindexed. |
-| `web/src/reader/NotesPanel.tsx` | Shows a highlight's colour. |
-| `web/src/parse/styles.ts` | Reads the book's CSS. Gives each block its look. |
-| `web/src/parse/html.ts` | Turns markup into blocks. Holds both heading rules. |
-| `web/src/parse/epub.ts` | Reads `toc.ncx`/`nav.xhtml`, and finds the stylesheets. |
-| `web/src/parse/assemble.ts` | Blocks into divisions. Holds the `guessed` flag. |
-| `web/src/reader/chapterHeading.ts` | Reads a number off a title. Picks the opening. |
-| `web/src/parse/version.ts` | `PARSER_VERSION`. Bump it when a book parses differently. |
+- `web/src/parse/epub.ts` — navigation, part levels
+- `web/src/parse/html.ts` — marks, block appearance
+- `web/src/parse/styles.ts` — the CSS engine
+- `web/src/parse/assemble.ts` — the block stream and its types
+- `web/src/reader/blocks.tsx` — drawing marks and appearance
+- `web/src/reader/linkRuns.ts` — cutting text at link and mark edges
 
 ### Out of scope
 
-- The tutor loop. It is its own waypoint.
-- A cloud path for notes. Notes are still device-local.
-- Any other screen, and any design token.
+Chapter numbers move in any book that nests. Saved places, bookmarks and
+highlights in those books point at the wrong paragraph. This was accepted
+before the work started; do not spend the session on migrating them.

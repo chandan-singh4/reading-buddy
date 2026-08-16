@@ -270,5 +270,28 @@
  *   navigation never points into now keeps its own guesses, so the fallback
  *   takes over exactly where the file went quiet — and the navigation still
  *   rules the documents it does describe.
+ * - **25** — the parser stopped throwing away what the book's own stylesheet
+ *   says, and stopped flattening books that nest their chapters under parts.
+ *
+ *   The stylesheet engine has always computed a full appearance for every
+ *   element — size, weight, slant, alignment, indent — and then reduced it to
+ *   one yes-or-no question: does this look like a heading? Everything else was
+ *   discarded. So italics were lost, and so was the size hierarchy of a part
+ *   page. Emphasis is now kept per run of characters (`marks`) and per block
+ *   (`appearance`), and the reader draws both. Two books needed two different
+ *   carriers to be read the same way: one marks its italics with `<em>`, the
+ *   other with a class and a CSS rule, and only reading the CSS finds both.
+ *
+ *   The second fault renumbered chapters. Navigation depth was written straight
+ *   into the heading level, and only the two shallowest levels survive — so a
+ *   book that nests chapters under parts put every chapter at depth 3 and lost
+ *   the lot. *The Mountains of My Life* came back with 9 chapters of 28; *Be As
+ *   You Are* with 11 of 21. A navigation level is now judged by how much of the
+ *   book it holds. A level of parts holds under 1%; a level of chapters holds
+ *   nearly all of it. A part no longer consumes a level — it stands beside the
+ *   chapters it names — so the anchor grammar stays two deep.
+ *
+ *   Chapter numbers move in any book that nests. Saved places, bookmarks and
+ *   highlights in those books point at the wrong paragraph and must be reset.
  */
-export const PARSER_VERSION = 24
+export const PARSER_VERSION = 25

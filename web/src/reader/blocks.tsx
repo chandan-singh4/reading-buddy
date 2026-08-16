@@ -12,9 +12,9 @@
  * a table whose grid didn't survive parsing still shows its flattened text.
  */
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 
-import type { Anchor, Paragraph } from '../structure/index.ts'
+import type { Anchor, Paragraph, ParagraphMark } from '../structure/index.ts'
 import { NO_IMAGES, srcOf } from './figures.ts'
 import { cellRunsOf, lineRunsOf, runsOf, type Run } from './linkRuns.ts'
 import styles from './blocks.module.css'
@@ -36,7 +36,68 @@ function display(block: Paragraph): string {
 }
 
 /**
- * A block's text with its links made tappable.
+ * How to draw a run the source set apart.
+ *
+ * Inline styles rather than classes, because `size` is a number the book chose
+ * and there is no fixed set of them to name. It is written in `em` so it stays
+ * relative to whatever the reader has set their type to: the publisher decided
+ * that its small caps are 0.83 of the line around them, and the reader decides
+ * how big that line is. Neither one overrules the other.
+ *
+ * Colour is deliberately absent. A book's own colours are not carried into the
+ * reader — the themes own that, and a hardcoded black would be invisible on the
+ * dark ones.
+ */
+function markStyle(mark: ParagraphMark | undefined): CSSProperties | undefined {
+  if (!mark) return undefined
+  const style: CSSProperties = {}
+  if (mark.italic) style.fontStyle = 'italic'
+  if (mark.bold) style.fontWeight = 'bold'
+  if (mark.size !== undefined) style.fontSize = `${mark.size}em`
+  return style
+}
+
+/**
+ * The largest a block may be drawn, as a multiple of body text.
+ *
+ * A book's own stylesheet occasionally sets a display line at three or four
+ * times the body size, which is fine on a printed page and swallows a phone
+ * screen. Clamping is a rendering decision, not a parsing one, so the measured
+ * number stays in the data and only the drawing of it is capped.
+ */
+const BIGGEST = 2
+
+/**
+ * How to draw a whole block the source set apart — a part title, a chapter
+ * number, a centred dedication line.
+ *
+ * The size hierarchy is the point. A book that writes its part title at 1.6 and
+ * its chapter number at 1.3 is saying which one outranks the other, and that
+ * relationship is lost the moment both are drawn at the reader's heading size.
+ * So the measured multiple is kept and applied in `em`, exactly as a mark is.
+ *
+ * `indented` is deliberately not read here. First-line indent is already the
+ * stylesheet's run-on rule, which knows what came before the paragraph; the
+ * book's own `text-indent` would fight it and win at the wrong times.
+ */
+function blockStyle(block: Paragraph): CSSProperties | undefined {
+  const appearance = block.appearance
+  if (!appearance) return undefined
+  const style: CSSProperties = {}
+  if (appearance.size !== undefined) style.fontSize = `${Math.min(appearance.size, BIGGEST)}em`
+  if (appearance.bold) style.fontWeight = 'bold'
+  if (appearance.italic) style.fontStyle = 'italic'
+  if (appearance.centred) {
+    style.textAlign = 'center'
+    // A centred line has no first line to indent, and the run-on rule cannot
+    // know that. Left in place it shunts the whole line off its centre.
+    style.textIndent = 0
+  }
+  return Object.keys(style).length > 0 ? style : undefined
+}
+
+/**
+ * A block's text with its links made tappable and its emphasis kept.
  *
  * An internal link is a `<button>`, not an `<a>`: it goes to a paragraph, not
  * to a URL, and dressing it as a link would put a meaningless address in the
@@ -47,7 +108,14 @@ function Runs({ runs, onFollow }: { runs: Run[]; onFollow?: FollowLink }) {
   return (
     <>
       {runs.map((run, index) => {
-        if (!run.link) return <span key={index}>{run.text}</span>
+        const emphasis = markStyle(run.mark)
+        if (!run.link) {
+          return (
+            <span key={index} style={emphasis}>
+              {run.text}
+            </span>
+          )
+        }
 
         if (run.link.anchor) {
           const target = run.link.anchor
@@ -56,6 +124,7 @@ function Runs({ runs, onFollow }: { runs: Run[]; onFollow?: FollowLink }) {
             <span
               key={index}
               className={styles.link}
+              style={emphasis}
               // A `<span>`, not a `<button>`, and the reason is layout rather
               // than semantics — `role` and the key handling below give back
               // everything the element loses.
@@ -96,6 +165,7 @@ function Runs({ runs, onFollow }: { runs: Run[]; onFollow?: FollowLink }) {
           <a
             key={index}
             className={styles.link}
+            style={emphasis}
             href={run.link.url}
             target="_blank"
             // Leaving the book entirely, so the new tab gets no handle back on
@@ -115,7 +185,10 @@ function Runs({ runs, onFollow }: { runs: Run[]; onFollow?: FollowLink }) {
 
 function Text({ block, onFollow }: { block: Paragraph; onFollow?: FollowLink }) {
   const runs = runsOf(block)
-  if (runs.length === 1 && !runs[0].link) return <>{block.text}</>
+  // The fast path is for a paragraph with nothing in it to draw — no link and
+  // no emphasis. Testing only the link would send an entirely italic paragraph
+  // down it and quietly drop the italics.
+  if (runs.length === 1 && !runs[0].link && !runs[0].mark) return <>{block.text}</>
   return <Runs runs={runs} onFollow={onFollow} />
 }
 
@@ -270,6 +343,11 @@ export function Block({
   // inside a block the browser has already decided not to split.
   const opens = block.startsPage ? ` ${styles.startsPage}` : ''
 
+  // What the book's own stylesheet said about this block, kept as far as the
+  // screen. Only the kinds that carry running text take it: a table or a figure
+  // is laid out by the reader, not by the publisher's page.
+  const look = blockStyle(block)
+
   /*
    * A heading the source book only ever marked up as a bold paragraph — which
    * is how most print conversions write every heading below the chapter level.
@@ -298,7 +376,7 @@ export function Block({
 
   if (block.kind === 'prose' && block.label === 'subheading') {
     return (
-      <h3 id={id} className={styles.heading + opens}>
+      <h3 id={id} className={styles.heading + opens} style={look}>
         {text}
       </h3>
     )
@@ -309,14 +387,14 @@ export function Block({
       // Always h3: the section's own title is the h2 above it, and a book's
       // internal heading levels are not the page's document outline.
       return (
-        <h3 id={id} className={styles.heading + opens}>
+        <h3 id={id} className={styles.heading + opens} style={look}>
           {text}
         </h3>
       )
 
     case 'quote':
       return (
-        <blockquote id={id} className={styles.quote + opens}>
+        <blockquote id={id} className={styles.quote + opens} style={look}>
           {text}
         </blockquote>
       )
@@ -339,7 +417,7 @@ export function Block({
 
     case 'note':
       return (
-        <aside id={id} className={styles.note + opens}>
+        <aside id={id} className={styles.note + opens} style={look}>
           {text}
         </aside>
       )
@@ -371,7 +449,7 @@ export function Block({
     // rather than vanishing.
     default:
       return (
-        <p id={id} className={styles.prose + opens + display(block)}>
+        <p id={id} className={styles.prose + opens + display(block)} style={look}>
           {text}
         </p>
       )

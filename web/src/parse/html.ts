@@ -21,7 +21,14 @@
 
 import type { ParsedBook } from '../storage/index.ts'
 import type { BookMeta, FigureImage } from '../structure/index.ts'
-import { assembleBook, type Block, type ContentBlock, type RawLink } from './assemble.ts'
+import {
+  assembleBook,
+  type Block,
+  type BlockAppearance,
+  type ContentBlock,
+  type RawLink,
+  type RawMark,
+} from './assemble.ts'
 import { isRunningHead } from './runningHead.ts'
 import { appearanceOf, baselineOf, NO_STYLES, type Appearance, type StyleSheet } from './styles.ts'
 
@@ -98,6 +105,68 @@ const INLINE = new Set([
 const HEADING = /^H([1-6])$/
 
 /**
+ * Emphasis in force at a point in an inline walk.
+ *
+ * `size` is cumulative and multiplicative, because that is what `em` means and
+ * what books rely on: `.smallcaps { font-size: smaller }` inside a heading
+ * already set at `x-large` is *relatively* smaller, not absolutely. Treating it
+ * as absolute would shrink a part title's small caps to body size and destroy
+ * the effect the publisher was after.
+ */
+interface Emphasis {
+  italic: boolean
+  bold: boolean
+  /** A multiple of the enclosing block's size. `1` is no change. */
+  size: number
+}
+
+const NO_EMPHASIS: Emphasis = { italic: false, bold: false, size: 1 }
+
+/**
+ * A size difference small enough that no reader would see it as a difference.
+ *
+ * Books round oddly — `0.9999em`, `medium` against a 16px base — and storing
+ * those as a deliberate size step would put an `appearance` on every paragraph
+ * of some books to say nothing at all.
+ */
+const SIZE_NOISE = 0.04
+
+/**
+ * What is worth recording about how a block was set.
+ *
+ * Returns `undefined` for ordinary body text, which is most of a book. Sizes
+ * are divided by the book's own baseline first, so a `large` heading is stored
+ * as `1.2` whatever the book thinks `1em` is, and two books can be compared.
+ */
+function blockAppearance(style: Appearance, baseline: number): BlockAppearance | undefined {
+  const appearance: BlockAppearance = {}
+  const size = style.size / baseline
+  if (Math.abs(size - 1) > SIZE_NOISE) appearance.size = Math.round(size * 100) / 100
+  if (style.bold) appearance.bold = true
+  if (style.italic) appearance.italic = true
+  if (style.centred) appearance.centred = true
+  if (style.indented) appearance.indented = true
+  return Object.keys(appearance).length > 0 ? appearance : undefined
+}
+
+/**
+ * Fold one element's own styling into the emphasis already in force.
+ *
+ * Italic and bold accumulate — nothing inside an italic passage un-italicises
+ * itself, and no book expects it to. Size only accumulates when the element
+ * *declared* a size: `appearanceOf` reports `1` both for "no rule" and for "a
+ * rule saying 1em", and reading the first as a change would put a spurious mark
+ * on every ordinary `<span>` in the book.
+ */
+function merge(state: Emphasis, own: Appearance): Emphasis {
+  return {
+    italic: state.italic || own.italic,
+    bold: state.bold || own.bold,
+    size: own.size === 1 ? state.size : state.size * own.size,
+  }
+}
+
+/**
  * The text of an element, plus where its links sit inside that text.
  *
  * This exists because `textContent` throws away the one thing a link needs:
@@ -109,9 +178,52 @@ const HEADING = /^H([1-6])$/
  * Whitespace is collapsed as it goes rather than afterwards, because collapsing
  * afterwards would move every offset already recorded.
  */
-function textAndLinks(element: Element): { text: string; links: RawLink[] } {
+function textAndLinks(
+  element: Element,
+  styleOf?: (element: Element) => Appearance,
+): { text: string; links: RawLink[]; marks: RawMark[] } {
   let text = ''
   const links: RawLink[] = []
+  const marks: RawMark[] = []
+
+  /**
+   * The emphasis in force at the point the walk has reached.
+   *
+   * Tracked as one merged state rather than one mark per element, so that
+   * `<em>a <span class="smallcaps">B</span></em>` yields two adjacent runs
+   * rather than an outer mark overlapping an inner one. Overlapping ranges are
+   * legal but leave the renderer to resolve them, and the renderer should not
+   * have to.
+   */
+  let run: RawMark | null = null
+
+  function plain(state: Emphasis): boolean {
+    return !state.italic && !state.bold && state.size === 1
+  }
+
+  /** Close the open run at the current end of `text`. */
+  function closeRun(): void {
+    if (run && run.end > run.start) marks.push(run)
+    run = null
+  }
+
+  function setState(state: Emphasis): void {
+    // Same emphasis as the open run: let it keep growing.
+    if (
+      run &&
+      Boolean(run.italic) === state.italic &&
+      Boolean(run.bold) === state.bold &&
+      (run.size ?? 1) === state.size
+    ) {
+      return
+    }
+    closeRun()
+    if (plain(state)) return
+    run = { start: text.length, end: text.length }
+    if (state.italic) run.italic = true
+    if (state.bold) run.bold = true
+    if (state.size !== 1) run.size = state.size
+  }
 
   function push(raw: string): void {
     const collapsed = raw.replace(/\s+/g, ' ')
@@ -122,14 +234,19 @@ function textAndLinks(element: Element): { text: string; links: RawLink[] } {
     // beginning, not one character in.
     if ((text === '' || text.endsWith(' ') || text.endsWith('\n')) && collapsed.startsWith(' ')) {
       text += collapsed.slice(1)
+      if (run) run.end = text.length
       return
     }
     text += collapsed
+    // The open run grows with the text, so a mark always ends where the emphasis
+    // it describes actually stopped rather than where it started.
+    if (run) run.end = text.length
   }
 
-  function walk(node: Node): void {
+  function walk(node: Node, state: Emphasis = NO_EMPHASIS): void {
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === 3 /* text */) {
+        setState(state)
         push(child.textContent ?? '')
         continue
       }
@@ -137,6 +254,11 @@ function textAndLinks(element: Element): { text: string; links: RawLink[] } {
 
       const el = child as Element
       if (SKIP.has(el.tagName.toUpperCase())) continue
+
+      // What this span adds to whatever is already in force. Only departures
+      // count: a `<span>` with no rule of its own resolves to `size: 1` and must
+      // not be read as "reset this heading to body size".
+      const inner = styleOf ? merge(state, styleOf(el)) : state
 
       // A `<br>` is a line, and it has no text of its own to carry that with.
       // Walking it therefore contributed nothing at all, and the words either
@@ -156,26 +278,33 @@ function textAndLinks(element: Element): { text: string; links: RawLink[] } {
       if (el.tagName.toUpperCase() === 'A') {
         const href = el.getAttribute('href') ?? ''
         const start = text.length
-        walk(el)
+        walk(el, inner)
         // A link with no text is a bookmark target, not something to tap.
         if (href && text.length > start) links.push({ start, end: text.length, href })
         continue
       }
 
-      walk(el)
+      walk(el, inner)
     }
   }
 
   walk(element)
+  closeRun()
 
   const trimmed = text.trimEnd()
+  /** Pull a range back inside the string once trailing space has gone. */
+  function clamp<T extends { start: number; end: number }>(ranges: T[]): T[] {
+    return ranges
+      .filter((range) => range.start < trimmed.length)
+      .map((range) => ({ ...range, end: Math.min(range.end, trimmed.length) }))
+  }
+
   return {
     text: trimmed,
     // Trailing whitespace was just removed, so a link that ended on it has to
     // be pulled back inside the string it now points into.
-    links: links
-      .filter((link) => link.start < trimmed.length)
-      .map((link) => ({ ...link, end: Math.min(link.end, trimmed.length) })),
+    links: clamp(links),
+    marks: clamp(marks),
   }
 }
 
@@ -851,7 +980,7 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
           continue
         }
 
-        const { text, links } = textAndLinks(element)
+        const { text, links, marks } = textAndLinks(element, styleOf)
         if (!text) continue
         // "* * *" typed into the manuscript, which is how most breaks reach a
         // file. Checked before anything else can claim the paragraph.
@@ -869,6 +998,9 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
               ? { kind: 'prose', text, label: 'subheading' }
               : { kind: 'prose', text }
         if (links.length > 0) block.links = links
+        if (marks.length > 0) block.marks = marks
+        const appearance = blockAppearance(styleOf(element), baseline)
+        if (appearance) block.appearance = appearance
         // Remembered so `promoteStyledHeadings` can rank these by size later.
         // A level cannot be settled here: "is this bigger than the other
         // headings" needs all of them, and only two have been seen so far.

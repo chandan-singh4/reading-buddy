@@ -1005,3 +1005,148 @@ describe('the book states its own structure', () => {
     expect(text).toContain('and my grandchildren')
   })
 })
+
+describe('a book that nests its chapters under parts', () => {
+  // The reported shape, reduced. Both books this was found on state their
+  // structure perfectly and were flattened *because* of it: the chapters sit at
+  // navigation depth 3, and only the two shallowest levels survive.
+  const PROSE = 'Sweetgrass is best planted not by seed but by putting roots directly in the ground. '.repeat(40)
+
+  function navList(): string {
+    return `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body>
+    <nav epub:type="toc">
+      <ol>
+        <li><a href="body.xhtml">The Whole Book</a>
+          <ol>
+            <li><a href="body.xhtml#part1">Part One</a>
+              <ol>
+                <li><a href="body.xhtml#c1">Chapter One</a></li>
+                <li><a href="body.xhtml#c2">Chapter Two</a></li>
+              </ol>
+            </li>
+            <li><a href="body.xhtml#part2">Part Two</a>
+              <ol>
+                <li><a href="body.xhtml#c3">Chapter Three</a>
+                  <ol><li><a href="body.xhtml#c3a">A Digression</a></li></ol>
+                </li>
+              </ol>
+            </li>
+          </ol>
+        </li>
+      </ol>
+    </nav>
+  </body>
+</html>`
+  }
+
+  const epub = makeEpub({
+    manifest: [
+      '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+      '<item id="b" href="body.xhtml" media-type="application/xhtml+xml"/>',
+    ].join(''),
+    spine: '<itemref idref="b"/>',
+    files: {
+      'OEBPS/nav.xhtml': navList(),
+      'OEBPS/body.xhtml': chapterDoc(
+        `<h1 id="part1">Part One</h1>
+         <h2 id="c1">Chapter One</h2><p>${PROSE}</p>
+         <h2 id="c2">Chapter Two</h2><p>${PROSE}</p>
+         <h1 id="part2">Part Two</h1>
+         <h2 id="c3">Chapter Three</h2><p>${PROSE}</p>
+         <h3 id="c3a">A Digression</h3><p>${PROSE}</p>`,
+      ),
+    },
+  })
+
+  it('keeps every chapter as a chapter', async () => {
+    const book = await parseEpub(epub, meta())
+    const titles = book.chapters.map((chapter) => chapter.title)
+    expect(titles).toContain('Chapter One')
+    expect(titles).toContain('Chapter Two')
+    expect(titles).toContain('Chapter Three')
+  })
+
+  it('keeps the parts, standing beside the chapters they name', async () => {
+    const book = await parseEpub(epub, meta())
+    const titles = book.chapters.map((chapter) => chapter.title)
+    expect(titles).toContain('Part One')
+    expect(titles).toContain('Part Two')
+  })
+
+  it('still puts a real subdivision under its chapter, not beside it', async () => {
+    const book = await parseEpub(epub, meta())
+    const chapter = book.chapters.find((c) => c.title === 'Chapter Three')
+    expect(chapter?.sections.map((section) => section.title)).toContain('A Digression')
+    expect(book.chapters.map((c) => c.title)).not.toContain('A Digression')
+  })
+
+  it('does not read a chapter as a part just because it opens with a subheading', async () => {
+    // Chapter Three holds no text before "A Digression", exactly as a part page
+    // holds none before its first chapter. Judged alone it is indistinguishable
+    // from one; judged as a level it is not, because its level holds the book.
+    const book = await parseEpub(epub, meta())
+    const chapter = book.chapters.find((c) => c.title === 'Chapter Three')
+    expect(chapter?.sections.length).toBeGreaterThan(0)
+  })
+})
+
+describe('what the book’s own stylesheet says about a line', () => {
+  const CSS = `
+    p { font-size: 1em; }
+    p.title { font-size: 1.8em; text-align: center; }
+    span.italic { font-style: italic; }
+    span.smallcaps { font-size: 0.8em; }
+    p.epi { font-size: 1em; font-style: italic; text-align: center; }
+  `
+
+  const epub = makeEpub({
+    manifest: [
+      '<item id="css" href="style.css" media-type="text/css"/>',
+      '<item id="b" href="body.xhtml" media-type="application/xhtml+xml"/>',
+    ].join(''),
+    spine: '<itemref idref="b"/>',
+    files: {
+      'OEBPS/style.css': CSS,
+      'OEBPS/body.xhtml': chapterDoc(
+        `<link rel="stylesheet" href="style.css"/>
+         <p class="title">PART ONE</p>
+         <p class="epi">for my father, who never once turned back on a mountain</p>
+         <p>He called it <span class="italic">the silent partner</span> and left.</p>
+         <p>Then <em>she</em> answered him.</p>`,
+      ),
+    },
+  })
+
+  async function paragraphs() {
+    const book = await parseEpub(epub, meta())
+    return book.sections.flatMap((section) => section.paragraphs)
+  }
+
+  it('keeps an italic phrase marked up with a class and a CSS rule', async () => {
+    // One of the two reported books carries no <em> at all — 413 italic phrases,
+    // every one of them a span with a class. Matching on tags finds none.
+    const block = (await paragraphs()).find((p) => p.text.includes('silent partner'))
+    const mark = block?.marks?.find((m) => m.italic)
+    expect(mark).toBeDefined()
+    expect(block!.text.slice(mark!.start, mark!.end)).toBe('the silent partner')
+  })
+
+  it('keeps an italic phrase marked up with a tag', async () => {
+    const block = (await paragraphs()).find((p) => p.text.includes('answered him'))
+    const mark = block?.marks?.find((m) => m.italic)
+    expect(block!.text.slice(mark!.start, mark!.end)).toBe('she')
+  })
+
+  it('keeps the centring and the slant the book gave a display line', async () => {
+    const block = (await paragraphs()).find((p) => p.text.startsWith('for my father'))
+    expect(block?.appearance?.centred).toBe(true)
+    expect(block?.appearance?.italic).toBe(true)
+  })
+
+  it('leaves ordinary body text with nothing to draw', async () => {
+    const block = (await paragraphs()).find((p) => p.text.includes('and left'))
+    expect(block?.appearance).toBeUndefined()
+  })
+})

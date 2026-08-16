@@ -364,3 +364,85 @@ describe('a heading the book only set in bold', () => {
     expect(container.querySelector('p')).not.toBeNull()
   })
 })
+
+describe('emphasis the source book gave', () => {
+  it('draws an italic phrase inside a paragraph', () => {
+    render(
+      <Block
+        block={blockOf('prose', 'He called it the silent partner and left.', {
+          marks: [{ start: 13, end: 31, italic: true }],
+        })}
+      />,
+    )
+    const span = screen.getByText('the silent partner')
+    expect(span.style.fontStyle).toBe('italic')
+  })
+
+  it('draws small caps at the size the publisher chose, in em', () => {
+    // `em` and not `px`: the book decided this run is 0.8 of the line around it,
+    // and the reader decides how big that line is. Neither overrules the other.
+    render(
+      <Block
+        block={blockOf('prose', 'CHAPTER ONE begins here.', {
+          marks: [{ start: 0, end: 11, size: 0.8 }],
+        })}
+      />,
+    )
+    expect(screen.getByText('CHAPTER ONE').style.fontSize).toBe('0.8em')
+  })
+
+  it('keeps the italics of a paragraph that is italic all through', () => {
+    // The fast path used to test only for links, so a wholly italic paragraph
+    // went down it and lost its slant.
+    render(
+      <Block
+        block={blockOf('prose', 'She had said as much the night before.', {
+          marks: [{ start: 0, end: 38, italic: true }],
+        })}
+      />,
+    )
+    expect(screen.getByText('She had said as much the night before.').style.fontStyle).toBe(
+      'italic',
+    )
+  })
+
+  it('draws a phrase that is both a link and italic', () => {
+    render(
+      <Block
+        block={blockOf('prose', 'See the appendix for the figures.', {
+          links: [{ start: 4, end: 16, url: 'https://example.com' }],
+          marks: [{ start: 4, end: 16, italic: true }],
+        })}
+      />,
+    )
+    const link = screen.getByText('the appendix')
+    expect(link.style.fontStyle).toBe('italic')
+    expect(link.getAttribute('href')).toBe('https://example.com')
+  })
+})
+
+describe('how the source book set a whole line', () => {
+  it('centres a line the book centred, and cancels the run-on indent', () => {
+    render(
+      <Block block={blockOf('prose', 'for my father', { appearance: { centred: true } })} />,
+    )
+    const line = screen.getByText('for my father')
+    expect(line.style.textAlign).toBe('center')
+    expect(line.style.textIndent).toBe('0px')
+  })
+
+  it('keeps the size step between a part title and a chapter number', () => {
+    render(<Block block={blockOf('heading', 'PART ONE', { appearance: { size: 1.6 } })} />)
+    expect(screen.getByText('PART ONE').style.fontSize).toBe('1.6em')
+  })
+
+  it('caps a display size that would swallow a phone screen', () => {
+    render(<Block block={blockOf('heading', 'THE END', { appearance: { size: 4 } })} />)
+    expect(screen.getByText('THE END').style.fontSize).toBe('2em')
+  })
+
+  it('leaves ordinary prose with no inline style at all', () => {
+    render(<Block block={blockOf('prose', 'Nuts fell that year in numbers.')} />)
+    expect(screen.getByText('Nuts fell that year in numbers.').getAttribute('style')).toBeNull()
+  })
+})

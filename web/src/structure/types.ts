@@ -547,4 +547,47 @@ export interface Paragraph {
   rows?: string[][]
   /** `kind: 'figure'` — the image itself, when the source format carries one. */
   image?: FigureImage
+  /**
+   * Stretches of `text` the source set apart — emphasis, small caps.
+   *
+   * Absent on most paragraphs. Present on every one that had a `<em>`, an `<i>`
+   * or a styled `<span>`, which in a scholarly book is close to all of them.
+   */
+  marks?: ParagraphMark[]
+  /**
+   * How the source set this paragraph, from the book's own stylesheet.
+   *
+   * Absent when the paragraph is ordinary body text, which is most of them. See
+   * `BlockAppearance` in `parse/assemble.ts` for why only departures are stored.
+   */
+  appearance?: ParagraphAppearance
+}
+
+/** A run of `text` set differently from the rest of the paragraph. */
+export interface ParagraphMark {
+  start: number
+  end: number
+  italic?: true
+  bold?: true
+  /** Relative to the paragraph's own size. Carries faked small caps. */
+  size?: number
+}
+
+/**
+ * How a paragraph was set. Every field optional, written only where the source
+ * departs from ordinary body text.
+ *
+ * The renderer reads this to set a page the way the publisher did — the size
+ * step between a part title and a chapter number, whether a line is centred,
+ * whether the paragraph takes a first-line indent. It is advisory: the reader's
+ * own theme, typeface and size always win, and this only says how the source
+ * ranked its lines against each other.
+ */
+export interface ParagraphAppearance {
+  /** A multiple of the book's own body-text size. */
+  size?: number
+  bold?: true
+  italic?: true
+  centred?: true
+  indented?: true
 }

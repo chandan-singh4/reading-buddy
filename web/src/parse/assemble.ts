@@ -65,6 +65,53 @@ export interface RawLink {
   href: string
 }
 
+/**
+ * A stretch of a block's text that is set differently from the rest of it.
+ *
+ * The parser used to reduce every inline span to its `textContent`, so a book's
+ * emphasis reached the reader as plain prose. That is not a cosmetic loss: in
+ * *Be As You Are* the italics are the Sanskrit terms, 2,590 of them, and without
+ * them a transliterated word is indistinguishable from an English one.
+ *
+ * Recorded as a range rather than as nested blocks for the same reason `RawLink`
+ * is: splitting a sentence around its emphasis would shatter one thought into
+ * three and anchor each separately. Offsets index `text`, so the anchor grammar
+ * and the paragraph count are untouched — this is additive.
+ *
+ * `size` is relative to the *block's own* size, not the book's baseline. It
+ * exists because small caps are usually faked rather than declared: books write
+ * `T<span class="smallcaps">HE</span>` against a `font-size: smaller` rule, and
+ * dropping the span turns elegant small caps into shouting.
+ */
+export interface RawMark {
+  /** Character offsets into the block's `text`. */
+  start: number
+  end: number
+  italic?: true
+  bold?: true
+  /** Set only when the span's size differs from its block's. */
+  size?: number
+}
+
+/**
+ * How a block was set, as its own stylesheet describes it.
+ *
+ * Every field is optional and written **only when it departs from ordinary body
+ * text**. A book is mostly body text, so on a 2,000-paragraph book the great
+ * majority of blocks carry no `appearance` at all and cost nothing to store.
+ * Recording `{ size: 1, bold: false, centred: false }` two thousand times would
+ * put the whole of a book's default styling into every row to say nothing.
+ */
+export interface BlockAppearance {
+  /** A multiple of the book's own body-text size. Absent means ordinary. */
+  size?: number
+  bold?: true
+  italic?: true
+  centred?: true
+  /** The source gave this block a first-line indent. */
+  indented?: true
+}
+
 interface BlockFields {
   kind: BlockKind
   /** A readable form of the block. Always present, whatever the kind. */
@@ -74,6 +121,22 @@ interface BlockFields {
   image?: FigureImage
   /** Links inside `text`, as the source wrote them. */
   links?: RawLink[]
+  /** Stretches of `text` the source set differently — emphasis, small caps. */
+  marks?: RawMark[]
+  /**
+   * How the source set this block, once its own stylesheet has been read.
+   *
+   * Kept rather than discarded. The style pass computes a full `Appearance` for
+   * every element in the book and then used it to answer one yes/no question —
+   * is this a heading — before throwing the rest away. Everything the reader
+   * needs to set a page the way its publisher did was in there: the size
+   * hierarchy of a part title against a chapter number, whether a line is
+   * centred, whether a paragraph takes a first-line indent.
+   *
+   * Sizes are a multiple of *this book's* own body text, so they compare across
+   * books that disagree about what `1em` means. See `baselineOf`.
+   */
+  appearance?: BlockAppearance
   /** Ids the source markup put on or inside this block — what links point at. */
   ids?: string[]
   /**
@@ -150,12 +213,13 @@ function resolveLevels(blocks: readonly Block[]): Levels | null {
  * which the reader already knows how to draw as a small heading.
  */
 function demoteHeading(block: HeadingBlock): ContentBlock {
-  const demoted: ContentBlock = { kind: 'prose', text: block.text, label: 'subheading' }
-  // A demoted heading keeps its place in the book, so it keeps the fact that it
-  // opened one of the source's documents — losing that here would silently undo
-  // the page break for exactly the books that use deep heading levels.
-  if (block.startsPage) demoted.startsPage = true
-  return demoted
+  const { level: _level, guessed: _guessed, kind: _kind, ...rest } = block
+  // Everything except the level survives. A demoted heading is still the line
+  // the publisher set — `The Mountains of My Life` opens Part 1 with five
+  // centred lines at two sizes, of which our two-tier model can consume only
+  // two as titles. The other three arrive here, and dropping their appearance
+  // was why they reached the page as three identical grey paragraphs.
+  return { ...rest, kind: 'prose', label: 'subheading' }
 }
 
 function asContent(block: Block): ContentBlock {
@@ -404,6 +468,8 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
           }))
         }
         if (block.ids !== undefined) paragraph.ids = block.ids
+        if (block.marks !== undefined && block.marks.length > 0) paragraph.marks = block.marks
+        if (block.appearance !== undefined) paragraph.appearance = block.appearance
         return paragraph
       })
 
