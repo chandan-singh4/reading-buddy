@@ -1043,15 +1043,15 @@ sign-in screen.
   for a book with no chapters in it.** Two reasons, and the second is the one
   that turned a thin list into a broken one. The plain one: a chapter is a long
   way, so a list offering page 1 and then page 300 cannot be navigated with. The
-  sharp one: the chapter heading level is resolved as the *shallowest level in
-  the document* (`parse/assemble.ts`), and a book that prints CONTENTS, NOTES and
-  GLOSSARY at `<h1>` and its real chapters at `<h2>` puts every chapter one level
-  down — so a chapter-only list showed six lines of furniture and not one chapter
-  of the book. Showing both levels answers that book **without re-parsing
-  anything**, which is why it was done first: the parser change fixes the shelf
-  only after every book is rebuilt, and can only ever be a better guess at the
-  same question. The titles were in storage all along — `listChapterIndexes`
-  loaded them for the spine and threw them away. — 2026-08-15
+  titles were in storage all along — `listChapterIndexes` loaded them for the
+  spine and threw them away.
+
+  **Correction, same day.** This entry first said the change also fixed a book
+  whose chapters were missing. It said the chapters sat one heading level below
+  CONTENTS and NOTES, so showing sections would reveal them. That was wrong. The
+  book's chapters have no heading of any level, and the cause was in the epub
+  parser — see the next entry. Sections are worth showing on their own merit, so
+  the change stands. — 2026-08-15
 - **Only a section the book named earns a row.** An untitled section is the
   parser's own bucket — the prose before the first heading, or a slice of the
   heading-free fallback. It is a real division of the text and not a thing the
@@ -1062,3 +1062,18 @@ sign-in screen.
   section when the list names it, the chapter when it does not. Marking both
   would print the line twice, a few lines apart, which reads as the list
   contradicting itself. — 2026-08-15
+- **A missing title is asked per document, not per book.** `parse/epub.ts` can
+  take a chapter's title from the epub's own contents when the chapter's markup
+  has no heading. Many books need this: the title is set as artwork, so the file
+  holds a picture and not an `<h1>`. But the parser asked the question once for
+  the whole book — if *any* document anywhere had a heading, no document got a
+  title. Almost every book has a heading somewhere, usually in the endnotes or a
+  glossary. So the back matter switched the fallback off for the chapters. Every
+  chapter arrived with no title, the body fused into one untitled division, and
+  the contents page listed the front and back matter and not one chapter of the
+  book. The question is now asked per document. The original worry was that a
+  synthesised title could compete with a real one and split a chapter in two.
+  Asking per document answers it: a document that already has a heading is left
+  exactly as it was, so only the documents with nothing to compete with change.
+  `PARSER_VERSION` goes 19 → 20, so each book re-parses when you open it, and
+  the idle trickle rebuilds the rest of the shelf. — 2026-08-15

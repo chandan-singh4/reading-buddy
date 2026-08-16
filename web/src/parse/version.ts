@@ -169,5 +169,16 @@
  *   itself rather than printing the block's text — so the mark is the theme's
  *   to choose. Labelled rather than given a `BlockKind`, for the same reason as
  *   16 and 17: the block was already there, and its anchor must not move.
+ * - **20** — the book with no chapters. An epub's chapter titles are often set
+ *   as artwork, so the file holds a picture and not an `<h1>`. The parser
+ *   already had the answer: take the title from the epub's own contents. But it
+ *   asked *once for the whole book* whether any heading existed anywhere, and a
+ *   book with headings in its endnotes and glossary — most books — switched the
+ *   fallback off for every chapter. Every chapter then arrived headless, the
+ *   body fused into one untitled division, and the contents page listed the
+ *   front and back matter and not one chapter of the book. The question is now
+ *   asked per document. A document that has a heading is untouched, so the
+ *   original worry — a synthesised title competing with a real one and splitting
+ *   a chapter — cannot happen.
  */
-export const PARSER_VERSION = 19
+export const PARSER_VERSION = 20

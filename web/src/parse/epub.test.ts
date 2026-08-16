@@ -392,6 +392,59 @@ describe('parseEpub — books with no headings in the markup', () => {
     expect(book.chapters.map((c) => c.title)).toEqual(['The Beginning', 'The End'])
   })
 
+  it('titles a headless chapter even when other documents have headings', async () => {
+    // The shape of a real book: chapter titles set as artwork, so the chapter
+    // documents hold no heading, while the back matter carries ordinary ones.
+    const ncx = `<?xml version="1.0"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+  <navPoint id="n1"><navLabel><text>Chapter One</text></navLabel><content src="ch1.xhtml"/></navPoint>
+  <navPoint id="n2"><navLabel><text>Chapter Two</text></navLabel><content src="ch2.xhtml"/></navPoint>
+  <navPoint id="n3"><navLabel><text>Notes</text></navLabel><content src="notes.xhtml"/></navPoint>
+</navMap></ncx>`
+
+    const epub = makeEpub({
+      manifest: [
+        '<item id="toc" href="toc.ncx" media-type="application/x-dtbncx+xml"/>',
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="c2" href="ch2.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="n" href="notes.xhtml" media-type="application/xhtml+xml"/>',
+      ].join(''),
+      spine: '<itemref idref="c1"/><itemref idref="c2"/><itemref idref="n"/>',
+      files: {
+        'OEBPS/toc.ncx': ncx,
+        'OEBPS/ch1.xhtml': chapterDoc('<p>Once upon a time.</p>'),
+        'OEBPS/ch2.xhtml': chapterDoc('<p>Happily ever after.</p>'),
+        'OEBPS/notes.xhtml': chapterDoc('<h1>NOTES</h1><p>See page one.</p>'),
+      },
+    })
+
+    const book = await parseEpub(epub, meta())
+    expect(book.chapters.map((c) => c.title)).toEqual(['Chapter One', 'Chapter Two', 'NOTES'])
+  })
+
+  it('leaves a document that has its own heading alone', async () => {
+    const ncx = `<?xml version="1.0"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+  <navPoint id="n1"><navLabel><text>Contents Entry</text></navLabel><content src="ch1.xhtml"/></navPoint>
+</navMap></ncx>`
+
+    const epub = makeEpub({
+      manifest: [
+        '<item id="toc" href="toc.ncx" media-type="application/x-dtbncx+xml"/>',
+        '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',
+      ].join(''),
+      spine: '<itemref idref="c1"/>',
+      files: {
+        'OEBPS/toc.ncx': ncx,
+        'OEBPS/ch1.xhtml': chapterDoc('<h1>The Real Title</h1><p>Body.</p>'),
+      },
+    })
+
+    // One chapter, not two: the ToC title is not added beside the real heading.
+    const book = await parseEpub(epub, meta())
+    expect(book.chapters.map((c) => c.title)).toEqual(['The Real Title'])
+  })
+
   it('falls back to bucketing when there is no ToC either', async () => {
     const epub = makeEpub({
       manifest: '<item id="c1" href="ch1.xhtml" media-type="application/xhtml+xml"/>',

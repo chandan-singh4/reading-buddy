@@ -822,19 +822,38 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
     return { path, blocks }
   })
 
-  const hasHeadings = perDocument.some((doc) =>
-    doc.blocks.some((block) => block.kind === 'heading'),
-  )
-
   const blocks: Block[] = []
   for (const doc of perDocument) {
     if (doc.blocks.length === 0) continue
 
-    // Only synthesise titles for books that supply no headings of their own —
-    // injecting them alongside real headings would compete with the level
-    // resolution and split chapters in two.
+    /*
+     * A title from the epub's own contents, for a document that has no heading
+     * of its own.
+     *
+     * **Asked per document, and that is the whole of a real bug.** It used to be
+     * asked once for the book — if *any* document anywhere had a heading, no
+     * document got a synthesised title. Mixed books are normal and that made
+     * them unreadable: a book whose chapter titles are set as images (very
+     * common — the title is artwork, so the markup has no `<h1>`) but whose
+     * endnotes and glossary carry ordinary headings would have the fallback
+     * switched off by the back matter. Every chapter then arrived headless, the
+     * whole body fused into one untitled slab, and the contents page listed the
+     * front and back matter and not one chapter of the book. That is a real book
+     * on the reader's shelf, not a hypothetical.
+     *
+     * The original worry was that injecting titles beside real headings would
+     * compete with level resolution and split a chapter in two. Asking per
+     * document answers it: a document that already has a heading is left exactly
+     * as it was, so nothing can be split — the only documents that change are the
+     * ones that had no heading to compete with.
+     *
+     * Level 1 because a spine document the contents page names is a division of
+     * the book, which is what level 1 means before `resolveLevels` rescales
+     * everything to whatever the book actually uses.
+     */
     const synthesised: Block[] = []
-    if (!hasHeadings) {
+    const hasHeading = doc.blocks.some((block) => block.kind === 'heading')
+    if (!hasHeading) {
       const title = tocTitles.get(doc.path)
       if (title) synthesised.push({ kind: 'heading', level: 1, text: title })
     }
