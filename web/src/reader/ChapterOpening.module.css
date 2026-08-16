@@ -50,14 +50,22 @@
   gap: var(--space-3);
 }
 
-/* Deliberately the border colour, not the accent: the figure is large enough
-   that any real colour at this size shouts over the title beside it. */
+/*
+ * A ghost of the page's own ink rather than a colour of its own: the figure is
+ * large enough that any real colour at this size shouts over the title beside
+ * it, but it still has to be legible in every theme.
+ *
+ * This was `--color-border` and it failed exactly there. A border colour is
+ * mixed to sit against the page, so on Paper and on the dark themes the figure
+ * all but vanished. Mixing the *text* colour keeps one relationship — a quarter
+ * of the ink — which holds whether the ink is near-black or near-white.
+ */
 .figure {
   font-family: var(--font-reading);
   font-size: 3.875rem;
   line-height: 0.8;
   font-weight: 600;
-  color: var(--color-border);
+  color: color-mix(in srgb, var(--color-text) 26%, transparent);
 }
 
 .numeralText {

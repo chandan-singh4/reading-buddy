@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 
 import { HIGHLIGHT_COLOURS, type ReaderSelection } from './selection.ts'
 import styles from './SelectionMenu.module.css'
@@ -162,9 +163,37 @@ export function SelectionMenu({ selection, onAction, onDismiss }: SelectionMenuP
     onAction(action)
   }
 
-  return (
-    <div
-      ref={card}
+  /*
+   * Both the marks and the card go through a portal onto `<body>`.
+   *
+   * `position: fixed` is measured against the nearest transformed ancestor, not
+   * against the screen, and the reading page is inside one: the stage carries
+   * `--page-scale`, and a page in flight carries the turn. So a card placed at
+   * the selection's viewport coordinates landed scaled and offset — on the phone
+   * it was off the screen entirely, while still catching taps meant for the
+   * page. Out here there is nothing between this and the viewport.
+   */
+  return createPortal(
+    <>
+      {/* The selection, drawn by us. The real one was taken away the moment it
+          was read — that is what dismisses the phone's own text menu — so
+          without this the reader cannot see what they picked. */}
+      {selection.rects.map((rect, index) => (
+        <span
+          key={index}
+          className={styles.mark}
+          aria-hidden="true"
+          style={{
+            top: `${rect.top}px`,
+            left: `${rect.left}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`,
+          }}
+        />
+      ))}
+
+      <div
+        ref={card}
       className={`${styles.card} ${place?.above ? styles.above : styles.below}`}
       style={{
         top: place ? `${place.top}px` : 0,
@@ -324,6 +353,8 @@ export function SelectionMenu({ selection, onAction, onDismiss }: SelectionMenuP
           ))}
         </ul>
       </div>
-    </div>
+      </div>
+    </>,
+    document.body,
   )
 }

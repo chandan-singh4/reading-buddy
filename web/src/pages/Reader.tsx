@@ -2172,27 +2172,43 @@ export default function Reader() {
 
   useEffect(() => {
     /*
-     * `selectionchange` fires for every character as the handle is dragged, so
-     * the menu is only raised once the finger is off. Until then the reader is
-     * still choosing, and a card that follows the drag covers the words being
-     * chosen.
+     * Read on `pointerup`, not on `selectionchange`: the latter fires for every
+     * character as a handle is dragged, and a card that follows the drag covers
+     * the words being chosen. Until the finger is off, the reader is still
+     * choosing.
+     *
+     * Then the selection is *let go* — and that is the whole trick. A phone
+     * shows its own text menu the moment a selection exists, and there is no
+     * way to ask it not to. Dropping the selection takes that menu away, and
+     * the words are drawn again by `SelectionMenu` so nothing looks lost.
+     *
+     * The cost is honest and worth naming: the drag handles go with it, so a
+     * selection is adjusted by making it again rather than by nudging an end.
      */
-    const onSelected = () => setSelected(selectionInReader(strip.current))
-    const onCleared = () => {
-      if (window.getSelection()?.isCollapsed) setSelected(null)
+    const onSelected = () => {
+      const found = selectionInReader(strip.current)
+      if (!found) return
+      setSelected(found)
+      window.getSelection()?.removeAllRanges()
     }
 
     document.addEventListener('pointerup', onSelected)
-    document.addEventListener('selectionchange', onCleared)
-    return () => {
-      document.removeEventListener('pointerup', onSelected)
-      document.removeEventListener('selectionchange', onCleared)
-    }
+    return () => document.removeEventListener('pointerup', onSelected)
   }, [])
+
+  /**
+   * The tap that put the menu away, remembered for one beat.
+   *
+   * A tap outside the menu closes it on `pointerdown`, and the `click` that
+   * follows lands on the page — which would raise the toolbar in the same
+   * gesture. This is what tells that click it has already done its job.
+   */
+  const dismissed = useRef(false)
 
   /** Put the menu away and let go of the words. */
   const dropSelection = useCallback(() => {
     setSelected(null)
+    dismissed.current = true
     window.getSelection()?.removeAllRanges()
   }, [])
 
@@ -2579,8 +2595,13 @@ export default function Reader() {
 
               // The tap that finished a selection is not a tap on the page. It
               // has already raised the selection menu, and toggling the toolbar
-              // under it would move the words the menu is pointing at.
+              // under it would move the words the menu is pointing at. Nor is
+              // the tap that put the menu away again.
               if (selected) return
+              if (dismissed.current) {
+                dismissed.current = false
+                return
+              }
 
               // The outer thirds turn a page; the middle shows the overlay.
               // Edge taps are what a reader's thumb already rests on, and they

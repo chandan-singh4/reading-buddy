@@ -42,6 +42,23 @@ export interface ReaderSelection {
   anchor: Anchor
   /** Where it sits on screen, for placing the menu. Viewport coordinates. */
   rect: { top: number; bottom: number; left: number; right: number }
+  /**
+   * One box per line of the selection.
+   *
+   * Kept because the app paints the selection itself. The phone's own text menu
+   * appears the moment a native selection exists and cannot be turned off, so
+   * the selection is read, dropped, and drawn again by us — and these are what
+   * gets drawn. See `SelectionMenu.tsx`.
+   */
+  rects: SelectionRect[]
+}
+
+/** One line of a selection, in viewport coordinates. */
+export interface SelectionRect {
+  top: number
+  left: number
+  width: number
+  height: number
 }
 
 /** `ch02-s03-p013` — the shape `elementIdOf` makes out of an anchor. */
@@ -92,5 +109,11 @@ export function selectionInReader(root: HTMLElement | null): ReaderSelection | n
       left: Math.min(...box.map((rect) => rect.left)),
       right: Math.max(...box.map((rect) => rect.right)),
     },
+    rects: box.map((rect) => ({
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    })),
   }
 }
