@@ -76,6 +76,7 @@ export {
   buildSpine,
   chapterAt,
   chapterPages,
+  contentsOutline,
   hasWordCounts,
   pagesAt,
   pagesOf,
@@ -86,7 +87,7 @@ export {
   wordsAt,
   wordsAtPage,
 } from './progress.ts'
-export type { Pages, Progress, Spine, SpineEntry } from './progress.ts'
+export type { OutlineEntry, Pages, Progress, Spine, SpineEntry } from './progress.ts'
 
 export {
   chapterTitle,

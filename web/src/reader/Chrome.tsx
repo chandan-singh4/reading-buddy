@@ -28,7 +28,7 @@ import { useRef } from 'react'
 import { Link } from 'react-router'
 
 import { stepThrough, swipeOf, type Touch } from './swipe.ts'
-import { progressOf, type Pages } from './progress.ts'
+import { progressOf, type OutlineEntry, type Pages } from './progress.ts'
 import { MIN_QUERY, type SearchOutcome } from './search.ts'
 import type { SectionRef } from './navigation.ts'
 import type { Anchor, Manifest } from '../structure/index.ts'
@@ -79,14 +79,6 @@ export interface ChromeProps {
    * see. Chrome stays presentational.
    */
   pages: Pages | null
-  /**
-   * The page each chapter opens on, or `null` for a book with no page numbers.
-   *
-   * Worked out by the reading page for the same reason `pages` is: the spine
-   * lives there. `null` costs the contents list its page column and nothing
-   * else.
-   */
-  chapterPages: ReadonlyMap<number, number> | null
   /** Whether the overlay is currently on screen. */
   shown: boolean
   focusMode: boolean
@@ -98,8 +90,13 @@ export interface ChromeProps {
   /** Open one panel by name — the ⋮, the Aa button, and each tab all use this. */
   onOpenSheet: (tab: SheetTab) => void
   onCloseSheet: () => void
-  /** Go to the first section of a chapter. */
-  onJumpToChapter: (chapter: number) => void
+  /**
+   * The contents list: chapters, with each chapter's named sections under it.
+   * Built by `contentsOutline`, which decides what earns a row.
+   */
+  outline: readonly OutlineEntry[]
+  /** Go to a chapter, or to one section inside it. */
+  onJumpTo: (chapter: number, section: number) => void
   /** Go to a page — which may be inside the section already on screen. */
   onJumpToPage: (page: number) => void
   /** Change one or more reading-comfort settings at once. */
@@ -158,7 +155,6 @@ export function Chrome({
   manifest,
   here,
   pages,
-  chapterPages,
   shown,
   focusMode,
   sheetOpen,
@@ -167,7 +163,8 @@ export function Chrome({
   onToggleFocus,
   onOpenSheet,
   onCloseSheet,
-  onJumpToChapter,
+  outline,
+  onJumpTo,
   onJumpToPage,
   onSettingsChange,
   bookmarks,
@@ -207,6 +204,21 @@ export function Chrome({
    * Notes back to Contents would contradict what the eye just saw.
    */
   const swipeFrom = useRef<Touch | null>(null)
+
+  /**
+   * Whether the contents list names the section the reader is actually in.
+   *
+   * It often does not: an untitled section earns no row, and a chapter of one
+   * section is left as a single line. When there is no section row to mark, the
+   * chapter row carries "reading now" instead — so the reader always has exactly
+   * one, and never two.
+   */
+  const readingSection = outline.some(
+    (entry) =>
+      entry.section !== undefined &&
+      entry.chapter === here.chapter &&
+      entry.section === here.section,
+  )
 
   return (
     /* `inert` rather than unmounted: the overlay keeps its scroll position in
@@ -483,36 +495,49 @@ export function Chrome({
               </div>
 
               <ul>
-                {manifest.chapters.map((entry) => {
-                  const reading = entry.chapter === chapter
-                  const startPage = chapterPages?.get(entry.chapter)
-                  const title = entry.title || `Chapter ${entry.chapter}`
+                {outline.map((entry) => {
+                  /*
+                    The one row that is *you*, and it must be exactly one.
+                    Marking the chapter row as well as the section row inside it
+                    would print "reading now" twice a few lines apart, which
+                    reads as the list contradicting itself. So the deepest row
+                    that matches wins: the section you are in when the list
+                    names it, and the chapter otherwise.
+                  */
+                  const reading =
+                    entry.section === undefined
+                      ? entry.chapter === here.chapter && !readingSection
+                      : entry.chapter === here.chapter && entry.section === here.section
+
+                  const label = `${entry.title}, page ${entry.page}`
 
                   return (
-                    <li key={entry.chapter}>
+                    <li
+                      key={entry.section === undefined ? `c${entry.chapter}` : `c${entry.chapter}s${entry.section}`}
+                      /* A section is drawn indented and lighter, so the eye
+                         reads the list as a hierarchy without a second heading
+                         level to scan past. */
+                      className={entry.section === undefined ? undefined : styles.contentsSub}
+                    >
                       <button
                         type="button"
                         className={styles.contentsItem}
                         aria-current={reading ? 'true' : undefined}
                         /* The dots are decoration, so the number has to be said
                            in words to anyone who can't see them line up. */
-                        aria-label={
-                          startPage === undefined ? title : `${title}, page ${startPage}`
-                        }
-                        onClick={() => onJumpToChapter(entry.chapter)}
+                        aria-label={label}
+                        onClick={() => onJumpTo(entry.chapter, entry.section ?? 1)}
                       >
-                        <span className={styles.contentsTitle}>{title}</span>
+                        <span className={styles.contentsTitle}>{entry.title}</span>
                         <span className={styles.contentsLeader} aria-hidden="true" />
-                        {startPage !== undefined && (
-                          <span className={styles.contentsPage} aria-hidden="true">
-                            {startPage}
-                          </span>
-                        )}
+                        <span className={styles.contentsPage} aria-hidden="true">
+                          {entry.page}
+                        </span>
                       </button>
 
                       {/*
-                        Where you actually are, under the chapter you are in.
-                        The right-hand column is where each chapter *starts*, so
+                        Where you actually are, under the row you are in. The
+                        right-hand column is where each division *starts*, so
                         without this line the list can say 91 while you are on
                         102 — true of the chapter, and not an answer to the
                         question a reader opens the contents to ask.
@@ -596,7 +621,9 @@ export function Chrome({
               aria-label="Move through the book"
               aria-valuetext={`Chapter ${chapter} of ${chapterCount}`}
               disabled={chapterCount <= 1}
-              onChange={(event) => onJumpToChapter(Number(event.target.value))}
+              // The coarse slider moves in whole chapters, so it always lands on
+              // the first section of one.
+              onChange={(event) => onJumpTo(Number(event.target.value), 1)}
             />
           )}
         </div>

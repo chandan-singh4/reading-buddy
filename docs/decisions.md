@@ -1039,3 +1039,26 @@ sign-in screen.
   page. Asked once, at `pointerdown`, exactly as the brightness gate is: a stroke
   that starts mid-page must not become a back gesture by *ending* at the edge,
   which is what every completed forward turn does. — 2026-08-15
+- **The contents page shows sections under chapters, and that is also the fix
+  for a book with no chapters in it.** Two reasons, and the second is the one
+  that turned a thin list into a broken one. The plain one: a chapter is a long
+  way, so a list offering page 1 and then page 300 cannot be navigated with. The
+  sharp one: the chapter heading level is resolved as the *shallowest level in
+  the document* (`parse/assemble.ts`), and a book that prints CONTENTS, NOTES and
+  GLOSSARY at `<h1>` and its real chapters at `<h2>` puts every chapter one level
+  down — so a chapter-only list showed six lines of furniture and not one chapter
+  of the book. Showing both levels answers that book **without re-parsing
+  anything**, which is why it was done first: the parser change fixes the shelf
+  only after every book is rebuilt, and can only ever be a better guess at the
+  same question. The titles were in storage all along — `listChapterIndexes`
+  loaded them for the spine and threw them away. — 2026-08-15
+- **Only a section the book named earns a row.** An untitled section is the
+  parser's own bucket — the prose before the first heading, or a slice of the
+  heading-free fallback. It is a real division of the text and not a thing the
+  book calls anything, so a contents page has nothing to print beside its page
+  number. A chapter of one section stays a single row for the same reason a
+  printed contents page does not indent a line under itself. — 2026-08-15
+- **Exactly one row says "reading now".** The deepest row that matches wins: the
+  section when the list names it, the chapter when it does not. Marking both
+  would print the line twice, a few lines apart, which reads as the list
+  contradicting itself. — 2026-08-15

@@ -578,6 +578,31 @@
   border-bottom-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
 }
 
+/*
+ * A section, indented under the chapter it belongs to.
+ *
+ * The whole hierarchy is carried by two things a printed contents page has
+ * always used: an indent, and slightly smaller type. No second heading level and
+ * no rules — a reader scanning for a chapter must be able to skip the indented
+ * lines without reading them, and weight is what the eye skips by. The chapter
+ * rows keep the base size, so they still read as the spine of the list.
+ *
+ * The indent is on the row and not on the title, so the dot leader starts inside
+ * it too. A leader that began at the chapter's left edge would tie the section's
+ * page number to the line above it.
+ */
+.contentsSub .contentsItem {
+  padding-left: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Still the accent when it is the row you are on — the indent says where it
+   sits, and the colour says it is you. The two are different questions. */
+.contentsSub .contentsItem[aria-current='true'] {
+  color: var(--color-accent);
+}
+
 /* Where you are inside that chapter, centred under it in small caps. */
 .readingNow {
   margin: 0 0 var(--space-2);

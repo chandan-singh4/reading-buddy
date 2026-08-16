@@ -7,8 +7,8 @@ import {
   anchorAtPage,
   bookmarkOn,
   buildSpine,
-  chapterPages,
   chapterTitle,
+  contentsOutline,
   inBookOrder,
   inNoteOrder,
   labelFor,
@@ -83,6 +83,7 @@ import type {
   Anchor,
   BookId,
   BookMeta,
+  ChapterIndex,
   Manifest,
   Paragraph,
   Section,
@@ -435,6 +436,16 @@ export default function Reader() {
    * hasn't finished; the overlay falls back to chapters on its own.
    */
   const [spine, setSpine] = useState<Spine | null>(null)
+
+  /**
+   * The same chapter indexes the spine is built from, kept rather than dropped.
+   *
+   * They carry every section title in the book, which is what the contents page
+   * lists under each chapter. Titles and paths only — never prose — so this is
+   * the cheap half of the book and holding it costs nothing a reading screen
+   * cannot afford.
+   */
+  const [chapterIndexes, setChapterIndexes] = useState<readonly ChapterIndex[]>([])
 
   /**
    * The paragraph currently at the top of the screen. Sections run to a dozen
@@ -902,13 +913,18 @@ export default function Reader() {
     : null
 
   /**
-   * The page each chapter opens on, for the contents list.
+   * The contents list itself: chapters, with each chapter's named sections
+   * indented under it. See `contentsOutline` for what earns a row and why the
+   * flat list of chapters was not enough.
    *
-   * Depends only on the spine, so it is worked out once per book rather than on
-   * every render: the list is forty rows on a real book, and it must not be
-   * rebuilt each time the reader turns a page.
+   * Memoised on the same reasoning as `chapterStartPages`, and it matters more
+   * here — with sections the list is hundreds of rows on a real book, not forty.
    */
-  const chapterStartPages = useMemo(() => (spine ? chapterPages(spine) : null), [spine])
+  const outline = useMemo(
+    () =>
+      frame.status === 'ready' ? contentsOutline(frame.manifest, chapterIndexes, spine) : [],
+    [frame, chapterIndexes, spine],
+  )
 
   /**
    * The page a bookmark or a note sits on — the number on a bookmark's flag.
@@ -1500,6 +1516,7 @@ export default function Reader() {
     let cancelled = false
 
     setSpine(null)
+    setChapterIndexes([])
 
     void (async () => {
       try {
@@ -1513,6 +1530,10 @@ export default function Reader() {
         if (cancelled || !manifest) return
 
         setSpine(buildSpine(manifest, chapterIndexes))
+        // Kept, not discarded. These carry every section title in the book, and
+        // the contents page lists them under their chapters — see
+        // `contentsOutline`. They were already being loaded for the spine.
+        setChapterIndexes(chapterIndexes)
       } catch {
         // Deliberately silent. The page number is a nicety; the overlay falls
         // back to "Chapter 5 of 12" by itself when the spine is null, and an
@@ -2180,7 +2201,7 @@ export default function Reader() {
             manifest={frame.manifest}
             here={here}
             pages={pages}
-            chapterPages={chapterStartPages}
+            outline={outline}
             shown={chromeShown}
             focusMode={focusMode}
             sheetOpen={sheetOpen}
@@ -2189,7 +2210,7 @@ export default function Reader() {
             onToggleFocus={toggleFocus}
             onOpenSheet={openSheet}
             onCloseSheet={closeSheet}
-            onJumpToChapter={(chapter) => goTo({ chapter, section: 1 })}
+            onJumpTo={(chapter, section) => goTo({ chapter, section })}
             onJumpToPage={jumpToPage}
             onSettingsChange={changeSettings}
             bookmarks={bookmarkRows}

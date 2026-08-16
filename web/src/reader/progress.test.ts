@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import type { BookId, Manifest } from '../structure/index.ts'
-import { chapterAt, chapterPages, progressLabel, progressOf, type Spine } from './progress.ts'
+import type { BookId, ChapterIndex, Manifest } from '../structure/index.ts'
+import {
+  chapterAt,
+  chapterPages,
+  contentsOutline,
+  progressLabel,
+  progressOf,
+  type Spine,
+} from './progress.ts'
 
 function manifestOf(titles: string[]): Manifest {
   return {
@@ -101,5 +108,90 @@ describe('the page each chapter opens on', () => {
     // The second section of chapter 1 starts on page 3. Letting it win would
     // put the chapter's own page three pages after the chapter begins.
     expect(chapterPages(spine).get(1)).toBe(1)
+  })
+})
+
+describe('the contents, to the depth the book has', () => {
+  const spine: Spine = {
+    entries: [
+      { chapter: 1, section: 1, words: 600, startWords: 0 },
+      { chapter: 1, section: 2, words: 300, startWords: 600 },
+      { chapter: 2, section: 1, words: 300, startWords: 900 },
+    ],
+    totalWords: 1200,
+  }
+
+  function indexes(
+    rows: { chapter: number; sections: (string | undefined)[] }[],
+  ): ChapterIndex[] {
+    return rows.map((row) => ({
+      chapter: row.chapter,
+      title: `Chapter ${row.chapter}`,
+      path: `/book/ch0${row.chapter}/index.md`,
+      sections: row.sections.map((title, index) => ({
+        section: index + 1,
+        title,
+        path: `/book/ch0${row.chapter}/s0${index + 1}.md`,
+        words: 300,
+      })),
+    })) as ChapterIndex[]
+  }
+
+  it('indents a chapter’s named sections under it, each with its own page', () => {
+    // The whole point: a list that offers page 1 and then page 300 cannot be
+    // navigated with. The sections are the only finer division a book has.
+    const outline = contentsOutline(
+      manifestOf(['One', 'Two']),
+      indexes([
+        { chapter: 1, sections: ['Openings', 'Middles'] },
+        { chapter: 2, sections: ['Ends'] },
+      ]),
+      spine,
+    )
+
+    expect(outline).toEqual([
+      { chapter: 1, title: 'One', page: 1 },
+      { chapter: 1, section: 1, title: 'Openings', page: 1 },
+      { chapter: 1, section: 2, title: 'Middles', page: 3 },
+      // Chapter 2 has one section, so it stays a single row.
+      { chapter: 2, title: 'Two', page: 4 },
+    ])
+  })
+
+  it('leaves out a section the book never named', () => {
+    // An untitled section is the parser's own bucket — the prose before the
+    // first heading. It is a real division of the text and not a thing the book
+    // calls anything, so there is nothing to print beside its page number.
+    const outline = contentsOutline(
+      manifestOf(['One']),
+      indexes([{ chapter: 1, sections: [undefined, 'Middles'] }]),
+      spine,
+    )
+
+    expect(outline).toEqual([
+      { chapter: 1, title: 'One', page: 1 },
+      { chapter: 1, section: 2, title: 'Middles', page: 3 },
+    ])
+  })
+
+  it('still lists the book when it does not know its own length', () => {
+    // No spine means no word counts, so no page numbers. The list must still
+    // navigate rather than vanish.
+    const outline = contentsOutline(
+      manifestOf(['One']),
+      indexes([{ chapter: 1, sections: ['Openings', 'Middles'] }]),
+      null,
+    )
+
+    expect(outline.map((row) => row.title)).toEqual(['One', 'Openings', 'Middles'])
+    expect(outline.every((row) => row.page === 1)).toBe(true)
+  })
+
+  it('names an untitled chapter rather than printing a blank line', () => {
+    expect(contentsOutline(manifestOf(['']), [], spine)[0]).toEqual({
+      chapter: 1,
+      title: 'Chapter 1',
+      page: 1,
+    })
   })
 })

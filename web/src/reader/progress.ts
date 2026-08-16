@@ -355,6 +355,107 @@ export function chapterPages(spine: Spine): Map<number, number> {
   return pages
 }
 
+// --- The contents, to the depth the book actually has ------------------------
+
+/** One line of the contents page: a chapter, or a titled section inside one. */
+export interface OutlineEntry {
+  chapter: number
+  /** Absent on a chapter's own row. Present on every row indented under it. */
+  section?: number
+  title: string
+  /** The page this division opens on. */
+  page: number
+}
+
+/**
+ * The contents page, with the book's sections shown under its chapters.
+ *
+ * ## Why a flat list of chapters was not enough
+ *
+ * Two reasons, and the second is the one that turned it from thin into broken.
+ *
+ * The plain one: a chapter is a long way. A contents list that offers page 1 and
+ * then page 300 is a list you cannot *navigate* with — the point of a contents
+ * page is to land near the thing you want, and a book's sections are the only
+ * finer division it has.
+ *
+ * The sharp one: which heading level becomes a "chapter" is resolved from the
+ * whole document, and it is the shallowest level present (`parse/assemble.ts`).
+ * Plenty of real books print their front and back matter — CONTENTS, NOTES,
+ * GLOSSARY, ACKNOWLEDGMENTS — at `<h1>` and their actual chapters at `<h2>`. In
+ * such a book every chapter is a *section*, and a contents page that lists only
+ * chapters shows six lines of furniture and not one chapter of the book. That is
+ * a real book on the reader's shelf, not a hypothetical.
+ *
+ * Showing both levels answers that book without re-parsing anything, which
+ * matters: the alternative fixes the shelf only after every book has been
+ * rebuilt, and it can only ever be a better guess at the same question. The
+ * chapter titles were in storage the whole time — `listChapterIndexes` already
+ * loads them for the spine and threw them away.
+ *
+ * ## What earns a row
+ *
+ * Only a section the book gave a *name*. An untitled section is one the parser
+ * made — the implicit bucket that holds prose appearing before the first
+ * heading, or a slice of the heading-free fallback. Those are real divisions of
+ * the text and they are not things the book calls anything, so a contents page
+ * has nothing to print beside their page number.
+ *
+ * A chapter of one section is left as a single row for the same reason a printed
+ * contents page does not indent a line under itself: the row would repeat what
+ * is directly above it and add a page number equal to it.
+ */
+export function contentsOutline(
+  manifest: Manifest,
+  chapterIndexes: readonly ChapterIndex[],
+  spine: Spine | null,
+): OutlineEntry[] {
+  const pageCount = spine ? pagesIn(spine.totalWords) : 0
+
+  /**
+   * The page a division opens on, from the words behind it — the same
+   * arithmetic `pagesAt` does, read off the division's start rather than off the
+   * reader's position. Page 1 when the book does not know its own length, which
+   * is honest: the list still navigates, it simply cannot number itself.
+   */
+  const pageOf = (chapter: number, section: number): number => {
+    if (!spine) return 1
+    const entry = spine.entries.find(
+      (candidate) => candidate.chapter === chapter && candidate.section === section,
+    )
+    if (!entry) return 1
+    return Math.min(pageCount, Math.floor(entry.startWords / WORDS_PER_PAGE) + 1)
+  }
+
+  const byChapter = new Map(chapterIndexes.map((index) => [index.chapter, index]))
+  const rows: OutlineEntry[] = []
+
+  for (const chapter of manifest.chapters) {
+    rows.push({
+      chapter: chapter.chapter,
+      title: chapter.title || `Chapter ${chapter.chapter}`,
+      page: pageOf(chapter.chapter, 1),
+    })
+
+    const sections = byChapter.get(chapter.chapter)?.sections ?? []
+    // A chapter that is one section is one row. See the note above.
+    if (sections.length <= 1) continue
+
+    for (const section of sections) {
+      // Untitled sections are the parser's, not the book's. Nothing to print.
+      if (!section.title) continue
+      rows.push({
+        chapter: chapter.chapter,
+        section: section.section,
+        title: section.title,
+        page: pageOf(chapter.chapter, section.section),
+      })
+    }
+  }
+
+  return rows
+}
+
 /** Which chapter a slider position means. The inverse of `progressOf`. */
 export function chapterAt(manifest: Manifest, fraction: number): number {
   const chapterCount = manifest.chapters.length
