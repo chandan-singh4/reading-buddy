@@ -293,5 +293,30 @@
  *
  *   Chapter numbers move in any book that nests. Saved places, bookmarks and
  *   highlights in those books point at the wrong paragraph and must be reset.
+ * - **26** — one reader for the text instead of two, ancestors in the style
+ *   rules, and the printed page numbers a book states about itself.
+ *
+ *   Content that sat loose between block tags — inside a bare `<div>` rather
+ *   than a `<p>` — was read with `textContent`, while a `<p>` got the full
+ *   extractor. The flat reader kept the words and threw away everything that
+ *   told them apart: the `<br>` that puts each line on its own line, every link,
+ *   every italic. A contents page written as `<div><a>…</a><br/><a>…</a></div>`
+ *   therefore arrived as one running paragraph of dead text. Both paths now use
+ *   the one extractor.
+ *
+ *   CSS selectors were matched on their rightmost compound alone, so `.pref p`
+ *   was a rule about every paragraph in the book. That was harmless while the
+ *   answer fed one yes-or-no question about headings, and stopped being harmless
+ *   in 25, when a book's own appearance started being drawn: one preface could
+ *   set a whole book in italic. Ancestors are now checked. `>` is read as an
+ *   ancestor, which can only ever match a little too widely; `+` and `~` are not
+ *   ancestry at all, and a selector using them keeps the old behaviour.
+ *
+ *   Page numbers: an epub may mark where the paper edition turned over
+ *   (`<span epub:type="pagebreak" id="page7"/>`, or the ARIA `doc-pagebreak`).
+ *   Where a book says so, the number is kept on the paragraph that opens that
+ *   page, as a string so roman front matter survives. Measured first: not one of
+ *   the five books on the shelf carries a single marker, so this changes nothing
+ *   for them. It is stored and not yet shown.
  */
-export const PARSER_VERSION = 25
+export const PARSER_VERSION = 26

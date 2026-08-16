@@ -200,3 +200,55 @@ describe('htmlToBlocks with the book’s own stylesheet', () => {
     expect(blocks.every((block) => block.kind === 'prose')).toBe(true)
   })
 })
+
+describe('a selector that asks for an ancestor', () => {
+  /** The deepest element in a fragment — the one the rule is about. */
+  function deepest(html: string): Element {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
+    return doc.querySelector('[data-target]')!
+  }
+
+  const sheet = readStyles(['.pref p { font-style: italic }'])
+
+  it('applies the rule inside that ancestor', () => {
+    const element = deepest('<div class="pref"><p data-target>The preface.</p></div>')
+    expect(appearanceOf(element, sheet).italic).toBe(true)
+  })
+
+  it('leaves every other paragraph in the book alone', () => {
+    // The whole point. Reading the rightmost compound alone made `.pref p` a
+    // rule about every `<p>` there is, so one preface set a whole book italic.
+    const element = deepest('<div class="chap"><p data-target>The body.</p></div>')
+    expect(appearanceOf(element, sheet).italic).toBe(false)
+  })
+
+  it('finds an ancestor that is not the direct parent', () => {
+    const element = deepest('<div class="pref"><blockquote><p data-target>Quoted.</p></blockquote></div>')
+    expect(appearanceOf(element, sheet).italic).toBe(true)
+  })
+
+  it('wants the ancestors in the order the selector gave them', () => {
+    const deep = readStyles(['.a .b p { font-weight: bold }'])
+    expect(appearanceOf(deepest('<div class="a"><div class="b"><p data-target>x</p></div></div>'), deep).bold).toBe(true)
+    expect(appearanceOf(deepest('<div class="b"><div class="a"><p data-target>x</p></div></div>'), deep).bold).toBe(false)
+  })
+
+  it('reads `>` as an ancestor too', () => {
+    // A relaxation, not an error: a child is also a descendant, so this can only
+    // ever match a little too widely — never too narrowly.
+    const child = readStyles(['.pref > p { font-style: italic }'])
+    expect(appearanceOf(deepest('<div class="pref"><p data-target>x</p></div>'), child).italic).toBe(true)
+  })
+
+  it('falls back to the rightmost compound for a sibling selector', () => {
+    // `+` and `~` are not ancestry and this file cannot answer them. Dropping
+    // the chain keeps the old behaviour rather than inventing an answer.
+    const sibling = readStyles(['h1 + p { font-style: italic }'])
+    expect(appearanceOf(deepest('<div><p data-target>x</p></div>'), sibling).italic).toBe(true)
+  })
+
+  it('lets the more specific rule win', () => {
+    const both = readStyles(['p { font-size: 1em } .pref p { font-size: 2em }'])
+    expect(appearanceOf(deepest('<div class="pref"><p data-target>x</p></div>'), both).size).toBe(2)
+  })
+})

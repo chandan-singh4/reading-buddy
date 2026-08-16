@@ -55,12 +55,25 @@ export const PLAIN: Appearance = {
   indented: false,
 }
 
-/** One parsed rule: what to match, how loudly it shouts, and how specific it is. */
-interface Rule {
-  /** The rightmost compound selector, pre-split. */
+/** One compound in a selector — `h1.title#x` — pre-split. */
+interface Compound {
   tag: string | null
   classes: string[]
   id: string | null
+}
+
+/** One parsed rule: what to match, how loudly it shouts, and how specific it is. */
+interface Rule extends Compound {
+  /**
+   * The compounds to the left of the target, outermost first. Empty for a plain
+   * selector such as `p`.
+   *
+   * Each is required to appear somewhere up the element's ancestor chain, in
+   * order. That is descendant semantics applied to `>` as well, which is a
+   * relaxation rather than an error: a child is also a descendant, so this can
+   * only ever match a little too widely, never too narrowly.
+   */
+  ancestors: Compound[]
   weight: number
   order: number
   declarations: Partial<Appearance>
@@ -146,24 +159,50 @@ function readDeclarations(body: string): Partial<Appearance> {
   return found
 }
 
-/** `h1.title#x` → its parts, plus a specificity. */
-function readSelector(selector: string, order: number, declarations: Partial<Appearance>): Rule | null {
-  // The rightmost compound is what the selector actually targets. `.chap p`
-  // and `p` both end in `p`, and for our one question that is close enough.
-  const last = selector.trim().split(/\s+|>/).pop()
-  if (!last) return null
-
-  const id = /#([\w-]+)/.exec(last)?.[1] ?? null
-  const classes = [...last.matchAll(/\.([\w-]+)/g)].map((match) => match[1]!)
-  const tag = /^[a-zA-Z][\w-]*/.exec(last)?.[0]?.toUpperCase() ?? null
+/** `h1.title#x` → its parts. Null when nothing in it is something we can match. */
+function readCompound(source: string): Compound | null {
+  const id = /#([\w-]+)/.exec(source)?.[1] ?? null
+  const classes = [...source.matchAll(/\.([\w-]+)/g)].map((match) => match[1]!)
+  const tag = /^[a-zA-Z][\w-]*/.exec(source)?.[0]?.toUpperCase() ?? null
 
   if (!id && classes.length === 0 && !tag) return null
+  return { tag, classes, id }
+}
+
+function specificity(compound: Compound): number {
+  return (compound.id ? 100 : 0) + compound.classes.length * 10 + (compound.tag ? 1 : 0)
+}
+
+/** `.chap h1.title` → the compound it targets, what must be above it, and a specificity. */
+function readSelector(selector: string, order: number, declarations: Partial<Appearance>): Rule | null {
+  const parts = selector.trim().split(/\s+|>/).filter(Boolean)
+  const last = parts.pop()
+  if (!last) return null
+
+  const target = readCompound(last)
+  if (!target) return null
+
+  // Every left-hand compound has to be readable for the chain to mean anything.
+  // `h1 + p` and `li ~ li` split into a part that is bare punctuation, and a
+  // sibling is not an ancestor, so the whole chain is dropped and the rule falls
+  // back to targeting its rightmost compound alone — which is what this file did
+  // for every selector before ancestors were read at all.
+  const ancestors: Compound[] = []
+  let chained = true
+  for (const part of parts) {
+    const compound = readCompound(part)
+    if (!compound) {
+      chained = false
+      break
+    }
+    ancestors.push(compound)
+  }
+  if (!chained) ancestors.length = 0
 
   return {
-    tag,
-    classes,
-    id,
-    weight: (id ? 100 : 0) + classes.length * 10 + (tag ? 1 : 0),
+    ...target,
+    ancestors,
+    weight: [target, ...ancestors].reduce((total, compound) => total + specificity(compound), 0),
     order,
     declarations,
   }
@@ -201,12 +240,53 @@ export function readStyles(sources: readonly string[]): StyleSheet {
   return { rules }
 }
 
-/** Whether a rule's rightmost compound describes this element. */
-function matches(rule: Rule, tag: string, classes: Set<string>, id: string): boolean {
-  if (rule.tag && rule.tag !== tag) return false
-  if (rule.id && rule.id !== id) return false
-  for (const wanted of rule.classes) if (!classes.has(wanted)) return false
+/** Whether a compound describes an element with these parts. */
+function describes(compound: Compound, tag: string, classes: Set<string>, id: string): boolean {
+  if (compound.tag && compound.tag !== tag) return false
+  if (compound.id && compound.id !== id) return false
+  for (const wanted of compound.classes) if (!classes.has(wanted)) return false
   return true
+}
+
+function partsOf(element: Element): { tag: string; classes: Set<string>; id: string } {
+  return {
+    tag: element.tagName.toUpperCase(),
+    classes: new Set((element.getAttribute('class') ?? '').split(/\s+/).filter(Boolean)),
+    id: element.getAttribute('id') ?? '',
+  }
+}
+
+/**
+ * Whether the ancestors a selector asks for are all above this element, in
+ * order. Walked from the element outwards, matching the innermost required
+ * ancestor first — the standard way to answer this without backtracking.
+ */
+function underAncestors(element: Element, wanted: readonly Compound[]): boolean {
+  let remaining = wanted.length - 1
+  let above = element.parentElement
+
+  while (above && remaining >= 0) {
+    const parts = partsOf(above)
+    if (describes(wanted[remaining]!, parts.tag, parts.classes, parts.id)) remaining -= 1
+    above = above.parentElement
+  }
+
+  return remaining < 0
+}
+
+/**
+ * Whether a rule describes this element.
+ *
+ * Reading only the rightmost compound — which this file did until a book's own
+ * appearance started being drawn rather than merely counted — makes `.pref p`
+ * match *every* paragraph in the book. That was harmless while the answer fed
+ * one yes/no question about headings. It is not harmless now: one such rule
+ * painted a whole book italic because a preface asked for it.
+ */
+function matches(rule: Rule, element: Element, tag: string, classes: Set<string>, id: string): boolean {
+  if (!describes(rule, tag, classes, id)) return false
+  if (rule.ancestors.length === 0) return true
+  return underAncestors(element, rule.ancestors)
 }
 
 /** The browser's own defaults for the tags a book uses to shout. */
@@ -242,7 +322,7 @@ export function appearanceOf(element: Element, sheet: StyleSheet): Appearance {
   const found: Partial<Appearance> = { ...BUILT_IN[tag] }
 
   const hits = sheet.rules
-    .filter((rule) => matches(rule, tag, classes, id))
+    .filter((rule) => matches(rule, element, tag, classes, id))
     .sort((a, b) => a.weight - b.weight || a.order - b.order)
 
   for (const rule of hits) Object.assign(found, rule.declarations)

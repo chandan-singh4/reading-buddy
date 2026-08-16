@@ -8,69 +8,75 @@
 
 ---
 
-## Re-import the books and judge PARSER_VERSION 25 on the phone
+## Re-import the books and judge PARSER_VERSION 26 on the phone
 
-Nothing is mid-edit. Build green, **1423 tests across 81 files** (2026-08-16).
+Nothing is mid-edit. Build green, **1440 tests across 81 files** (2026-08-16).
 
 **This is the task: re-parse the books and look at them. No code.**
 
 1. Open the shelf. Accept the re-parse it offers for every book.
-2. Open the Contents tab of *The Mountains of My Life*. Chapters 1 to 27 must
-   all be there, with PART 1, PART 2 and PART 3 standing beside them.
-3. Open the Contents tab of *Be As You Are*. Chapters 1 to 21 must all be
-   there, with Parts Two to Six beside them.
-4. Read a few pages of each. Italic phrases must be in italics. A centred line
-   must be centred. A display line must be larger than the body text.
+2. Open a contents page. Each entry must sit on its own line.
+3. Read the preface of a book that sets one in italic. Only the preface may be
+   italic. The chapters after it must not be.
+4. Read a few pages. Italic phrases must be in italics. A centred line must be
+   centred. A display line must be larger than the body text.
 
-### What changed in 25
+### What changed in 26
 
-Two faults, both of them the same mistake in different places: the parser
-measured something true about the book and then threw the measurement away.
+**One reader for the text, not two.** Content that sat loose between block tags
+— inside a bare `<div>` rather than a `<p>` — was read with `textContent`, while
+a `<p>` got the full extractor. The flat reader kept the words and threw away
+everything that told them apart: the `<br>` that puts each line on its own line,
+every link, every italic. A contents page written as
+`<div><a>…</a><br/><a>…</a></div>` therefore arrived as one running paragraph of
+dead text. Measured in *Man and His Symbols*: "PART 1 APPROACHING THE
+UNCONSCIOUSCarl G. Jung", two lines pasted into one. Both paths now use the one
+extractor.
 
-**Emphasis is kept.** The stylesheet engine always computed a full appearance
-for every element — size, weight, slant, alignment, indent — then reduced it to
-one yes-or-no question and discarded the rest. Now a paragraph carries `marks`
-(runs of characters the book set apart) and `appearance` (how the book set the
-whole line), and the reader draws both. Two books needed two different carriers
-to be read alike: one marks italics with `<em>`, the other with a class and a
-CSS rule. Only reading the CSS finds both.
+**Style rules read their ancestors.** Selectors were matched on the rightmost
+compound alone, so `.pref p` was a rule about every paragraph in the book. That
+was harmless while the answer fed one yes-or-no question about headings. It
+stopped being harmless in 25, when a book's own appearance started being drawn:
+one preface could set a whole book in italic. `>` is read as an ancestor, which
+can only match a little too widely. `+` and `~` are not ancestry, and a selector
+using them keeps the old behaviour.
 
-**Parts no longer eat chapters.** Navigation depth was written straight into the
-heading level, and only the two shallowest levels survive. A book that nests
-chapters under parts put every chapter at depth 3 and lost all of them.
-*Mountains* came back with 9 chapters of 28. A navigation level is now judged by
-how much of the book it holds: a level of parts holds under 1%, a level of
-chapters holds nearly all of it. A part stands beside the chapters it names
-rather than above them, so the anchor grammar stays two deep.
+**Printed page numbers are read where a book states them.** EPUB 3 marks the
+spot the paper edition turned over — `<span epub:type="pagebreak" id="page7"/>`,
+or the ARIA `doc-pagebreak`. The number now rides on the paragraph that opens
+that page, as a string so roman front matter (`xxvii`) survives.
 
 ### Still open — measured, not fixed
 
+- **No book on the shelf carries page numbers.** All five were counted: zero
+  `pagebreak` markers, zero NCX `<pageTarget>` entries. So 26 reads them and
+  nothing shows them yet. Two pieces are still missing: the EPUB 2 `<pageList>`
+  in `toc.ncx`, and the reader's own page counter, which still estimates from
+  word count. Build the display half when a book that has real markers arrives.
+- **The books that show the faults are not on disk.** *Braiding Sweetgrass* and
+  the Nondual Love book were never added to `books/`. The two fixes above were
+  measured on the books that are there, and the shapes match, but neither was
+  confirmed on the exact file that showed the problem.
 - **Kundalini is missing chapters Three, Eleven and Fourteen.** Measured cause:
-  the file states nothing about them. `<p class="calibre1">Chapter Three</p>`,
-  where `.calibre1` is the class every body paragraph uses, and the contents
-  omits those three entries. A text rule was written and withdrawn: it did not
-  fire in that book (the promotion pass stops early when a document has no
-  styled headings at all) and it added three false chapters to another book.
-- **A part page does not get its own page.** The CSS `page-break` properties are
-  still unread. Measured: *Mountains* defines `.pgbrk` and never uses it, so a
-  page-break rule alone would not have fixed that book either.
+  the file states nothing about them. A text rule was written and withdrawn — it
+  did not fire in that book and added three false chapters to another.
+- **A part page does not get its own page.** CSS `page-break` is still unread.
 - **Mountains lists 14 footnote entries as chapters.** Its `toc.ncx` forgets two
-  closing `</navPoint>` tags, so the footnote list nests a level too deep. These
-  are real entries in the book's own contents; they are noise, not loss.
+  closing `</navPoint>` tags.
 - **The source is not stored aside yet.** Re-parsing still needs the original
   file.
 
 ### Files in scope
 
+- `web/src/parse/html.ts` — the one text extractor, page-break markers
+- `web/src/parse/styles.ts` — the CSS engine and its ancestor matching
 - `web/src/parse/epub.ts` — navigation, part levels
-- `web/src/parse/html.ts` — marks, block appearance
-- `web/src/parse/styles.ts` — the CSS engine
 - `web/src/parse/assemble.ts` — the block stream and its types
+- `web/src/structure/types.ts` — `Paragraph`, including `printedPage`
 - `web/src/reader/blocks.tsx` — drawing marks and appearance
-- `web/src/reader/linkRuns.ts` — cutting text at link and mark edges
 
 ### Out of scope
 
 Chapter numbers move in any book that nests. Saved places, bookmarks and
-highlights in those books point at the wrong paragraph. This was accepted
-before the work started; do not spend the session on migrating them.
+highlights in those books point at the wrong paragraph. This was accepted before
+the work started; do not spend the session on migrating them.

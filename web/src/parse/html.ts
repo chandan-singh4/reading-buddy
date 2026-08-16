@@ -179,7 +179,7 @@ function merge(state: Emphasis, own: Appearance): Emphasis {
  * afterwards would move every offset already recorded.
  */
 function textAndLinks(
-  element: Element,
+  source: Element | readonly Node[],
   styleOf?: (element: Element) => Appearance,
 ): { text: string; links: RawLink[]; marks: RawMark[] } {
   let text = ''
@@ -243,8 +243,8 @@ function textAndLinks(
     if (run) run.end = text.length
   }
 
-  function walk(node: Node, state: Emphasis = NO_EMPHASIS): void {
-    for (const child of Array.from(node.childNodes)) {
+  function walk(nodes: readonly Node[], state: Emphasis = NO_EMPHASIS): void {
+    for (const child of nodes) {
       if (child.nodeType === 3 /* text */) {
         setState(state)
         push(child.textContent ?? '')
@@ -254,6 +254,10 @@ function textAndLinks(
 
       const el = child as Element
       if (SKIP.has(el.tagName.toUpperCase())) continue
+      // A page-break marker is a position, not a word. Its number is read off
+      // the element by the caller; letting its text through would drop a bare
+      // "137" into the middle of the sentence it interrupts.
+      if (printedPageOf(el) !== null) continue
 
       // What this span adds to whatever is already in force. Only departures
       // count: a `<span>` with no rule of its own resolves to `size: 1` and must
@@ -278,17 +282,17 @@ function textAndLinks(
       if (el.tagName.toUpperCase() === 'A') {
         const href = el.getAttribute('href') ?? ''
         const start = text.length
-        walk(el, inner)
+        walk(Array.from(el.childNodes), inner)
         // A link with no text is a bookmark target, not something to tap.
         if (href && text.length > start) links.push({ start, end: text.length, href })
         continue
       }
 
-      walk(el, inner)
+      walk(Array.from(el.childNodes), inner)
     }
   }
 
-  walk(element)
+  walk(Array.isArray(source) ? source : Array.from((source as Element).childNodes))
   closeRun()
 
   const trimmed = text.trimEnd()
@@ -437,6 +441,37 @@ function semanticType(element: Element): string {
 
 function matchesAny(haystack: string, needles: string[]): string | undefined {
   return needles.find((needle) => haystack.includes(needle))
+}
+
+/**
+ * The printed page a marker announces, or `null` if this element is not one.
+ *
+ * A page break in an epub is an empty element dropped into the text at the spot
+ * where the paper edition turned over — `<span epub:type="pagebreak" id="page7"
+ * title="7"/>`. It has no reading content of its own, so it is read for its
+ * number and then thrown away rather than left to appear as a stray "7" in the
+ * middle of a sentence.
+ *
+ * The number is written in four different places by four different converters,
+ * so all four are tried in the order of how deliberate each one is: `title` and
+ * `aria-label` are stated on purpose, the text content is next, and the id is a
+ * last resort because `page7` is a naming habit rather than a statement.
+ */
+const PAGE_ID = /^(?:page[_-]?)(.+)$/i
+
+function printedPageOf(element: Element): string | null {
+  const semantics = semanticType(element)
+  if (!semantics.includes('pagebreak') && !semantics.includes('doc-pagebreak')) return null
+
+  const stated =
+    element.getAttribute('title') ??
+    element.getAttribute('aria-label') ??
+    normalise(element.textContent) ??
+    ''
+  if (stated.trim()) return stated.trim()
+
+  const fromId = PAGE_ID.exec(element.getAttribute('id') ?? '')?.[1]
+  return fromId ?? null
 }
 
 // --- Self-contained element readers -----------------------------------------
@@ -824,7 +859,9 @@ function isSectionBreak(text: string): boolean {
 export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block[] {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const blocks: Block[] = []
-  let inline: string[] = []
+  let inline: Node[] = []
+  /** Printed page numbers, against the index of the block each one opens. */
+  const pageAt = new Map<number, string>()
 
   // Resolving a style walks every rule, and the walk below asks about the same
   // element the baseline pass already asked about. Memoised so each element is
@@ -860,14 +897,36 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
   )
 
   /**
-   * Emit whatever inline text has accumulated. Runs of text and inline elements
-   * between two block-level tags form one paragraph, which is what lets loose
-   * prose inside a bare `<div>` survive intact.
+   * Emit whatever inline content has accumulated. Runs of text and inline
+   * elements between two block-level tags form one paragraph, which is what lets
+   * loose prose inside a bare `<div>` survive intact.
+   *
+   * The nodes themselves are kept, not their `textContent`, and the same
+   * extractor a `<p>` gets is run over them. Flattening here was a second, much
+   * poorer reader of the same content: a contents page built as
+   * `<div><a>Chapter One</a><br/><a>Chapter Two</a></div>` — which is how a
+   * great many converted epubs set one out — lost the `<br>` that put each entry
+   * on its own line, lost every link, and lost every italic, purely because the
+   * entries sat in a `<div>` instead of a `<p>`.
    */
   function flushInline(): void {
-    const text = normalise(inline.join(' '))
-    if (text) blocks.push({ kind: 'prose', text })
+    const nodes = inline
     inline = []
+    if (nodes.length === 0) return
+
+    const { text, links, marks } = textAndLinks(nodes, styleOf)
+    if (!text) return
+
+    const block: ContentBlock = { kind: 'prose', text }
+    if (links.length > 0) block.links = links
+    if (marks.length > 0) block.marks = marks
+    // Link targets that sat on the loose elements themselves. Collected the same
+    // way `withLinks` does it, but from several roots rather than one.
+    const ids = nodes
+      .filter((node): node is Element => node.nodeType === 1)
+      .flatMap((element) => idsIn(element))
+    if (ids.length > 0) block.ids = ids
+    blocks.push(block)
   }
 
   /**
@@ -881,7 +940,7 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
   function walk(node: Node, inherited = ''): void {
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === 3 /* text */) {
-        inline.push(child.textContent ?? '')
+        inline.push(child)
         continue
       }
       if (child.nodeType !== 1 /* element */) continue
@@ -890,8 +949,23 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
       const tag = element.tagName.toUpperCase()
 
       if (SKIP.has(tag)) continue
+
+      // A page-break marker between two blocks belongs to the block that comes
+      // after it: it says "the printed page turns here". Recorded against the
+      // index the next block will take, and attached once the walk is over —
+      // the block itself does not exist yet.
+      const page = printedPageOf(element)
+      if (page !== null) {
+        // Pending inline content becomes a block of its own before the next one,
+        // but only if it holds actual words — the whitespace between two tags is
+        // in the buffer too and flushes to nothing.
+        const pending = inline.some((node) => normalise(node.textContent) !== '')
+        pageAt.set(blocks.length + (pending ? 1 : 0), page)
+        continue
+      }
+
       if (INLINE.has(tag)) {
-        inline.push(element.textContent ?? '')
+        inline.push(element)
         continue
       }
 
@@ -927,6 +1001,7 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
         // epub's own contents points at one.
         const ids = idsIn(element)
         if (ids.length > 0) block.ids = ids
+        pageInside(element, blocks.length)
         blocks.push(block)
         continue
       }
@@ -1007,6 +1082,7 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
         if (block.label === 'subheading') {
           styledHeadings.set(block, { size: styleOf(element).size, ids: idsIn(element) })
         }
+        pageInside(element, blocks.length)
         blocks.push(withLinks(block, element))
         continue
       }
@@ -1018,7 +1094,27 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
     flushInline()
   }
 
+  /**
+   * A page-break marker inside a block that has already been built. Converters
+   * put one at the head of the paragraph the page opens with as often as they
+   * put it between two, and a leaf block is never walked into.
+   */
+  function pageInside(element: Element, index: number): void {
+    for (const node of Array.from(element.querySelectorAll('*'))) {
+      const page = printedPageOf(node)
+      if (page !== null) {
+        if (!pageAt.has(index)) pageAt.set(index, page)
+        return
+      }
+    }
+  }
+
   walk(doc.body)
+
+  for (const [index, page] of pageAt) {
+    const block = blocks[index]
+    if (block) block.printedPage = page
+  }
 
   /*
    * The running heads a print edition left in the text — "Introduction | 7".

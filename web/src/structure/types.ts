@@ -541,6 +541,17 @@ export interface Paragraph {
    * pay a field for it in storage.
    */
   startsPage?: true
+  /**
+   * The page of the printed edition this paragraph opens, as the book states it.
+   *
+   * EPUB 3 marks these in the text — `<span epub:type="pagebreak" id="page7"/>`
+   * — and EPUB 2 lists them in the NCX `<pageList>`. Absent on nearly every
+   * paragraph, and absent on every paragraph of a book that carries no page
+   * numbering at all, which is most of them.
+   *
+   * A string, so roman front matter (`xxvii`) survives.
+   */
+  printedPage?: string
   /** Finer-grained type when it matters: `epigraph`, `pull-quote`, `footnote`… */
   label?: string
   /** `kind: 'table'` — rows of cells. The first row is often, not always, a header. */

@@ -148,6 +148,15 @@ interface BlockFields {
   startsPage?: true
 
   /**
+   * The printed page this block opens, when the source says so.
+   *
+   * A string, not a number: front matter is numbered in roman — `xxvii` — and a
+   * book that numbers its plates separately writes `A-3`. Whatever the book
+   * wrote is what is kept.
+   */
+  printedPage?: string
+
+  /**
    * This heading was inferred from how the line looked, not read from the
    * markup. Set by the style pass in `html.ts`.
    *
@@ -456,6 +465,7 @@ export function assembleBook(blocks: readonly Block[], meta: BookMeta): ParsedBo
         if (block.rows !== undefined) paragraph.rows = block.rows
         if (block.image !== undefined) paragraph.image = block.image
         if (block.startsPage) paragraph.startsPage = true
+        if (block.printedPage !== undefined) paragraph.printedPage = block.printedPage
         // Carried through unresolved — as bare destinations, which is all the
         // parser knows. `parse/links.ts` upgrades the ones that turn out to
         // point inside this book into anchors, once every block has one: a link

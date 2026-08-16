@@ -355,3 +355,67 @@ describe('a contents entry is not a subheading', () => {
     }
   })
 })
+
+describe('loose inline content between block tags', () => {
+  // A contents page built out of `<div>`s rather than `<p>`s is how a great many
+  // converted epubs set one out. The text of such a run used to be flattened
+  // with `textContent`, which is a second and much poorer reader of the same
+  // markup: it kept the words and threw away everything that told them apart.
+  const TOC =
+    '<div class="toc_part"><a href="p01.htm"><strong>PART 1 APPROACHING THE UNCONSCIOUS</strong>' +
+    '<br/>Carl G. Jung</a></div>'
+
+  it('keeps the line break a `<br>` asks for', () => {
+    const [block] = htmlToBlocks(TOC)
+    expect(block!.text).toBe('PART 1 APPROACHING THE UNCONSCIOUS\nCarl G. Jung')
+  })
+
+  it('keeps the links', () => {
+    const [block] = htmlToBlocks(TOC)
+    expect(block!.links).toEqual([{ start: 0, end: 47, href: 'p01.htm' }])
+  })
+
+  it('keeps the emphasis', () => {
+    const [block] = htmlToBlocks('<div>Plain and <em>emphatic</em>.</div>')
+    expect(block!.text).toBe('Plain and emphatic.')
+    expect(block!.marks).toEqual([{ start: 10, end: 18, italic: true }])
+  })
+
+  it('keeps the ids links point at', () => {
+    const [block] = htmlToBlocks('<div><a id="note12">Loose text.</a></div>')
+    expect(block!.ids).toEqual(['note12'])
+  })
+})
+
+describe('the printed pages a book states', () => {
+  it('gives a marker’s page to the block that follows it', () => {
+    const blocks = htmlToBlocks(
+      '<span epub:type="pagebreak" id="page7" title="7"></span><p>Page seven opens here.</p>',
+    )
+    expect(blocks[0]!.printedPage).toBe('7')
+  })
+
+  it('gives it to the paragraph it sits inside', () => {
+    const blocks = htmlToBlocks('<p><span epub:type="pagebreak" title="8"></span>Page eight.</p>')
+    expect(blocks[0]!.printedPage).toBe('8')
+  })
+
+  it('keeps roman front matter as the book wrote it', () => {
+    const blocks = htmlToBlocks('<p><a id="page_xxvii" epub:type="pagebreak"></a>Contents</p>')
+    expect(blocks[0]!.printedPage).toBe('xxvii')
+  })
+
+  it('reads the ARIA spelling too', () => {
+    const blocks = htmlToBlocks('<span role="doc-pagebreak" title="41"></span><p>Text.</p>')
+    expect(blocks[0]!.printedPage).toBe('41')
+  })
+
+  it('does not let a marker’s number into the prose', () => {
+    const blocks = htmlToBlocks('<p>Half a<span epub:type="pagebreak" id="page9">9</span> sentence.</p>')
+    expect(blocks[0]!.text).toBe('Half a sentence.')
+  })
+
+  it('says nothing about a book that carries no page numbers', () => {
+    expect(htmlToBlocks('<p>Ordinary prose.</p>')[0]!.printedPage).toBeUndefined()
+  })
+})
