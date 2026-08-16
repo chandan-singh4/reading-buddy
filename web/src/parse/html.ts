@@ -9,9 +9,9 @@
  *
  * We use the browser's own `DOMParser` rather than a dependency: it is the same
  * battle-tested parser the reader will render with, it is free, and it recovers
- * from the malformed markup that real epubs are full of. Parsing as `text/html`
- * even for XHTML is intentional — the HTML parser never throws on a stray
- * unclosed tag, whereas the XML one refuses the whole file.
+ * from the malformed markup that real epubs are full of. Which of its two modes
+ * a document gets is `parseMarkup`'s decision — XHTML read as XHTML, everything
+ * else (and anything the XML parser rejects) read as HTML.
  *
  * The walk is structured around one rule: **an element that owns its contents
  * is a single block.** A table is one block with its rows, not one block per
@@ -31,6 +31,50 @@ import {
 } from './assemble.ts'
 import { isRunningHead } from './runningHead.ts'
 import { appearanceOf, baselineOf, NO_STYLES, type Appearance, type StyleSheet } from './styles.ts'
+
+/**
+ * An element's tag name, always upper case.
+ *
+ * `tagName` is upper-cased by the HTML parser and left exactly as written by
+ * the XML one. Since a document may now arrive either way (see `parseMarkup`),
+ * every comparison in this file goes through here — a bare `tagName === 'P'`
+ * is silently false for every XHTML chapter in the library.
+ */
+function tagOf(element: Element): string {
+  return element.tagName.toUpperCase()
+}
+
+/**
+ * Markup → document, reading XHTML as XHTML where the file offers it.
+ *
+ * Epub chapters are XHTML, and XHTML lets any element close itself: `<a
+ * id="page205"/>`, `<span epub:type="pagebreak"/>`. The HTML parser has no such
+ * rule — only the void elements (`<br>`, `<img>`) may self-close — so it reads
+ * that `<a/>` as an *opening* tag with no closing tag, and the recovery rule it
+ * then applies is to nest everything that follows inside it. One page anchor at
+ * the top of a chapter therefore swallowed the chapter: every heading and every
+ * paragraph after it became inline content of one `<a>`, and arrived as a single
+ * block of running text. Measured across the library: five books of eight, and
+ * 2,250 self-closing tags.
+ *
+ * So XHTML is parsed as XHTML. The catch is that the XML parser refuses a whole
+ * file over one fault — an undefined entity, an unquoted attribute — where the
+ * HTML parser recovers. That is why this is a *try*, not a switch: anything the
+ * XML parser rejects falls back to the forgiving HTML one, which is no worse
+ * than what the parser did for every file before. Measured: 201 of the
+ * library's 202 chapter documents parse as XHTML, and the one that does not
+ * falls back.
+ */
+export function parseMarkup(source: string): Document {
+  // Only worth trying for markup that claims to be XML. A docx arrives here as
+  // an HTML fragment with several roots, which is not a legal XML document and
+  // would fail the parse on every call.
+  if (/^\s*(?:<\?xml|<!DOCTYPE\s+html\s+PUBLIC\s+"-\/\/W3C\/\/DTD XHTML)/i.test(source) || /<html[^>]*\sxmlns=/i.test(source)) {
+    const doc = new DOMParser().parseFromString(source, 'application/xhtml+xml')
+    if (!doc.querySelector('parsererror') && doc.body) return doc
+  }
+  return new DOMParser().parseFromString(source, 'text/html')
+}
 
 /** Presentational or non-prose — never contributes text to a book. */
 const SKIP = new Set([
@@ -253,7 +297,7 @@ function textAndLinks(
       if (child.nodeType !== 1 /* element */) continue
 
       const el = child as Element
-      if (SKIP.has(el.tagName.toUpperCase())) continue
+      if (SKIP.has(tagOf(el))) continue
       // A page-break marker is a position, not a word. Its number is read off
       // the element by the caller; letting its text through would drop a bare
       // "137" into the middle of the sentence it interrupts.
@@ -274,12 +318,12 @@ function textAndLinks(
       // lines of an imprint, an address or a verse are not one sentence — the
       // renderer honours it (`white-space: pre-line`), the same newline lists
       // already use to separate their items.
-      if (el.tagName.toUpperCase() === 'BR') {
+      if (tagOf(el) === 'BR') {
         if (text !== '') text = `${text.trimEnd()}\n`
         continue
       }
 
-      if (el.tagName.toUpperCase() === 'A') {
+      if (tagOf(el) === 'A') {
         const href = el.getAttribute('href') ?? ''
         const start = text.length
         walk(Array.from(el.childNodes), inner)
@@ -422,7 +466,7 @@ function joinParts(
  */
 function containerContent(element: Element): { text: string; links: RawLink[] } {
   const parts = Array.from(element.children)
-    .filter((child) => ['P', 'DIV', 'BLOCKQUOTE', 'LI'].includes(child.tagName))
+    .filter((child) => ['P', 'DIV', 'BLOCKQUOTE', 'LI'].includes(tagOf(child)))
     .map((child) => textAndLinks(child))
     .filter((part) => part.text !== '')
 
@@ -528,7 +572,7 @@ function readTable(element: Element): ContentBlock {
 
   for (const row of Array.from(element.getElementsByTagName('tr'))) {
     const cells = Array.from(row.children)
-      .filter((cell) => cell.tagName === 'TD' || cell.tagName === 'TH')
+      .filter((cell) => tagOf(cell) === 'TD' || tagOf(cell) === 'TH')
       .map((cell) => textAndLinks(cell))
     if (!cells.some((cell) => cell.text !== '')) continue
 
@@ -559,7 +603,7 @@ function readTable(element: Element): ContentBlock {
  * covers and plates in real books are almost always the second form.
  */
 function readImage(element: Element): FigureImage | undefined {
-  const img = element.tagName === 'IMG' ? element : element.getElementsByTagName('img')[0]
+  const img = tagOf(element) === 'IMG' ? element : element.getElementsByTagName('img')[0]
   if (img) {
     const src = img.getAttribute('src') ?? ''
     if (src) {
@@ -605,15 +649,15 @@ function readFigure(element: Element): ContentBlock {
  * contents page is a list of links, and so is most of a notes section.
  */
 function readList(element: Element): ContentBlock {
-  const ordered = element.tagName === 'OL'
+  const ordered = tagOf(element) === 'OL'
   const parts = Array.from(element.children)
-    .filter((child) => ['LI', 'DT', 'DD'].includes(child.tagName))
+    .filter((child) => ['LI', 'DT', 'DD'].includes(tagOf(child)))
     .map((child) => textAndLinks(child))
     .filter((part) => part.text !== '')
     .map((part, index) => ({ ...part, prefix: ordered ? `${index + 1}. ` : '• ' }))
 
   const { text, links } = joinParts(parts, '\n')
-  const label = element.tagName === 'DL' ? 'definition' : ordered ? 'ordered' : 'unordered'
+  const label = tagOf(element) === 'DL' ? 'definition' : ordered ? 'ordered' : 'unordered'
 
   const block: ContentBlock = { kind: 'list', text, label }
   if (links.length > 0) block.links = links
@@ -873,7 +917,7 @@ function isSectionBreak(text: string): boolean {
 }
 
 export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block[] {
-  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const doc = parseMarkup(html)
   const blocks: Block[] = []
   let inline: Node[] = []
   /** Printed page numbers, against the index of the block each one opens. */
@@ -962,7 +1006,7 @@ export function htmlToBlocks(html: string, sheet: StyleSheet = NO_STYLES): Block
       if (child.nodeType !== 1 /* element */) continue
 
       const element = child as Element
-      const tag = element.tagName.toUpperCase()
+      const tag = tagOf(element)
 
       if (SKIP.has(tag)) continue
 

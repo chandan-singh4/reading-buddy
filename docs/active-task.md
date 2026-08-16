@@ -1,82 +1,81 @@
-> **What's in here (read at every startup).** The single task in flight right
-> now — its goal, its definition of done, the exact list of files to open, and
-> what's explicitly out of scope. This is the linchpin of the token strategy: the
-> build session reads *only* the paths under "Files in scope" and nothing else. If
-> a task genuinely needs another file, add its path here with a one-line reason
-> rather than scanning the repo. Rewritten at the end of every session by
-> `/wrap-session` so the next one resumes without re-reading code.
+# Active task
 
----
+> What is in here: the one task in flight, and the exact files to open for it.
+> Read it at startup, before anything else.
 
-## Re-import the books and judge PARSER_VERSION 26 on the phone
+## Task — re-import the books and judge PARSER_VERSION 27
 
-Nothing is mid-edit. Build green, **1440 tests across 81 files** (2026-08-16).
+**Goal.** Check on the phone that the library now reads the way the printed book
+reads. The parser stamp is 27, so the shelf offers to rebuild every book.
 
-**This is the task: re-parse the books and look at them. No code.**
+### What changed in 27
 
-1. Open the shelf. Accept the re-parse it offers for every book.
-2. Open a contents page. Each entry must sit on its own line.
-3. Read the preface of a book that sets one in italic. Only the preface may be
-   italic. The chapters after it must not be.
-4. Read a few pages. Italic phrases must be in italics. A centred line must be
-   centred. A display line must be larger than the body text.
+The parser read an epub's chapters as HTML. They are XHTML.
 
-### What changed in 26
+XHTML lets any element close itself. Publishers write a page anchor as
+`<a id="page205"/>` and put one at the top of every chapter. The HTML parser
+allows self-closing only for `<br>` and `<img>`. So it read that anchor as an
+opening tag with no closing tag, and put the rest of the file inside it. The
+whole chapter then arrived as one block of running text.
 
-**One reader for the text, not two.** Content that sat loose between block tags
-— inside a bare `<div>` rather than a `<p>` — was read with `textContent`, while
-a `<p>` got the full extractor. The flat reader kept the words and threw away
-everything that told them apart: the `<br>` that puts each line on its own line,
-every link, every italic. A contents page written as
-`<div><a>…</a><br/><a>…</a></div>` therefore arrived as one running paragraph of
-dead text. Measured in *Man and His Symbols*: "PART 1 APPROACHING THE
-UNCONSCIOUSCarl G. Jung", two lines pasted into one. Both paths now use the one
-extractor.
+This is the cause of "the new lines are gone".
 
-**Style rules read their ancestors.** Selectors were matched on the rightmost
-compound alone, so `.pref p` was a rule about every paragraph in the book. That
-was harmless while the answer fed one yes-or-no question about headings. It
-stopped being harmless in 25, when a book's own appearance started being drawn:
-one preface could set a whole book in italic. `>` is read as an ancestor, which
-can only match a little too widely. `+` and `~` are not ancestry, and a selector
-using them keeps the old behaviour.
+Measured across the eight books on disk:
 
-**Printed page numbers are read where a book states them.** EPUB 3 marks the
-spot the paper edition turned over — `<span epub:type="pagebreak" id="page7"/>`,
-or the ARIA `doc-pagebreak`. The number now rides on the paragraph that opens
-that page, as a string so roman front matter (`xxvii`) survives.
+| | Before | After |
+|---|---|---|
+| Paragraphs | 9,808 | 11,381 |
+| Chapters | 252 | 291 |
+| Sections | 326 | 378 |
+| Printed page numbers | 204 | 205 |
+| Subheadings kept | 146 | 185 |
+
+Two books gained most: *The Mountains of My Life* (56 → 94 chapters) and
+*The Quantum and the Lotus* (832 → 1,424 paragraphs).
+
+The XML parser refuses a whole file over one fault. So the parser tries XHTML
+first and falls back to HTML. One of the library's 202 chapter documents falls
+back.
+
+Second change, found by the first. A chapter's own heading is no longer
+overwritten by the name the navigation gave it. If the two are the same line
+said twice, the navigation still wins. If they differ, the page carries a real
+second heading under the chapter's name, and it is kept as a subheading.
 
 ### Still open — measured, not fixed
 
-- **No book on the shelf carries page numbers.** All five were counted: zero
-  `pagebreak` markers, zero NCX `<pageTarget>` entries. So 26 reads them and
-  nothing shows them yet. Two pieces are still missing: the EPUB 2 `<pageList>`
-  in `toc.ncx`, and the reader's own page counter, which still estimates from
-  word count. Build the display half when a book that has real markers arrives.
-- **The books that show the faults are not on disk.** *Braiding Sweetgrass* and
-  the Nondual Love book were never added to `books/`. The two fixes above were
-  measured on the books that are there, and the shapes match, but neither was
-  confirmed on the exact file that showed the problem.
-- **Kundalini is missing chapters Three, Eleven and Fourteen.** Measured cause:
-  the file states nothing about them. A text rule was written and withdrawn — it
-  did not fire in that book and added three false chapters to another.
-- **A part page does not get its own page.** CSS `page-break` is still unread.
-- **Mountains lists 14 footnote entries as chapters.** Its `toc.ncx` forgets two
-  closing `</navPoint>` tags.
-- **The source is not stored aside yet.** Re-parsing still needs the original
-  file.
+1. **Printed page numbers are read but not shown.** The reader still estimates
+   the page from the word count. Only *Nondual Love* states its pages with
+   EPUB 3 markers.
+2. **The `<a id="pageNNN"/>` form is not read as a page number.** *The Quantum
+   and the Lotus* and *The Mountains of My Life* mark their pages this way. The
+   ids survive; nothing reads them.
+3. **The EPUB 2 `<pageList>` in `toc.ncx` is unread.**
+4. **CSS `page-break-before` / `page-break-after` is unread.** Only the epub
+   spine seam makes a page break.
+5. ***The Mountains of My Life*** lists 14 footnote entries as chapters. Its
+   `toc.ncx` is malformed — two `</navPoint>` tags are missing.
+6. ***Kundalini*** loses chapters Three, Eleven and Fourteen.
+7. **The original file is not kept aside.** A book must be imported again to be
+   parsed again.
+
+### How to compare the whole library
+
+`web/src/parse/library.report.ts` prints nine numbers for every epub in a
+folder. Run it before and after a parser change. Judge the change on all the
+books, never on one.
 
 ### Files in scope
 
-- `web/src/parse/html.ts` — the one text extractor, page-break markers
-- `web/src/parse/styles.ts` — the CSS engine and its ancestor matching
-- `web/src/parse/epub.ts` — navigation, part levels
-- `web/src/parse/assemble.ts` — the block stream and its types
-- `web/src/structure/types.ts` — `Paragraph`, including `printedPage`
-- `web/src/reader/blocks.tsx` — drawing marks and appearance
+- `web/src/parse/html.ts` — `parseMarkup`, `tagOf`, the block walk.
+- `web/src/parse/epub.ts` — `applyNavigation`, the spine walk.
+- `web/src/parse/assemble.ts` — `sameLine`, level resolution.
+- `web/src/parse/styles.ts` — the mini CSS engine.
+- `web/src/parse/version.ts` — the stamp and its log.
+- `web/src/parse/library.report.ts` — the whole-library report.
+- Tests beside each of the above.
 
 ### Out of scope
 
-Chapter numbers move in any book that nests. Saved places, bookmarks and
-highlights in those books point at the wrong paragraph. This was accepted before
-the work started; do not spend the session on migrating them.
+The reading screen, storage, and the tutor. This task changes what a book
+*becomes*, not how it draws.

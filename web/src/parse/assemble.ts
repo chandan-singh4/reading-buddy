@@ -347,7 +347,7 @@ function groupByHeadings(
  * survives normalising is the letters and digits, which is the part a reader
  * would say out loud.
  */
-function sameLine(a: string, b: string): boolean {
+export function sameLine(a: string, b: string): boolean {
   const key = (text: string) =>
     text
       .replace(/[^\p{L}\p{N}]+/gu, ' ')

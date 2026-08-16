@@ -321,5 +321,32 @@
  *   number only when it holds nothing but the number; the same attribute sitting
  *   on a container that wraps a real page of prose is walked into like any other
  *   element, so no text is lost to it.
+ * - **27** — an epub's chapters are XHTML, and were being read as HTML.
+ *
+ *   XHTML lets any element close itself. A page anchor written `<a
+ *   id="page205"/>` is the commonest case, and publishers put one at the top of
+ *   every chapter. The HTML parser allows self-closing only for `<br>` and
+ *   `<img>`, so it read that anchor as an *opening* tag with no closing tag and
+ *   nested the rest of the file inside it. The whole chapter — every heading,
+ *   every paragraph — then arrived as inline content of one `<a>` and was
+ *   emitted as a single block of running text.
+ *
+ *   That is the fault behind "the new lines are gone". Measured on the shelf:
+ *   five books of eight carry self-closing tags, 2,250 of them. Re-parsing the
+ *   library restores 1,573 paragraphs that were fused into their neighbours,
+ *   38 chapters and 50 sections that had been swallowed, and 205 printed page
+ *   numbers on the one book that states them (its markers are self-closing
+ *   `<span>`s, so every one of them was being eaten).
+ *
+ *   XHTML is now parsed as XHTML, with a fall back to the forgiving HTML parser
+ *   for any file the XML parser refuses — one of the library's 202 chapter
+ *   documents, as it turns out.
+ *
+ *   Second change, which the first uncovered: a chapter's own heading is no
+ *   longer overwritten by the name the navigation gave it. Where the two are
+ *   the same line said twice the navigation still wins, as before. Where they
+ *   differ, the page carries a real second heading under the chapter's name
+ *   ("Chapter 12" over "NATURAL LAWS, MATHEMATICS, AND THE WORLD OF IDEALS"),
+ *   and it is kept as a subheading instead of being erased.
  */
-export const PARSER_VERSION = 26
+export const PARSER_VERSION = 27

@@ -1150,3 +1150,113 @@ describe('what the book’s own stylesheet says about a line', () => {
     expect(block?.appearance).toBeUndefined()
   })
 })
+
+describe('a chapter whose own heading is not the name the navigation gave it', () => {
+  // The reported shape. The navigation points at the chapter file and calls it
+  // "Chapter 12 - The Grammar of the Universe". The page itself opens with a
+  // second, styled heading — the chapter's subject. Both are the book speaking,
+  // and the navigation's label used to overwrite the page's.
+  const CSS = `
+    p { font-size: 1em; text-indent: 1.2em; }
+    p.head { font-size: 1.4em; font-weight: bold; text-indent: 0; }
+  `
+
+  const NAV = `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body>
+    <nav epub:type="toc">
+      <ol>
+        <li><a href="c11.xhtml">Chapter 11 - Robots That Think</a></li>
+        <li><a href="c12.xhtml">Chapter 12 - The Grammar of the Universe</a></li>
+        <li><a href="c13.xhtml">Chapter 13 - Reason and Contemplation</a></li>
+      </ol>
+    </nav>
+  </body>
+</html>`
+
+  // Enough body text that the book's baseline is plainly the body's size, which
+  // is what makes the styled line stand out as a heading at all.
+  const FILLER =
+    'The argument runs on for several paragraphs, at the ordinary size the book ' +
+    'sets its body text in, so that the one larger line above it is measurably larger.'
+
+  const chapter = (klass: string, head: string, body: string) =>
+    chapterDoc(
+      `<link rel="stylesheet" href="style.css"/>
+       <p class="${klass}">${head}</p>
+       <p>${body}</p>
+       <p>${FILLER}</p>
+       <p>${FILLER}</p>
+       <p>${FILLER}</p>`,
+    )
+
+  const epub = makeEpub({
+    manifest: [
+      '<item id="css" href="style.css" media-type="text/css"/>',
+      '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+      '<item id="a" href="c11.xhtml" media-type="application/xhtml+xml"/>',
+      '<item id="b" href="c12.xhtml" media-type="application/xhtml+xml"/>',
+      '<item id="c" href="c13.xhtml" media-type="application/xhtml+xml"/>',
+    ].join(''),
+    spine: '<itemref idref="a"/><itemref idref="b"/><itemref idref="c"/>',
+    files: {
+      'OEBPS/style.css': CSS,
+      'OEBPS/nav.xhtml': NAV,
+      'OEBPS/c11.xhtml': chapter('head', 'CAN A MACHINE THINK?', 'A question older than the machines.'),
+      'OEBPS/c12.xhtml': chapter(
+        'head',
+        'NATURAL LAWS, MATHEMATICS, AND THE WORLD OF IDEALS',
+        'Do natural laws govern the world?',
+      ),
+      'OEBPS/c13.xhtml': chapter('head', 'TWO WAYS OF KNOWING', 'Reason walks; contemplation sits.'),
+    },
+  })
+
+  it('takes the chapter’s name from the navigation', async () => {
+    const book = await parseEpub(epub, meta())
+    expect(book.chapters.map((c) => c.title)).toContain('Chapter 12 - The Grammar of the Universe')
+  })
+
+  it('keeps the page’s own heading instead of overwriting it', async () => {
+    const book = await parseEpub(epub, meta())
+    const text = book.sections.flatMap((s) => s.paragraphs).map((p) => p.text)
+    expect(text).toContain('NATURAL LAWS, MATHEMATICS, AND THE WORLD OF IDEALS')
+  })
+
+  it('leaves it looking like a heading, not like prose', async () => {
+    const book = await parseEpub(epub, meta())
+    const kept = book.sections
+      .flatMap((s) => s.paragraphs)
+      .find((p) => p.text === 'NATURAL LAWS, MATHEMATICS, AND THE WORLD OF IDEALS')
+    expect(kept?.label).toBe('subheading')
+  })
+
+  it('still lets a heading that only repeats the label be taken over', async () => {
+    // Said twice is said once. Keeping both would print the chapter's name
+    // immediately under the chapter's name.
+    const same = makeEpub({
+      manifest: [
+        '<item id="css" href="style.css" media-type="text/css"/>',
+        '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+        '<item id="a" href="c11.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="b" href="c12.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="c" href="c13.xhtml" media-type="application/xhtml+xml"/>',
+      ].join(''),
+      spine: '<itemref idref="a"/><itemref idref="b"/><itemref idref="c"/>',
+      files: {
+        'OEBPS/style.css': CSS,
+        'OEBPS/nav.xhtml': NAV,
+        'OEBPS/c11.xhtml': chapter('head', 'Chapter 11 - Robots That Think', 'A question older than machines.'),
+        'OEBPS/c12.xhtml': chapter(
+          'head',
+          'Chapter 12 — The Grammar of the Universe',
+          'Do natural laws govern the world?',
+        ),
+        'OEBPS/c13.xhtml': chapter('head', 'Chapter 13 - Reason and Contemplation', 'Reason walks.'),
+      },
+    })
+    const book = await parseEpub(same, meta())
+    const text = book.sections.flatMap((s) => s.paragraphs).map((p) => p.text)
+    expect(text).not.toContain('Chapter 12 — The Grammar of the Universe')
+  })
+})

@@ -432,3 +432,38 @@ describe('a page-break attribute on something that is not a marker', () => {
     expect(blocks[0]!.printedPage).toBe('12')
   })
 })
+
+describe('an XHTML chapter that closes its own tags', () => {
+  const xhtml = (body: string) =>
+    `<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml"><body>${body}</body></html>`
+
+  it('does not let a self-closing anchor swallow the chapter', () => {
+    // XHTML lets any element close itself. The HTML parser only allows it for
+    // void elements, so it reads `<a id="page1"/>` as an opening tag and nests
+    // the whole rest of the file inside it — which fused every paragraph of the
+    // chapter into one block of running text.
+    const blocks = htmlToBlocks(
+      xhtml('<a id="page1"/><h1>The Grammar</h1><p>First line.</p><p>Second line.</p>'),
+    )
+    expect(blocks.map((block) => block.text)).toEqual(['The Grammar', 'First line.', 'Second line.'])
+  })
+
+  it('reads a self-closing page marker', () => {
+    const blocks = htmlToBlocks(xhtml('<span epub:type="pagebreak" id="page7"/><p>On page seven.</p>'))
+    expect(blocks.map((block) => block.text)).toEqual(['On page seven.'])
+    expect(blocks[0]!.printedPage).toBe('7')
+  })
+
+  it('keeps italics on the one paragraph that is italic', () => {
+    const blocks = htmlToBlocks(xhtml('<a id="page1"/><p><em>Set apart.</em></p><p>Plain.</p>'))
+    expect(blocks[0]!.marks).toEqual([{ start: 0, end: 10, italic: true }])
+    expect(blocks[1]!.marks).toBeUndefined()
+  })
+
+  it('falls back to the HTML parser when the XML parser refuses the file', () => {
+    // `&nbsp;` is defined in HTML and undefined in XML, and one of these is
+    // enough for the XML parser to reject a whole chapter.
+    const blocks = htmlToBlocks(xhtml('<p>A&nbsp;line the XML parser will not read.</p>'))
+    expect(blocks[0]!.text).toBe('A line the XML parser will not read.')
+  })
+})

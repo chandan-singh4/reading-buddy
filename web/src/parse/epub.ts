@@ -28,8 +28,8 @@ import { cleanTitle } from './cleanTitle.ts'
 
 import { COVER_ASSET_PATH, type BookAsset, type ParsedBook } from '../storage/index.ts'
 import type { BookMeta } from '../structure/index.ts'
-import { assembleBook, type Block } from './assemble.ts'
-import { htmlToBlocks } from './html.ts'
+import { assembleBook, sameLine, type Block } from './assemble.ts'
+import { htmlToBlocks, parseMarkup } from './html.ts'
 import { NO_STYLES, readStyles, type StyleSheet } from './styles.ts'
 
 export class EpubError extends Error {
@@ -1018,12 +1018,19 @@ function applyNavigation(
 
     const level = levels.get(entry) ?? 1
     const target = doc.blocks[at]!
-    if (target.kind === 'heading') {
+    // A guessed heading may take the navigation's label — it has no authority
+    // over its own text — but only when the two are the same line said twice.
+    // Where they differ the guess is a *second* heading the page carries under
+    // the chapter's name ("Chapter 12" over "NATURAL LAWS, MATHEMATICS, AND THE
+    // WORLD OF IDEALS"), and overwriting it deleted the book's own words. Those
+    // fall through to the insert path below, which puts the navigation's
+    // heading in front and leaves the guess to be demoted to a subheading.
+    const overwritable = !target.guessed || sameLine(target.text ?? '', entry.label)
+    if (target.kind === 'heading' && overwritable) {
       // Structure comes from the navigation; the words stay the markup's own.
       // A real `<h1>NOTES</h1>` and a contents line reading "Notes" are both
       // the author speaking, and rewriting the heading to match the contents
-      // gains nothing while quietly changing the page. Only a guessed heading —
-      // which has no authority over its own text either — takes the label.
+      // gains nothing while quietly changing the page.
       target.level = level
       if (target.guessed) target.text = entry.label
       delete target.guessed
@@ -1227,7 +1234,7 @@ export async function parseEpub(data: ArrayBuffer | Uint8Array, meta: BookMeta):
     // claims, and again inside `htmlToBlocks`. Cheap next to unzipping, and it
     // keeps `htmlToBlocks` taking a string, so docx and plain HTML still work.
     const sheet = source
-      ? stylesFor(archive, path, new DOMParser().parseFromString(source, 'text/html'), stylesheets)
+      ? stylesFor(archive, path, parseMarkup(source), stylesheets)
       : NO_STYLES
     const blocks = source ? htmlToBlocks(source, sheet) : []
 
