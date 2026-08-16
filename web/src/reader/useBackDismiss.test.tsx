@@ -4,7 +4,8 @@
 // jsdom's real history, because the whole behaviour *is* the history stack —
 // mocking it would only assert that the mock was called.
 
-import { cleanup, render } from '@testing-library/react'
+import { useState } from 'react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useBackDismiss } from './useBackDismiss.ts'
@@ -16,8 +17,8 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/')
 })
 
-function Panel({ open, onDismiss }: { open: boolean; onDismiss: () => void }) {
-  useBackDismiss(open, onDismiss)
+function Panel({ depth, onDismiss }: { depth: number; onDismiss: () => void }) {
+  useBackDismiss(depth, onDismiss)
   return null
 }
 
@@ -28,14 +29,14 @@ function Panel({ open, onDismiss }: { open: boolean; onDismiss: () => void }) {
 describe('closing a panel with the back gesture', () => {
   it('adds a history entry to absorb the gesture', () => {
     const before = window.history.length
-    render(<Panel open onDismiss={() => {}} />)
+    render(<Panel depth={1} onDismiss={() => {}} />)
 
     expect(window.history.length).toBe(before + 1)
   })
 
   it('closes the panel instead of leaving the page', async () => {
     const onDismiss = vi.fn()
-    render(<Panel open onDismiss={onDismiss} />)
+    render(<Panel depth={1} onDismiss={onDismiss} />)
 
     window.history.back()
 
@@ -46,39 +47,25 @@ describe('closing a panel with the back gesture', () => {
     expect(window.location.pathname).toBe('/')
   })
 
-  it('does nothing at all while the panel is closed', () => {
+  it('does nothing at all while the page is bare', () => {
     const before = window.history.length
-    render(<Panel open={false} onDismiss={() => {}} />)
+    render(<Panel depth={0} onDismiss={() => {}} />)
 
     expect(window.history.length).toBe(before)
   })
 
-  // The 2026-08-09 report: the toolbar shrinks the page, and Back left the book
-  // instead of putting it back. Peeling one layer at a time is what fixes it,
-  // and re-arming is what makes the *second* gesture land on the second layer
-  // rather than on the book.
-  it('re-arms when a layer is peeled and another is still there', async () => {
-    // Two layers: a panel over the toolbar. The first back closes the panel and
-    // reports that the toolbar remains; the second has to close the toolbar.
-    let layers = 2
-    const onDismiss = vi.fn(() => {
-      layers -= 1
-      return layers > 0
-    })
-    render(<Panel open onDismiss={onDismiss} />)
+  it('keeps one entry for each open layer', async () => {
+    // Counted by gestures rather than by `history.length`: a push truncates any
+    // forward entries left by an earlier test in this file, so the length is not
+    // a number that can be reasoned about. What matters is that two open layers
+    // can absorb two gestures without the page moving.
+    const onDismiss = vi.fn()
+    render(<Panel depth={2} onDismiss={onDismiss} />)
 
     window.history.back()
     await vi.waitFor(() => {
       expect(onDismiss).toHaveBeenCalledTimes(1)
     })
-    expect(window.location.pathname).toBe('/')
-
-    // The assertion that actually separates fixed from broken. Asking whether a
-    // second `history.back()` fires another `popstate` does not: jsdom's history
-    // is shared across a file and there are always older entries behind, so the
-    // gesture appears to work either way. What differs is whether an entry of
-    // *ours* is on top afterwards — with no re-arm the reader's next gesture
-    // reaches one of those older entries, which in the app is the book.
     expect(window.history.state).toMatchObject({ 'reading-buddy-layer': true })
 
     window.history.back()
@@ -86,47 +73,92 @@ describe('closing a panel with the back gesture', () => {
       expect(onDismiss).toHaveBeenCalledTimes(2)
     })
     expect(window.location.pathname).toBe('/')
-    expect(layers).toBe(0)
+  })
+
+  it('adds an entry as a second layer opens', () => {
+    const { rerender } = render(<Panel depth={1} onDismiss={() => {}} />)
+    const withOne = window.history.length
+
+    rerender(<Panel depth={2} onDismiss={() => {}} />)
+
+    expect(window.history.length).toBe(withOne + 1)
+  })
+
+  /*
+   * The 2026-08-16 report, driven through the same wiring `Reader` uses: the
+   * toolbar up, the contents page over it. The first swipe closed the contents
+   * page. The second, which should have put the toolbar away, left the app.
+   *
+   * The cause is not visible here — Chrome skips the entry this hook used to
+   * push from inside its own `popstate` handler, and jsdom does not. What this
+   * test can hold is the shape of the fix: after the first gesture an entry of
+   * ours is still on the stack, and it was pushed when the layer opened rather
+   * than in answer to a back navigation.
+   */
+  it('peels one layer per gesture with a Reader wired up', async () => {
+    function Reader() {
+      const [chromeShown, setChromeShown] = useState(true)
+      const [sheetOpen, setSheetOpen] = useState(true)
+
+      const dismiss = () => {
+        if (sheetOpen) {
+          setSheetOpen(false)
+          return
+        }
+        setChromeShown(false)
+      }
+
+      useBackDismiss((chromeShown ? 1 : 0) + (sheetOpen ? 1 : 0), dismiss)
+      return (
+        <span data-testid="state">{`${chromeShown ? 'bar' : ''}${sheetOpen ? '+sheet' : ''}`}</span>
+      )
+    }
+
+    render(<Reader />)
+    const state = () => screen.getByTestId('state').textContent
+
+    window.history.back()
+    await vi.waitFor(() => {
+      expect(state()).toBe('bar')
+    })
+
+    // The toolbar is still up, so a gesture of ours must still be armed. Without
+    // it the next swipe reaches the book — or, with the book at the bottom of
+    // the stack, leaves the app.
+    expect(window.history.state).toMatchObject({ 'reading-buddy-layer': true })
+
+    window.history.back()
+    await vi.waitFor(() => {
+      expect(state()).toBe('')
+    })
+    expect(window.location.pathname).toBe('/')
     // Both layers peeled, so nothing of ours should remain.
     expect(window.history.state).not.toMatchObject({ 'reading-buddy-layer': true })
   })
 
-  it('does not re-arm once the page is bare again', async () => {
-    const onDismiss = vi.fn(() => false)
-    render(<Panel open onDismiss={onDismiss} />)
+  it('never pushes an entry while answering a gesture', async () => {
+    // The whole point of the rewrite. An entry pushed in answer to a back
+    // navigation is what Chrome's history-manipulation intervention skips, so
+    // the stack must only ever get shorter while a gesture is being answered.
+    const pushed = vi.spyOn(window.history, 'pushState')
+    render(<Panel depth={2} onDismiss={() => {}} />)
+    pushed.mockClear()
 
     window.history.back()
     await vi.waitFor(() => {
-      expect(onDismiss).toHaveBeenCalled()
+      expect(window.history.state).toMatchObject({ 'reading-buddy-layer': true })
     })
 
-    // Nothing of ours left on the stack, so the reader's next gesture is the
-    // book's to answer. A spare entry here is the dead gesture this hook's
-    // teardown already guards against, arriving by a different route.
-    expect(window.history.state).not.toMatchObject({ 'reading-buddy-layer': true })
-  })
-
-  // The handler in `Reader` closes over which layers are open, so its identity
-  // changes every time one does. If the effect depended on it, that would tear
-  // the entry down and rebuild it — and the teardown's `history.back()` is
-  // asynchronous, so the traversal can land after the rebuild and undo it.
-  it('keeps its single entry when the callback identity changes', async () => {
-    const { rerender } = render(<Panel open onDismiss={() => false} />)
-    const withPanel = window.history.length
-
-    rerender(<Panel open onDismiss={() => true} />)
-    rerender(<Panel open onDismiss={() => false} />)
-
-    expect(window.history.length).toBe(withPanel)
-    expect(window.history.state).toMatchObject({ 'reading-buddy-layer': true })
+    expect(pushed).not.toHaveBeenCalled()
+    pushed.mockRestore()
   })
 
   it('calls the newest callback, not the one it mounted with', async () => {
-    const stale = vi.fn(() => false)
-    const fresh = vi.fn(() => false)
-    const { rerender } = render(<Panel open onDismiss={stale} />)
+    const stale = vi.fn()
+    const fresh = vi.fn()
+    const { rerender } = render(<Panel depth={1} onDismiss={stale} />)
 
-    rerender(<Panel open onDismiss={fresh} />)
+    rerender(<Panel depth={1} onDismiss={fresh} />)
     window.history.back()
 
     await vi.waitFor(() => {
@@ -135,11 +167,22 @@ describe('closing a panel with the back gesture', () => {
     expect(stale).not.toHaveBeenCalled()
   })
 
-  it('takes its entry back when the panel is closed by a tap', async () => {
-    const { rerender } = render(<Panel open onDismiss={() => {}} />)
+  it('keeps its entries when the callback identity changes', () => {
+    const { rerender } = render(<Panel depth={1} onDismiss={() => {}} />)
     const withPanel = window.history.length
 
-    rerender(<Panel open={false} onDismiss={() => {}} />)
+    rerender(<Panel depth={1} onDismiss={() => {}} />)
+    rerender(<Panel depth={1} onDismiss={() => {}} />)
+
+    expect(window.history.length).toBe(withPanel)
+    expect(window.history.state).toMatchObject({ 'reading-buddy-layer': true })
+  })
+
+  it('takes its entry back when the panel is closed by a tap', async () => {
+    const { rerender } = render(<Panel depth={1} onDismiss={() => {}} />)
+    const withPanel = window.history.length
+
+    rerender(<Panel depth={0} onDismiss={() => {}} />)
 
     // Left behind, the spare entry would swallow the reader's *next* back
     // gesture and appear to do nothing — a dead gesture, worse than the bug
@@ -148,5 +191,20 @@ describe('closing a panel with the back gesture', () => {
       expect(window.history.state).not.toMatchObject({ 'reading-buddy-layer': true })
     })
     expect(withPanel).toBeGreaterThan(0)
+  })
+
+  it('does not read its own tidying up as another gesture', async () => {
+    // Closing both layers with one tap removes two entries with `history.go`,
+    // which fires `popstate` exactly as a back swipe does. Answering those would
+    // close layers that are already shut.
+    const onDismiss = vi.fn()
+    const { rerender } = render(<Panel depth={2} onDismiss={onDismiss} />)
+
+    rerender(<Panel depth={0} onDismiss={onDismiss} />)
+
+    await vi.waitFor(() => {
+      expect(window.history.state).not.toMatchObject({ 'reading-buddy-layer': true })
+    })
+    expect(onDismiss).not.toHaveBeenCalled()
   })
 })

@@ -1252,21 +1252,29 @@ export default function Reader() {
    * changes the page's size, and a reader who raised it has somewhere to come
    * back to. That is the whole definition.
    */
-  const dismissTopLayer = useCallback((): boolean => {
+  const dismissTopLayer = useCallback((): void => {
     // One gesture, one layer. A reader with the sheet open over the toolbar
     // expects Back to close the sheet and leave them looking at the toolbar —
     // not to clear the screen in one go, which loses the state they were in.
     if (sheetOpen || searchOpen) {
       closeLayers()
-      // The toolbar is still up behind the panel, so there is more to peel.
-      return chromeShown
+      return
     }
 
     setChromeShown(false)
-    return false
-  }, [sheetOpen, searchOpen, chromeShown, closeLayers])
+  }, [sheetOpen, searchOpen, closeLayers])
 
-  useBackDismiss(sheetOpen || searchOpen || chromeShown, dismissTopLayer)
+  /*
+   * How many layers stand between the reader and the bare page. The panel counts
+   * as one however it is dressed — search, contents, bookmarks, notes — because
+   * only one of them is ever up, and the toolbar under it counts as another.
+   *
+   * A count and not a flag: the hook keeps one history entry per layer, pushed
+   * as each opens. See `useBackDismiss` for why it must be that way round.
+   */
+  const layerDepth = (chromeShown ? 1 : 0) + (sheetOpen || searchOpen ? 1 : 0)
+
+  useBackDismiss(layerDepth, dismissTopLayer)
 
   const toggleFocus = useCallback(() => {
     setFocusMode((on) => !on)

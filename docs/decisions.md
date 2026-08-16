@@ -1062,6 +1062,21 @@ sign-in screen.
   section when the list names it, the chapter when it does not. Marking both
   would print the line twice, a few lines apart, which reads as the list
   contradicting itself. — 2026-08-15
+- **One history entry per open layer, each pushed by the tap that opened it.**
+  The back gesture closes what is over the book by consuming a history entry
+  this app puts there. That used to be a single entry, re-armed from inside the
+  `popstate` handler: the gesture consumed one, and the handler pushed a
+  replacement. It failed on the phone. From the contents page the first swipe
+  worked and the second left the app. Chrome on Android treats an entry pushed in
+  answer to a back navigation, with no user gesture behind it, as a page trying
+  to trap the reader, and its history-manipulation intervention *skips* that
+  entry on the next Back. jsdom has no such rule, so every test passed and the
+  bug was only visible on a real phone. Nothing is pushed during `popstate` now.
+  The hook is told how many layers are open and keeps that many entries, adding
+  one as each layer opens — a tap, so every push has a gesture behind it.
+  Removing entries when a panel is closed by tapping still uses `history.go`, and
+  those `popstate` events are counted and ignored so they do not read as the
+  reader's own gesture. — 2026-08-16
 - **Contents opens at the reader, not at page one.** A long book's list is
   hundreds of rows. A reader on page 260 opens it to ask what comes next, and a
   list that opens at the top answers by making them scroll past everything they
