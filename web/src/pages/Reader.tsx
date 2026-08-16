@@ -8,6 +8,7 @@ import {
   NoteComposer,
   SelectionMenu,
   Highlights,
+  chapterNumber,
   describeRange,
   selectAround,
   highlightAt,
@@ -2845,6 +2846,23 @@ export default function Reader() {
                   <ChapterOpening
                     chapterTitle={title}
                     sectionTitle={page.status === 'ready' ? page.section.title : undefined}
+                    subjects={frame.status === 'ready' ? frame.book.subjects : undefined}
+                  />
+                </div>
+              ) : page.status === 'ready' && chapterNumber(page.section.title) ? (
+                /*
+                  A numbered section opens like a chapter, because it *is* one.
+                  Where a book is cut into parts, the part becomes the division
+                  and "Chapter 1" lands here as a section — the same words print
+                  gives a full opening to. Setting it as a plain line while the
+                  part above it got the numeral put the design on the wrong one.
+
+                  Only when the title carries a number: an unnumbered section is
+                  a subdivision, and a full opening on each would be relentless.
+                */
+                <div className={styles.openingHeading}>
+                  <ChapterOpening
+                    chapterTitle={page.section.title}
                     subjects={frame.status === 'ready' ? frame.book.subjects : undefined}
                   />
                 </div>

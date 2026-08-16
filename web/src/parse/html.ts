@@ -471,8 +471,19 @@ const ENDS_LIKE_A_SENTENCE = /[.!?,;:]$/
  * "An Example of Growing Toward Self-Leadership 130" — a contents entry, not a
  * heading. A contents page sets its lines in the same bold as the headings they
  * point at, and the page number trailing the title is what tells them apart.
+ *
+ * The number must follow a title of *more than one word*, and that qualifier is
+ * the whole difficulty. "Chapter 1" and "Part 1" end in a space and a number
+ * too, and they are the commonest chapter titles in print. Without the qualifier
+ * this rule threw out every numbered chapter in a book before any other rule
+ * saw it — which is what emptied the contents of a reported book down to the one
+ * chapter its own navigation happened to list.
+ *
+ * A contents line names something, so it has a name to give: two words at least
+ * before the page number. A numbered title is a label and a figure, and nothing
+ * else. That is the difference, and it needs no list of label words.
  */
-const ENDS_WITH_A_PAGE_NUMBER = /\s\d{1,4}$/
+const ENDS_WITH_A_PAGE_NUMBER = /\S+(\s+\S+)+\s+\d{1,4}$/
 
 /**
  * Whether this paragraph is a section heading wearing a paragraph's clothes.

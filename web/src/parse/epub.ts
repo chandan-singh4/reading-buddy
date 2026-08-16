@@ -826,11 +826,30 @@ const NAV_IS_AUTHORITATIVE = 3
  *    a converted book gives, since its titles are only paragraphs — a heading
  *    is put in front of it.
  * 2. **Levels come from the nesting**, so a part contains its chapters.
- * 3. **Guessed headings the navigation did not name are put back to prose**,
- *    keeping the emphasis and losing the division. This is what stops a
- *    dedication of three short centred lines from becoming three chapters: the
- *    book's own contents does not call them chapters, and it is in a position
- *    to know. A real `<h1>` is never touched, because the author wrote it.
+ * 3. **Some guessed headings are put back to prose**, keeping the emphasis and
+ *    losing the division. This is what stops a dedication of three short centred
+ *    lines from becoming three chapters. A real `<h1>` is never touched, because
+ *    the author wrote it.
+ *
+ * Step 3 is where the care is, and it is deliberately narrow. Silence is not
+ * denial. A navigation that lists the front matter and then one chapter — real
+ * files do this, and one was reported — has not said the other twenty-five
+ * chapters are prose. It has said nothing about them. Treating that silence as
+ * a denial threw away every heading the styling pass had correctly found, for
+ * the whole book, on the strength of a contents file that had plainly given up.
+ *
+ * So a guess is only overruled where the navigation was actually speaking: a
+ * **document the navigation never points into** keeps all of its guesses. The
+ * fallback takes over exactly where the file went quiet, and nowhere else. A
+ * document the navigation *does* reach is described by it, and a guess it did
+ * not name there goes back to prose as before.
+ *
+ * A finer rule was tried and withdrawn: keep a guess that *looks like* one the
+ * navigation named in the same document, on the theory that a book sets all its
+ * chapter titles alike. It fails on the case this function exists for. A
+ * navigation names the dedication, pointing at its first line — so the two lines
+ * under it look endorsed, and become chapters again. Appearance cannot tell a
+ * heading from the line below it when both are the same line of the same block.
  *
  * Does nothing at all when the file has no usable navigation, which leaves a
  * bare or broken epub exactly where it was.
@@ -845,6 +864,10 @@ function applyNavigation(
   const named = new Set<Block>()
   const inserts = new Map<string, { at: number; entry: NavEntry }[]>()
 
+  // Which documents the navigation actually reached. Only these are ones it can
+  // be said to have described.
+  const spokenFor = new Set<string>()
+
   for (const entry of nav) {
     const doc = byPath.get(entry.path)
     if (!doc) continue
@@ -856,6 +879,7 @@ function applyNavigation(
       ? doc.blocks.findIndex((block) => block.ids?.includes(wanted))
       : doc.blocks.findIndex((block) => block.kind !== 'furniture')
     if (at < 0) continue
+    spokenFor.add(entry.path)
 
     const target = doc.blocks[at]!
     if (target.kind === 'heading') {
@@ -877,13 +901,18 @@ function applyNavigation(
   }
 
   for (const doc of perDocument) {
-    // A guess the book never called a division goes back to being a paragraph.
-    // It keeps `subheading`, so it still reads as a heading on the page.
+    // A guess is only overruled where the navigation was speaking. See the note
+    // on this function for why silence must not count as denial.
     for (const [i, block] of doc.blocks.entries()) {
-      if (block.kind === 'heading' && block.guessed && !named.has(block)) {
-        const { level: _level, guessed: _guessed, ...rest } = block
-        doc.blocks[i] = { ...rest, kind: 'prose', label: 'subheading' }
+      if (block.kind !== 'heading' || !block.guessed || named.has(block)) continue
+      if (!spokenFor.has(doc.path)) {
+        delete block.guessed
+        continue
       }
+      // Demoted. It keeps `subheading`, so it still reads as a heading on the
+      // page — it simply no longer divides the book.
+      const { level: _level, guessed: _guessed, ...rest } = block
+      doc.blocks[i] = { ...rest, kind: 'prose', label: 'subheading' }
     }
 
     const list = inserts.get(doc.path)

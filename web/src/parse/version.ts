@@ -249,5 +249,26 @@
  *   it. And the rule could not tell where the list ended, so it read on into
  *   "PREFACE" — short, no full stop — and ate it. That is the reported missing
  *   Preface. The rule is gone.
+ * - **24** — two faults that emptied a book's contents between them, both found
+ *   on one reported file whose contents listed its front matter and then jumped
+ *   to chapter twenty-six.
+ *
+ *   The first is older than the navigation work and is the deeper one. A rule
+ *   rejected any line ending in a space and a number, to keep a contents entry —
+ *   "An Example of Growing Toward Self-Leadership 130" — from reading as the
+ *   heading it is set to look like. "Chapter 1" and "Part 1" have that shape
+ *   too. So every numbered chapter title in print was refused before any other
+ *   rule saw it. The number must now follow a title of more than one word: a
+ *   contents line names something and then gives a page, a numbered title is a
+ *   label and a figure. Books parsed under 21–23 are missing these headings
+ *   entirely.
+ *
+ *   The second is that 23 let the navigation speak for the whole book. A
+ *   navigation that lists nothing between chapters 1 and 26 has not said those
+ *   chapters are prose; it has said nothing about them. Read as denial, it threw
+ *   away every heading the styling pass had correctly found. A document the
+ *   navigation never points into now keeps its own guesses, so the fallback
+ *   takes over exactly where the file went quiet — and the navigation still
+ *   rules the documents it does describe.
  */
-export const PARSER_VERSION = 23
+export const PARSER_VERSION = 24

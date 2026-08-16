@@ -923,6 +923,80 @@ describe('the book states its own structure', () => {
     expect(titles).not.toContain('yet to join us in this beautiful place')
   })
 
+  // The second reported book. Its contents lists the front matter and then one
+  // chapter — number twenty-six — and says nothing about the twenty-five before
+  // it. Silence is not denial: the fallback has to take over there by itself.
+  const PARTIAL_NAV = `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body>
+    <nav epub:type="toc">
+      <ol>
+        <li><a href="front.xhtml#note">Author’s Note</a></li>
+        <li><a href="front.xhtml#pre">Preface</a></li>
+        <li><a href="late.xhtml#c26">Chapter 26</a></li>
+      </ol>
+    </nav>
+  </body>
+</html>`
+
+  const partial = makeEpub({
+    manifest: [
+      '<item id="css" href="style.css" media-type="text/css"/>',
+      '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+      '<item id="f" href="front.xhtml" media-type="application/xhtml+xml"/>',
+      '<item id="e" href="early.xhtml" media-type="application/xhtml+xml"/>',
+      '<item id="l" href="late.xhtml" media-type="application/xhtml+xml"/>',
+    ].join(''),
+    spine: '<itemref idref="f"/><itemref idref="e"/><itemref idref="l"/>',
+    files: {
+      'OEBPS/style.css': CSS,
+      'OEBPS/nav.xhtml': PARTIAL_NAV,
+      'OEBPS/front.xhtml': chapterDoc(
+        `<link rel="stylesheet" href="style.css"/>
+         <p class="ded" id="ded">for my mother</p>
+         <p class="ded">who let me go to the mountains</p>
+         <p class="chap" id="note">Author’s Note</p>
+         <p>A few words on the names of the peaks, and on the years they were climbed.</p>
+         <p class="chap" id="pre">Preface</p>
+         <p>The mountains gave me everything I have, and asked a great deal in return.</p>`,
+      ),
+      // Not mentioned by the navigation at all.
+      'OEBPS/early.xhtml': chapterDoc(
+        `<link rel="stylesheet" href="style.css"/>
+         <p class="part" id="part1">Part 1</p>
+         <p class="chap" id="c1">Chapter 1</p>
+         <p>When I was a child I used to get away from home on one pretext or another.</p>
+         <p class="chap" id="c2">Chapter 2</p>
+         <p>The eagles did fly in the skies of the Prealps in those days, and I watched them.</p>`,
+      ),
+      'OEBPS/late.xhtml': chapterDoc(
+        `<link rel="stylesheet" href="style.css"/>
+         <p class="chap" id="c26">Chapter 26</p>
+         <p>The last of the great walls, and the longest winter I ever spent under one.</p>`,
+      ),
+    },
+  })
+
+  it('keeps the chapters a partial navigation never mentions', async () => {
+    const book = await parseEpub(partial, meta())
+    const titles = book.chapters.flatMap((chapter) => [
+      chapter.title,
+      ...chapter.sections.map((section) => section.title),
+    ])
+    for (const wanted of ['Chapter 1', 'Chapter 2', 'Chapter 26']) {
+      expect(titles).toContain(wanted)
+    }
+  })
+
+  it('still refuses the dedication in the document the navigation did reach', async () => {
+    const book = await parseEpub(partial, meta())
+    const titles = book.chapters.flatMap((chapter) => [
+      chapter.title,
+      ...chapter.sections.map((section) => section.title),
+    ])
+    expect(titles).not.toContain('who let me go to the mountains')
+  })
+
   it('keeps those lines in the text, still set apart', async () => {
     const book = await parseEpub(epub, meta())
     const text = book.sections

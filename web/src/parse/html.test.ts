@@ -345,4 +345,13 @@ describe('a contents entry is not a subheading', () => {
     const [block] = htmlToBlocks('<p><b>An Example of Growing Toward Self-Leadership 130</b></p>')
     expect(block.label).toBeUndefined()
   })
+
+  it('reads a numbered chapter title as a heading, not as a contents line', () => {
+    // A contents entry names something and then gives a page. A numbered title
+    // is a label and a figure. Both end in a space and a number.
+    for (const title of ['Chapter 1', 'Part 1', 'CHAPTER 26', 'Book 2']) {
+      const [block] = htmlToBlocks(`<p><b>${title}</b></p>`)
+      expect(block.kind, title).toBe('heading')
+    }
+  })
 })
