@@ -241,9 +241,16 @@ export function Chrome({
    * well, and this list sits inside an overlay that must not move. In a layout
    * effect so it lands before the paint; the reader never sees the top of the
    * list, so there is no jump to notice.
+   *
+   * Keyed to `sheetOpen` and not to `shown`. They are different things: `shown`
+   * is the bar at the top of the reading screen, which is already up by the time
+   * a reader taps Contents. Watching it meant that opening the panel changed
+   * nothing this effect could see — `sheetTab` is remembered between visits, so
+   * on the second open no dependency changed at all and the list stayed where it
+   * was.
    */
   useLayoutEffect(() => {
-    if (!shown || sheetTab !== 'contents') return
+    if (!sheetOpen || sheetTab !== 'contents') return
     const list = contentsBox.current
     const row = readingRow.current
     if (!list || !row) return
@@ -254,7 +261,11 @@ export function Chrome({
     if (top < list.clientHeight) return
 
     list.scrollTop = top - list.clientHeight / 3
-  }, [shown, sheetTab, outline])
+    // Deliberately not keyed to the reading position. `here` is a fresh object
+    // on every render, so watching it would re-run this on each one and drag the
+    // list back under a reader who is scrolling it. Opening the panel is the
+    // only moment this should act, and the panel unmounts when it closes.
+  }, [sheetOpen, sheetTab, outline])
 
   return (
     /* `inert` rather than unmounted: the overlay keeps its scroll position in
