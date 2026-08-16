@@ -8,51 +8,50 @@
 
 ---
 
-## Two things wait on the phone, then WP-25 finishes
+## Judge the chapter openings and the selection menu on the phone
 
-Nothing is mid-edit. Build green, **1335 tests across 77 files** (2026-08-15).
-`main` is pushed, so both items below are live on the phone now.
+Nothing is mid-edit. Build green, **1379 tests across 79 files** (2026-08-16).
 
-### 1. Judge on the phone (reader only — no code needed)
+Two features landed. The Browser pane has no book on its shelf, so neither was
+proved by eye.
 
-- **The finger-tracked page curl.** jsdom has no compositor, so no drag has ever
-  been under a thumb. This is provable on the phone or not at all.
-- **The new Bookmarks and Notes panels.** The Browser pane has no book on its
-  shelf, so both were proved by tests, not by eye. Look for the ribbon growing
-  down when a bookmark unfurls, and for the two note styles side by side.
+### 1. Judge on the phone (no code needed)
 
-### 2. Then: finish WP-25 — something that *writes* a note
+- **The chapter opening.** Open a chapter and look at its title. Four settings
+  exist. A religious or spiritual book gets the ornament. Fiction gets the
+  ruled nameplate. A numbered chapter gets the large figure. Everything else
+  gets the plain setting.
+- **The selection menu.** Select some words. Check the card lands near them, and
+  flips above the selection near the foot of the screen.
+- **Highlights and notes.** Both write a row into the Notes tab under *Quotes*.
+  A highlight keeps its colour as a bar beside it.
 
-The Notes tab reads a table that nothing fills. That is the next task.
+### 2. Then: the tutor, and the two lookups
 
-**Definition of done**
+Six actions in the menu say "not built yet" when tapped. They need work this app
+has not done:
 
-1. A reader can make a note from a selected paragraph, and it appears in the
-   Notes tab against the right anchor, with `author: 'you'`.
-2. Deleting a note works from the panel.
-3. Tests cover the write path the way `notes.test.ts` covers the read path.
-4. Build green, then ship per CLAUDE.md.
-
-**Open question to settle first:** whether notes stay device-local or go to the
-cloud. Going to the cloud means a Supabase table, an outbox entry and a method on
-`Repository` — a session of its own. Recommend shipping device-local first.
+- **Ask Claude** (four actions) needs the tutor loop — WP-17 onward.
+- **Define** needs a dictionary. **Translate** needs a translator.
 
 ### Files in scope
 
 | Path | Why |
 |---|---|
-| `web/src/storage/notes.ts` | The note store. `addNote` already exists; wire it. |
-| `web/src/reader/NotesPanel.tsx` | Where a new note must appear. |
-| `web/src/reader/notes.ts` | Order, filters and chapter grouping. Pure. |
-| `web/src/pages/Reader.tsx` | Builds `noteRows`; the write must refresh them. |
-| `web/src/reader/Chrome.tsx` | Where the panels mount. |
-| `web/src/storage/db.ts` | The `notes` table at `version(11)`. |
-| `web/src/reader/BookmarksPanel.tsx` | Only if the reader asks for a change. |
-| `web/src/reader/BookmarksPanel.module.css` | Only if the reader asks for a change. |
-| `web/src/reader/NotesPanel.module.css` | Only if the reader asks for a change. |
+| `web/src/reader/chapterHeading.ts` | Which of the four settings a chapter takes. Pure. |
+| `web/src/reader/ChapterOpening.tsx` | Draws the four settings. |
+| `web/src/reader/ChapterOpening.module.css` | Their type and spacing. |
+| `web/src/reader/selection.ts` | A DOM selection turned into text plus an anchor. |
+| `web/src/reader/SelectionMenu.tsx` | The menu itself. |
+| `web/src/reader/SelectionMenu.module.css` | Its look, and where the tutor block sits. |
+| `web/src/reader/NoteComposer.tsx` | The box a note is written in. |
+| `web/src/pages/Reader.tsx` | Mounts all of the above; holds the actions. |
+| `web/src/storage/notes.ts` | `addNote`, now with `quote` and `colour`. |
+| `web/src/storage/db.ts` | `StoredNote`. Both new fields are unindexed. |
+| `web/src/reader/NotesPanel.tsx` | Shows a highlight's colour. |
 
 ### Out of scope
 
-- Highlights. WP-25 names them, but a note is the smaller half; do it first.
-- A cloud path for notes. See the open question above.
+- The tutor loop. It is its own waypoint.
+- A cloud path for notes. Notes are still device-local.
 - Any other screen, and any design token.

@@ -227,6 +227,26 @@ export interface StoredNote {
   text: string
   /** ISO 8601 — shown on the note, not used for ordering. */
   createdAt: string
+  /**
+   * The words the note is about, where it was made from a selection.
+   *
+   * Copied rather than pointed at. The anchor names the paragraph, and a
+   * paragraph is often long; without this a highlight could not be shown as the
+   * sentence the reader marked. It is a copy of the book's own text, so it is
+   * never edited.
+   */
+  quote?: string
+  /**
+   * A highlight's colour, as CSS — `#f2df6b`.
+   *
+   * Present only on a highlight. Stored rather than derived, because readers
+   * put meaning in the colour: yellow for "important", blue for "look this up".
+   * A theme change must not rewrite what somebody meant.
+   *
+   * Unindexed, so no schema version is needed for it — Dexie only declares the
+   * keys it has to search by, and no query asks for notes by colour.
+   */
+  colour?: string
 }
 
 export const DB_NAME = 'reading-buddy'

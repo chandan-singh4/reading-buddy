@@ -32,6 +32,8 @@ export interface NoteRow {
   chapterTitle: string
   page: number | null
   createdAt: string
+  /** A highlight's colour, where the note is one. */
+  colour?: string
 }
 
 export interface NotesPanelProps {
@@ -63,7 +65,15 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
   return (
     <li className={styles.note}>
       <span className={styles.tag}>{whereItIs(note)}</span>
-      <button type="button" className={styles.hand} onClick={onJump}>
+      {/* The colour the reader chose, carried through to the list. It is the
+          only thing telling two highlights apart at a glance, and readers give
+          their colours meanings the app is not told about. */}
+      <button
+        type="button"
+        className={styles.hand}
+        onClick={onJump}
+        style={note.colour ? { borderInlineStartColor: note.colour } : undefined}
+      >
         {note.text}
       </button>
     </li>

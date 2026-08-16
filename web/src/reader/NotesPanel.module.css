@@ -124,8 +124,12 @@
 .hand {
   display: block;
   width: 100%;
-  padding: 0;
+  padding: 0 0 0 8px;
   border: none;
+  /* Held open for a highlight's colour, which arrives inline. Transparent
+     rather than absent so a coloured row and a plain one share one margin —
+     otherwise every highlight would shift the list eleven pixels. */
+  border-inline-start: 3px solid transparent;
   background: none;
   color: var(--pen);
   font-family: Caveat, cursive;

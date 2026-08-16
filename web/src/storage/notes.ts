@@ -25,6 +25,10 @@ export interface NewNote {
   anchor: Anchor
   author: NoteAuthor
   text: string
+  /** The selected words this note was made from, where there were any. */
+  quote?: string
+  /** A highlight's colour, as CSS. Only a highlight carries one. */
+  colour?: string
 }
 
 /** Built against a database so tests can hand it a scratch one. */
@@ -42,6 +46,11 @@ export function createNoteStore(database: ReadingBuddyDB = defaultDb) {
         author: note.author,
         text: note.text,
         createdAt: new Date().toISOString(),
+        // Written only when they exist: an undefined field on a Dexie row is
+        // stored as a present key holding nothing, and `exists` checks later
+        // would have to know the difference.
+        ...(note.quote ? { quote: note.quote } : {}),
+        ...(note.colour ? { colour: note.colour } : {}),
       }
       await database.notes.put(row)
       return row

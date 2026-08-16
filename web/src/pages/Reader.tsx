@@ -3,7 +3,13 @@ import { Link, useParams } from 'react-router'
 
 import {
   Block,
+  ChapterOpening,
   Chrome,
+  NoteComposer,
+  SelectionMenu,
+  selectionInReader,
+  type ReaderSelection,
+  type SelectionAction,
   anchorAtPage,
   bookmarkOn,
   buildSpine,
@@ -2039,6 +2045,7 @@ export default function Reader() {
         chapterTitle: chapterTitle(frame.manifest, chapter) ?? 'Elsewhere',
         page: pageOfAnchor(parts),
         createdAt: row.createdAt,
+        colour: row.colour,
       }
     })
   }, [notes, frame, pageOfAnchor])
@@ -2132,6 +2139,141 @@ export default function Reader() {
       jumpToAnchor(anchor)
     },
     [jumpToAnchor],
+  )
+
+  /*
+   * The selection menu.
+   *
+   * Two states, not one. `selected` is the words the reader is holding, and it
+   * is dropped the moment the selection goes; `composing` is the note being
+   * written *about* those words, and it has to outlive them — opening a text
+   * box takes the selection away, and the note would lose the sentence it is
+   * about halfway through being written.
+   */
+  const [selected, setSelected] = useState<ReaderSelection | null>(null)
+  const [composing, setComposing] = useState<ReaderSelection | null>(null)
+
+  /**
+   * The one-line "not built yet" note.
+   *
+   * Define, Translate and the four Ask Claude actions all need something this
+   * app does not have — a dictionary, a translator, and the tutor loop itself
+   * (WP-17 onward). The menu still lists them, because the menu is the design
+   * and hiding half of it would settle a question that is not settled. Tapping
+   * one says so plainly instead of doing nothing.
+   */
+  const [unbuilt, setUnbuilt] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!unbuilt) return
+    const timer = window.setTimeout(() => setUnbuilt(null), 2600)
+    return () => window.clearTimeout(timer)
+  }, [unbuilt])
+
+  useEffect(() => {
+    /*
+     * `selectionchange` fires for every character as the handle is dragged, so
+     * the menu is only raised once the finger is off. Until then the reader is
+     * still choosing, and a card that follows the drag covers the words being
+     * chosen.
+     */
+    const onSelected = () => setSelected(selectionInReader(strip.current))
+    const onCleared = () => {
+      if (window.getSelection()?.isCollapsed) setSelected(null)
+    }
+
+    document.addEventListener('pointerup', onSelected)
+    document.addEventListener('selectionchange', onCleared)
+    return () => {
+      document.removeEventListener('pointerup', onSelected)
+      document.removeEventListener('selectionchange', onCleared)
+    }
+  }, [])
+
+  /** Put the menu away and let go of the words. */
+  const dropSelection = useCallback(() => {
+    setSelected(null)
+    window.getSelection()?.removeAllRanges()
+  }, [])
+
+  /** Write a note or a highlight against the selection, and show it at once. */
+  const keepNote = useCallback(
+    async (note: { text: string; quote: string; anchor: Anchor; colour?: string }) => {
+      if (!id) return
+      const row = await noteStore.addNote(id, {
+        anchor: note.anchor,
+        author: 'you',
+        text: note.text,
+        quote: note.quote,
+        colour: note.colour,
+      })
+      setNotes((rows) => [...rows, row])
+    },
+    [id],
+  )
+
+  const onSelectionAction = useCallback(
+    (action: SelectionAction) => {
+      const at = selected
+      if (!at) return
+
+      switch (action.kind) {
+        case 'highlight':
+          // The text *is* the highlight: the Quotes tab lists the book's own
+          // words, and the colour rides along beside them.
+          void keepNote({ text: at.text, quote: at.text, anchor: at.anchor, colour: action.colour })
+          break
+
+        case 'note':
+          setComposing(at)
+          break
+
+        case 'copy':
+          void navigator.clipboard?.writeText(at.text)
+          break
+
+        case 'save':
+          if (id) void repository.addQuote(id, at.text)
+          break
+
+        case 'share':
+          // A quotation, not the whole passage dressed up as a post — the share
+          // sheet is the phone's, and what it is handed is one sentence.
+          void navigator.share?.({ text: at.text }).catch(() => {})
+          break
+
+        case 'search':
+          setQuery(at.text)
+          openSearch()
+          break
+
+        case 'speak': {
+          const speech = window.speechSynthesis
+          if (speech) {
+            speech.cancel()
+            speech.speak(new SpeechSynthesisUtterance(at.text))
+          }
+          break
+        }
+
+        case 'define':
+        case 'translate':
+        case 'ask':
+          // Nothing to open yet — see `unbuilt` above.
+          setUnbuilt(
+            action.kind === 'define'
+              ? 'Define'
+              : action.kind === 'translate'
+                ? 'Translate'
+                : 'Ask Claude',
+          )
+          break
+      }
+
+      if (action.kind !== 'note') dropSelection()
+      else setSelected(null)
+    },
+    [selected, keepNote, id, openSearch, dropSelection],
   )
 
   const title =
@@ -2435,6 +2577,11 @@ export default function Reader() {
                 return
               }
 
+              // The tap that finished a selection is not a tap on the page. It
+              // has already raised the selection menu, and toggling the toolbar
+              // under it would move the words the menu is pointing at.
+              if (selected) return
+
               // The outer thirds turn a page; the middle shows the overlay.
               // Edge taps are what a reader's thumb already rests on, and they
               // are the one control that works with the overlay hidden.
@@ -2473,17 +2620,34 @@ export default function Reader() {
             <header
               className={`${styles.header} ${here.section === 1 ? styles.opening : ''}`}
             >
-              {title && here.section === 1 && (
-                <p className={styles.chapterName}>{title}</p>
-              )}
+              {/*
+                A chapter's first section gets the designed opening — see
+                `reader/ChapterOpening.tsx`. Which of the four settings it takes
+                is the book's subject headings and the chapter's own title,
+                decided in `reader/chapterHeading.ts`.
 
-              {page.status === 'ready' && page.section.title && (
-                <h2 className={styles.sectionTitle}>{page.section.title}</h2>
-              )}
+                Its own left alignment, so the header's centring does not fight
+                the two settings that are set left.
+              */}
+              {here.section === 1 && (title || (page.status === 'ready' && page.section.title)) ? (
+                <div className={styles.openingHeading}>
+                  <ChapterOpening
+                    chapterTitle={title}
+                    sectionTitle={page.status === 'ready' ? page.section.title : undefined}
+                    subjects={frame.status === 'ready' ? frame.book.subjects : undefined}
+                  />
+                </div>
+              ) : (
+                <>
+                  {page.status === 'ready' && page.section.title && (
+                    <h2 className={styles.sectionTitle}>{page.section.title}</h2>
+                  )}
 
-              {/* A hairline instead of a blank gap: it says "the chapter starts
-                  below this" without spending a word on it. */}
-              <span className={styles.openingRule} aria-hidden="true" />
+                  {/* A hairline instead of a blank gap: it says "the chapter
+                      starts below this" without spending a word on it. */}
+                  <span className={styles.openingRule} aria-hidden="true" />
+                </>
+              )}
 
               {/* Only for a place saved a while ago. Opening a book you were
                   reading a minute ago somewhere other than the first page is
@@ -2538,6 +2702,47 @@ export default function Reader() {
           */}
           <PageDecks percent={pages?.percent ?? null} />
           <PageSpine />
+
+          {/*
+            The selection menu, and the note it can open.
+
+            Both live out here rather than inside `<article>`: the article is
+            the thing that slides when a page turns, and a menu that slid with
+            it would leave the words it points at. The composer outlives the
+            selection on purpose — see `composing` above.
+          */}
+          {selected && !composing && (
+            <SelectionMenu
+              selection={selected}
+              onAction={onSelectionAction}
+              onDismiss={dropSelection}
+            />
+          )}
+
+          {composing && (
+            <NoteComposer
+              quote={composing.text}
+              onSave={(text) => {
+                void keepNote({
+                  text,
+                  quote: composing.text,
+                  anchor: composing.anchor,
+                })
+                setComposing(null)
+                dropSelection()
+              }}
+              onCancel={() => {
+                setComposing(null)
+                dropSelection()
+              }}
+            />
+          )}
+
+          {unbuilt && (
+            <p className={styles.unbuilt} role="status">
+              {unbuilt} is not built yet.
+            </p>
+          )}
 
 
           <StatusLine

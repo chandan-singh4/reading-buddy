@@ -1,0 +1,94 @@
+/* The note composer. Chrome, so `--font-ui` throughout, like the menu that
+   opens it. */
+
+.veil {
+  position: fixed;
+  inset: 0;
+  /* Over the menu (12), because it is what the menu opened. */
+  z-index: 13;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 35%);
+}
+
+.card {
+  width: min(30rem, 100%);
+  padding: var(--space-4);
+  /* Bottom sheet on a phone: it sits above the keyboard, which is where a
+     thumb already is. The corners it keeps are the two the reader can see. */
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  box-shadow: 0 -6px 24px rgb(0 0 0 / 22%);
+}
+
+/* The words the note is about, quoted rather than repeated: it is the book
+   talking, so it is set in the reading face and ruled like a quotation. */
+.quote {
+  margin-bottom: var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--color-accent);
+  font-family: var(--font-reading);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  /* A long selection must not push the buttons off the screen. */
+  max-height: 6rem;
+  overflow-y: auto;
+}
+
+.box {
+  display: block;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-base);
+  resize: none;
+}
+
+.box:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.button {
+  min-height: 2.75rem;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.save {
+  border-color: transparent;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+}
+
+.save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

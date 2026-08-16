@@ -1113,3 +1113,31 @@ sign-in screen.
   exactly as it was, so only the documents with nothing to compete with change.
   `PARSER_VERSION` goes 19 → 20, so each book re-parses when you open it, and
   the idle trickle rebuilds the rest of the shelf. — 2026-08-15
+
+- **A chapter opening is chosen by the book, then by the chapter.** Four
+  settings exist. The first two are chosen from the publisher's own subject
+  headings, because how a book letters its chapter openings is a fact about the
+  book: a spiritual text ornaments every one, a novel gives every one a
+  nameplate. Only the books that match neither fall through to the per-chapter
+  rule, which is simply whether the chapter's title carries a number. The
+  headings arrive as "Religion / Spirituality", so they are cut at the slashes
+  and each piece becomes a tag. `ChapterOpening` takes a `style` prop, so a
+  theme or a setting can force one later without any of the rules moving.
+  — 2026-08-16
+
+- **The selection menu takes the prototype's actions and the platform's look.**
+  The actions are the prototype's, unchanged. The card is the phone's own text
+  menu — an icon row, hairline rows, a labelled block at the foot. A reader who
+  has used a phone already knows how to read that shape, and that is worth more
+  than a menu that matches the book. Six of its actions have no home yet:
+  Define, Translate and the four under Ask Claude. They are still listed, and
+  tapping one says so. Hiding half a menu would settle a design question that is
+  not settled. — 2026-08-16
+
+- **A highlight is a note that keeps its colour.** No second table, and no
+  second type. The Quotes tab already lists rows whose text is the book's own
+  words, which is exactly what a highlight is. Two unindexed fields carry the
+  rest: `quote`, the words the note is about, and `colour`. The colour is stored
+  rather than derived because readers put meaning in it — yellow for important,
+  blue for look this up — and a theme change must not rewrite what they meant.
+  Unindexed, so no schema version was needed. — 2026-08-16

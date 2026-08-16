@@ -501,6 +501,28 @@
 
 /* The hairline under a chapter opening. Short and centred, so it reads as a
    flourish closing the title rather than as a border dividing the screen. */
+/* The designed chapter opening sets its own alignment — two of its four
+   settings are ranged left — so it opts out of the header's centring. */
+/* The line that says an action of the menu has no home yet. A note, not a
+   dialog: it says one thing and takes itself away. */
+.unbuilt {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-6);
+  transform: translateX(-50%);
+  z-index: 12;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.openingHeading {
+  text-align: initial;
+}
+
 .openingRule {
   display: block;
   width: 2.5rem;

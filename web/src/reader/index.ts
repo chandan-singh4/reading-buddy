@@ -28,6 +28,18 @@ export type { BookmarkLike } from './bookmarks.ts'
 export { BookmarksPanel } from './BookmarksPanel.tsx'
 export type { BookmarkColor, BookmarksPanelProps } from './BookmarksPanel.tsx'
 
+export { ChapterOpening } from './ChapterOpening.tsx'
+export type { ChapterOpeningProps } from './ChapterOpening.tsx'
+export { chapterHeadingStyle, chapterNumber, subjectTags } from './chapterHeading.ts'
+export type { ChapterHeadingStyle, ChapterNumber } from './chapterHeading.ts'
+
+export { NoteComposer } from './NoteComposer.tsx'
+export type { NoteComposerProps } from './NoteComposer.tsx'
+export { SelectionMenu } from './SelectionMenu.tsx'
+export type { SelectionAction, SelectionMenuProps } from './SelectionMenu.tsx'
+export { HIGHLIGHT_COLOURS, selectionInReader } from './selection.ts'
+export type { HighlightColour, ReaderSelection } from './selection.ts'
+
 export { NotesPanel } from './NotesPanel.tsx'
 export type { NoteRow, NotesPanelProps } from './NotesPanel.tsx'
 
