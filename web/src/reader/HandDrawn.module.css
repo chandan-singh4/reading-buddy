@@ -6,29 +6,47 @@
  * mark, and `::after` is the pool of ink where the pen stopped.
  */
 
+/*
+ * Nothing in here may make a stacking context.
+ *
+ * `mix-blend-mode` blends an element with the backdrop *inside its own stacking
+ * context*. Put a `z-index`, a `contain`, or a `transform` on any ancestor and
+ * the ink has nothing behind it but empty space: it blends with transparency,
+ * which is the same as not blending at all, and the mark paints as a solid slab
+ * over the words. That is exactly what happened on the phone. So the layer takes
+ * no z-index and no containment, and the per-stroke tilt lives on the two
+ * pseudo-elements that do the blending rather than on the box that holds them.
+ */
+/*
+ * The layer holds nothing and lays out nothing: every stroke inside it is fixed,
+ * so the box itself is empty and has no size. It must stay that way. `position:
+ * fixed` on this element would make it a stacking context, and a stacking
+ * context is exactly what the ink must not sit inside — see `.stroke`.
+ */
 .layer {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
   /* The whole point: the ink must never take a tap. Text selection, the tap that
      opens a highlight's menu, and the page turn all keep working through it. */
   pointer-events: none;
-  /* Nothing here is a box the reader can reach, and none of it should ever be
-     read out — the words underneath are the content. */
-  contain: layout paint;
 }
 
+/*
+ * One stroke, and one blend.
+ *
+ * `mix-blend-mode` mixes an element with the backdrop *of the stacking context
+ * it sits in*. Anything that makes a stacking context between the ink and the
+ * page — a `z-index`, a `contain`, a `transform`, or `position: fixed` itself —
+ * leaves the ink blending against empty space, which paints it as a solid slab
+ * over the words. That was the bug on the phone.
+ *
+ * So the blend lives here, on the outermost box, where the backdrop is the page.
+ * Everything below is inside this one group: the body of the mark, its grain,
+ * and the pool of ink at the tail all combine here first and then multiply onto
+ * the paper together, once.
+ */
 .stroke {
-  position: absolute;
+  position: fixed;
   /* Set per stroke from the measured line-box. */
   border-radius: 4px;
-}
-
-.stroke::before,
-.stroke::after {
-  content: '';
-  position: absolute;
-  background: var(--ink);
   /*
    * Multiply, not opacity.
    *
@@ -38,6 +56,13 @@
    * read than an unmarked one, which is exactly backwards.
    */
   mix-blend-mode: multiply;
+}
+
+.stroke::before,
+.stroke::after {
+  content: '';
+  position: absolute;
+  background: var(--ink);
 }
 
 /* The body of the stroke. */
@@ -50,6 +75,7 @@
     rgb(255 255 255 / 12%) 3px 4px
   );
   border-radius: 5px 7px 6px 8px;
+  transform: rotate(var(--tilt, 0deg));
   /* The dry start: the pen is not yet wet, so the first few percent fade in. */
   mask-image: linear-gradient(90deg, rgb(0 0 0 / 10%), #000 6%, #000 100%);
   filter: var(--wobble);
@@ -62,6 +88,7 @@
   bottom: -0.02em;
   width: 0.4em;
   border-radius: 2px 5px 6px 3px;
+  transform: rotate(var(--tilt, 0deg));
   filter: var(--pool);
 }
 
@@ -72,7 +99,7 @@
  */
 @media (prefers-reduced-motion: reduce) {
   .stroke {
-    transform: none !important;
+    --tilt: 0deg;
   }
 
   .stroke::before {

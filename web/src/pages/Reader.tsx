@@ -2542,6 +2542,33 @@ export default function Reader() {
    * The app owns the selection now, so stretching it is arithmetic on a range
    * rather than anything the browser does for us.
    */
+  /**
+   * While our menu is up, the phone's own menu stays down.
+   *
+   * `capture` lets the selection go once, and that is enough for the ordinary
+   * path. It is not enough for every path: a long press that the system handles
+   * itself can put the selection back after we have dropped it, and the phone
+   * draws its Copy / Share / Select all bar over the top of ours. There is no
+   * way to ask it not to, so the answer is the same one, kept up: as long as the
+   * menu is open, a live selection is let go the moment it appears.
+   *
+   * Safe because nothing in the reader reads the live selection while the menu
+   * is open — the words are held in `selected`, and dragging a handle asks the
+   * page where the finger is, not what is selected.
+   */
+  useEffect(() => {
+    if (!selected) return
+
+    const letGo = () => {
+      const live = window.getSelection()
+      if (live && !live.isCollapsed) live.removeAllRanges()
+    }
+
+    letGo()
+    document.addEventListener('selectionchange', letGo)
+    return () => document.removeEventListener('selectionchange', letGo)
+  }, [selected])
+
   const stretchSelection = useCallback((pivot: SelectionPivot, x: number, y: number) => {
     setSelected((at) => (at ? (selectionBetween(pivot, x, y, strip.current) ?? at) : at))
   }, [])

@@ -166,12 +166,50 @@ export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
     window.addEventListener('scroll', soon, { capture: true, passive: true })
     window.addEventListener('resize', soon, { passive: true })
 
+    /*
+     * The page also moves without changing at all.
+     *
+     * Raising the toolbars scales the whole reading stage down and slides it
+     * clear of the top bar. That is a `transform` on an ancestor: no mutation,
+     * no resize, no scroll — every observer above stays silent while the words
+     * visibly move, and the marks stay where the words used to be. So the
+     * transition itself is the signal, and because it is a transition the ink
+     * has to keep up with it rather than jump at the end.
+     */
+    let ticking = 0
+    const stopTicking = () => {
+      if (ticking) window.clearInterval(ticking)
+      ticking = 0
+    }
+    const moving = (event: Event) => {
+      if (!(event.target instanceof Node) || !event.target.contains(root)) return
+      stopTicking()
+      measure()
+      ticking = window.setInterval(measure, 32)
+      // A ceiling, in case the `transitionend` never arrives — an interrupted
+      // transition does not always send one.
+      window.setTimeout(stopTicking, 1000)
+    }
+    const stopped = (event: Event) => {
+      if (!(event.target instanceof Node) || !event.target.contains(root)) return
+      stopTicking()
+      soon()
+    }
+
+    window.addEventListener('transitionrun', moving, true)
+    window.addEventListener('transitionend', stopped, true)
+    window.addEventListener('transitioncancel', stopped, true)
+
     return () => {
       if (pending) window.clearTimeout(pending)
+      stopTicking()
       changes?.disconnect()
       sizes?.disconnect()
       window.removeEventListener('scroll', soon, { capture: true })
       window.removeEventListener('resize', soon)
+      window.removeEventListener('transitionrun', moving, true)
+      window.removeEventListener('transitionend', stopped, true)
+      window.removeEventListener('transitioncancel', stopped, true)
     }
   }, [measure, root, watch, highlights.length])
 
@@ -197,9 +235,11 @@ export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
             left: stroke.left,
             width: stroke.width,
             height: stroke.height,
-            transform: `rotate(${stroke.tilt.toFixed(2)}deg)`,
             // Custom properties rather than four class names: the colour is a
             // stored value and can be anything, and so the CSS cannot know it.
+            // The tilt is one too, because a `transform` on this box would make
+            // it a stacking context and kill the blend. See the module's CSS.
+            ['--tilt' as string]: `${stroke.tilt.toFixed(2)}deg`,
             ['--ink' as string]: stroke.colour,
             ['--wobble' as string]: `url(#rb-mark-${stroke.variant})`,
             ['--pool' as string]: `url(#rb-pool-${stroke.variant})`,
