@@ -18,8 +18,10 @@
  * the in-flow text at z-index 0 or auto, and a wash of colour over the letters
  * dims them. At -1 the layer paints after the paragraph's background and before
  * its text, so the ink goes under the words the way a real highlighter does.
- * The paragraph is only `position: relative` — no z-index, no transform — so it
- * is not a stacking context and the negative index resolves against the page.
+ * The paragraph is made a stacking context on purpose (`position: relative` plus
+ * `isolation: isolate`, set in `HandDrawn.tsx`), so the -1 can reach no further
+ * up than the paragraph's own background. See the note there: an opaque ancestor
+ * — the turning sheet is one — would otherwise paint straight over the ink.
  *
  * This replaces the earlier `mix-blend-mode: multiply`. A blend mixes with the
  * backdrop of its own stacking context, and inside the page there is no paper

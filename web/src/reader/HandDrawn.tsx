@@ -291,12 +291,29 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
    * one. Set here rather than in the stylesheet because the paragraphs belong to
    * the book, not to this component, and only the ones actually carrying a mark
    * should be touched. Put back on the way out.
+   *
+   * `isolation: isolate` makes the paragraph a stacking context, and that is not
+   * cosmetic — it is what makes the ink survive a page turn. The layer sits at
+   * `z-index: -1` so it paints under the words; without a stacking context here
+   * that -1 resolves against the nearest ancestor that is one. On the live page
+   * that ancestor (`.stage`) has no background and the ink shows. Inside a
+   * turning sheet it is the sheet box, which is deliberately *opaque* — so the
+   * ink painted behind the sheet's own background and the reader saw a page with
+   * every highlight wiped off it, exactly at the moment the finger moved. With
+   * the paragraph as the stacking context, -1 can only reach as far as the
+   * paragraph's own background, wherever the paragraph is copied to.
    */
   useEffect(() => {
     const touched = marks.map((mark) => mark.block)
-    for (const block of touched) block.style.position = 'relative'
+    for (const block of touched) {
+      block.style.position = 'relative'
+      block.style.isolation = 'isolate'
+    }
     return () => {
-      for (const block of touched) block.style.position = ''
+      for (const block of touched) {
+        block.style.position = ''
+        block.style.isolation = ''
+      }
     }
   }, [marks])
 
