@@ -11,8 +11,11 @@ Built and shipped. Build green, 1481 tests pass. New files: `highlightStyle.ts`,
 
 Two notes for the next session:
 
-1. The hand-drawn layer sits **over** the text with `mix-blend-mode: multiply`,
-   not behind it. `pointer-events: none` gives the brief what it asked for.
+1. The hand-drawn ink lives **inside the anchored paragraph** it marks, in that
+   paragraph's own coordinates, at `z-index: -1`. So it goes under the words, and
+   a scale, a scroll or a page-turn clone carries it. Do not move it back to a
+   fixed screen layer: that broke three ways on the phone. There is no blend mode
+   any more — plain translucent ink under the text does the same work.
 2. `flatIndexOf` in `selection.ts` returns index 0 for a boundary past the end of
    a text node. `units.ts` works around it in `indexIn`. Fix at the source later.
 

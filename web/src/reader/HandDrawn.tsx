@@ -7,30 +7,33 @@
  * page turn or a font change moves the colour with the text in the same frame.
  *
  * This one cannot use it. `::highlight()` accepts a background colour and almost
- * nothing else — no filter, no mask, no blend mode — and a marker stroke is
- * *made* of a filter, a mask and a blend mode. So this renderer goes back to
- * measuring: one box per line of each highlight, in viewport coordinates,
- * re-measured whenever the page moves.
+ * nothing else — no filter, no mask — and a marker stroke is *made* of a filter
+ * and a mask. So this renderer measures: one box per line of each highlight.
  *
- * That is the cost of the style, and the reader chose it knowingly. It is
- * contained three ways:
+ * ## The ink goes inside the paragraph it marks
  *
- * 1. It is opt-in. Clean is the default on every flat theme and never measures.
- * 2. It measures on a timer, not a frame, so it also works in a tab that is not
- *    painting — the same choice `Highlights.tsx` makes and for the same reason.
- * 3. It watches everything that moves the words: the section, the strip's
- *    scroll, a resize, and any mutation inside the column.
+ * The first version painted into one fixed layer over the whole screen. It was
+ * wrong three times over on the phone, and all three faults were the same fault:
+ * ink that is not part of the page does not travel with the page.
  *
- * ## Over the text, not behind it
+ * - Raising the toolbars scales the reading stage. The words moved; the ink,
+ *   fixed to the screen, did not, and then visibly chased them.
+ * - Starting a page turn lays a copy of the page over the real one. The copy had
+ *   no ink on it, so the mark vanished the moment a finger moved.
+ * - Nothing above reports a transform, so there was nothing honest to listen to.
  *
- * The brief asked for the layer to sit behind the text. It sits over it instead,
- * with `mix-blend-mode: multiply`. For translucent ink the two are the same
- * picture — multiply darkens the paper and leaves the black letters black — and
- * the reason the brief gave for "behind" was that the layer must not intercept
- * taps, which `pointer-events: none` settles outright. Going genuinely behind
- * would need a negative z-index inside the reading strip's stacking context, and
- * that context is load-bearing for the page turn. The same trade is already made
- * by `.mark` in `SelectionMenu.module.css`, which has been proven on the phone.
+ * Now each mark is drawn inside the anchored paragraph that holds its words, in
+ * that paragraph's own coordinates. A transform on any ancestor carries it. The
+ * strip scrolling carries it. And a page turn copies the paragraph — with the
+ * ink already in it — into the sheet that flips.
+ *
+ * ## Alpha, not multiply
+ *
+ * The consequence, and it is worth stating plainly: `mix-blend-mode: multiply`
+ * only mixes with the backdrop of the stacking context the ink sits in, and
+ * inside the page that backdrop is the page, not the paper. So the ink is
+ * translucent instead — the same thing the clean style does with its background
+ * colour, which is legible on every theme this app ships.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -40,7 +43,7 @@ import type { PaintedHighlight } from './highlightStyle.ts'
 import { rangeOfQuote } from './selection.ts'
 import styles from './HandDrawn.module.css'
 
-/** One line-box of one highlight, ready to place. */
+/** One line-box of one highlight, in its paragraph's own coordinates. */
 interface Stroke {
   key: string
   top: number
@@ -51,6 +54,13 @@ interface Stroke {
   /** Which turbulence pair this stroke uses, and how far it tilts. */
   variant: number
   tilt: number
+}
+
+/** Every stroke that belongs in one paragraph. */
+interface Mark {
+  key: string
+  block: HTMLElement
+  strokes: Stroke[]
 }
 
 /**
@@ -65,18 +75,22 @@ interface Stroke {
 const VARIANTS = [0, 1, 2, 3]
 
 /** Whether two measured sets place the same ink in the same places. */
-function same(a: readonly Stroke[], b: readonly Stroke[]): boolean {
+function same(a: readonly Mark[], b: readonly Mark[]): boolean {
   if (a.length !== b.length) return false
   return a.every((one, index) => {
     const other = b[index]!
-    return (
-      one.key === other.key &&
-      one.top === other.top &&
-      one.left === other.left &&
-      one.width === other.width &&
-      one.height === other.height &&
-      one.colour === other.colour
-    )
+    if (one.block !== other.block || one.strokes.length !== other.strokes.length) return false
+    return one.strokes.every((stroke, at) => {
+      const twin = other.strokes[at]!
+      return (
+        stroke.key === twin.key &&
+        stroke.top === twin.top &&
+        stroke.left === twin.left &&
+        stroke.width === twin.width &&
+        stroke.height === twin.height &&
+        stroke.colour === twin.colour
+      )
+    })
   })
 }
 
@@ -87,19 +101,34 @@ export interface HandDrawnProps {
 }
 
 export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
-  const [strokes, setStrokes] = useState<Stroke[]>([])
+  const [marks, setMarks] = useState<Mark[]>([])
 
   const measure = useCallback(() => {
-    if (!root) {
-      setStrokes([])
+    if (!root || highlights.length === 0) {
+      // Not an early return with the state left alone: a highlight the reader
+      // has just taken off must take its ink with it.
+      setMarks((current) => (current.length === 0 ? current : []))
       return
     }
 
-    const found: Stroke[] = []
+    const byBlock = new Map<HTMLElement, Mark>()
+
     for (const highlight of highlights) {
       if (!highlight.quote) continue
       const range = rangeOfQuote(highlight.anchor, highlight.quote)
       if (!range || !root.contains(range.commonAncestorContainer)) continue
+
+      const block = document.getElementById(highlight.anchor)
+      if (!(block instanceof HTMLElement) || !root.contains(block)) continue
+
+      /*
+       * The page can be under a scale — that is what raising the toolbars does —
+       * and `getClientRects` answers in painted pixels while the box the ink is
+       * placed in is measured in layout ones. One divides out the other.
+       */
+      const box = block.getBoundingClientRect()
+      const scale = block.offsetWidth > 0 ? box.width / block.offsetWidth : 1
+      if (scale <= 0) continue
 
       // The seed is derived from the highlight's id, so a mark keeps the same
       // wobble and the same tilt for its whole life — through a re-measure, a
@@ -107,15 +136,18 @@ export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
       const variant = VARIANTS[Math.floor(highlight.seed * VARIANTS.length)] ?? 0
       const tilt = (highlight.seed - 0.5) * 1.2
 
+      const mark = byBlock.get(block) ?? { key: block.id, block, strokes: [] }
+      byBlock.set(block, mark)
+
       let line = 0
       for (const rect of range.getClientRects()) {
         if (rect.width <= 0 || rect.height <= 0) continue
-        found.push({
+        mark.strokes.push({
           key: `${highlight.id}:${line}`,
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
+          top: (rect.top - box.top) / scale,
+          left: (rect.left - box.left) / scale,
+          width: rect.width / scale,
+          height: rect.height / scale,
           colour: highlight.colour,
           variant,
           tilt,
@@ -124,16 +156,15 @@ export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
       }
     }
 
+    const found = [...byBlock.values()].filter((mark) => mark.strokes.length > 0)
     // Only when it actually moved. A measure runs on every mutation in the
-    // column, and a fresh array each time would re-render — and re-portal — the
-    // whole layer for a page that has not moved a pixel.
-    setStrokes((current) => (same(current, found) ? current : found))
+    // column, and a fresh array each time would re-render every layer for a page
+    // that has not moved a pixel.
+    setMarks((current) => (same(current, found) ? current : found))
   }, [highlights, root])
 
   useEffect(() => {
-    // Nothing to draw, nothing to watch. A book with no marks in it should not
-    // carry an observer on every node in the column.
-    if (!root || highlights.length === 0) return
+    if (!root) return
 
     measure()
 
@@ -155,7 +186,22 @@ export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
       }, 0)
     }
 
-    const changes = typeof MutationObserver === 'function' ? new MutationObserver(soon) : null
+    /*
+     * Our own ink is a mutation too. Watching it would be a loop: measure, place
+     * a stroke, hear the stroke land, measure again.
+     */
+    const ours = (node: Node): boolean =>
+      node instanceof Element
+        ? node.closest(`.${styles.layer}`) !== null
+        : node.parentElement?.closest(`.${styles.layer}`) !== null
+
+    const changes =
+      typeof MutationObserver === 'function'
+        ? new MutationObserver((records) => {
+            if (records.every((record) => ours(record.target))) return
+            soon()
+          })
+        : null
     changes?.observe(root, { childList: true, subtree: true, characterData: true })
 
     const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(soon) : null
@@ -166,102 +212,82 @@ export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
     window.addEventListener('scroll', soon, { capture: true, passive: true })
     window.addEventListener('resize', soon, { passive: true })
 
-    /*
-     * The page also moves without changing at all.
-     *
-     * Raising the toolbars scales the whole reading stage down and slides it
-     * clear of the top bar. That is a `transform` on an ancestor: no mutation,
-     * no resize, no scroll — every observer above stays silent while the words
-     * visibly move, and the marks stay where the words used to be. So the
-     * transition itself is the signal, and because it is a transition the ink
-     * has to keep up with it rather than jump at the end.
-     */
-    let ticking = 0
-    const stopTicking = () => {
-      if (ticking) window.clearInterval(ticking)
-      ticking = 0
-    }
-    const moving = (event: Event) => {
-      if (!(event.target instanceof Node) || !event.target.contains(root)) return
-      stopTicking()
-      measure()
-      ticking = window.setInterval(measure, 32)
-      // A ceiling, in case the `transitionend` never arrives — an interrupted
-      // transition does not always send one.
-      window.setTimeout(stopTicking, 1000)
-    }
-    const stopped = (event: Event) => {
-      if (!(event.target instanceof Node) || !event.target.contains(root)) return
-      stopTicking()
-      soon()
-    }
-
-    window.addEventListener('transitionrun', moving, true)
-    window.addEventListener('transitionend', stopped, true)
-    window.addEventListener('transitioncancel', stopped, true)
-
     return () => {
       if (pending) window.clearTimeout(pending)
-      stopTicking()
       changes?.disconnect()
       sizes?.disconnect()
       window.removeEventListener('scroll', soon, { capture: true })
       window.removeEventListener('resize', soon)
-      window.removeEventListener('transitionrun', moving, true)
-      window.removeEventListener('transitionend', stopped, true)
-      window.removeEventListener('transitioncancel', stopped, true)
     }
-  }, [measure, root, watch, highlights.length])
-
-  if (typeof document === 'undefined' || strokes.length === 0) return null
+  }, [measure, root, watch])
 
   /*
-   * Portalled to `document.body`, like the selection menu's own marks.
-   *
-   * These are `position: fixed`, and a fixed box is measured against the nearest
-   * transformed ancestor rather than the viewport. The reading stage carries a
-   * scale transform, so a layer rendered inside it would place every stroke in
-   * the wrong place by exactly that scale.
+   * A paragraph is not a positioned box, and the ink has to be placed against
+   * one. Set here rather than in the stylesheet because the paragraphs belong to
+   * the book, not to this component, and only the ones actually carrying a mark
+   * should be touched. Put back on the way out.
    */
-  return createPortal(
-    <div className={styles.layer} aria-hidden="true">
+  useEffect(() => {
+    const touched = marks.map((mark) => mark.block)
+    for (const block of touched) block.style.position = 'relative'
+    return () => {
+      for (const block of touched) block.style.position = ''
+    }
+  }, [marks])
+
+  if (typeof document === 'undefined' || marks.length === 0) return null
+
+  return (
+    <>
       <Filters />
-      {strokes.map((stroke) => (
-        <span
-          key={stroke.key}
-          className={styles.stroke}
-          style={{
-            top: stroke.top,
-            left: stroke.left,
-            width: stroke.width,
-            height: stroke.height,
-            // Custom properties rather than four class names: the colour is a
-            // stored value and can be anything, and so the CSS cannot know it.
-            // The tilt is one too, because a `transform` on this box would make
-            // it a stacking context and kill the blend. See the module's CSS.
-            ['--tilt' as string]: `${stroke.tilt.toFixed(2)}deg`,
-            ['--ink' as string]: stroke.colour,
-            ['--wobble' as string]: `url(#rb-mark-${stroke.variant})`,
-            ['--pool' as string]: `url(#rb-pool-${stroke.variant})`,
-          }}
-        />
-      ))}
-    </div>,
-    document.body,
+      {marks.map((mark) =>
+        createPortal(
+          <span className={styles.layer} aria-hidden="true">
+            {mark.strokes.map((stroke) => (
+              <span
+                key={stroke.key}
+                className={styles.stroke}
+                style={{
+                  top: stroke.top,
+                  left: stroke.left,
+                  width: stroke.width,
+                  height: stroke.height,
+                  // Custom properties rather than four class names: the colour
+                  // is a stored value and can be anything, so the CSS cannot
+                  // know it. The tilt is one too, so that the box holding the
+                  // ink stays free of a transform of its own.
+                  ['--tilt' as string]: `${stroke.tilt.toFixed(2)}deg`,
+                  ['--ink' as string]: stroke.colour,
+                  ['--wobble' as string]: `url(#rb-mark-${stroke.variant})`,
+                  ['--pool' as string]: `url(#rb-pool-${stroke.variant})`,
+                }}
+              />
+            ))}
+          </span>,
+          mark.block,
+          mark.key,
+        ),
+      )}
+    </>
   )
 }
 
 /**
  * The turbulence fields the strokes point at.
  *
- * Rendered once, inside the layer, and never re-rendered — the `seed` on each
- * `feTurbulence` is a constant, so React has nothing to update here and the
- * browser generates each noise field once. The generous filter regions are
- * needed because a displacement map pushes pixels outside the source box; they
- * are bounded rather than unbounded so the browser knows how much to rasterize.
+ * Rendered once, and never re-rendered — the `seed` on each `feTurbulence` is a
+ * constant, so React has nothing to update here and the browser generates each
+ * noise field once. The generous filter regions are needed because a
+ * displacement map pushes pixels outside the source box; they are bounded rather
+ * than unbounded so the browser knows how much to rasterize.
+ *
+ * They live at the end of the document rather than inside a paragraph: a filter
+ * is referenced by id from anywhere, and a page turn copies paragraphs — which
+ * would copy these too, ids and all, and a duplicate id is a filter nobody can
+ * name reliably.
  */
 function Filters() {
-  return (
+  return createPortal(
     <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true" focusable="false">
       <defs>
         {VARIANTS.map((variant) => (
@@ -301,6 +327,7 @@ function Filters() {
           </g>
         ))}
       </defs>
-    </svg>
+    </svg>,
+    document.body,
   )
 }

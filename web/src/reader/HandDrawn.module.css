@@ -1,61 +1,45 @@
 /*
  * The marker look, ported from `design-inspiration/reading_experience_v2.html`.
  *
- * One `.stroke` per line-box of a highlight, laid out in viewport coordinates by
- * `HandDrawn.tsx`. The stroke itself is two layers: `::before` is the body of the
- * mark, and `::after` is the pool of ink where the pen stopped.
+ * One `.stroke` per line-box of a highlight. The stroke itself is two layers:
+ * `::before` is the body of the mark, and `::after` is the pool of ink where the
+ * pen stopped.
+ *
+ * The coordinates are the *paragraph's*, not the screen's — `HandDrawn.tsx`
+ * portals one layer into each anchored paragraph and measures against it. That
+ * is what keeps the ink with the words when the stage scales, when the strip
+ * scrolls, and when a page turn clones the paragraph into the flipping sheet.
  */
 
 /*
- * Nothing in here may make a stacking context.
+ * The layer covers its paragraph and sits *under* the words.
  *
- * `mix-blend-mode` blends an element with the backdrop *inside its own stacking
- * context*. Put a `z-index`, a `contain`, or a `transform` on any ancestor and
- * the ink has nothing behind it but empty space: it blends with transparency,
- * which is the same as not blending at all, and the mark paints as a solid slab
- * over the words. That is exactly what happened on the phone. So the layer takes
- * no z-index and no containment, and the per-stroke tilt lives on the two
- * pseudo-elements that do the blending rather than on the box that holds them.
- */
-/*
- * The layer holds nothing and lays out nothing: every stroke inside it is fixed,
- * so the box itself is empty and has no size. It must stay that way. `position:
- * fixed` on this element would make it a stacking context, and a stacking
- * context is exactly what the ink must not sit inside — see `.stroke`.
+ * `z-index: -1` is the whole trick. Painting order puts a positioned child above
+ * the in-flow text at z-index 0 or auto, and a wash of colour over the letters
+ * dims them. At -1 the layer paints after the paragraph's background and before
+ * its text, so the ink goes under the words the way a real highlighter does.
+ * The paragraph is only `position: relative` — no z-index, no transform — so it
+ * is not a stacking context and the negative index resolves against the page.
+ *
+ * This replaces the earlier `mix-blend-mode: multiply`. A blend mixes with the
+ * backdrop of its own stacking context, and inside the page there is no paper
+ * behind the ink to mix with. Under the text, plain translucent colour does the
+ * same job and does it everywhere.
  */
 .layer {
-  /* The whole point: the ink must never take a tap. Text selection, the tap that
-     opens a highlight's menu, and the page turn all keep working through it. */
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* The ink must never take a tap. Text selection, the tap that opens a
+     highlight's menu, and the page turn all keep working through it. */
   pointer-events: none;
 }
 
-/*
- * One stroke, and one blend.
- *
- * `mix-blend-mode` mixes an element with the backdrop *of the stacking context
- * it sits in*. Anything that makes a stacking context between the ink and the
- * page — a `z-index`, a `contain`, a `transform`, or `position: fixed` itself —
- * leaves the ink blending against empty space, which paints it as a solid slab
- * over the words. That was the bug on the phone.
- *
- * So the blend lives here, on the outermost box, where the backdrop is the page.
- * Everything below is inside this one group: the body of the mark, its grain,
- * and the pool of ink at the tail all combine here first and then multiply onto
- * the paper together, once.
- */
+/* One stroke: a single measured line-box of one highlight. */
 .stroke {
-  position: fixed;
-  /* Set per stroke from the measured line-box. */
+  position: absolute;
+  /* Top, left, width and height are set per stroke from the measured box. */
   border-radius: 4px;
-  /*
-   * Multiply, not opacity.
-   *
-   * Translucent ink over black text is what a real highlighter does: the words
-   * stay as dark as they were and the paper takes the colour. Plain alpha lifts
-   * the text towards the highlight colour and makes a marked passage harder to
-   * read than an unmarked one, which is exactly backwards.
-   */
-  mix-blend-mode: multiply;
 }
 
 .stroke::before,
