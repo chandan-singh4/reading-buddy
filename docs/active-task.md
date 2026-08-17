@@ -8,6 +8,45 @@
 **Goal.** Check on the phone that the library now reads the way the printed book
 reads. The parser stamp is 28, so the shelf offers to rebuild every book.
 
+### The page turn at a section seam
+
+**The fault.** The last page of a section did not follow the finger. Nor did the
+first page, going back. The page jumped instead. In a book of 100 sections, that
+is about 200 dead pages.
+
+**The cause.** A section is laid out in columns in one strip. `turn()` returns
+`null` when the next page is outside that strip. `startDrag` then gave up, and
+the reader fell back to a threshold swipe. The sheet had nothing to reveal,
+because the arriving page was in a different section that was not on screen.
+
+**The fix.** Both neighbour sections are now on the page all the time. They sit
+in two more `<article>` strips, in the same box as the live one, with the same
+markup. They are laid out but not painted (`visibility: hidden`). See
+`.understudy` in `Reader.module.css`.
+
+When a drag runs off the end of a section, `startSeamDrag` does this:
+
+1. It scrolls the neighbour strip to the page the finger is asking for.
+2. It makes that strip visible and hides the live one.
+3. It starts the flip, with the neighbour as the page under the sheet.
+
+If the finger goes back, the strips swap back and nothing has moved. If the
+finger commits, the reader loads the neighbour as normal, and the strip is
+hidden again the moment the real page arrives.
+
+The two directions build the sheet in opposite orders. `beginDrag` already
+records why, at `pageTurn.ts`.
+
+**Why the markup is shared.** `sectionBody` draws the live strip and both
+neighbours. The page breaks must fall in the same places, or the page under the
+sheet is not the page that arrives. One function is what guarantees that.
+
+**Checked in the browser.** With the live strip on the last page of a section:
+the next strip appears at its first page, the live one hides, and the flip runs.
+On release, the reader lands on the next section's first page and both
+neighbours go dark again. Backwards is the mirror of that, landing on the
+previous section's last page. No console errors.
+
 ### What changed in 28
 
 Three faults, each found by reading a book beside the same book in Google Books.
@@ -153,7 +192,23 @@ books, never on one.
 - `web/src/parse/library.report.ts` — the whole-library report.
 - Tests beside each of the above.
 
+For the page turn at a section seam:
+
+- `web/src/pages/Reader.tsx` — `startSeamDrag`, `endDrag`, `sectionBody`.
+- `web/src/pages/Reader.module.css` — `.understudy`.
+- `web/src/reader/pageTurn.ts` — `beginDrag`, `holdStill`, `settleDrag`.
+- `web/src/reader/columns.ts` — `turn`, `offsetOfPage`, `pageCountOf`.
+- `web/src/pages/Reader.test.tsx`.
+
 ### Out of scope
 
-The reading screen, storage, and the tutor. This task changes what a book
-*becomes*, not how it draws.
+Storage and the tutor.
+
+The parser part of this task changes what a book *becomes*, not how it draws.
+The page-turn part is the reading screen only. It changes no parsed data.
+
+### Still open here
+
+A figure is not drawn in a neighbour strip. The page breaks still match, because
+the space is kept. A figure at a section seam will appear as the page lands, not
+before it.

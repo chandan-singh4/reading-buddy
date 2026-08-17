@@ -227,6 +227,53 @@
  * by hand leaves you stranded between two pages; every turn here is programmatic
  * and lands exactly on a column. `scrollLeft` still works when set from code.
  */
+/*
+ * The next section and the previous one, laid out and waiting.
+ *
+ * ## Why they exist
+ *
+ * A page turn follows the finger by hanging a picture of the page you are
+ * leaving over the page you are arriving at. That needs the arriving page to be
+ * *on the screen already*, underneath — and at the seam between two sections it
+ * was not, because the next section had not been fetched or laid out. So the
+ * last page of every section, and the first page going back, dropped out of the
+ * drag and fell back to a threshold swipe. In a book of a hundred sections that
+ * is two hundred pages that do not move with the thumb.
+ *
+ * These two are the same section markup, mounted early and kept out of sight, so
+ * there is something real to reveal. `reader/pageTurn.ts` copies from whichever
+ * of the three strips is the one being left, and reveals whichever is arriving.
+ *
+ * ## Why `visibility` rather than `display: none`
+ *
+ * A box that is not displayed is not laid out, and an unlaid-out strip has no
+ * columns, no `scrollWidth`, and no answer to "which page would I land on".
+ * `visibility: hidden` keeps every one of those and only stops it being drawn.
+ * The geometry has to match `.page` exactly — the same box produces the same
+ * page breaks, and a break in a different place would mean the page revealed is
+ * not the page you were promised.
+ *
+ * ## Why the inset repeats `.stage`'s padding
+ *
+ * These are out of the flow, so they take their box from the stage's padding
+ * edge rather than from the flex line `.page` sits on. The four values are the
+ * same tokens `.stage` pads with, which is what keeps the two boxes identical.
+ */
+.understudy {
+  position: absolute;
+  top: var(--running-head);
+  bottom: var(--status-line);
+  left: var(--page-deck);
+  right: var(--page-deck);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Brought out only for the length of a seam turn, under the sheet. */
+.understudy[data-showing='true'] {
+  visibility: visible;
+}
+
 .page {
   flex: 1;
   min-height: 0;

@@ -192,6 +192,22 @@ async function turnPage(key: 'ArrowRight' | 'ArrowLeft') {
 const turnForward = () => turnPage('ArrowRight')
 const turnBack = () => turnPage('ArrowLeft')
 
+/**
+ * Text on the page the reader is actually looking at.
+ *
+ * The sections either side are mounted too — hidden, so a turn at the seam has
+ * something real to be dragged onto (see `.understudy` in `Reader.module.css`).
+ * They hold the same words as the page before and the page after, so "is this in
+ * the document" stopped being the same question as "is the reader seeing this".
+ * The understudies are `aria-hidden`, which is the same fact stated in the way
+ * the DOM already had to state it.
+ */
+function onThePage(text: string): HTMLElement | null {
+  return screen.queryByText(text, {
+    ignore: '[aria-hidden="true"], [aria-hidden="true"] *, script, style',
+  })
+}
+
 /** Whether the overlay is on screen. It stays mounted, so presence isn't the test. */
 function chromeShown(container: HTMLElement): boolean {
   return container.querySelector('[data-shown]')?.getAttribute('data-shown') === 'true'
@@ -236,7 +252,19 @@ describe('moving through the book', () => {
     await turnForward()
 
     expect(await screen.findByText('Later in the first chapter.')).toBeTruthy()
-    expect(screen.queryByText('The opening words.')).toBeNull()
+    expect(onThePage('The opening words.')).toBeNull()
+  })
+
+  it('keeps the next section mounted, so a turn at the seam has somewhere to land', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+
+    // The section after this one is in the document before it is asked for, and
+    // out of sight. That is what lets the last page of a section follow the
+    // finger: `startSeamDrag` reveals this strip under the sheet, and without it
+    // the turn falls back to a threshold swipe. See `.understudy`.
+    await screen.findByText('Later in the first chapter.')
+    expect(onThePage('Later in the first chapter.')).toBeNull()
   })
 
   it('crosses into the next chapter and updates the line of context', async () => {
@@ -932,7 +960,7 @@ describe('reopening where you left off', () => {
     expect(await screen.findByText('Later in the first chapter.')).toBeTruthy()
     // And never showed the first page on the way — the whole point of waiting
     // for the lookup before fetching a section.
-    expect(screen.queryByText('The opening words.')).toBeNull()
+    expect(onThePage('The opening words.')).toBeNull()
   })
 
   it('reports the restored place, not the start of the book', async () => {

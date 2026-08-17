@@ -364,6 +364,22 @@ export default function Reader() {
     next?: SectionRef
   }>({})
 
+  /**
+   * The text of those two neighbours, not just where they are.
+   *
+   * `neighbours` above says which section comes next. This says what is *in* it,
+   * and the difference is the whole of the seam turn. To follow the finger, a
+   * page turn needs the arriving page laid out and on screen underneath the
+   * sheet before the finger moves; a reference cannot be revealed, only fetched.
+   * So both sides are read as soon as the page settles and mounted out of sight
+   * — see `.understudy` in `Reader.module.css`.
+   *
+   * Two extra section reads per page. They are the same reads the turn was going
+   * to make a moment later anyway, moved earlier, and IndexedDB serves them off
+   * the same store the current page came from.
+   */
+  const [beside, setBeside] = useState<{ previous?: Section; next?: Section }>({})
+
   /*
    * Whose book the two states above are describing.
    *
@@ -546,6 +562,34 @@ export default function Reader() {
 
   /** The element the book is laid out in — the strip of pages. */
   const strip = useRef<HTMLElement | null>(null)
+
+  /**
+   * The same, for the section on either side. Laid out, and not drawn until a
+   * turn at the seam brings one of them out. See `beside` and `.understudy`.
+   */
+  const beforeStrip = useRef<HTMLElement | null>(null)
+  const afterStrip = useRef<HTMLElement | null>(null)
+
+  /**
+   * The seam turn in flight: which section it lands in, and which strip is
+   * showing while it runs.
+   *
+   * A turn inside a section needs none of this — the strip is already sitting on
+   * the destination, so completing is the case where nothing has to happen. A
+   * seam turn is the opposite. The destination is a different section, so
+   * finishing means loading it, and abandoning means putting the understudy away
+   * again. Neither is knowable from the sheet alone, so it is written down when
+   * the drag starts.
+   */
+  const seam = useRef<{ to: SectionRef; land: 'start' | 'end'; shown: HTMLElement } | null>(null)
+
+  /**
+   * An understudy left on screen after a seam turn went through, holding the
+   * arriving page until the real strip has caught up with it. Put away by the
+   * landing effect, which is the first moment the real strip shows the right
+   * section.
+   */
+  const holdSeam = useRef<HTMLElement | null>(null)
 
   /**
    * Which end of a freshly loaded section to land on.
@@ -1081,6 +1125,99 @@ export default function Reader() {
    *   the sheet and nothing honest to scrub against. Those turns keep the
    *   two-copy handoff in `turnPage`, which was built for exactly that seam.
    */
+  /**
+   * The same turn, where the destination is the next section rather than the
+   * next page.
+   *
+   * ## What makes this different
+   *
+   * Everything a dragged turn does rests on one thing: the page you are arriving
+   * at is already on screen, underneath, so the sheet reveals it rather than
+   * announcing it. Inside a section that is free — the strip is scrolled to the
+   * destination and the sheet is a picture laid over it. At a seam it was not
+   * free, because the arriving section was not fetched, so these turns fell back
+   * to the threshold swipe and the thumb carried nothing. Two pages per section.
+   *
+   * `beside` closes that. Both neighbours are read and mounted out of sight as
+   * soon as the page settles, so there is a real, laid-out strip to reveal.
+   *
+   * ## The ordering, which is the same rule as inside a section
+   *
+   * `beginDrag` photographs whatever the strip shows *at the moment it is
+   * called*, so the two directions sequence in opposite orders:
+   *
+   * - **Forwards** the sheet is the page being left, so it is built off the real
+   *   strip first, and the understudy is brought out behind it afterwards.
+   * - **Backwards** the sheet is the page *arriving*, so the understudy has to be
+   *   showing before it is photographed — and the page being left is pinned by
+   *   `holdStill` before that, or it goes out from under the reader.
+   *
+   * Either way the real strip is hidden once the understudy is out. They occupy
+   * the same box and neither is opaque, so leaving both up prints two sections
+   * of text over each other.
+   *
+   * ## Why it does not commit here
+   *
+   * The finger can still come back. Loading the next section on the way past
+   * would make an abandoned turn a real move, so the destination is only written
+   * down, and `endDrag` decides.
+   */
+  const startSeamDrag = useCallback(
+    (by: 1 | -1, at: number) => {
+      const element = strip.current
+      if (!element) return false
+
+      const to = by === 1 ? neighbours.next : neighbours.previous
+      const understudy = by === 1 ? afterStrip.current : beforeStrip.current
+      // The reference and the text are set a beat apart. Both are needed: one
+      // says where to go, the other is what gets revealed on the way.
+      const loaded = by === 1 ? beside.next : beside.previous
+      if (!to || !understudy || !loaded) return false
+
+      // Where in the arriving section the turn lands: its first page going
+      // forward, its last page coming back — the same rule `landOn` follows, so
+      // the page revealed under the sheet is the page that is still there when
+      // the section itself arrives.
+      const land: 'start' | 'end' = by === 1 ? 'start' : 'end'
+      const box = measure(understudy)
+      if (box.pageWidth <= 0) return false
+      understudy.scrollLeft = offsetOfPage(box, land === 'start' ? 1 : pageCountOf(box))
+
+      const show = () => {
+        understudy.dataset.showing = 'true'
+        element.style.visibility = 'hidden'
+      }
+
+      const still = by === -1 ? holdStill(element, drawnAt) : null
+      if (by === -1) show()
+
+      const built =
+        by === 1
+          ? beginDrag(element, by, drawnAt, null, 0)
+          : beginDrag(understudy, by, drawnAt, still, 0)
+
+      if (!built) {
+        // Declined — reduced motion, or no frame to hang it on. Put everything
+        // back exactly as it was and let `turnPage` play the fixed animation.
+        dropStill(still)
+        understudy.dataset.showing = 'false'
+        element.style.visibility = ''
+        return false
+      }
+
+      if (by === 1) show()
+
+      seam.current = { to, land, shown: understudy }
+      drag.current = built
+      dragFrom.current = at
+      dragAt.current = 0
+      dragSpeed.current = 0
+      dragLast.current = { x: at, at: performance.now() }
+      return true
+    },
+    [neighbours, beside, drawnAt],
+  )
+
   const startDrag = useCallback(
     (by: 1 | -1, at: number) => {
       const element = strip.current
@@ -1088,9 +1225,12 @@ export default function Reader() {
 
       const now = measure(element)
       const next = turn(now, by)
-      if (next === null) return false
 
       dragHome.current = pageAt(now)
+
+      // Off the end of this section. The arriving page is in a different
+      // section, which is mounted and waiting — see `startSeamDrag`.
+      if (next === null) return startSeamDrag(by, at)
 
       // Backwards, the arriving page is the one that moves, so the page being
       // left has to be pinned down *before* the strip is scrolled off it. See
@@ -1120,7 +1260,7 @@ export default function Reader() {
       dragLast.current = { x: at, at: performance.now() }
       return true
     },
-    [showPage, drawnAt],
+    [showPage, drawnAt, startSeamDrag],
   )
 
   /** Move the sheet to wherever the thumb now is. */
@@ -1166,10 +1306,34 @@ export default function Reader() {
     drag.current = null
 
     const home = dragHome.current
+    const crossing = seam.current
+    seam.current = null
+
     settleDrag(held, dragAt.current, dragSpeed.current, (committed) => {
-      if (!committed) showPage(home, true)
+      if (!crossing) {
+        if (!committed) showPage(home, true)
+        return
+      }
+
+      if (!committed) {
+        // Turned back. Put the understudy away and give the real strip back —
+        // the reader never left the page they were on.
+        crossing.shown.dataset.showing = 'false'
+        if (strip.current) strip.current.style.visibility = ''
+        showPage(home, true)
+        return
+      }
+
+      // Gone through. The understudy stays out and the real strip stays hidden
+      // until the section it is showing has actually loaded — the arriving page
+      // is on screen now, and taking it away to wait for the same page to be
+      // fetched would be a blink of the section just left. `holdSeam` is put
+      // away by the landing, which is the moment the real strip is right again.
+      holdSeam.current = crossing.shown
+      landOn.current = crossing.land
+      goTo(crossing.to)
     })
-  }, [showPage])
+  }, [showPage, goTo])
 
   /**
    * Turn a page from the keyboard.
@@ -1596,7 +1760,18 @@ export default function Reader() {
           previousSection(here, sectionsIn),
           nextSection(frame.manifest, here, sectionsIn),
         ])
-        if (!cancelled) setNeighbours({ previous, next })
+        if (cancelled) return
+        setNeighbours({ previous, next })
+
+        // And their text, for the sheet to be dragged over. Cleared first: the
+        // old neighbours belong to the page we just left, and revealing one of
+        // those under a turn would show the reader a page from somewhere else.
+        setBeside({})
+        const [before, after] = await Promise.all([
+          previous ? repository.getSection(id, pathOf(previous)) : undefined,
+          next ? repository.getSection(id, pathOf(next)) : undefined,
+        ])
+        if (!cancelled) setBeside({ previous: before ?? undefined, next: after ?? undefined })
       } catch (error: unknown) {
         if (!cancelled) setPage({ status: 'failed', message: messageOf(error) })
       }
@@ -1633,6 +1808,16 @@ export default function Reader() {
     if (page.status !== 'ready') return
     if (landedOn.current === page.section.path) return
     landedOn.current = page.section.path
+
+    // The real strip now holds the section the reader dragged into, so the
+    // understudy that has been standing in for it can go. Done before the scroll
+    // below rather than after: the two show the same page, and swapping while
+    // they agree is the swap nobody can see.
+    if (holdSeam.current) {
+      holdSeam.current.dataset.showing = 'false'
+      holdSeam.current = null
+      if (strip.current) strip.current.style.visibility = ''
+    }
 
     const wanted = pendingPage.current
     const saved = pendingAnchor.current
@@ -2481,6 +2666,90 @@ export default function Reader() {
   const title =
     frame.status === 'ready' ? chapterTitle(frame.manifest, here.chapter) : undefined
 
+  /** The same, for a chapter that is not the one on screen. */
+  const titleOfChapter = (chapter: number) =>
+    frame.status === 'ready' ? chapterTitle(frame.manifest, chapter) : undefined
+
+  /**
+   * One section's markup: its opening, then its paragraphs.
+   *
+   * Written once and used three times — the page on screen and the two
+   * understudies either side of it — and that sharing carries weight rather than
+   * saving typing. The strip's page breaks are decided by the browser from the
+   * markup in the box, so an understudy built from *nearly* the same markup
+   * breaks its pages in nearly the same places. The reader would drag onto a
+   * page and then watch the text shift as the real section arrived. The chapter
+   * opening is almost the whole of that risk: it is the tallest thing in a
+   * section and it appears on the first one only.
+   *
+   * Figures are the known gap. Their pictures are fetched for the section on
+   * screen alone, so an understudy draws a figure at its empty height. It costs
+   * nothing on the great majority of sections, which carry none.
+   */
+  const sectionBody = (section: Section, at: SectionRef, chapter?: string) => (
+    <>
+      {/*
+        The chapter line only appears on a chapter's *first* section. Repeating
+        "Part Three" over each of its nine sections would turn a title page into
+        a running header.
+      */}
+      <header className={`${styles.header} ${at.section === 1 ? styles.opening : ''}`}>
+        {/*
+          A chapter's first section gets the designed opening — see
+          `reader/ChapterOpening.tsx`. Which of the four settings it takes is the
+          book's subject headings and the chapter's own title, decided in
+          `reader/chapterHeading.ts`.
+
+          Its own left alignment, so the header's centring does not fight the two
+          settings that are set left.
+        */}
+        {at.section === 1 && (chapter || section.title) ? (
+          <div className={styles.openingHeading}>
+            <ChapterOpening
+              chapterTitle={chapter}
+              sectionTitle={section.title}
+              subjects={frame.status === 'ready' ? frame.book.subjects : undefined}
+            />
+          </div>
+        ) : chapterNumber(section.title) ? (
+          /*
+            A numbered section opens like a chapter, because it *is* one. Where a
+            book is cut into parts, the part becomes the division and "Chapter 1"
+            lands here as a section — the same words print gives a full opening
+            to. Setting it as a plain line while the part above it got the
+            numeral put the design on the wrong one.
+
+            Only when the title carries a number: an unnumbered section is a
+            subdivision, and a full opening on each would be relentless.
+          */
+          <div className={styles.openingHeading}>
+            <ChapterOpening
+              chapterTitle={section.title}
+              subjects={frame.status === 'ready' ? frame.book.subjects : undefined}
+            />
+          </div>
+        ) : (
+          <>
+            {section.title && <h2 className={styles.sectionTitle}>{section.title}</h2>}
+
+            {/* A hairline instead of a blank gap: it says "the chapter starts
+                below this" without spending a word on it. */}
+            <span className={styles.openingRule} aria-hidden="true" />
+          </>
+        )}
+      </header>
+
+      {section.paragraphs.map((block) => (
+        <Block
+          key={block.anchor}
+          block={block}
+          onFollowLink={jumpToAnchor as FollowLink}
+          images={figureImages}
+        />
+      ))}
+    </>
+  )
+
   return (
     /* `data-page-frame` marks the unscaled box a page turn measures itself
        against — see `FRAME` in `reader/pageTurn.ts`. */
@@ -2829,63 +3098,17 @@ export default function Reader() {
               Repeating "Part Three" over each of its nine sections would turn
               a title page into a running header.
             */}
-            <header
-              className={`${styles.header} ${here.section === 1 ? styles.opening : ''}`}
-            >
-              {/*
-                A chapter's first section gets the designed opening — see
-                `reader/ChapterOpening.tsx`. Which of the four settings it takes
-                is the book's subject headings and the chapter's own title,
-                decided in `reader/chapterHeading.ts`.
+            {page.status === 'ready' && sectionBody(page.section, here, title)}
 
-                Its own left alignment, so the header's centring does not fight
-                the two settings that are set left.
-              */}
-              {here.section === 1 && (title || (page.status === 'ready' && page.section.title)) ? (
-                <div className={styles.openingHeading}>
-                  <ChapterOpening
-                    chapterTitle={title}
-                    sectionTitle={page.status === 'ready' ? page.section.title : undefined}
-                    subjects={frame.status === 'ready' ? frame.book.subjects : undefined}
-                  />
-                </div>
-              ) : page.status === 'ready' && chapterNumber(page.section.title) ? (
-                /*
-                  A numbered section opens like a chapter, because it *is* one.
-                  Where a book is cut into parts, the part becomes the division
-                  and "Chapter 1" lands here as a section — the same words print
-                  gives a full opening to. Setting it as a plain line while the
-                  part above it got the numeral put the design on the wrong one.
+            {/* Only for a place saved a while ago. Opening a book you were
+                reading a minute ago somewhere other than the first page is
+                expected; opening last month's book on page 190 without a word
+                looks like the app lost your place rather than kept it.
 
-                  Only when the title carries a number: an unnumbered section is
-                  a subdivision, and a full opening on each would be relentless.
-                */
-                <div className={styles.openingHeading}>
-                  <ChapterOpening
-                    chapterTitle={page.section.title}
-                    subjects={frame.status === 'ready' ? frame.book.subjects : undefined}
-                  />
-                </div>
-              ) : (
-                <>
-                  {page.status === 'ready' && page.section.title && (
-                    <h2 className={styles.sectionTitle}>{page.section.title}</h2>
-                  )}
-
-                  {/* A hairline instead of a blank gap: it says "the chapter
-                      starts below this" without spending a word on it. */}
-                  <span className={styles.openingRule} aria-hidden="true" />
-                </>
-              )}
-
-              {/* Only for a place saved a while ago. Opening a book you were
-                  reading a minute ago somewhere other than the first page is
-                  expected; opening last month's book on page 190 without a word
-                  looks like the app lost your place rather than kept it. */}
-              {resumed && (
-                <p className={styles.resumed}>Picked up where you left off.</p>
-              )}
-            </header>
+                Outside `sectionBody` on purpose: it is about this reader's last
+                visit, not about the section, and an understudy that carried it
+                would break its pages in a place the real page will not. */}
+            {resumed && <p className={styles.resumed}>Picked up where you left off.</p>}
 
             {page.status === 'loading' && <p className={styles.note}>Loading…</p>}
 
@@ -2894,16 +3117,40 @@ export default function Reader() {
                 {page.message}
               </p>
             )}
+          </article>
 
-            {page.status === 'ready' &&
-              page.section.paragraphs.map((block) => (
-                <Block
-                  key={block.anchor}
-                  block={block}
-                  onFollowLink={jumpToAnchor as FollowLink}
-                  images={figureImages}
-                />
-              ))}
+          {/*
+            The two sections either side, laid out and waiting to be turned onto.
+            See `.understudy` in `Reader.module.css` for what they are for, and
+            `startSeamDrag` for what brings them out.
+
+            Hidden from assistive technology and from find-in-page: they are the
+            same words as a page the reader has not reached yet, and a screen
+            reader meeting the next chapter in the middle of this one would be
+            reading the book out of order.
+          */}
+          <article
+            ref={beforeStrip}
+            className={`${styles.page} ${styles.understudy}`}
+            data-showing="false"
+            aria-hidden="true"
+            inert={!beside.previous ? true : undefined}
+          >
+            {beside.previous &&
+              neighbours.previous &&
+              sectionBody(beside.previous, neighbours.previous, titleOfChapter(neighbours.previous.chapter))}
+          </article>
+
+          <article
+            ref={afterStrip}
+            className={`${styles.page} ${styles.understudy}`}
+            data-showing="false"
+            aria-hidden="true"
+            inert={!beside.next ? true : undefined}
+          >
+            {beside.next &&
+              neighbours.next &&
+              sectionBody(beside.next, neighbours.next, titleOfChapter(neighbours.next.chapter))}
           </article>
 
           </div>
