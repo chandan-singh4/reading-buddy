@@ -99,6 +99,28 @@
 }
 
 /*
+ * While a page is turning, the marker loses its texture.
+ *
+ * The texture is two SVG filters per line of ink, and a filtered box has to be
+ * rasterized again whenever the thing holding it moves. A page turn moves it on
+ * every frame, and a page full of marks carries hundreds of them — which is why
+ * hand-drawn turned heavier than clean.
+ *
+ * `data-page-sheet` exists only for the length of a turn, and `pageTurn.ts` puts
+ * its sheets inside `[data-page-frame]`, which also holds the real page. So this
+ * one rule reaches the ink on the flipping copy *and* on the page underneath it,
+ * with nothing to keep in step.
+ *
+ * Only the texture goes. The colour, the size and the place of every stroke are
+ * untouched, so nothing moves — a straight-edged stroke for a third of a second
+ * of motion, and the pen comes back the moment the page lands.
+ */
+[data-page-frame]:has([data-page-sheet]) .stroke::before,
+[data-page-frame]:has([data-page-sheet]) .stroke::after {
+  filter: none;
+}
+
+/*
  * The filters are the expensive part, and a reader who has asked for less motion
  * has usually asked for less of everything. Drop to a plain rounded wash: same
  * colour, same place, no turbulence and no per-stroke rotation.
