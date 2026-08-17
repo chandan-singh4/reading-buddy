@@ -108,9 +108,20 @@ export interface HandDrawnProps {
   highlights: readonly PaintedHighlight[]
   root: HTMLElement | null
   watch?: unknown
+  /**
+   * The marker look, or a flat wash.
+   *
+   * Both styles are painted here, and that is deliberate. The clean style used
+   * the browser's own highlight API, which holds *text nodes* — and this reader
+   * shows a copy of the page whenever it turns one, with its own text nodes. So
+   * the colour stayed on the page underneath and the reader watched it go. Ink
+   * that is real elements inside the paragraph is copied with the paragraph, by
+   * every mechanism, for free.
+   */
+  marker?: boolean
 }
 
-export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
+export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnProps) {
   const [marks, setMarks] = useState<Mark[]>([])
 
   const measure = useCallback(() => {
@@ -263,7 +274,7 @@ export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
             {mark.strokes.map((stroke) => (
               <span
                 key={stroke.key}
-                className={styles.stroke}
+                className={marker ? styles.stroke : `${styles.stroke} ${styles.plain}`}
                 style={{
                   top: stroke.top,
                   left: stroke.left,

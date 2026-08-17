@@ -77,6 +77,26 @@
 }
 
 /*
+ * The clean style: the same ink, with none of the pen.
+ *
+ * A flat rounded wash the width of the line-box. No turbulence, no grain, no dry
+ * start and no pool — and no tilt, because a straight edge is the whole point of
+ * this one.
+ */
+.plain::before {
+  inset: 0;
+  border-radius: 4px;
+  background-image: none;
+  mask-image: none;
+  filter: none;
+  transform: none;
+}
+
+.plain::after {
+  display: none;
+}
+
+/*
  * The filters are the expensive part, and a reader who has asked for less motion
  * has usually asked for less of everything. Drop to a plain rounded wash: same
  * colour, same place, no turbulence and no per-stroke rotation.

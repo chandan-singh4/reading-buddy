@@ -1,5 +1,30 @@
 /**
- * The highlights, painted into the page by the browser.
+ * The highlights: which rows to paint, and in which style.
+ *
+ * ## Why the browser no longer paints them
+ *
+ * This used to hand the ranges to the CSS custom highlight API and let the
+ * browser paint the colour under the words. On a page that only ever moves, that
+ * is the better model — a range is part of the document, so the colour goes
+ * where the words go, in the same frame, with nothing to measure.
+ *
+ * This page does not only move. It *turns*, and a turn lays a **copy** of the
+ * page over the real one and flips the copy. A range holds text nodes, and the
+ * copy has its own; so the browser went on faithfully painting the colour on the
+ * page underneath while the reader was looking at the copy, and the highlight
+ * appeared to vanish the instant a finger moved. Registering the copies as well
+ * only moved the problem: there are several copies of the page alive at once —
+ * the live strip, two understudies, and the turn's sheets — and any scheme that
+ * has to keep a registry in step with which one is showing gets it wrong at some
+ * moment.
+ *
+ * Ink that is *elements inside the paragraph* has none of that. Whatever copies
+ * the paragraph copies the ink with it, by construction, for every mechanism
+ * this reader has or will have. So both styles are drawn by `HandDrawn` now —
+ * one with the marker's filters, one as a flat wash — and this component is only
+ * the fork between them.
+ *
+ * ## The old note, still true
  *
  * The first version of this drew a coloured box over each line, measured in
  * screen coordinates. That is the wrong model, and it showed: every time the
@@ -31,7 +56,7 @@
  * write. See `highlightStyle.ts`.
  */
 
-import { useCallback, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 
 import type { Anchor } from '../structure/index.ts'
 import { HandDrawn } from './HandDrawn.tsx'
@@ -42,7 +67,6 @@ import {
   type HighlighterStyle,
   type PaintedHighlight,
 } from './highlightStyle.ts'
-import { rangesOfQuote } from './selection.ts'
 
 /** One stored highlight: enough to find it and enough to paint it. */
 export interface HighlightLike {
@@ -98,115 +122,10 @@ export function canPaintHighlights(): boolean {
   return typeof CSS !== 'undefined' && 'highlights' in CSS
 }
 
-/** A CSS ident per colour, and the stylesheet that gives each one its rule. */
-const NAMES = new Map<string, string>()
-let sheet: HTMLStyleElement | null = null
-
-function nameFor(colour: string): string {
-  const known = NAMES.get(colour)
-  if (known) return known
-
-  const name = `rb-highlight-${NAMES.size}`
-  NAMES.set(colour, name)
-
-  if (!sheet) {
-    sheet = document.createElement('style')
-    sheet.dataset.reason = 'reader highlights'
-    document.head.append(sheet)
-  }
-  // `::highlight` takes background-color and colour and little else, which is
-  // all a highlight needs. The ink is left alone deliberately: recolouring the
-  // text as well is what makes a highlighted passage harder to read, not
-  // easier.
-  sheet.append(document.createTextNode(`::highlight(${name}){background-color:${colour};}`))
-  return name
-}
-
 export function Highlights({ highlights, root, watch, style = 'clean' }: HighlightsProps) {
   const rows = useMemo(() => paintable(highlights), [highlights])
-  const drawn = style === 'handdrawn'
-
-  const paint = useCallback(() => {
-    // The other renderer is on. Painting both would double every colour.
-    if (drawn || !root || !canPaintHighlights()) return () => {}
-
-    const ranges = new Map<string, Range[]>()
-    for (const highlight of highlights) {
-      if (!highlight.quote || !highlight.colour) continue
-      /*
-       * Every copy of the paragraph, not only the one on the live page. A page
-       * turn flips a clone, and a range points at text nodes — so the clone
-       * carries none of the ink unless it is registered too. That is why the
-       * colour used to vanish the moment a finger started a swipe.
-       */
-      for (const range of rangesOfQuote(highlight.anchor, highlight.quote)) {
-        const found = ranges.get(highlight.colour)
-        if (found) found.push(range)
-        else ranges.set(highlight.colour, [range])
-      }
-    }
-
-    const painted: string[] = []
-    for (const [colour, group] of ranges) {
-      const name = nameFor(colour)
-      CSS.highlights.set(name, new Highlight(...group))
-      painted.push(name)
-    }
-
-    return () => {
-      for (const name of painted) CSS.highlights.delete(name)
-    }
-  }, [drawn, highlights, root])
-
-  useEffect(() => {
-    if (!root) return
-
-    let drop = paint()
-
-    /*
-     * The one thing a live range cannot survive: the words themselves being
-     * replaced.
-     *
-     * A range holds text nodes, not text. React throws those nodes away and
-     * makes new ones whenever the page is re-rendered — a section change, a new
-     * font, a re-parse — and a range left holding the old ones points at
-     * nothing and paints nothing. Movement is fine, and is why this component
-     * exists in this shape; replacement is not, and this is the watch for it.
-     *
-     * Nothing here is measured, so this waits on a timer rather than on a
-     * frame: a re-render's worth of mutations still folds into one pass, and it
-     * still runs in a tab that is painting no frames at all.
-     */
-    let pending = 0
-    const soon = () => {
-      if (pending) return
-      pending = window.setTimeout(() => {
-        pending = 0
-        drop()
-        drop = paint()
-      }, 0)
-    }
-
-    const changes =
-      typeof MutationObserver === 'function' ? new MutationObserver(soon) : null
-    changes?.observe(root, { childList: true, subtree: true, characterData: true })
-    /*
-     * And the sheets, which arrive next to the page rather than inside it. A
-     * turn adds a clone of the page to the stage and takes it away again at the
-     * end; both are the moment to register the ranges again, so the ink is on
-     * whichever copy the reader is looking at.
-     */
-    const frame = root.closest('[data-page-frame]') ?? root.parentElement
-    if (frame) changes?.observe(frame, { childList: true })
-
-    return () => {
-      if (pending) window.clearTimeout(pending)
-      changes?.disconnect()
-      drop()
-    }
-  }, [paint, root, watch])
-
-  // Clean has nothing to render: the page carries the colour itself.
-  if (!drawn) return null
-  return <HandDrawn highlights={rows} root={root} watch={watch} />
+  // One painter for both styles. See `HandDrawn`'s `marker` prop for why the
+  // browser's own highlight API had to go.
+  return <HandDrawn highlights={rows} root={root} watch={watch} marker={style === 'handdrawn'} />
 }
+
