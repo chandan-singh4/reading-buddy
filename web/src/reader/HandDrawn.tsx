@@ -56,6 +56,8 @@ function blockOf(node: Node | null): HTMLElement | null {
 /** One line-box of one highlight, in its paragraph's own coordinates. */
 interface Stroke {
   key: string
+  /** Which highlight this stroke belongs to, so ink can outlive its row or not. */
+  id: string
   top: number
   left: number
   width: number
@@ -372,6 +374,7 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
           const column = fragmentOf(rect)
           mark.strokes.push({
             key: `${highlight.id}:${line}`,
+            id: highlight.id,
             top: (rect.top - box.top + column * fold) / scale,
             left: (rect.left - box.left - column * pitch) / scale,
             width: rect.width / scale,
@@ -403,7 +406,31 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
      * there. The ink is only cleared when the reader actually removes it, which
      * is the early return at the top.
      */
-    if (found.length === 0) return
+    if (found.length === 0) {
+      /*
+       * Ignored, but not blindly. Ink for a row the reader has deleted must go.
+       *
+       * The rule above keeps the old ink because an empty measure is usually a
+       * bad moment. It is not a bad moment when the reader has just taken a mark
+       * off: the row is gone, the measure is honestly empty, and holding the old
+       * answer left the colour on the words for good. That happened whenever the
+       * deleted mark was the only one this root could measure — the book's other
+       * highlights kept `highlights` non-empty, so the clear at the top never
+       * ran, and nothing else ever cleared it.
+       *
+       * So drop the strokes whose highlight no longer exists, and keep the rest.
+       * A mid-turn empty measure loses nothing, because every one of its rows is
+       * still alive.
+       */
+      const live = new Set(highlights.map((highlight) => highlight.id))
+      setMarks((current) => {
+        const kept = current
+          .map((mark) => ({ ...mark, strokes: mark.strokes.filter((s) => live.has(s.id)) }))
+          .filter((mark) => mark.strokes.length > 0)
+        return same(current, kept) ? current : kept
+      })
+      return
+    }
     // Only when it actually moved. A measure runs on every mutation in the
     // column, and a fresh array each time would re-render every layer for a page
     // that has not moved a pixel.
@@ -454,17 +481,40 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
     const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(soon) : null
     sizes?.observe(root)
 
-    // Capture, because the strip that actually scrolls is inside the page and
-    // its scroll event does not bubble to the window.
-    window.addEventListener('scroll', soon, { capture: true, passive: true })
+    /*
+     * Scroll is deliberately not listened to, and that is a fix, not an
+     * omission.
+     *
+     * It was listened to when the ink was measured in screen coordinates. It is
+     * measured in the paragraph's own coordinates now, and scrolling a strip of
+     * columns moves the paragraph and the ink together — verified in the running
+     * page: 1200px of scroll left every stroke's `top`, `left` and `width`
+     * identical. So the listener could never change an answer.
+     *
+     * It could and did cost a great deal. A page turn writes to the DOM on every
+     * frame and scrolls the strip, and a geometry read after a write must relay
+     * the whole strip out. Measured on a 6000-paragraph section: a read costs
+     * 0.1ms with layout clean and about 550ms with it dirty. One turn of a
+     * heavily marked page therefore paid for several full relayouts, which is
+     * exactly the slow, sticky turn the reader reported — worst in hand-drawn,
+     * because that page carries the most ink.
+     */
     window.addEventListener('resize', soon, { passive: true })
+
+    /*
+     * A picture arriving *does* move the words, and it is neither a mutation nor
+     * a size change of the strip — the image element was always there, and the
+     * strip's own box never changes. It is the columns behind it that shift.
+     * Capture, because `load` does not bubble. It fires once per picture.
+     */
+    root.addEventListener('load', soon, { capture: true })
 
     return () => {
       if (pending) window.clearTimeout(pending)
       changes?.disconnect()
       sizes?.disconnect()
-      window.removeEventListener('scroll', soon, { capture: true })
       window.removeEventListener('resize', soon)
+      root.removeEventListener('load', soon, { capture: true })
     }
   }, [measure, root, watch])
 
