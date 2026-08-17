@@ -276,6 +276,36 @@ export function flatIndexOf(from: Source[], node: Node, offset: number): number 
  */
 export function rangeOfQuote(anchor: Anchor, quote: string): Range | null {
   const element = document.getElementById(anchor.replace(/[[\]]/g, ''))
+  if (!element) return rangeIn(null, quote)
+  return rangeIn(element, quote)
+}
+
+/**
+ * The same words, in every copy of their paragraph that is on screen.
+ *
+ * A page turn puts a *clone* of the page over the real one and flips that. The
+ * clone holds copies of the text nodes, and a range points at nodes rather than
+ * at text — so a highlight registered against the real page paints nothing on
+ * the sheet, and the colour drops out the instant a finger moves. Painting every
+ * copy keeps the ink on the page that is actually being looked at.
+ *
+ * Ordinarily there is exactly one copy and this is `rangeOfQuote` with a longer
+ * name. A duplicate id is illegal in a document a person writes by hand; here
+ * one is made on purpose, for a few hundred milliseconds, by the turn.
+ */
+export function rangesOfQuote(anchor: Anchor, quote: string): Range[] {
+  const id = anchor.replace(/[[\]]/g, '')
+  if (!ANCHOR_ID.test(id)) return []
+
+  const found: Range[] = []
+  for (const element of document.querySelectorAll(`[id="${id}"]`)) {
+    const range = rangeIn(element, quote)
+    if (range) found.push(range)
+  }
+  return found
+}
+
+function rangeIn(element: Element | null, quote: string): Range | null {
   if (!element) return null
 
   const { flat, from } = flatten(element)

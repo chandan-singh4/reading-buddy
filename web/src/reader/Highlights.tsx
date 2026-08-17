@@ -42,7 +42,7 @@ import {
   type HighlighterStyle,
   type PaintedHighlight,
 } from './highlightStyle.ts'
-import { rangeOfQuote } from './selection.ts'
+import { rangesOfQuote } from './selection.ts'
 
 /** One stored highlight: enough to find it and enough to paint it. */
 export interface HighlightLike {
@@ -133,12 +133,17 @@ export function Highlights({ highlights, root, watch, style = 'clean' }: Highlig
     const ranges = new Map<string, Range[]>()
     for (const highlight of highlights) {
       if (!highlight.quote || !highlight.colour) continue
-      const range = rangeOfQuote(highlight.anchor, highlight.quote)
-      if (!range || !root.contains(range.commonAncestorContainer)) continue
-
-      const found = ranges.get(highlight.colour)
-      if (found) found.push(range)
-      else ranges.set(highlight.colour, [range])
+      /*
+       * Every copy of the paragraph, not only the one on the live page. A page
+       * turn flips a clone, and a range points at text nodes — so the clone
+       * carries none of the ink unless it is registered too. That is why the
+       * colour used to vanish the moment a finger started a swipe.
+       */
+      for (const range of rangesOfQuote(highlight.anchor, highlight.quote)) {
+        const found = ranges.get(highlight.colour)
+        if (found) found.push(range)
+        else ranges.set(highlight.colour, [range])
+      }
     }
 
     const painted: string[] = []
@@ -185,6 +190,14 @@ export function Highlights({ highlights, root, watch, style = 'clean' }: Highlig
     const changes =
       typeof MutationObserver === 'function' ? new MutationObserver(soon) : null
     changes?.observe(root, { childList: true, subtree: true, characterData: true })
+    /*
+     * And the sheets, which arrive next to the page rather than inside it. A
+     * turn adds a clone of the page to the stage and takes it away again at the
+     * end; both are the moment to register the ranges again, so the ink is on
+     * whichever copy the reader is looking at.
+     */
+    const frame = root.closest('[data-page-frame]') ?? root.parentElement
+    if (frame) changes?.observe(frame, { childList: true })
 
     return () => {
       if (pending) window.clearTimeout(pending)
