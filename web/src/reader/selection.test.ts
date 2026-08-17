@@ -7,8 +7,10 @@ import {
   selectAround,
   pivotFor,
   selectionBetween,
+  rangeOfQuote,
   type ReaderSelection,
 } from './selection.ts'
+import type { Anchor } from '../structure/index.ts'
 
 // jsdom lays nothing out, so a range has no boxes. Nothing here is about where
 // the selection sits on screen; this only keeps `describe` from tripping.
@@ -108,5 +110,37 @@ describe('dragging one end of a selection', () => {
     caretAt(node, 4)
 
     expect(selectionBetween(pivotFor(at, 'end'), 0, 0, root)).toBeNull()
+  })
+})
+
+describe('a quote that covers more than one paragraph', () => {
+  /** Three paragraphs, run together exactly as the parser emits them. */
+  function pages(): HTMLElement {
+    document.body.innerHTML =
+      '<main id="strip">' +
+      '<p id="ch01-s01-p001">One one one.</p>' +
+      '<p id="ch01-s01-p002">Two two two.</p>' +
+      '<p id="ch01-s01-p003">Three three three.</p>' +
+      '</main>'
+    return document.getElementById('strip') as HTMLElement
+  }
+
+  it('finds a quote that runs past the end of its own paragraph', () => {
+    // The report: "I highlighted three paragraphs together. The highlight was
+    // saved in Notes, but the colour was missing." The quote was looked for in
+    // the anchor paragraph alone, so it was never found and never painted.
+    pages()
+    const quote = 'one one.Two two two.Three'
+
+    const range = rangeOfQuote('[ch01-s01-p001]' as Anchor, quote)
+
+    expect(range).not.toBeNull()
+    expect(range?.toString()).toBe(quote)
+    expect((range?.endContainer.parentElement as HTMLElement).id).toBe('ch01-s01-p003')
+  })
+
+  it('still refuses words that are not on the page', () => {
+    pages()
+    expect(rangeOfQuote('[ch01-s01-p001]' as Anchor, 'four four four')).toBeNull()
   })
 })

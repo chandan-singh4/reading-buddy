@@ -305,23 +305,68 @@ export function rangesOfQuote(anchor: Anchor, quote: string): Range[] {
   return found
 }
 
+/**
+ * How many blocks past the first one a quote is allowed to run.
+ *
+ * A reader can select several paragraphs at once — the menu's Paragraph button
+ * grows the selection one paragraph at a time — so a quote is not always inside
+ * the paragraph it is anchored to. It is always a *bounded* number of blocks
+ * after it, though, and the search must not walk the rest of the chapter when
+ * the words are simply not there any more.
+ */
+const SPAN_BLOCKS = 64
+
 function rangeIn(element: Element | null, quote: string): Range | null {
   if (!element) return null
 
-  const { flat, from } = flatten(element)
-
   const wanted = quote.replace(/\s+/g, ' ').trim()
-  const at = flat.indexOf(wanted)
-  if (at < 0 || wanted.length === 0) return null
+  if (wanted.length === 0) return null
 
-  const start = from[at]
-  const end = from[at + wanted.length - 1]
-  if (!start || !end) return null
+  /*
+   * The quote may run past the end of its own paragraph.
+   *
+   * A highlight is stored as `range.toString()` with its spaces squeezed, and a
+   * range over three paragraphs stringifies as their text run together — the
+   * parser leaves no whitespace between block elements, so there is not even a
+   * space at the join (measured in the running page, not assumed). Flattening
+   * one paragraph therefore cannot contain such a quote, `indexOf` answered -1,
+   * and the highlight was saved with no ink to show for it.
+   *
+   * So the flat text grows one block at a time from the anchor, joined exactly
+   * as the browser joined it, until the words are found or the text is longer
+   * than the words can be.
+   */
+  let flat = ''
+  let from: Source[] = []
+  let block: Element | null = element
+  /** The furthest the quote can reach: it begins inside the first block. */
+  let reach = 0
 
-  const range = document.createRange()
-  range.setStart(start.node, start.offset)
-  range.setEnd(end.node, end.offset + 1)
-  return range
+  for (let step = 0; block && step <= SPAN_BLOCKS; step += 1) {
+    const piece = flatten(block)
+    flat += piece.flat
+    from = from.concat(piece.from)
+    if (step === 0) reach = flat.length + wanted.length
+
+    const at = flat.indexOf(wanted)
+    if (at >= 0) {
+      const start = from[at]
+      const end = from[at + wanted.length - 1]
+      if (!start || !end) return null
+
+      const range = document.createRange()
+      range.setStart(start.node, start.offset)
+      range.setEnd(end.node, end.offset + 1)
+      return range
+    }
+
+    // Past this length the quote cannot begin inside the first block any more,
+    // and a quote always begins at its anchor.
+    if (flat.length >= reach) return null
+    block = block.nextElementSibling
+  }
+
+  return null
 }
 
 /**

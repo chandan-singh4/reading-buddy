@@ -84,6 +84,56 @@ interface Mark {
  */
 const VARIANTS = [0, 1, 2, 3]
 
+/**
+ * Every anchored block a quote covers, from the first to the last.
+ *
+ * They are siblings in the strip, so the walk is `nextElementSibling`. Bounded,
+ * because a range whose end is somehow not after its start must not become a
+ * walk to the end of the chapter.
+ */
+function blocksOf(first: HTMLElement, last: HTMLElement | null): HTMLElement[] {
+  const blocks: HTMLElement[] = [first]
+  if (!last || last === first) return blocks
+
+  let node = first.nextElementSibling
+  for (let step = 0; node && step < SPAN_BLOCKS; step += 1) {
+    if (node instanceof HTMLElement && ANCHOR_ID.test(node.id)) blocks.push(node)
+    if (node === last) return blocks
+    node = node.nextElementSibling
+  }
+  // The end was never reached: paint the block we are sure of and no more.
+  return [first]
+}
+
+/** How many blocks past the first one one quote may cover. */
+const SPAN_BLOCKS = 64
+
+/**
+ * The part of `range` that lies inside `block`, or `null` if none of it does.
+ *
+ * A range over three paragraphs measures as one set of line boxes across all
+ * three, and those boxes have to be placed in three different paragraphs. Cut
+ * the range at the block's own edges and each piece measures where it belongs.
+ */
+function clipTo(range: Range, block: HTMLElement): Range | null {
+  const whole = document.createRange()
+  whole.selectNodeContents(block)
+
+  const part = range.cloneRange()
+  try {
+    if (part.compareBoundaryPoints(Range.START_TO_START, whole) < 0) {
+      part.setStart(whole.startContainer, whole.startOffset)
+    }
+    if (part.compareBoundaryPoints(Range.END_TO_END, whole) > 0) {
+      part.setEnd(whole.endContainer, whole.endOffset)
+    }
+  } catch {
+    // Boundary points in different documents — a copy of the page mid-turn.
+    return null
+  }
+  return part.collapsed ? null : part
+}
+
 /** Whether two measured sets place the same ink in the same places. */
 function same(a: readonly Mark[], b: readonly Mark[]): boolean {
   if (a.length !== b.length) return false
@@ -146,19 +196,35 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
        * finds nothing at all. Walking up from the range cannot get that wrong,
        * and it lands on the same paragraph the quote was matched inside.
        */
-      const block = blockOf(range.startContainer)
-      if (!block || !root.contains(block)) continue
+      const first = blockOf(range.startContainer)
+      const last = blockOf(range.endContainer) ?? first
+      if (!first || !root.contains(first)) continue
 
       /*
-       * The page can be under a scale — that is what raising the toolbars does —
-       * and `getClientRects` answers in painted pixels while the box the ink is
-       * placed in is measured in layout ones. One divides out the other.
+       * One quote can cover several paragraphs, and each paragraph holds its own
+       * ink. A reader who taps Paragraph twice selects two of them; the range is
+       * then one range over two blocks, and a single set of strokes measured
+       * against the first block would place the second block's lines hundreds of
+       * pixels away — or, before this, nowhere at all.
+       *
+       * So the range is cut at each block boundary and each piece is measured
+       * against the block it lies in.
        */
-      const bounds = block.getBoundingClientRect()
-      const scale = block.offsetWidth > 0 ? bounds.width / block.offsetWidth : 1
-      if (scale <= 0) continue
+      for (const block of blocksOf(first, last)) {
+        if (!root.contains(block)) continue
+        const part = clipTo(range, block)
+        if (!part) continue
 
-      /*
+        /*
+         * The page can be under a scale — that is what raising the toolbars does
+         * — and `getClientRects` answers in painted pixels while the box the ink
+         * is placed in is measured in layout ones. One divides out the other.
+         */
+        const bounds = block.getBoundingClientRect()
+        const scale = block.offsetWidth > 0 ? bounds.width / block.offsetWidth : 1
+        if (scale <= 0) continue
+
+        /*
        * The origin is the paragraph's *first* fragment, not its bounding box.
        *
        * The page is a strip of columns, and a paragraph long enough to run past
@@ -173,33 +239,34 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
        * is what moved a whole highlight onto the following page.
        *
        * The strokes of the second piece then come out with a left offset of
-       * roughly one column plus the gap, which is exactly where that column is.
-       */
-      const box = block.getClientRects()[0] ?? bounds
+         * roughly one column plus the gap, which is exactly where that column is.
+         */
+        const box = block.getClientRects()[0] ?? bounds
 
-      // The seed is derived from the highlight's id, so a mark keeps the same
-      // wobble and the same tilt for its whole life — through a re-measure, a
-      // page turn, and a reload.
-      const variant = VARIANTS[Math.floor(highlight.seed * VARIANTS.length)] ?? 0
-      const tilt = (highlight.seed - 0.5) * 1.2
+        // The seed is derived from the highlight's id, so a mark keeps the same
+        // wobble and the same tilt for its whole life — through a re-measure, a
+        // page turn, and a reload.
+        const variant = VARIANTS[Math.floor(highlight.seed * VARIANTS.length)] ?? 0
+        const tilt = (highlight.seed - 0.5) * 1.2
 
-      const mark = byBlock.get(block) ?? { key: block.id, block, strokes: [] }
-      byBlock.set(block, mark)
+        const mark = byBlock.get(block) ?? { key: block.id, block, strokes: [] }
+        byBlock.set(block, mark)
 
-      let line = 0
-      for (const rect of range.getClientRects()) {
-        if (rect.width <= 0 || rect.height <= 0) continue
-        mark.strokes.push({
-          key: `${highlight.id}:${line}`,
-          top: (rect.top - box.top) / scale,
-          left: (rect.left - box.left) / scale,
-          width: rect.width / scale,
-          height: rect.height / scale,
-          colour: highlight.colour,
-          variant,
-          tilt,
-        })
-        line += 1
+        let line = mark.strokes.length
+        for (const rect of part.getClientRects()) {
+          if (rect.width <= 0 || rect.height <= 0) continue
+          mark.strokes.push({
+            key: `${highlight.id}:${line}`,
+            top: (rect.top - box.top) / scale,
+            left: (rect.left - box.left) / scale,
+            width: rect.width / scale,
+            height: rect.height / scale,
+            colour: highlight.colour,
+            variant,
+            tilt,
+          })
+          line += 1
+        }
       }
     }
 
