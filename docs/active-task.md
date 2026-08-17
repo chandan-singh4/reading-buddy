@@ -283,3 +283,36 @@ jump into a new section still does.
 No test: a seam drag needs columns and `element.animate`, and jsdom has
 neither. This was checked in the browser — after the fix, no such animation
 starts on landing.
+
+### The page under the sheet was wider than the page
+
+The photograph showed it plainly: under the curling sheet, the arriving text
+ran to the edge of the screen. After the turn landed, the same text had a
+margin. The eye reads that as the words sliding left.
+
+**The measurement.** On a 375px screen:
+
+| | Live page | Understudy |
+|---|---|---|
+| Width | 353.2 | 375.2 |
+| Right edge | 364.2 | 386.2 |
+| Strip length | 738 | 782 |
+
+The understudy was 22px wider — the stage's two paddings — and its right edge
+was 11px past the screen.
+
+**The cause.** `.understudy` insets the strip with `left` and `right`. But an
+inset only decides the width when nothing else does, and `.page` sets
+`width: 100%`. Out of the flow that is 100% of the stage's *padding* box, which
+is wider than the flex line the real page sits on. The browser then balanced
+the box with `margin-right: -22px`.
+
+Two rules of one class each, and `.page` is written second, so `.page` won on
+source order.
+
+**The fix.** The rule is `.page.understudy` now, and it sets `width: auto`. The
+inset decides the width, as it was meant to.
+
+This is a real fault, not only an apparent one. A 22px wider column breaks its
+lines in different places, so every page under the sheet was set to a different
+measure than the page that replaced it.

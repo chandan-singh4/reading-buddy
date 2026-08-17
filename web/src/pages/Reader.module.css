@@ -259,18 +259,38 @@
  * edge rather than from the flex line `.page` sits on. The four values are the
  * same tokens `.stage` pads with, which is what keeps the two boxes identical.
  */
-.understudy {
+/* Two classes, not one: every strip carries `.page` as well, and `.page` is
+   written below this — so at equal weight it would win on source order, which
+   is exactly how `width: 100%` came to beat the inset below. */
+.page.understudy {
   position: absolute;
   top: var(--running-head);
   bottom: var(--status-line);
   left: var(--page-deck);
   right: var(--page-deck);
+  /*
+   * The inset above only decides the width if nothing else does — and `.page`
+   * does: `width: 100%`. Out of the flow that means 100% of the stage's *padding*
+   * box, which is the stage's two paddings wider than the flex line the real page
+   * sits on. The browser then solved the over-constrained box with
+   * `margin-right: -22px`, so the strip hung past the right edge of the screen.
+   *
+   * The reader saw it as the arriving page having no right margin: text ran to
+   * the edge under the sheet, and gained a margin the moment the real page took
+   * over. Worse, a 22px wider column breaks its lines in different places, so
+   * the words genuinely moved as well.
+   *
+   * `auto` hands the width back to `left` and `right`, which is what this rule
+   * meant all along. `max-width` still centres it on a wide screen, exactly as
+   * it centres the real page.
+   */
+  width: auto;
   visibility: hidden;
   pointer-events: none;
 }
 
 /* Brought out only for the length of a seam turn, under the sheet. */
-.understudy[data-showing='true'] {
+.page.understudy[data-showing='true'] {
   visibility: visible;
 }
 
