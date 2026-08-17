@@ -2587,6 +2587,27 @@ export default function Reader() {
     setColumn(element)
   }, [])
 
+  /*
+   * The same, for the two understudies — because they are read pages too.
+   *
+   * A turn at a section seam does not copy the strip: it brings the understudy
+   * out and turns *that*. So a highlight on the first page of the next section
+   * was painted on the real strip, which was not what the reader was looking at,
+   * and the colour only appeared once the turn finished and the section loaded.
+   * That was the fault reported over and over. Every page a reader can see needs
+   * its own ink.
+   */
+  const [beforeColumn, setBeforeColumn] = useState<HTMLElement | null>(null)
+  const holdBefore = useCallback((element: HTMLElement | null) => {
+    beforeStrip.current = element
+    setBeforeColumn(element)
+  }, [])
+  const [afterColumn, setAfterColumn] = useState<HTMLElement | null>(null)
+  const holdAfter = useCallback((element: HTMLElement | null) => {
+    afterStrip.current = element
+    setAfterColumn(element)
+  }, [])
+
   /**
    * A tap on a highlight opens the menu over it.
    *
@@ -3273,7 +3294,7 @@ export default function Reader() {
             reading the book out of order.
           */}
           <article
-            ref={beforeStrip}
+            ref={holdBefore}
             className={`${styles.page} ${styles.understudy}`}
             data-showing="false"
             aria-hidden="true"
@@ -3285,7 +3306,7 @@ export default function Reader() {
           </article>
 
           <article
-            ref={afterStrip}
+            ref={holdAfter}
             className={`${styles.page} ${styles.understudy}`}
             data-showing="false"
             aria-hidden="true"
@@ -3335,6 +3356,30 @@ export default function Reader() {
             highlights={highlights}
             root={column}
             watch={here.section}
+            style={resolveHighlighter(highlighter, settings.theme)}
+          />
+
+          {/*
+            And the same again for the two understudies.
+
+            A seam turn does not flip a copy of this strip — it flips the
+            understudy itself. So the understudy is a page the reader looks at,
+            and it needs its own ink, or a highlight on the first page of the
+            next section stays invisible for the whole turn and only appears
+            after the section lands. Each painter only paints paragraphs its own
+            root contains, and the two sections have different anchor ids, so
+            the three never fight over the same paragraph.
+          */}
+          <Highlights
+            highlights={highlights}
+            root={beforeColumn}
+            watch={beside.previous}
+            style={resolveHighlighter(highlighter, settings.theme)}
+          />
+          <Highlights
+            highlights={highlights}
+            root={afterColumn}
+            watch={beside.next}
             style={resolveHighlighter(highlighter, settings.theme)}
           />
 
