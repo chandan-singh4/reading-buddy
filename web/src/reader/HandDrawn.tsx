@@ -154,9 +154,28 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
        * and `getClientRects` answers in painted pixels while the box the ink is
        * placed in is measured in layout ones. One divides out the other.
        */
-      const box = block.getBoundingClientRect()
-      const scale = block.offsetWidth > 0 ? box.width / block.offsetWidth : 1
+      const bounds = block.getBoundingClientRect()
+      const scale = block.offsetWidth > 0 ? bounds.width / block.offsetWidth : 1
       if (scale <= 0) continue
+
+      /*
+       * The origin is the paragraph's *first* fragment, not its bounding box.
+       *
+       * The page is a strip of columns, and a paragraph long enough to run past
+       * the foot of one is broken in two: a piece at the bottom of this page and
+       * a piece at the top of the next. `getBoundingClientRect` answers with the
+       * box around *both* pieces, whose top is the top of the second one — 466px
+       * above where the paragraph actually starts, in the case that showed this.
+       *
+       * The browser does not place the ink there. An absolutely positioned child
+       * of a broken paragraph hangs off the first piece (measured in the running
+       * page, not assumed). Measuring from one corner and painting from another
+       * is what moved a whole highlight onto the following page.
+       *
+       * The strokes of the second piece then come out with a left offset of
+       * roughly one column plus the gap, which is exactly where that column is.
+       */
+      const box = block.getClientRects()[0] ?? bounds
 
       // The seed is derived from the highlight's id, so a mark keeps the same
       // wobble and the same tilt for its whole life — through a re-measure, a
