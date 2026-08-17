@@ -1860,6 +1860,7 @@ export default function Reader() {
     // understudy that has been standing in for it can go. Done before the scroll
     // below rather than after: the two show the same page, and swapping while
     // they agree is the swap nobody can see.
+    const crossed = holdSeam.current !== null
     if (holdSeam.current) {
       holdSeam.current.dataset.showing = 'false'
       holdSeam.current = null
@@ -1896,9 +1897,15 @@ export default function Reader() {
     // the contents list, the slider crossing a boundary — is a jump, and gets
     // the jump's fade at the same duration. Except the very first section of
     // all: opening the book has its own entrance, and two at once is a flicker.
+    //
+    // A seam turn is a *turn*, and `crossed` is how this knows. The sheet has
+    // already curled over and landed by the time the section loads, so the fade
+    // arrives after the movement is finished and over the page the reader is
+    // already reading — which is the flash they reported, and the text
+    // apparently changing weight as its opacity climbed back to 1.
     const arriving = () => {
       if (turn) playFlip(turn, strip.current)
-      else if (landedBefore.current) fadeIn(strip.current)
+      else if (landedBefore.current && !crossed) fadeIn(strip.current)
       landedBefore.current = true
     }
 

@@ -255,3 +255,31 @@ even when the picture on screen does not change.
 This also fixes the moving words properly. A picture fetched while its section
 was a neighbour is still held when that section becomes the page. So the page
 arrives already laid out, and nothing drops into place after it lands.
+
+### The flash on landing
+
+**The fault.** A seam turn landed, and then the new page flashed. The text
+looked as if it changed weight at the same moment.
+
+**The measurement.** The browser was asked what was moving. Two facts:
+
+- No layout shift was recorded on any turn. The words do not really move.
+- A second animation started on the live strip after the turn had landed:
+  `opacity 0.6 → 1` over 400 ms.
+
+**The cause.** That animation is `fadeIn` in `reader/motion.ts`. It belongs to a
+*jump* — a link, the contents list, the slider. A jump has no direction, so it
+gets a fade instead of a slide. A seam turn loads a section the same way a jump
+does, so it collected the fade as well. The sheet had already curled over and
+landed, so the fade ran on top of a page the reader was reading.
+
+Text drawn at 0.6 opacity is lighter than the same text at 1.0. The 400 ms climb
+back is what looked like the letters changing size.
+
+**The fix.** The landing effect now records `crossed` before it puts the
+understudy away. A turn that crossed a seam is a turn, so it gets no fade. A
+jump into a new section still does.
+
+No test: a seam drag needs columns and `element.animate`, and jsdom has
+neither. This was checked in the browser — after the fix, no such animation
+starts on landing.
