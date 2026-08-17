@@ -109,6 +109,84 @@ function blocksOf(first: HTMLElement, last: HTMLElement | null): HTMLElement[] {
 const SPAN_BLOCKS = 64
 
 /**
+ * The line boxes of a range — the words, and nothing but the words.
+ *
+ * `Range.getClientRects()` is not one answer but two, and which one it gives
+ * depends on where the boundaries sit. Boundaries *inside* text return tight
+ * boxes around the letters. Boundaries on an element — which is what cutting a
+ * range at a paragraph's edge produces — let the browser answer with the boxes
+ * of whole nodes instead, and a fully covered paragraph then comes back as one
+ * rectangle the size of the paragraph. Painted, that is a solid slab of colour
+ * from margin to margin, over the line gaps and past the end of the last line.
+ * That is what the reader photographed: two paragraphs as blocks, and the third
+ * — the only one cut inside its text — correct.
+ *
+ * So no rectangle here is ever asked for across an element edge. The range is
+ * split into one piece per text node, each piece measured on its own, and the
+ * pieces that share a line are joined back together. Text boundaries only, so
+ * there is only ever the one answer.
+ */
+function linesOf(part: Range): DOMRect[] {
+  const found: DOMRect[] = []
+
+  const holder =
+    part.commonAncestorContainer instanceof Element
+      ? part.commonAncestorContainer
+      : part.commonAncestorContainer.parentElement
+  if (!holder) return found
+
+  const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT)
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!part.intersectsNode(node)) continue
+
+    const piece = document.createRange()
+    piece.selectNodeContents(node)
+    if (piece.compareBoundaryPoints(Range.START_TO_START, part) < 0) {
+      piece.setStart(part.startContainer, part.startOffset)
+    }
+    if (piece.compareBoundaryPoints(Range.END_TO_END, part) > 0) {
+      piece.setEnd(part.endContainer, part.endOffset)
+    }
+    if (piece.collapsed) continue
+
+    for (const rect of piece.getClientRects()) {
+      if (rect.width > 0 && rect.height > 0) found.push(rect)
+    }
+  }
+
+  return join(found)
+}
+
+/**
+ * One box per line, out of one box per run of text.
+ *
+ * A line broken by an italic word measures as two or three boxes, and drawn as
+ * three the marker would put a wet pen-pool in the middle of a word. Boxes that
+ * sit on the same line and touch are made one.
+ */
+function join(rects: readonly DOMRect[]): DOMRect[] {
+  const sorted = [...rects].sort((a, b) => a.top - b.top || a.left - b.left)
+  const lines: DOMRect[] = []
+
+  for (const rect of sorted) {
+    const last = lines[lines.length - 1]
+    // Two pixels of tolerance: a superscript or a smaller font on the same line
+    // sits a little higher, and a space between two runs is not a gap.
+    if (last && Math.abs(last.top - rect.top) <= 2 && rect.left <= last.right + 2) {
+      const left = Math.min(last.left, rect.left)
+      const top = Math.min(last.top, rect.top)
+      const right = Math.max(last.right, rect.right)
+      const bottom = Math.max(last.bottom, rect.bottom)
+      lines[lines.length - 1] = new DOMRect(left, top, right - left, bottom - top)
+      continue
+    }
+    lines.push(rect)
+  }
+
+  return lines
+}
+
+/**
  * The part of `range` that lies inside `block`, or `null` if none of it does.
  *
  * A range over three paragraphs measures as one set of line boxes across all
@@ -240,8 +318,44 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
        *
        * The strokes of the second piece then come out with a left offset of
          * roughly one column plus the gap, which is exactly where that column is.
+         *
+         * ## The ink is folded into the next column, exactly as the text is
+         *
+         * The first fragment is the origin, but an offset from it is not a place
+         * on the screen. The paragraph's box is broken by the column, and so is
+         * anything positioned inside it: ink pushed past the foot of the column
+         * does not hang below the page, it reappears at the top of the next
+         * column. Measured in the running page, with a probe at known offsets:
+         *
+         *     top +100 → 100px down, same column
+         *     top +471 → *up* 145px and one column right
+         *     top +900 → two columns right
+         *
+         * Every fold takes the same step: down by the column's height, across by
+         * the column's pitch. Ink for a line in the second fragment must
+         * therefore be given the offset that folds *onto* it — its height plus
+         * one column height, its left minus one column pitch — and the browser
+         * lands it on the words. Placed naively it went a column early, which on
+         * a phone is a highlight painted on the page before the words.
+         *
+         * Both numbers come from the paragraph's own fragments, so nothing here
+         * knows or assumes anything about the page: the pitch is the step
+         * between two fragments' left edges, and the height is the first
+         * fragment's foot down to the second fragment's head.
          */
-        const box = block.getClientRects()[0] ?? bounds
+        const frags = block.getClientRects()
+        const box = frags[0] ?? bounds
+        const pitch = frags.length > 1 ? frags[1]!.left - frags[0]!.left : 0
+        const fold = frags.length > 1 ? frags[0]!.bottom - frags[1]!.top : 0
+
+        /** Which fragment of the paragraph a line sits in. */
+        const fragmentOf = (rect: DOMRect): number => {
+          for (let i = frags.length - 1; i > 0; i -= 1) {
+            const frag = frags[i]!
+            if (rect.left >= frag.left - 1 && rect.top >= frag.top - 1) return i
+          }
+          return 0
+        }
 
         // The seed is derived from the highlight's id, so a mark keeps the same
         // wobble and the same tilt for its whole life — through a re-measure, a
@@ -253,12 +367,13 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
         byBlock.set(block, mark)
 
         let line = mark.strokes.length
-        for (const rect of part.getClientRects()) {
+        for (const rect of linesOf(part)) {
           if (rect.width <= 0 || rect.height <= 0) continue
+          const column = fragmentOf(rect)
           mark.strokes.push({
             key: `${highlight.id}:${line}`,
-            top: (rect.top - box.top) / scale,
-            left: (rect.left - box.left) / scale,
+            top: (rect.top - box.top + column * fold) / scale,
+            left: (rect.left - box.left - column * pitch) / scale,
             width: rect.width / scale,
             height: rect.height / scale,
             colour: highlight.colour,
