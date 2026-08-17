@@ -10,6 +10,28 @@
  * should not follow the reading font the way the page does.
  */
 
+/*
+ * While a page is turning, the selection's furniture steps out of the way.
+ *
+ * A selection now lives through a page turn, so that a reader can turn to the
+ * far end of one and reach the chevron there. But the marks, the handles and the
+ * card are all placed in screen coordinates, and those are only true again once
+ * the turn has landed and the Reader has measured the range afresh. Left showing,
+ * they would sit over the flipping sheet in the places they held on the page the
+ * reader is leaving.
+ *
+ * `data-page-sheet` exists only for the length of a turn. The test is made on
+ * `body` rather than on the page frame because all three of these are portalled
+ * out to `body` and are not inside the frame at all. `visibility`, not
+ * `display`: the card must keep its size, or it would be measured as nothing and
+ * placed again from scratch when it came back.
+ */
+body:has([data-page-sheet]) .mark,
+body:has([data-page-sheet]) .handle,
+body:has([data-page-sheet]) .card {
+  visibility: hidden;
+}
+
 /* The selection itself, painted by the app. One box per line. */
 .mark {
   position: fixed;
@@ -212,7 +234,18 @@
  * the last word the reader is looking at, and it is drawn on the card's surface
  * so it reads as a control rather than as part of the selection.
  */
+/*
+ * Above the card, not under it.
+ *
+ * Placement gives the card `GAP + half a chevron` of clearance, so on a normal
+ * screen the two never meet. But when the card fits neither above nor below the
+ * selection it is clamped to the foot of the window, and a tall card then covers
+ * the selection and both chevrons with it. The chevrons are the only way to grow
+ * the selection by a sentence, so they must stay visible and tappable there.
+ * 13 puts them one step over the card's 12.
+ */
 .chevron {
+  z-index: 13;
   display: grid;
   place-items: center;
   width: 1.5rem;

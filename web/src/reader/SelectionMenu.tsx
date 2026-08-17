@@ -105,6 +105,12 @@ const GAP = 10
  */
 const SLOP = 6
 
+/** The chevron's own size, in pixels. Kept the same as `.chevron` in the CSS. */
+const CHEVRON = 24
+
+/** The page, which owns the turn gesture. See the dismissal rule below. */
+const FRAME = '[data-page-frame]'
+
 function Icon({ path, filled = false }: { path: string; filled?: boolean }) {
   return (
     <svg
@@ -188,8 +194,23 @@ export function SelectionMenu({
     const width = window.innerWidth
     const height = window.innerHeight
 
-    const below = selection.rect.bottom + GAP
-    const above = selection.rect.top - GAP - box.height
+    /*
+     * The card clears the chevrons, rather than sitting on them.
+     *
+     * A chevron is a 1.5rem disc centred on the corner of the selection, so half
+     * of it hangs below the last line and half above the first. `GAP` alone is
+     * smaller than that half, and the card landed on the very button the reader
+     * was reaching for — the end chevron when the card goes below, the start one
+     * when it goes above.
+     *
+     * Only in unit mode. The plain drag knobs are the reader's own finger's
+     * business and sit tight against the text, and holding the card away from
+     * them would push a menu off a short selection for nothing.
+     */
+    const clear = unit === null ? GAP : GAP + CHEVRON / 2 + 2
+
+    const below = selection.rect.bottom + clear
+    const above = selection.rect.top - clear - box.height
     const fitsBelow = below + box.height + MARGIN <= height
     const goesAbove = !fitsBelow && above >= MARGIN
 
@@ -201,7 +222,7 @@ export function SelectionMenu({
       left: Math.max(left, MARGIN),
       above: goesAbove,
     })
-  }, [selection, asking])
+  }, [selection, asking, unit])
 
   // Focus goes to the card itself, not to the first item: the reader is holding
   // a finger on the page, and moving focus onto "Highlight" would announce a
@@ -210,17 +231,60 @@ export function SelectionMenu({
     card.current?.focus({ preventScroll: true })
   }, [])
 
+  /*
+   * What counts as tapping the selection away.
+   *
+   * Everywhere except the page, the answer is still `pointerdown`: a tap outside
+   * clears the selection first, and by click time there is nothing left to act
+   * on.
+   *
+   * The page itself has to wait for the finger to come up, because on the page a
+   * press is the start of two different gestures. A tap means "put this away". A
+   * drag means "turn the page" — and a selection that can cover two pages must
+   * survive that, or the reader can never reach the chevron sitting on the other
+   * one. Both begin with the same `pointerdown`, so the difference is distance,
+   * measured when the finger lifts.
+   *
+   * A press that the system takes away (a call, an edge gesture) keeps the
+   * selection. It was never a tap.
+   */
   useEffect(() => {
+    let held: { x: number; y: number } | null = null
+
     const onDown = (event: PointerEvent) => {
+      held = null
       if (card.current?.contains(event.target as Node)) return
       // A handle is not the card, but grabbing one is not a tap outside either.
       if ((event.target as HTMLElement | null)?.closest?.(`.${styles.handle}`)) return
+
+      if ((event.target as HTMLElement | null)?.closest?.(FRAME)) {
+        held = { x: event.clientX, y: event.clientY }
+        return
+      }
       onDismiss()
     }
-    // `pointerdown` rather than `click`: a tap outside clears the selection
-    // first, and by click time there is nothing left to act on.
+
+    const onUp = (event: PointerEvent) => {
+      const from = held
+      held = null
+      if (!from) return
+      const far =
+        Math.abs(event.clientX - from.x) > SLOP || Math.abs(event.clientY - from.y) > SLOP
+      if (!far) onDismiss()
+    }
+
+    const onCancel = () => {
+      held = null
+    }
+
     document.addEventListener('pointerdown', onDown)
-    return () => document.removeEventListener('pointerdown', onDown)
+    document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onCancel)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onCancel)
+    }
   }, [onDismiss])
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {

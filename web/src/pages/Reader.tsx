@@ -2569,6 +2569,25 @@ export default function Reader() {
     return () => document.removeEventListener('selectionchange', letGo)
   }, [selected])
 
+  /*
+   * The selection is measured again when the page under it moves.
+   *
+   * A selection can start on one page and end on the next, and the reader has to
+   * be able to turn to the far end of it — to reach the chevron there, or simply
+   * to read what they picked. The words themselves are safe: `selected.range`
+   * points into the page, so a turn moves it with the text. What goes stale is
+   * everything drawn from it, because the marks, the two handles and the card are
+   * placed in screen coordinates, and after the turn those describe the page the
+   * reader has just left.
+   *
+   * So the range is asked where it is now. One measure per turn, and the boxes
+   * for lines that are no longer on this page simply fall outside the screen.
+   */
+  useEffect(() => {
+    setSelected((at) => (at ? (describeRange(at.range, strip.current) ?? at) : at))
+    // The page number, not the scroll: this should run once the turn has landed.
+  }, [pages?.page])
+
   const stretchSelection = useCallback((pivot: SelectionPivot, x: number, y: number) => {
     setSelected((at) => (at ? (selectionBetween(pivot, x, y, strip.current) ?? at) : at))
   }, [])
