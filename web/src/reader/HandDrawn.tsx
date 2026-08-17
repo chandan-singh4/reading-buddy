@@ -204,6 +204,24 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
     }
 
     const found = [...byBlock.values()].filter((mark) => mark.strokes.length > 0)
+
+    /*
+     * A measure that finds nothing, while the reader still has highlights, is
+     * not an answer — it is a bad moment.
+     *
+     * The page is rebuilt and rearranged constantly, and a measure lands in the
+     * middle of some of that: a paragraph between two renders, a strip that is
+     * hidden for a turn, a copy that has replaced the original for a few frames.
+     * Any of those reports no boxes at all. Acting on it takes the ink off the
+     * page, and if a page turn photographs the page in that instant, the copy it
+     * flips has no ink on it either — which is what the reader saw as the mark
+     * disappearing the moment a slow swipe began.
+     *
+     * So an empty answer is ignored while the highlights themselves are still
+     * there. The ink is only cleared when the reader actually removes it, which
+     * is the early return at the top.
+     */
+    if (found.length === 0) return
     // Only when it actually moved. A measure runs on every mutation in the
     // column, and a fresh array each time would re-render every layer for a page
     // that has not moved a pixel.
