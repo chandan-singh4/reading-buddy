@@ -2584,7 +2584,25 @@ export default function Reader() {
    * for lines that are no longer on this page simply fall outside the screen.
    */
   useEffect(() => {
-    setSelected((at) => (at ? (describeRange(at.range, strip.current) ?? at) : at))
+    setSelected((at) => {
+      if (!at) return at
+      // The browser's own selection is let go at the first turn. It is a thing
+      // the engine may scroll back into view whenever the strip is touched, and
+      // a reader who turns a page and lands somewhere else has met exactly that.
+      // Nothing here needs it: the marks are drawn by the app, the handles work
+      // from coordinates, and the text was taken when the selection was made.
+      window.getSelection()?.removeAllRanges()
+      // A turn into another section rebuilds the strip, and the range then points
+      // at nodes no page holds any more. Keeping it would leave the marks and the
+      // card standing in the last page's places, over words they do not belong to,
+      // and every tap after that would only be spent putting them away.
+      const now = describeRange(at.range, strip.current)
+      if (!now) {
+        setUnit(null)
+        return null
+      }
+      return now
+    })
     // The page number, not the scroll: this should run once the turn has landed.
   }, [pages?.page])
 

@@ -108,6 +108,15 @@ const SLOP = 6
 /** The chevron's own size, in pixels. Kept the same as `.chevron` in the CSS. */
 const CHEVRON = 24
 
+/**
+ * The least room the card is ever given, in pixels.
+ *
+ * Below this the card is not a menu any more, it is a scroll bar. A selection
+ * this tight against an edge is better served by a short card that overhangs by
+ * a few pixels than by one nothing can be read in.
+ */
+const MIN_CARD = 200
+
 /** The page, which owns the turn gesture. See the dismissal rule below. */
 const FRAME = '[data-page-frame]'
 
@@ -176,7 +185,12 @@ export function SelectionMenu({
     moved: boolean
   } | null>(null)
   const [dragging, setDragging] = useState(false)
-  const [place, setPlace] = useState<{ top: number; left: number; above: boolean } | null>(null)
+  const [place, setPlace] = useState<{
+    top: number
+    left: number
+    above: boolean
+    limit: number
+  } | null>(null)
   const [asking, setAsking] = useState(true)
   const askId = useId()
 
@@ -208,19 +222,49 @@ export function SelectionMenu({
      * them would push a menu off a short selection for nothing.
      */
     const clear = unit === null ? GAP : GAP + CHEVRON / 2 + 2
+    /*
+     * The two chevrons do not hang by the same amount, so they are cleared by
+     * different amounts.
+     *
+     * Both are drawn from the corner of the selection, but `.handleEnd` carries
+     * `translateY(50%)` and `.handleStart` carries `translateY(-50%)`. The end
+     * one is therefore pushed a whole disc below the last line, while the start
+     * one straddles the first line and stands only half a disc above it.
+     */
+    const under = unit === null ? GAP : GAP + CHEVRON + 2
 
-    const below = selection.rect.bottom + clear
-    const above = selection.rect.top - clear - box.height
-    const fitsBelow = below + box.height + MARGIN <= height
-    const goesAbove = !fitsBelow && above >= MARGIN
+    /*
+     * The card never sits on the selection. It takes the side with the room.
+     *
+     * The old rule clamped a card that fit neither side to the foot of the
+     * window, which laid it straight over the words and over the chevrons — the
+     * end chevron landed on the Paragraph button, so the tap that should have
+     * grown the selection by a sentence took the whole paragraph instead.
+     *
+     * So: measure the room on each side, take the side that holds the card, and
+     * if neither does, take the roomier side and cap the card to it. A capped
+     * card scrolls inside itself. A short menu is never capped, and a reader who
+     * selects near the middle of a full screen scrolls a menu instead of losing
+     * the control they were aiming at.
+     */
+    const roomBelow = height - MARGIN - (selection.rect.bottom + under)
+    const roomAbove = selection.rect.top - clear - MARGIN
+    // `scrollHeight`, not the rect: once a cap is on, the rect reports the
+    // capped height, and measuring that would let the cap shrink itself on every
+    // pass. `scrollHeight` is the height the card wants, capped or not.
+    const wants = node.scrollHeight
+    const goesAbove = wants > roomBelow && roomAbove > roomBelow
+    const room = Math.max(goesAbove ? roomAbove : roomBelow, MIN_CARD)
+    const tall = Math.min(wants, room)
 
     const middle = (selection.rect.left + selection.rect.right) / 2
     const left = Math.min(Math.max(middle - box.width / 2, MARGIN), width - box.width - MARGIN)
 
     setPlace({
-      top: goesAbove ? above : Math.min(below, height - box.height - MARGIN),
+      top: goesAbove ? selection.rect.top - clear - tall : selection.rect.bottom + under,
       left: Math.max(left, MARGIN),
       above: goesAbove,
+      limit: room,
     })
   }, [selection, asking, unit])
 
@@ -506,6 +550,9 @@ export function SelectionMenu({
       style={{
         top: place ? `${place.top}px` : 0,
         left: place ? `${place.left}px` : 0,
+        // The room the placement found on the chosen side. The card scrolls
+        // rather than growing past it and onto the words.
+        maxHeight: place ? `${place.limit}px` : undefined,
         // Hidden until measured, so it is never seen in the wrong place. Hidden
         // again during a drag: the card would sit over the words being chosen.
         visibility: place && !dragging ? 'visible' : 'hidden',

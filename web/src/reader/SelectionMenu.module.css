@@ -100,7 +100,12 @@ body:has([data-page-sheet]) .card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
-  overflow: hidden;
+  /* `hidden` across, so the rounded corners still clip the rows. `auto` down,
+     because the placement caps the height to the room beside the selection and
+     a long menu has to scroll inside that rather than cover the words. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   animation: rise 120ms ease-out;
 }
 
