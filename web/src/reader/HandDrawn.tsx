@@ -40,8 +40,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { PaintedHighlight } from './highlightStyle.ts'
-import { rangeOfQuote } from './selection.ts'
+import { ANCHOR_ID, rangeOfQuote } from './selection.ts'
 import styles from './HandDrawn.module.css'
+
+/** The anchored paragraph a node sits in, if it is in one. */
+function blockOf(node: Node | null): HTMLElement | null {
+  let element = node instanceof Element ? node : (node?.parentElement ?? null)
+  while (element) {
+    if (element instanceof HTMLElement && ANCHOR_ID.test(element.id)) return element
+    element = element.parentElement
+  }
+  return null
+}
 
 /** One line-box of one highlight, in its paragraph's own coordinates. */
 interface Stroke {
@@ -118,8 +128,15 @@ export function HandDrawn({ highlights, root, watch }: HandDrawnProps) {
       const range = rangeOfQuote(highlight.anchor, highlight.quote)
       if (!range || !root.contains(range.commonAncestorContainer)) continue
 
-      const block = document.getElementById(highlight.anchor)
-      if (!(block instanceof HTMLElement) || !root.contains(block)) continue
+      /*
+       * The block comes from the range, not from `getElementById(anchor)`. An
+       * anchor is stored in brackets — `[ch02-s03-p013]` — and the element's id
+       * is the bare part inside them, so looking one up by the stored string
+       * finds nothing at all. Walking up from the range cannot get that wrong,
+       * and it lands on the same paragraph the quote was matched inside.
+       */
+      const block = blockOf(range.startContainer)
+      if (!block || !root.contains(block)) continue
 
       /*
        * The page can be under a scale — that is what raising the toolbars does —
