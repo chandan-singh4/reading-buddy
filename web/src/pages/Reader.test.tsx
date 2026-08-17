@@ -50,10 +50,27 @@ function sectionOf(chapter: number, section: number, texts: string[]): Section {
  * to cross a chapter boundary in both directions, which is the case that
  * navigation actually has to think about.
  */
+/** A stored picture, in the section *next* to the one the reader opens on. */
+const NEIGHBOUR_FIGURE = 'OEBPS/images/plate.png'
+
 function bookOf(): ParsedBook {
+  const neighbour = sectionOf(1, 2, ['Later in the first chapter.'])
+  // A figure one section ahead. An understudy that draws this at no height
+  // breaks its columns in the wrong places, so the reader lands on the page and
+  // then watches the words drop — see `shownParagraphs` in Reader.tsx.
+  neighbour.paragraphs = [
+    ...neighbour.paragraphs,
+    {
+      anchor: formatAnchor({ chapter: 1, section: 2, paragraph: 2 }),
+      text: 'A plate.',
+      kind: 'figure' as const,
+      image: { src: NEIGHBOUR_FIGURE },
+    },
+  ]
+
   const sections = [
     sectionOf(1, 1, ['The opening words.', 'A second thought.']),
-    sectionOf(1, 2, ['Later in the first chapter.']),
+    neighbour,
     sectionOf(2, 1, ['The second chapter begins.']),
   ]
 
@@ -253,6 +270,20 @@ describe('moving through the book', () => {
 
     expect(await screen.findByText('Later in the first chapter.')).toBeTruthy()
     expect(onThePage('The opening words.')).toBeNull()
+  })
+
+  it("fetches a neighbour's pictures with the page's own, so the columns agree", async () => {
+    const assets = vi.spyOn(repository, 'getAssets')
+    openReader()
+    await screen.findByText('The opening words.')
+    await screen.findByText('Later in the first chapter.')
+
+    // The reader is on section 1. The plate is in section 2, which is mounted
+    // behind it. Its bytes have to be asked for now, not when the turn lands:
+    // a figure with no picture yet is a figure with no height.
+    const asked = assets.mock.calls.flatMap(([, paths]) => [...paths])
+    expect(asked).toContain(NEIGHBOUR_FIGURE)
+    assets.mockRestore()
   })
 
   it('keeps the next section mounted, so a turn at the seam has somewhere to land', async () => {

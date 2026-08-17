@@ -378,7 +378,18 @@ export default function Reader() {
    * to make a moment later anyway, moved earlier, and IndexedDB serves them off
    * the same store the current page came from.
    */
-  const [beside, setBeside] = useState<{ previous?: Section; next?: Section }>({})
+  const [beside, setBeside] = useState<{
+    /**
+     * The path of the section these two sit beside.
+     *
+     * They outlive the page they were read for, on purpose: see the effect that
+     * sets them. So every use has to ask whether they still describe the page on
+     * screen, and `for` is the only honest way to ask.
+     */
+    for?: string
+    previous?: Section
+    next?: Section
+  }>({})
 
   /*
    * Whose book the two states above are describing.
@@ -414,10 +425,29 @@ export default function Reader() {
       id ? repository.getAssets(id, paths) : new Map<string, Blob>(),
     [id],
   )
-  const figureImages = useFigureImages(
-    page.status === 'ready' ? page.section.paragraphs : EMPTY_PARAGRAPHS,
-    loadAssets,
-  )
+  /*
+   * The pictures for all three strips, not just the one on screen.
+   *
+   * An understudy is a real page the reader can be dragged onto, so it has to
+   * break its columns exactly where the section itself will. A figure with no
+   * picture yet draws at no height. Every line after it then sits a picture's
+   * worth too high, and the reader lands on the page and watches the text drop
+   * into place as the real section arrives — with the picture appearing before
+   * the turn has finished. That was the reported fault.
+   *
+   * Memoised because the hook re-fetches whenever this array changes identity,
+   * and it returns the live list unchanged while there are no neighbours, so a
+   * book with no figures never builds a second array.
+   */
+  const shownParagraphs = useMemo(() => {
+    const live = page.status === 'ready' ? page.section.paragraphs : EMPTY_PARAGRAPHS
+    const before = beside.previous?.paragraphs
+    const after = beside.next?.paragraphs
+    if (!before && !after) return live
+    return [...live, ...(before ?? []), ...(after ?? [])]
+  }, [page, beside])
+
+  const figureImages = useFigureImages(shownParagraphs, loadAssets)
 
   const [focusMode, setFocusMode] = useState(readFocusMode)
 
@@ -1167,6 +1197,12 @@ export default function Reader() {
       const element = strip.current
       if (!element) return false
 
+      // The two strips hold the last page's neighbours until the new ones are
+      // read. Revealing one then would drag the reader onto a page from
+      // somewhere else entirely, so the turn declines and the threshold swipe
+      // takes it — for the fraction of a second the read takes.
+      if (beside.for !== pathOf(here)) return false
+
       const to = by === 1 ? neighbours.next : neighbours.previous
       const understudy = by === 1 ? afterStrip.current : beforeStrip.current
       // The reference and the text are set a beat apart. Both are needed: one
@@ -1215,7 +1251,7 @@ export default function Reader() {
       dragLast.current = { x: at, at: performance.now() }
       return true
     },
-    [neighbours, beside, drawnAt],
+    [neighbours, beside, here, drawnAt],
   )
 
   const startDrag = useCallback(
@@ -1763,15 +1799,26 @@ export default function Reader() {
         if (cancelled) return
         setNeighbours({ previous, next })
 
-        // And their text, for the sheet to be dragged over. Cleared first: the
-        // old neighbours belong to the page we just left, and revealing one of
-        // those under a turn would show the reader a page from somewhere else.
-        setBeside({})
+        // And their text, for the sheet to be dragged over.
+        //
+        // Replaced in one go when it arrives, never cleared first. Clearing
+        // empties two strips that are on screen — one of them possibly the very
+        // page a finished turn is still resting on — and it throws away the
+        // figure blobs with them, so the pictures on the live page are revoked
+        // and fetched again for nothing. `for` is what keeps the old text
+        // honest in the meantime: it names the page these two belong beside,
+        // and `startSeamDrag` will not reveal them beside any other.
         const [before, after] = await Promise.all([
           previous ? repository.getSection(id, pathOf(previous)) : undefined,
           next ? repository.getSection(id, pathOf(next)) : undefined,
         ])
-        if (!cancelled) setBeside({ previous: before ?? undefined, next: after ?? undefined })
+        if (!cancelled) {
+          setBeside({
+            for: pathOf(here),
+            previous: before ?? undefined,
+            next: after ?? undefined,
+          })
+        }
       } catch (error: unknown) {
         if (!cancelled) setPage({ status: 'failed', message: messageOf(error) })
       }
@@ -2682,9 +2729,11 @@ export default function Reader() {
    * opening is almost the whole of that risk: it is the tallest thing in a
    * section and it appears on the first one only.
    *
-   * Figures are the known gap. Their pictures are fetched for the section on
-   * screen alone, so an understudy draws a figure at its empty height. It costs
-   * nothing on the great majority of sections, which carry none.
+   * Figures were the hole in that. Their pictures used to be fetched for the
+   * section on screen alone, so an understudy drew every figure at no height,
+   * and a section with a picture in it broke its columns in the wrong places —
+   * the reader landed and then watched the words drop. `shownParagraphs` now
+   * fetches all three sections' pictures together, so the three strips agree.
    */
   const sectionBody = (section: Section, at: SectionRef, chapter?: string) => (
     <>

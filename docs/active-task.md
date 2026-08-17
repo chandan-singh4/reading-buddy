@@ -207,8 +207,25 @@ Storage and the tutor.
 The parser part of this task changes what a book *becomes*, not how it draws.
 The page-turn part is the reading screen only. It changes no parsed data.
 
-### Still open here
+### The words that moved at the seam
 
-A figure is not drawn in a neighbour strip. The page breaks still match, because
-the space is kept. A figure at a section seam will appear as the page lands, not
-before it.
+The first build of the seam turn had a fault. The reader dragged onto the new
+page, and then the words dropped into place. Going back, a picture appeared
+before the turn had landed.
+
+**The cause.** A figure's picture is stored in the book, not on the web. The
+reader turns it into a `blob:` URL, and it did that for the section on screen
+only. So a neighbour strip drew every figure at no height. The strip then broke
+its columns in the wrong places. The reader saw a page built with the pictures
+missing, and the real section replaced it a moment later with the pictures in.
+
+**The fix.** `shownParagraphs` in `Reader.tsx` now gives the picture hook all
+three sections at once. The three strips get the same pictures, so they break
+their columns in the same places, and the page that arrives is the page that was
+under the sheet.
+
+Second fault, found beside it. The two neighbours were emptied at the start of
+every page load and filled again when the reads came back. That threw away the
+live page's pictures as well, and left a gap where a seam turn could not start.
+They are now replaced in one step, and carry the path of the page they belong
+beside, so a stale pair is never revealed.
