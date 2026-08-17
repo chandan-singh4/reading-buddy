@@ -40,7 +40,6 @@ export type { SelectionAction, SelectionMenuProps } from './SelectionMenu.tsx'
 export { Highlights, canPaintHighlights } from './Highlights.tsx'
 export type { HighlightLike, HighlightsProps } from './Highlights.tsx'
 export {
-  HIGHLIGHT_COLOURS,
   describeRange,
   selectAround,
   highlightAt,
@@ -50,12 +49,33 @@ export {
   selectionInReader,
 } from './selection.ts'
 export type {
-  HighlightColour,
   ReaderSelection,
   SelectionEdge,
   SelectionGrain,
   SelectionPivot,
 } from './selection.ts'
+
+export { canGrow, unitAround, unitBeyond } from './units.ts'
+export type { SelectionUnit, UnitSide } from './units.ts'
+
+export {
+  HIGHLIGHTER_CHOICES,
+  HIGHLIGHT_COLOURS,
+  colourOfKey,
+  keyOfColour,
+  readHighlighter,
+  resolveHighlighter,
+  seedOf,
+  styleForTheme,
+  writeHighlighter,
+} from './highlightStyle.ts'
+export type {
+  ColourKey,
+  HighlightColour,
+  HighlighterChoice,
+  HighlighterStyle,
+  PaintedHighlight,
+} from './highlightStyle.ts'
 
 export { NotesPanel } from './NotesPanel.tsx'
 export type { NoteRow, NotesPanelProps } from './NotesPanel.tsx'

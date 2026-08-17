@@ -345,6 +345,79 @@
   --swatch-accent: #0000cc;
 }
 
+/* ---- Highlighter ------------------------------------------------------ */
+
+/*
+ * Three choices, each showing its own answer rather than naming it.
+ *
+ * The same argument as the theme swatches above: "Hand-drawn" is a word for a
+ * look, and a small marked `Aa` skips the translation. Auto draws whichever of
+ * the two the current theme asks for, so the reader can see what Auto means
+ * here and now instead of having to try it.
+ */
+.choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.choice[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.choiceName {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+
+/* The specimen: a couple of letters with the mark under them. */
+.choiceMark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.35rem;
+  font-family: var(--face-serif);
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.choiceMark::before {
+  content: '';
+  position: absolute;
+  inset: 0.15em -0.1em 0.05em;
+  /* Yellow, because it is the first swatch in the menu and the one most
+     readers reach for. `multiply`, as the real marks are. */
+  background: #f2df6b;
+  mix-blend-mode: multiply;
+  border-radius: 3px;
+}
+
+.choiceMark[data-style='handdrawn']::before {
+  border-radius: 5px 7px 6px 8px;
+  transform: rotate(-0.6deg);
+  background-image: repeating-linear-gradient(
+    11deg,
+    transparent 0 3px,
+    rgb(255 255 255 / 12%) 3px 4px
+  );
+}
+
 /* ---- Margins, drawn -------------------------------------------------- */
 
 /*

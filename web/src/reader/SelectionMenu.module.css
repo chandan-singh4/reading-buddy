@@ -144,77 +144,106 @@
   background: var(--color-surface-raised);
 }
 
+/* Sentence or Paragraph, while the selection is snapped to it. It is a mode the
+   chevrons are obeying, so it has to be visible without reading the page. */
+.quickButton[data-current] {
+  background: var(--color-accent-wash);
+  color: var(--color-accent);
+}
+
 .icon {
   display: block;
 }
 
 /* --- The colour swatches --------------------------------------------------- */
 
+/*
+ * Four circles, evenly spread, and nothing else on the row.
+ *
+ * `space-around` rather than a gap: with the label and the eraser gone the row
+ * holds one kind of thing, and four dots pushed left under a full-width card
+ * look like the start of a list that was cut off.
+ */
 .colours {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  justify-content: space-around;
+  padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--color-border);
 }
 
+/*
+ * Drawn at 1.75rem and touched at 2.75rem.
+ *
+ * The dot is the size the design wants; the target is the size a thumb needs.
+ * `::before` reaches past the circle to make up the difference without moving
+ * anything on screen.
+ */
 .swatch {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  border: 1px solid rgb(0 0 0 / 12%);
-  cursor: pointer;
-}
-
-/* The colour these words already carry, ringed so it is findable at a glance. */
-.swatch[data-current] {
-  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-accent);
-}
-
-/* Pushed to the far end, away from the swatches: it is the one control here
-   that takes something away, and it must not be hit by a finger aiming near. */
-.remove {
-  margin-inline-start: auto;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.custom {
   position: relative;
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 50%;
-  /* The colour wheel, so it reads as "anything else" beside four fixed dots. */
-  background: conic-gradient(#f2df6b, #a8d5a2, #a9c7f0, #d8b6ec, #f2df6b);
   border: 1px solid rgb(0 0 0 / 12%);
-}
-
-.customLabel {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-/* The input is the whole swatch and invisible: the wheel above is what shows,
-   and the browser's own colour button is never the right shape. */
-.customInput {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  border: 0;
-  padding: 0;
   cursor: pointer;
+}
+
+.swatch::before {
+  content: '';
+  position: absolute;
+  inset: -0.5rem;
+}
+
+/* The colour these words already carry, ringed so it is findable at a glance.
+   The ring is also what tells the reader which swatch will take the highlight
+   off rather than add one. */
+.swatch[data-current] {
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-accent);
+}
+
+/* --- The chevron handles ---------------------------------------------------- */
+
+/*
+ * A handle in unit mode: still the bar, with an arrow where the knob was.
+ *
+ * The arrow sits beside the selection rather than on it, so it does not cover
+ * the last word the reader is looking at, and it is drawn on the card's surface
+ * so it reads as a control rather than as part of the selection.
+ */
+.chevron {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-inline-start: -0.75rem;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  cursor: pointer;
+}
+
+/* Held at the top of the first line and the bottom of the last, the way the
+   knobs were, so the two never sit on the same word. */
+.handleStart.chevron {
+  transform: translateY(-50%);
+}
+
+.handleEnd.chevron {
+  transform: translateY(50%);
+}
+
+.chevron::before {
+  /* ≥44px of target around a 24px button. */
+  content: '';
+  position: absolute;
+  inset: -0.625rem;
+}
+
+.chevron .icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* --- The list rows --------------------------------------------------------- */
@@ -249,12 +278,6 @@
    to the block below, which brings its own. */
 .rows li + li .row {
   box-shadow: inset 0 1px 0 var(--color-border);
-}
-
-/* "Select sentence" and "Select paragraph" change what is selected rather than
-   act on it, so they are ruled off from the rows that follow. */
-.widen {
-  border-block-end: 1px solid var(--color-border);
 }
 
 /* --- Ask Claude ------------------------------------------------------------ */
@@ -309,15 +332,17 @@
  * the first or last row would be cut in half by the rounded corner.
  */
 .quickButton:focus-visible,
-.swatch:focus-visible,
-.remove:focus-visible,
 .row:focus-visible,
-.askHeader:focus-visible,
-.customInput:focus-visible {
+.askHeader:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--color-focus);
 }
 
-.customInput:focus-visible {
-  border-radius: 50%;
+/* The swatches and the chevrons are round, and an inset ring on a circle reads
+   as a second border rather than as focus. They also carry a `box-shadow` ring
+   of their own when current, which an inset one would replace. */
+.swatch:focus-visible,
+.chevron:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }

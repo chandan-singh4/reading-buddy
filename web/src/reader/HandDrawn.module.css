@@ -1,0 +1,88 @@
+/*
+ * The marker look, ported from `design-inspiration/reading_experience_v2.html`.
+ *
+ * One `.stroke` per line-box of a highlight, laid out in viewport coordinates by
+ * `HandDrawn.tsx`. The stroke itself is two layers: `::before` is the body of the
+ * mark, and `::after` is the pool of ink where the pen stopped.
+ */
+
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  /* The whole point: the ink must never take a tap. Text selection, the tap that
+     opens a highlight's menu, and the page turn all keep working through it. */
+  pointer-events: none;
+  /* Nothing here is a box the reader can reach, and none of it should ever be
+     read out — the words underneath are the content. */
+  contain: layout paint;
+}
+
+.stroke {
+  position: absolute;
+  /* Set per stroke from the measured line-box. */
+  border-radius: 4px;
+}
+
+.stroke::before,
+.stroke::after {
+  content: '';
+  position: absolute;
+  background: var(--ink);
+  /*
+   * Multiply, not opacity.
+   *
+   * Translucent ink over black text is what a real highlighter does: the words
+   * stay as dark as they were and the paper takes the colour. Plain alpha lifts
+   * the text towards the highlight colour and makes a marked passage harder to
+   * read than an unmarked one, which is exactly backwards.
+   */
+  mix-blend-mode: multiply;
+}
+
+/* The body of the stroke. */
+.stroke::before {
+  inset: -0.06em -0.14em -0.02em -0.1em;
+  /* The faint diagonal grain of a chisel tip, over the colour. */
+  background-image: repeating-linear-gradient(
+    11deg,
+    transparent 0 3px,
+    rgb(255 255 255 / 12%) 3px 4px
+  );
+  border-radius: 5px 7px 6px 8px;
+  /* The dry start: the pen is not yet wet, so the first few percent fade in. */
+  mask-image: linear-gradient(90deg, rgb(0 0 0 / 10%), #000 6%, #000 100%);
+  filter: var(--wobble);
+}
+
+/* The wet end: the pen rests, and the ink pools. */
+.stroke::after {
+  right: -0.1em;
+  top: 0.1em;
+  bottom: -0.02em;
+  width: 0.4em;
+  border-radius: 2px 5px 6px 3px;
+  filter: var(--pool);
+}
+
+/*
+ * The filters are the expensive part, and a reader who has asked for less motion
+ * has usually asked for less of everything. Drop to a plain rounded wash: same
+ * colour, same place, no turbulence and no per-stroke rotation.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .stroke {
+    transform: none !important;
+  }
+
+  .stroke::before {
+    filter: none;
+    background-image: none;
+    mask-image: none;
+    border-radius: 4px;
+  }
+
+  .stroke::after {
+    display: none;
+  }
+}

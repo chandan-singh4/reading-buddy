@@ -11,29 +11,6 @@
 
 import type { Anchor } from '../structure/index.ts'
 
-/** A highlight colour the reader can pick without opening the colour wheel. */
-export interface HighlightColour {
-  /** Stored on the note, so it must never change once shipped. */
-  id: string
-  label: string
-  /** The swatch and the highlight itself. */
-  value: string
-}
-
-/**
- * The four standing colours, from the prototype.
- *
- * Named rather than numbered because the colour is kept on the annotation: a
- * reader who uses yellow for "important" and blue for "look this up" is storing
- * meaning in it, and a re-themed palette must not rewrite what they meant.
- */
-export const HIGHLIGHT_COLOURS: readonly HighlightColour[] = [
-  { id: 'yellow', label: 'Yellow', value: '#f2df6b' },
-  { id: 'green', label: 'Green', value: '#a8d5a2' },
-  { id: 'blue', label: 'Blue', value: '#a9c7f0' },
-  { id: 'purple', label: 'Purple', value: '#d8b6ec' },
-]
-
 /** A selection the reader made inside the page. */
 export interface ReaderSelection {
   /** The selected words, whitespace tidied. */
@@ -151,7 +128,7 @@ export function selectionBetween(
 }
 
 /** Where one squeezed character came from. */
-interface Source {
+export interface Source {
   node: Text
   offset: number
 }
@@ -166,7 +143,7 @@ interface Source {
  * each character of `flat` has an entry in `from` saying which text node and
  * which offset it came from.
  */
-function flatten(element: Element): { flat: string; from: Source[] } {
+export function flatten(element: Element): { flat: string; from: Source[] } {
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
   let flat = ''
   const from: Source[] = []
@@ -188,7 +165,7 @@ function flatten(element: Element): { flat: string; from: Source[] } {
 }
 
 /** A range over `flat[at .. end)`, in page terms. */
-function rangeOfSpan(from: Source[], at: number, end: number): Range | null {
+export function rangeOfSpan(from: Source[], at: number, end: number): Range | null {
   const start = from[at]
   const last = from[end - 1]
   if (!start || !last) return null
@@ -271,7 +248,7 @@ function sentenceIn(flat: string, from: Source[], selection: ReaderSelection): R
 }
 
 /** Where a page position lands in the squeezed text. `-1` if it is not in it. */
-function flatIndexOf(from: Source[], node: Node, offset: number): number {
+export function flatIndexOf(from: Source[], node: Node, offset: number): number {
   for (let i = 0; i < from.length; i += 1) {
     const source = from[i]!
     if (source.node === node && source.offset >= offset) return i
@@ -359,9 +336,9 @@ export function describeRange(range: Range, root: HTMLElement | null): ReaderSel
 }
 
 /** `ch02-s03-p013` — the shape `elementIdOf` makes out of an anchor. */
-const ANCHOR_ID = /^ch\d+-s\d+-[a-z]\d+$/
+export const ANCHOR_ID = /^ch\d+-s\d+-[a-z]\d+$/
 
-function anchorOfNode(node: Node | null): Anchor | null {
+export function anchorOfNode(node: Node | null): Anchor | null {
   let element = node instanceof Element ? node : node?.parentElement
   while (element) {
     if (ANCHOR_ID.test(element.id)) return `[${element.id}]` as Anchor

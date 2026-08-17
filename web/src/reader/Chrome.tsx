@@ -33,6 +33,7 @@ import { MIN_QUERY, type SearchOutcome } from './search.ts'
 import type { SectionRef } from './navigation.ts'
 import type { Anchor, Manifest } from '../structure/index.ts'
 import type { ReaderSettings } from './readerSettings.ts'
+import type { HighlighterChoice } from './highlightStyle.ts'
 import { TextSettings } from './TextSettings.tsx'
 import { BookmarksPanel, type BookmarkRow } from './BookmarksPanel.tsx'
 import { NotesPanel, type NoteRow } from './NotesPanel.tsx'
@@ -101,6 +102,12 @@ export interface ChromeProps {
   onJumpToPage: (page: number) => void
   /** Change one or more reading-comfort settings at once. */
   onSettingsChange: (patch: Partial<ReaderSettings>) => void
+  /**
+   * How highlights are painted in this book. Optional, because it is kept per
+   * book rather than in `settings` and a caller without a book has none.
+   */
+  highlighter?: HighlighterChoice
+  onHighlighterChange?: (choice: HighlighterChoice) => void
 
   /** Every mark in this book, already in the book's own order. */
   bookmarks: readonly BookmarkRow[]
@@ -160,6 +167,8 @@ export function Chrome({
   sheetOpen,
   sheetTab,
   settings,
+  highlighter,
+  onHighlighterChange,
   onToggleFocus,
   onOpenSheet,
   onCloseSheet,
@@ -451,7 +460,12 @@ export function Chrome({
             inline was what made this file's sheet a hundred lines of form.
           */}
           <div className={styles.sheetPanel}>
-            <TextSettings settings={settings} onSettingsChange={onSettingsChange} />
+            <TextSettings
+              settings={settings}
+              onSettingsChange={onSettingsChange}
+              highlighter={highlighter}
+              onHighlighterChange={onHighlighterChange}
+            />
           </div>
         </div>
       )}

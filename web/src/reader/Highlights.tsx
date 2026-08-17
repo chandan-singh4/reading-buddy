@@ -17,11 +17,31 @@
  * One rule is registered per colour in use, written into a stylesheet of this
  * module's own, because a reader's custom colour is not something a static
  * stylesheet can know in advance.
+ *
+ * ## Two styles, one set of rows
+ *
+ * All of the above is the *clean* style, and it is the default. The reader can
+ * ask instead for *hand-drawn*, which cannot use this mechanism at all —
+ * `::highlight()` takes a colour and refuses filters, masks and blend modes, and
+ * a marker stroke is made of those. So this component became the fork: it owns
+ * the clean path itself, and hands the same rows to `HandDrawn` for the other.
+ *
+ * The rows do not change either way. A highlight stores which words and which
+ * colour, never how it looks, so switching style is a re-render and never a
+ * write. See `highlightStyle.ts`.
  */
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 
 import type { Anchor } from '../structure/index.ts'
+import { HandDrawn } from './HandDrawn.tsx'
+import {
+  colourOfKey,
+  keyOfColour,
+  seedOf,
+  type HighlighterStyle,
+  type PaintedHighlight,
+} from './highlightStyle.ts'
 import { rangeOfQuote } from './selection.ts'
 
 /** One stored highlight: enough to find it and enough to paint it. */
@@ -44,6 +64,33 @@ export interface HighlightsProps {
    * point into have been thrown away.
    */
   watch?: unknown
+  /** How to paint them. Clean unless the reader asked otherwise. */
+  style?: HighlighterStyle
+}
+
+/**
+ * A stored row as a renderer wants it.
+ *
+ * The only interesting part is the colour. Rows written before highlights had
+ * keys hold a CSS value, so the key is recovered from the value where it is one
+ * of ours and left `null` where it is not — an old custom colour off the colour
+ * wheel still paints, it simply has no key to compare against.
+ */
+export function paintable(highlights: readonly HighlightLike[]): PaintedHighlight[] {
+  const ready: PaintedHighlight[] = []
+  for (const highlight of highlights) {
+    if (!highlight.quote || !highlight.colour) continue
+    const colourKey = keyOfColour(highlight.colour)
+    ready.push({
+      id: highlight.id,
+      anchor: highlight.anchor,
+      quote: highlight.quote,
+      colourKey,
+      colour: colourKey ? colourOfKey(colourKey) : highlight.colour,
+      seed: seedOf(highlight.id),
+    })
+  }
+  return ready
 }
 
 /** Whether this browser paints custom highlights. Chrome 105, Safari 17.2. */
@@ -75,9 +122,13 @@ function nameFor(colour: string): string {
   return name
 }
 
-export function Highlights({ highlights, root, watch }: HighlightsProps) {
+export function Highlights({ highlights, root, watch, style = 'clean' }: HighlightsProps) {
+  const rows = useMemo(() => paintable(highlights), [highlights])
+  const drawn = style === 'handdrawn'
+
   const paint = useCallback(() => {
-    if (!root || !canPaintHighlights()) return () => {}
+    // The other renderer is on. Painting both would double every colour.
+    if (drawn || !root || !canPaintHighlights()) return () => {}
 
     const ranges = new Map<string, Range[]>()
     for (const highlight of highlights) {
@@ -100,7 +151,7 @@ export function Highlights({ highlights, root, watch }: HighlightsProps) {
     return () => {
       for (const name of painted) CSS.highlights.delete(name)
     }
-  }, [highlights, root])
+  }, [drawn, highlights, root])
 
   useEffect(() => {
     if (!root) return
@@ -142,6 +193,7 @@ export function Highlights({ highlights, root, watch }: HighlightsProps) {
     }
   }, [paint, root, watch])
 
-  // Nothing to render. The page carries the colour itself.
-  return null
+  // Clean has nothing to render: the page carries the colour itself.
+  if (!drawn) return null
+  return <HandDrawn highlights={rows} root={root} watch={watch} />
 }

@@ -24,8 +24,8 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 
+import { HIGHLIGHT_COLOURS } from './highlightStyle.ts'
 import {
-  HIGHLIGHT_COLOURS,
   pivotFor,
   type ReaderSelection,
   type SelectionEdge,
@@ -65,25 +65,45 @@ export interface SelectionMenuProps {
   /**
    * The highlight already on these words, if there is one.
    *
-   * It changes what "Highlight" means. On plain text it adds one; on words that
-   * are already highlighted it changes the colour, and a way to take the
-   * highlight off appears beside the swatches. Without this the same sentence
-   * could be highlighted again and again, once per tap.
+   * It is what makes a swatch a toggle. Tapping the colour a passage already
+   * wears takes the highlight off; tapping a different one recolours it; tapping
+   * any of them on plain text adds one. Without this the same sentence could be
+   * highlighted again and again, once per tap.
    */
   highlighted?: { id: string; colour: string } | null
   /**
-   * Which "select the whole…" buttons are worth offering.
+   * The unit the selection is currently snapped to, if it is snapped to one.
    *
-   * The Reader works this out, because only it can: the answer is in the page,
-   * and a button that is already satisfied — "Select paragraph" on a selection
-   * that is the paragraph — teaches the reader to doubt the menu.
+   * Set by tapping Sentence or Paragraph, and it changes what the two handles
+   * are. Off, they are drag handles. On, they are chevrons that step the
+   * selection out one whole unit at a time — and still drag, for the fine
+   * adjustment a chevron cannot make.
    */
-  canSelect?: { sentence: boolean; paragraph: boolean }
+  unit?: SelectionGrain | null
+  /** Grow the selection by one unit at this end. */
+  onGrow?: (side: SelectionEdge) => void
+  /**
+   * Whether there is another unit to take at each end.
+   *
+   * The Reader works this out, because only it can see the page. A chevron with
+   * nowhere to go is not shown at all: a button that does nothing teaches the
+   * reader to doubt the menu.
+   */
+  canGrow?: { start: boolean; end: boolean }
 }
 
 /** How far the card stays from the edge of the screen, and from the selection. */
 const MARGIN = 8
 const GAP = 10
+
+/**
+ * How far a finger may wander and still count as a tap on a chevron.
+ *
+ * A finger never lands still. Nothing under this is a drag, so a reader who
+ * meant "one more sentence" gets one more sentence rather than a selection
+ * dragged three characters sideways.
+ */
+const SLOP = 6
 
 function Icon({ path, filled = false }: { path: string; filled?: boolean }) {
   return (
@@ -114,9 +134,11 @@ const ICONS = {
   translate: 'M3 6h9M7.5 6v-2M9 6c0 4-3 8-6 8m2-4c2 3 4 4 6 4m1 6 4-10 4 10m-6.5-3h5',
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm5 12 4 4',
   speak: 'M4 10v4h3l4 4V6l-4 4zm11-1a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12',
-  widen: 'M6 5v14M18 5v14M9.5 12h5m-5 0 2-2m-2 2 2 2m3-4 2 2m-2 2 2-2',
+  sentence: 'M4 7h16M4 12h11m-11 5h7',
+  paragraph: 'M6 4h13M6 4v16M11 4v16M19 4v8a4 4 0 0 1-4 4h-4',
   spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
   chevron: 'M9 6l6 6-6 6',
+  back: 'M15 6l-6 6 6 6',
 }
 
 export function SelectionMenu({
@@ -125,7 +147,9 @@ export function SelectionMenu({
   onDismiss,
   onExtend,
   highlighted = null,
-  canSelect = { sentence: true, paragraph: true },
+  unit = null,
+  onGrow,
+  canGrow = { start: true, end: true },
 }: SelectionMenuProps) {
   const card = useRef<HTMLDivElement | null>(null)
   /**
@@ -137,12 +161,16 @@ export function SelectionMenu({
    * that is the whole first half of the gesture, which felt exactly like a
    * handle that would not move.
    */
-  const drag = useRef<{ pointerId: number; pivot: SelectionPivot; lift: number } | null>(null)
+  const drag = useRef<{
+    pointerId: number
+    pivot: SelectionPivot
+    lift: number
+    /** Where the finger went down, so a tap can be told from a drag. */
+    from: { x: number; y: number }
+    moved: boolean
+  } | null>(null)
   const [dragging, setDragging] = useState(false)
   const [place, setPlace] = useState<{ top: number; left: number; above: boolean } | null>(null)
-  // Open already when the words carry a highlight: the reader who tapped one is
-  // there to change it or take it off, and both live in this panel.
-  const [colours, setColours] = useState(highlighted !== null)
   const [asking, setAsking] = useState(true)
   const askId = useId()
 
@@ -173,7 +201,7 @@ export function SelectionMenu({
       left: Math.max(left, MARGIN),
       above: goesAbove,
     })
-  }, [selection, colours, asking])
+  }, [selection, asking])
 
   // Focus goes to the card itself, not to the first item: the reader is holding
   // a finger on the page, and moving focus onto "Highlight" would announce a
@@ -242,11 +270,22 @@ export function SelectionMenu({
    * do the finger is holding the handle drawn at the *other* end of the
    * selection; asking "is this the end handle?" would stop the drag dead at the
    * moment it crossed.
+   *
+   * In unit mode the same handle grows a chevron and becomes a real button. It
+   * keeps every pointer handler, because a chevron that could no longer be
+   * dragged would take away the fine adjustment it exists to sit beside. A tap
+   * and a drag are told apart by distance, not by time: anything under `SLOP`
+   * pixels was a tap, and a tap steps one unit.
    */
   function handleFor(edge: SelectionEdge) {
     const rects = selection.rects
     const rect = edge === 'start' ? rects[0] : rects[rects.length - 1]
     if (!rect) return null
+
+    // Hidden at the first or last unit of the book — there is no more page to
+    // take, and a chevron pointing at nothing is worse than no chevron.
+    const stepping = unit !== null && (edge === 'start' ? canGrow.start : canGrow.end)
+    if (unit !== null && !stepping) return null
 
     const x = edge === 'start' ? rect.left : rect.left + rect.width
 
@@ -264,8 +303,12 @@ export function SelectionMenu({
         pointerId: event.pointerId,
         pivot: pivotFor(selection, edge),
         lift: rect.height / 2,
+        from: { x: event.clientX, y: event.clientY },
+        moved: false,
       }
-      setDragging(true)
+      // In unit mode the card only hides once the finger has actually moved: a
+      // tap on a chevron should not make the menu blink.
+      if (!stepping) setDragging(true)
       try {
         event.currentTarget.setPointerCapture(event.pointerId)
       } catch {
@@ -278,10 +321,21 @@ export function SelectionMenu({
       const held = drag.current
       if (!held || held.pointerId !== event.pointerId) return
       event.preventDefault()
+
+      if (!held.moved) {
+        const far =
+          Math.abs(event.clientX - held.from.x) > SLOP ||
+          Math.abs(event.clientY - held.from.y) > SLOP
+        if (!far) return
+        held.moved = true
+        setDragging(true)
+      }
+
       onExtend(held.pivot, event.clientX, event.clientY - held.lift)
     }
 
     function onPointerUp(event: ReactPointerEvent<HTMLSpanElement>) {
+      const held = drag.current
       try {
         event.currentTarget.releasePointerCapture?.(event.pointerId)
       } catch {
@@ -289,20 +343,63 @@ export function SelectionMenu({
       }
       drag.current = null
       setDragging(false)
+
+      // A tap on a chevron, not a drag of one.
+      if (stepping && held && !held.moved && event.type === 'pointerup') onGrow?.(edge)
     }
 
+    const label =
+      edge === 'start'
+        ? `Extend to previous ${unit ?? ''}`.trim()
+        : `Extend to next ${unit ?? ''}`.trim()
+
+    /*
+     * One element either way, and a `role` rather than a `<button>`.
+     *
+     * A drag handle is not something a keyboard can use and not something a
+     * screen reader should announce — it is a grip on a selection the reader can
+     * already move other ways, so plain it stays. A chevron is a command, so it
+     * takes a name, a tab stop and Enter. It is the same element because it is
+     * the same thing: swapping the tag would end any drag in flight the moment
+     * the reader crossed into the last unit and the chevron went away.
+     */
     return (
       <span
         key={edge}
-        className={`${styles.handle} ${edge === 'start' ? styles.handleStart : styles.handleEnd}`}
-        aria-hidden="true"
-        style={{ top: `${rect.top}px`, left: `${x}px`, height: `${rect.height}px` }}
+        className={`${styles.handle} ${edge === 'start' ? styles.handleStart : styles.handleEnd} ${
+          stepping ? styles.chevron : ''
+        }`}
+        aria-hidden={stepping ? undefined : true}
+        role={stepping ? 'button' : undefined}
+        tabIndex={stepping ? 0 : undefined}
+        aria-label={stepping ? label : undefined}
+        style={
+          stepping
+            ? // Centred on the corner of the selection, not stretched down the
+              // line: a chevron is a button, and its height is its own.
+              { top: `${edge === 'start' ? rect.top : rect.top + rect.height}px`, left: `${x}px` }
+            : { top: `${rect.top}px`, left: `${x}px`, height: `${rect.height}px` }
+        }
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onKeyDown={
+          stepping
+            ? (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                event.stopPropagation()
+                onGrow?.(edge)
+              }
+            : undefined
+        }
       >
-        <span className={styles.knob} />
+        {stepping ? (
+          <Icon path={edge === 'start' ? ICONS.back : ICONS.chevron} />
+        ) : (
+          <span className={styles.knob} />
+        )}
       </span>
     )
   }
@@ -354,19 +451,44 @@ export function SelectionMenu({
       tabIndex={-1}
       onKeyDown={onKeyDown}
     >
-      {/* The quick row: the five things a reader does most, as icons. */}
+      {/*
+        The colours, and nothing else.
+
+        No label and no eraser. A row of four coloured circles under a piece of
+        selected text needs no word to explain it, and the eraser was a fifth
+        thing to aim at that only ever did what tapping the current colour now
+        does. Each swatch is a toggle: tap it to mark, tap the same one again to
+        take the mark off, tap another to change it.
+      */}
+      <div className={styles.colours} role="group" aria-label="Highlight">
+        {HIGHLIGHT_COLOURS.map((colour) => {
+          const current = highlighted?.colour === colour.value
+          return (
+            <button
+              key={colour.id}
+              type="button"
+              data-item
+              role="menuitem"
+              className={styles.swatch}
+              style={{ background: colour.value }}
+              aria-label={
+                current ? `Remove ${colour.label.toLowerCase()} highlight` : `Highlight ${colour.label.toLowerCase()}`
+              }
+              aria-pressed={current}
+              data-current={current || undefined}
+              onClick={() =>
+                act(current ? { kind: 'unhighlight' } : { kind: 'highlight', colour: colour.value })
+              }
+            />
+          )
+        })}
+      </div>
+
+      {/* The quick row: the four things a reader does most, as icons. The last
+          two widen the selection rather than act on it, which is why they sit
+          beside Note and Copy rather than in a list of their own — the reader
+          reaches for "this whole sentence" as often as for "copy this". */}
       <div className={styles.quick}>
-        <button
-          type="button"
-          data-item
-          role="menuitem"
-          className={styles.quickButton}
-          aria-expanded={colours}
-          onClick={() => setColours((open) => !open)}
-        >
-          <Icon path={ICONS.highlight} />
-          <span>Highlight</span>
-        </button>
         <button
           type="button"
           data-item
@@ -387,100 +509,27 @@ export function SelectionMenu({
           <Icon path={ICONS.copy} />
           <span>Copy</span>
         </button>
-        <button
-          type="button"
-          data-item
-          role="menuitem"
-          className={styles.quickButton}
-          onClick={() => act({ kind: 'save' })}
-        >
-          <Icon path={ICONS.save} />
-          <span>Save</span>
-        </button>
-        <button
-          type="button"
-          data-item
-          role="menuitem"
-          className={styles.quickButton}
-          onClick={() => act({ kind: 'share' })}
-        >
-          <Icon path={ICONS.share} />
-          <span>Share</span>
-        </button>
+        {(
+          [
+            ['sentence', 'Sentence', ICONS.sentence],
+            ['paragraph', 'Paragraph', ICONS.paragraph],
+          ] as const
+        ).map(([grain, label, path]) => (
+          <button
+            key={grain}
+            type="button"
+            data-item
+            role="menuitem"
+            className={styles.quickButton}
+            aria-pressed={unit === grain}
+            data-current={unit === grain || undefined}
+            onClick={() => act({ kind: 'select', grain })}
+          >
+            <Icon path={path} />
+            <span>{label}</span>
+          </button>
+        ))}
       </div>
-
-      {colours && (
-        <div className={styles.colours} role="group" aria-label="Highlight colour">
-          {HIGHLIGHT_COLOURS.map((colour) => (
-            <button
-              key={colour.id}
-              type="button"
-              data-item
-              role="menuitem"
-              className={styles.swatch}
-              style={{ background: colour.value }}
-              aria-label={`Highlight ${colour.label.toLowerCase()}`}
-              aria-current={highlighted?.colour === colour.value || undefined}
-              data-current={highlighted?.colour === colour.value || undefined}
-              onClick={() => act({ kind: 'highlight', colour: colour.value })}
-            />
-          ))}
-          {/* The native colour wheel, worn as a swatch. A custom colour is rare
-              enough that building a picker for it would be all cost. */}
-          <label className={styles.custom}>
-            <span className={styles.customLabel}>Custom colour</span>
-            <input
-              type="color"
-              data-item
-              className={styles.customInput}
-              defaultValue="#f2df6b"
-              onChange={(event) => act({ kind: 'highlight', colour: event.target.value })}
-            />
-          </label>
-
-          {/* Only when there is one to take off. A "remove" that removes
-              nothing is a button that teaches the reader to doubt the menu. */}
-          {highlighted && (
-            <button
-              type="button"
-              data-item
-              role="menuitem"
-              className={styles.remove}
-              onClick={() => act({ kind: 'unhighlight' })}
-            >
-              Remove
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Widen the selection rather than act on it. Kept above the rest and
-          ruled off, because these two change what the menu is about. */}
-      {(canSelect.sentence || canSelect.paragraph) && (
-        <ul className={`${styles.rows} ${styles.widen}`}>
-          {(
-            [
-              ['sentence', 'Select sentence', canSelect.sentence],
-              ['paragraph', 'Select paragraph', canSelect.paragraph],
-            ] as const
-          )
-            .filter(([, , offered]) => offered)
-            .map(([grain, label]) => (
-              <li key={grain}>
-                <button
-                  type="button"
-                  data-item
-                  role="menuitem"
-                  className={styles.row}
-                  onClick={() => act({ kind: 'select', grain })}
-                >
-                  <Icon path={ICONS.widen} />
-                  <span>{label}</span>
-                </button>
-              </li>
-            ))}
-        </ul>
-      )}
 
       <ul className={styles.rows}>
         {(

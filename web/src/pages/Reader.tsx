@@ -10,12 +10,18 @@ import {
   Highlights,
   chapterNumber,
   describeRange,
-  selectAround,
   highlightAt,
   selectionBetween,
   selectionInReader,
+  unitAround,
+  unitBeyond,
+  readHighlighter,
+  resolveHighlighter,
+  writeHighlighter,
+  type HighlighterChoice,
   type ReaderSelection,
   type SelectionAction,
+  type SelectionGrain,
   type SelectionPivot,
   anchorAtPage,
   bookmarkOn,
@@ -457,6 +463,29 @@ export default function Reader() {
   const changeSettings = useCallback((patch: Partial<ReaderSettings>) => {
     setSettings((current) => ({ ...current, ...patch }))
   }, [])
+
+  /**
+   * How highlights are painted, for this book.
+   *
+   * Kept apart from `settings` because it is kept per book, not per app: a
+   * devotional read on paper and a manual read on a dark screen want different
+   * marks. `auto` — the default — takes the answer from the theme, and any other
+   * value is the reader overruling that and is never overwritten.
+   */
+  const [highlighter, setHighlighter] = useState<HighlighterChoice>(() => readHighlighter(id))
+
+  // The book can change under this screen without it remounting.
+  useEffect(() => {
+    setHighlighter(readHighlighter(id))
+  }, [id])
+
+  const changeHighlighter = useCallback(
+    (choice: HighlighterChoice) => {
+      setHighlighter(choice)
+      writeHighlighter(id, choice)
+    },
+    [id],
+  )
 
   /**
    * A book opens on the book, not on the interface.
@@ -2572,23 +2601,45 @@ export default function Reader() {
   }, [selected, highlights])
 
   /**
-   * Whether widening the selection would do anything.
+   * The unit the selection is snapped to, once the reader has asked for one.
    *
-   * Asked once per selection, not once per render: it reads the paragraph out
-   * of the page and cuts it into sentences, which is not work to repeat while a
-   * handle is under a finger.
+   * Off until Sentence or Paragraph is tapped, and off again the moment the
+   * selection is dismissed. It is what turns the two drag handles into chevrons,
+   * and what decides how big a step each chevron takes.
    */
-  const canSelect = useMemo(
-    () => ({
-      sentence: selected !== null && selectAround(selected, 'sentence', strip.current) !== null,
-      paragraph: selected !== null && selectAround(selected, 'paragraph', strip.current) !== null,
-    }),
-    [selected],
+  const [unit, setUnit] = useState<SelectionGrain | null>(null)
+
+  /**
+   * Whether each chevron has another unit to take.
+   *
+   * Asked once per selection, not once per render: it reads every paragraph on
+   * the page and cuts them into sentences, which is not work to repeat while a
+   * handle is under a finger. A chevron with nowhere to go is not drawn at all.
+   */
+  const canGrow = useMemo(() => {
+    if (!selected || !unit) return { start: false, end: false }
+    return {
+      start: unitBeyond(selected.range, unit, 'start', strip.current) !== null,
+      end: unitBeyond(selected.range, unit, 'end', strip.current) !== null,
+    }
+  }, [selected, unit])
+
+  /** One more unit at one end. The menu stays open; the reader is still aiming. */
+  const growSelection = useCallback(
+    (side: 'start' | 'end') => {
+      if (!selected || !unit) return
+      const wider = unitBeyond(selected.range, unit, side, strip.current)
+      if (!wider) return
+      const grown = describeRange(wider, strip.current)
+      if (grown) setSelected(grown)
+    },
+    [selected, unit],
   )
 
   /** Put the menu away and let go of the words. */
   const dropSelection = useCallback(() => {
     setSelected(null)
+    setUnit(null)
     dismissed.current = true
     window.getSelection()?.removeAllRanges()
   }, [])
@@ -2660,8 +2711,15 @@ export default function Reader() {
         case 'select': {
           // The one action that leaves the menu open: the reader asked for more
           // words, not for something to happen to them.
-          const wider = selectAround(at, action.grain, strip.current)
-          if (wider) setSelected(wider)
+          //
+          // It also arms the chevrons. Tapping the *other* unit re-snaps what is
+          // already selected to that unit, so a reader who grew three sentences
+          // and then tapped Paragraph gets the paragraphs those sentences are
+          // in — never less than they had.
+          setUnit(action.grain)
+          const wider = unitAround(at.range, action.grain, strip.current)
+          const grown = wider ? describeRange(wider, strip.current) : null
+          if (grown) setSelected(grown)
           return
         }
 
@@ -2890,6 +2948,8 @@ export default function Reader() {
             onJumpTo={(chapter, section) => goTo({ chapter, section })}
             onJumpToPage={jumpToPage}
             onSettingsChange={changeSettings}
+            highlighter={highlighter}
+            onHighlighterChange={changeHighlighter}
             bookmarks={bookmarkRows}
             onJumpToBookmark={jumpToAnchor}
             onRenameBookmark={renameBookmark}
@@ -3244,7 +3304,12 @@ export default function Reader() {
             selection on purpose — see `composing` above.
           */}
           {/* The reader's own marks, found again in the page and painted. */}
-          <Highlights highlights={highlights} root={column} watch={here.section} />
+          <Highlights
+            highlights={highlights}
+            root={column}
+            watch={here.section}
+            style={resolveHighlighter(highlighter, settings.theme)}
+          />
 
           {selected && !composing && (
             <SelectionMenu
@@ -3253,7 +3318,9 @@ export default function Reader() {
               onDismiss={dropSelection}
               onExtend={stretchSelection}
               highlighted={touched}
-              canSelect={canSelect}
+              unit={unit}
+              onGrow={growSelection}
+              canGrow={canGrow}
             />
           )}
 

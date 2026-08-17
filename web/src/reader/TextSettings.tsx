@@ -41,6 +41,11 @@ import {
   type ReaderSettings,
   type Spacing,
 } from './readerSettings.ts'
+import {
+  HIGHLIGHTER_CHOICES,
+  resolveHighlighter,
+  type HighlighterChoice,
+} from './highlightStyle.ts'
 import styles from './TextSettings.module.css'
 
 /** Which group of settings is showing. */
@@ -84,9 +89,23 @@ type Adjusting = null | 'size' | 'spacing' | 'margins'
 export interface TextSettingsProps {
   settings: ReaderSettings
   onSettingsChange: (patch: Partial<ReaderSettings>) => void
+  /**
+   * How highlights are painted in this book, and how to change it.
+   *
+   * Both optional. The setting is kept per book rather than in `settings`, so a
+   * caller with no book open — and the panel's own tests — simply leave the
+   * control out.
+   */
+  highlighter?: HighlighterChoice
+  onHighlighterChange?: (choice: HighlighterChoice) => void
 }
 
-export function TextSettings({ settings, onSettingsChange }: TextSettingsProps) {
+export function TextSettings({
+  settings,
+  onSettingsChange,
+  highlighter,
+  onHighlighterChange,
+}: TextSettingsProps) {
   const [pane, setPane] = useState<Pane>('text')
   const [adjusting, setAdjusting] = useState<Adjusting>(null)
 
@@ -253,6 +272,45 @@ export function TextSettings({ settings, onSettingsChange }: TextSettingsProps) 
               ))}
             </div>
           </div>
+
+          {/*
+            The highlighter, under the themes and not beside them.
+
+            It belongs on this tab because it is the same kind of choice — how
+            the page looks, not what it says — and because its default follows
+            the theme directly above it: a paper theme gets marker strokes, a
+            flat one gets a clean wash. Choosing anything but Auto overrules that
+            for this book and is never overwritten.
+          */}
+          {highlighter && onHighlighterChange && (
+            <div className={styles.row}>
+              <span className={styles.rowLabel}>Highlighter</span>
+              <div className={styles.choices} role="group" aria-label="Highlighter style">
+                {HIGHLIGHTER_CHOICES.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={styles.choice}
+                    aria-pressed={highlighter === option.value}
+                    onClick={() => onHighlighterChange(option.value)}
+                  >
+                    <span
+                      className={styles.choiceMark}
+                      data-style={
+                        option.value === 'auto'
+                          ? resolveHighlighter('auto', settings.theme)
+                          : option.value
+                      }
+                      aria-hidden="true"
+                    >
+                      Aa
+                    </span>
+                    <span className={styles.choiceName}>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
