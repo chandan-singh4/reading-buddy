@@ -3,159 +3,88 @@
 > What is in here: the one task in flight, and the exact files to open for it.
 > Read it at startup, before anything else.
 
-## Task — re-import the books and judge PARSER_VERSION 28
+## Task — judge PARSER_VERSION 28 on the phone
 
-**Goal.** Check on the phone that the library now reads the way the printed book
-reads. The parser stamp is 28, so the shelf offers to rebuild every book.
+**Goal.** Read the library on the phone beside the same books in Google Books.
+Find where the app and the printed book disagree.
 
-### The page turn at a section seam
+**This needs no code.** The parser stamp is 28, so the shelf offers to rebuild
+every book. Accept the rebuild first.
 
-**The fault.** The last page of a section did not follow the finger. Nor did the
-first page, going back. The page jumped instead. In a book of 100 sections, that
-is about 200 dead pages.
+**Definition of done.** The reader has looked at the Contents tab of at least
+*The Mountains of My Life* and *The Gay Science*, and has said what still
+disagrees. Nothing is fixed until there is a fault to fix.
 
-**The cause.** A section is laid out in columns in one strip. `turn()` returns
-`null` when the next page is outside that strip. `startDrag` then gave up, and
-the reader fell back to a threshold swipe. The sheet had nothing to reveal,
-because the arriving page was in a different section that was not on screen.
+**What to expect after the rebuild:**
 
-**The fix.** Both neighbour sections are now on the page all the time. They sit
-in two more `<article>` strips, in the same box as the live one, with the same
-markup. They are laid out but not painted (`visibility: hidden`). See
-`.understudy` in `Reader.module.css`.
+- Chapters nest under their parts.
+- The Preface is listed.
+- The book's own printed contents page is still in the text.
+- A numbered chapter opens with the large numeral.
+- *The Mountains of My Life* no longer lists 14 footnote entries as chapters.
+  It went from 136 sections to 108, and gained 28 printed page numbers.
+- *The Gay Science* shows "3" over "Emerson", on two lines.
+- *Determined* opens its chapters at body size, not five times it.
 
-When a drag runs off the end of a section, `startSeamDrag` does this:
+### Next after that — drop caps
 
-1. It scrolls the neighbour strip to the page the finger is asking for.
-2. It makes that strip visible and hides the live one.
-3. It starts the flip, with the neighbour as the page under the sheet.
+The reader parked this and will send a screenshot. Nothing is decided yet.
 
-If the finger goes back, the strips swap back and nothing has moved. If the
-finger commits, the reader loads the neighbour as normal, and the strip is
-hidden again the moment the real page arrives.
+The recommendation on file: find the shape rather than the book. One letter,
+offset 0 in its paragraph, set at twice body size or more. Float it as print
+does, and clamp the size to the number of lines it spans. Do not add a rule for
+one book.
 
-The two directions build the sheet in opposite orders. `beginDrag` already
-records why, at `pageTurn.ts`.
+Note the reading page already floats a drop cap of its own, in
+`.opening + p::first-letter` in `Reader.module.css`. Read that first: the
+question may be which of the two is right, not how to build one.
 
-**Why the markup is shared.** `sectionBody` draws the live strip and both
-neighbours. The page breaks must fall in the same places, or the page under the
-sheet is not the page that arrives. One function is what guarantees that.
+### Files in scope
 
-**Checked in the browser.** With the live strip on the last page of a section:
-the next strip appears at its first page, the live one hides, and the flip runs.
-On release, the reader lands on the next section's first page and both
-neighbours go dark again. Backwards is the mirror of that, landing on the
-previous section's last page. No console errors.
+For the parser judgement (only if a fault is found):
 
-### What changed in 28
+- `web/src/parse/html.ts` — `parseMarkup`, `tagOf`, the block walk.
+- `web/src/parse/epub.ts` — `applyNavigation`, the spine walk.
+- `web/src/parse/assemble.ts` — `sameLine`, level resolution.
+- `web/src/parse/styles.ts` — the mini CSS engine.
+- `web/src/parse/version.ts` — the stamp and its log.
+- `web/src/parse/library.report.ts` — the whole-library report.
+- Tests beside each of the above.
 
-Three faults, each found by reading a book beside the same book in Google Books.
-Each one is a place the parser wrote something the publisher did not.
+For anything that touches the page turn:
 
-**1. A heading lost the line break the book wrote into it.**
+- `web/src/pages/Reader.tsx` — `startSeamDrag`, `endDrag`, `sectionBody`.
+- `web/src/pages/Reader.module.css` — `.page`, `.page.understudy`.
+- `web/src/reader/pageTurn.ts` — `beginDrag`, `holdStill`, `settleDrag`.
+- `web/src/reader/columns.ts` — `turn`, `offsetOfPage`, `pageCountOf`.
+- `web/src/reader/motion.ts` — `fadeIn`, `MOVE_MS`.
+- `web/src/reader/figures.ts` — `useFigureImages`.
+- `web/src/pages/Reader.test.tsx`, `web/src/reader/figures.test.tsx`.
 
-A heading was read with `textContent`. A paragraph was read with the full
-extractor. `textContent` has no idea what a line is.
+### Out of scope
 
-A numeral over a name is the commonest title in print. *The Gay Science* writes
-it as one heading with a break inside:
+Storage and the tutor.
 
-```html
-<h2 class="section"><strong>3</strong><br/><em>Emerson</em></h2>
-```
+### How to compare the whole library
 
-So the two halves arrived pasted together as "3Emerson". Headings now read
-through the same extractor as prose. The break survives as a newline, and the
-reader prints it on two lines. The extractor also skips a bare page marker inside
-a heading, so its number no longer joins the title.
+`web/src/parse/library.report.ts` prints nine numbers for every epub in a
+folder. Run it before and after a parser change. Judge the change on all the
+books, never on one.
 
-**2. A drop cap set the whole first paragraph five times too large.**
+### Carried forward — how to work on the reading page
 
-`::first-letter` styles one letter that CSS invents. The parser read it as a rule
-about the element. *Determined* carries:
+Three lessons this thread paid for. They cost half a day each.
 
-```css
-p.x03-CO-Body-Text::first-letter { font-size: 5em }
-```
-
-It sits after the plain `1em` rule, so it won on source order. Every chapter
-opened with a page of enormous type. It also gave the baseline a 5em paragraph to
-weigh, which moves what the rest of the book is measured against.
-
-A rule is now dropped when its rightmost compound carries a pseudo-element.
-Pseudo-*classes* (`:first-child`, `:hover`) are kept on purpose. They select the
-element itself and only narrow which ones.
-
-**3. "Page 360" became a chapter title.**
-
-*The Mountains of My Life* gathers each chapter's footnotes into a file of their
-own. It lists them in the contents under the chapter they belong to, one entry
-per note, labelled with the page the note was printed on:
-
-```xml
-<navLabel><text>Page 360</text></navLabel>
-<content src="xhtml/chapter025-fn.xhtml#ch25fn002"/>
-```
-
-The target is the footnote paragraph. That file holds no heading at all. So a
-title was invented for each one. The reader met a page headed "Page 360" above a
-footnote, and the contents listed 14 of them among the chapters.
-
-The label is now read as what it says: this block opens printed page 360. The
-number is kept on the block. The entry goes no further — it never becomes a
-heading and never takes a level. The rule is tight on purpose. The whole label
-must be the reference and nothing else, so a chapter called "Page One" is safe.
-
-### What the numbers say
-
-Measured across all 32 books, before and after. Exactly one row moves:
-
-| The Mountains of My Life | Before | After |
-|---|---|---|
-| Sections | 136 | 108 |
-| Printed page numbers | 0 | 28 |
-
-28 invented titles gone. 28 printed pages recovered. No other book changes.
-
-The report cannot see faults 1 and 2, so each was checked on the book itself:
-
-- *The Gay Science* — the title is now `"3\nEmerson"`, not `"3Emerson"`.
-- *Determined* — paragraphs set over twice body size: 0. It was every chapter
-  opening in the book.
-
-### What changed in 27
-
-The parser read an epub's chapters as HTML. They are XHTML.
-
-XHTML lets any element close itself. Publishers write a page anchor as
-`<a id="page205"/>` and put one at the top of every chapter. The HTML parser
-allows self-closing only for `<br>` and `<img>`. So it read that anchor as an
-opening tag with no closing tag, and put the rest of the file inside it. The
-whole chapter then arrived as one block of running text.
-
-This is the cause of "the new lines are gone".
-
-Measured across the eight books on disk:
-
-| | Before | After |
-|---|---|---|
-| Paragraphs | 9,808 | 11,381 |
-| Chapters | 252 | 291 |
-| Sections | 326 | 378 |
-| Printed page numbers | 204 | 205 |
-| Subheadings kept | 146 | 185 |
-
-Two books gained most: *The Mountains of My Life* (56 → 94 chapters) and
-*The Quantum and the Lotus* (832 → 1,424 paragraphs).
-
-The XML parser refuses a whole file over one fault. So the parser tries XHTML
-first and falls back to HTML. One of the library's 202 chapter documents falls
-back.
-
-Second change, found by the first. A chapter's own heading is no longer
-overwritten by the name the navigation gave it. If the two are the same line
-said twice, the navigation still wins. If they differ, the page carries a real
-second heading under the chapter's name, and it is kept as a subheading.
+1. **Measure in a real browser, not by reading the file.** Every one of the four
+   seam faults was found by asking the running page a number: a layout-shift
+   observer, `getAnimations()`, `offsetWidth`. None of them was visible in the
+   source.
+2. **Layout is `offsetWidth`, paint is `getBoundingClientRect`.** The turning
+   sheet is under a transform, so its rectangles are distorted. Two false alarms
+   came from comparing the two.
+3. **The Browser pane does not composite.** `document.hidden` is true, so
+   `requestAnimationFrame` never fires and every animation reads as `running` at
+   time 0. Step a drag synchronously and observe settles with `setTimeout`.
 
 ### Still open — measured, not fixed
 
@@ -172,147 +101,8 @@ second heading under the chapter's name, and it is kept as a subheading.
 6. **The original file is not kept aside.** A book must be imported again to be
    parsed again.
 
-Closed in 28: *The Mountains of My Life* listed 14 footnote entries as chapters.
-Its `toc.ncx` is still malformed, but those entries are now read as printed
-pages, so they no longer reach the code the fault hurt.
+### Closed this thread
 
-### How to compare the whole library
-
-`web/src/parse/library.report.ts` prints nine numbers for every epub in a
-folder. Run it before and after a parser change. Judge the change on all the
-books, never on one.
-
-### Files in scope
-
-- `web/src/parse/html.ts` — `parseMarkup`, `tagOf`, the block walk.
-- `web/src/parse/epub.ts` — `applyNavigation`, the spine walk.
-- `web/src/parse/assemble.ts` — `sameLine`, level resolution.
-- `web/src/parse/styles.ts` — the mini CSS engine.
-- `web/src/parse/version.ts` — the stamp and its log.
-- `web/src/parse/library.report.ts` — the whole-library report.
-- Tests beside each of the above.
-
-For the page turn at a section seam:
-
-- `web/src/pages/Reader.tsx` — `startSeamDrag`, `endDrag`, `sectionBody`.
-- `web/src/pages/Reader.module.css` — `.understudy`.
-- `web/src/reader/pageTurn.ts` — `beginDrag`, `holdStill`, `settleDrag`.
-- `web/src/reader/columns.ts` — `turn`, `offsetOfPage`, `pageCountOf`.
-- `web/src/pages/Reader.test.tsx`.
-- `web/src/reader/figures.ts` — `useFigureImages`, which holds the pictures the
-  three strips draw.
-- `web/src/reader/figures.test.tsx` — the tests for it.
-
-### Out of scope
-
-Storage and the tutor.
-
-The parser part of this task changes what a book *becomes*, not how it draws.
-The page-turn part is the reading screen only. It changes no parsed data.
-
-### The words that moved at the seam
-
-The first build of the seam turn had a fault. The reader dragged onto the new
-page, and then the words dropped into place. Going back, a picture appeared
-before the turn had landed.
-
-**The cause.** A figure's picture is stored in the book, not on the web. The
-reader turns it into a `blob:` URL, and it did that for the section on screen
-only. So a neighbour strip drew every figure at no height. The strip then broke
-its columns in the wrong places. The reader saw a page built with the pictures
-missing, and the real section replaced it a moment later with the pictures in.
-
-**The fix.** `shownParagraphs` in `Reader.tsx` now gives the picture hook all
-three sections at once. The three strips get the same pictures, so they break
-their columns in the same places, and the page that arrives is the page that was
-under the sheet.
-
-Second fault, found beside it. The two neighbours were emptied at the start of
-every page load and filled again when the reads came back. That threw away the
-live page's pictures as well, and left a gap where a seam turn could not start.
-They are now replaced in one step, and carry the path of the page they belong
-beside, so a stale pair is never revealed.
-
-### The picture that went away
-
-The fix above had a cost, and it showed at once: the words still moved on the
-first page of a new section, and a picture on a page you turned back to was
-gone. Only the word "Figure" stayed.
-
-**The cause.** `useFigureImages` treated the whole list of paths as one request.
-Any change to the list revoked every URL at once, and the new ones arrived an
-`await` later. That was rare while the list was one section. It became constant
-when the list grew to three, because then the list changes on every page turn —
-even when the picture on screen does not change.
-
-**The fix.** The hook now holds one URL per path:
-
-- A path already held is never fetched again and never revoked.
-- Only a path that falls out of the set is let go.
-- A new book lets go of everything, because a path means different bytes there.
-- Leaving the reader lets go of everything. That promise still stands.
-
-This also fixes the moving words properly. A picture fetched while its section
-was a neighbour is still held when that section becomes the page. So the page
-arrives already laid out, and nothing drops into place after it lands.
-
-### The flash on landing
-
-**The fault.** A seam turn landed, and then the new page flashed. The text
-looked as if it changed weight at the same moment.
-
-**The measurement.** The browser was asked what was moving. Two facts:
-
-- No layout shift was recorded on any turn. The words do not really move.
-- A second animation started on the live strip after the turn had landed:
-  `opacity 0.6 → 1` over 400 ms.
-
-**The cause.** That animation is `fadeIn` in `reader/motion.ts`. It belongs to a
-*jump* — a link, the contents list, the slider. A jump has no direction, so it
-gets a fade instead of a slide. A seam turn loads a section the same way a jump
-does, so it collected the fade as well. The sheet had already curled over and
-landed, so the fade ran on top of a page the reader was reading.
-
-Text drawn at 0.6 opacity is lighter than the same text at 1.0. The 400 ms climb
-back is what looked like the letters changing size.
-
-**The fix.** The landing effect now records `crossed` before it puts the
-understudy away. A turn that crossed a seam is a turn, so it gets no fade. A
-jump into a new section still does.
-
-No test: a seam drag needs columns and `element.animate`, and jsdom has
-neither. This was checked in the browser — after the fix, no such animation
-starts on landing.
-
-### The page under the sheet was wider than the page
-
-The photograph showed it plainly: under the curling sheet, the arriving text
-ran to the edge of the screen. After the turn landed, the same text had a
-margin. The eye reads that as the words sliding left.
-
-**The measurement.** On a 375px screen:
-
-| | Live page | Understudy |
-|---|---|---|
-| Width | 353.2 | 375.2 |
-| Right edge | 364.2 | 386.2 |
-| Strip length | 738 | 782 |
-
-The understudy was 22px wider — the stage's two paddings — and its right edge
-was 11px past the screen.
-
-**The cause.** `.understudy` insets the strip with `left` and `right`. But an
-inset only decides the width when nothing else does, and `.page` sets
-`width: 100%`. Out of the flow that is 100% of the stage's *padding* box, which
-is wider than the flex line the real page sits on. The browser then balanced
-the box with `margin-right: -22px`.
-
-Two rules of one class each, and `.page` is written second, so `.page` won on
-source order.
-
-**The fix.** The rule is `.page.understudy` now, and it sets `width: auto`. The
-inset decides the width, as it was meant to.
-
-This is a real fault, not only an apparent one. A 22px wider column breaks its
-lines in different places, so every page under the sheet was set to a different
-measure than the page that replaced it.
+The seam turn and the four faults under it are done and signed off. The full
+write-up is in `docs/progress.md` under *The page turn crosses a section*, and
+the three decisions are in `docs/decisions.md`, all dated 2026-08-17.

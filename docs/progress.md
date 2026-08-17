@@ -15,18 +15,19 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1407 tests across 81 files** (2026-08-16).
-- **`PARSER_VERSION` is 24, and two books are waiting on a re-parse.** The
-  reader should open the shelf and accept the rebuild for *Braiding Sweetgrass*
-  and *The Mountains of My Life*, then check the Contents tab of each. Expected:
+  **1459 tests across 81 files** (2026-08-17).
+- **`PARSER_VERSION` is 28, so the shelf offers to rebuild every book.** The
+  reader should accept the rebuild and check the Contents tab. Expected:
   chapters nested under their parts, the Preface listed, the book's own printed
   contents page still in the text, and a numbered chapter opening with the large
-  numeral.
-- **The page-flip seam is still open, and the reader chose to defer it.** The
-  animation shows on some turns and not others. Cause is known: `turn()` returns
-  `null` at a strip's end and `startDrag` refuses a turn that crosses a section,
-  because the destination is not laid out yet. The fix is to lay the next
-  section out ahead of time.
+  numeral. *The Mountains of My Life* is the book to look at first — it lost 28
+  invented "Page 360" chapters.
+- **The page-flip seam is closed** — see *The page turn crosses a section* in
+  Recently done. Signed off by the reader on the phone, 2026-08-17.
+- **Drop caps are parked, waiting on a screenshot.** The reader deferred them to
+  a later thread. The recommendation on file: recognise the shape (one letter,
+  offset 0, at least twice body size) and float it as print does, with the size
+  clamped to the lines it spans.
 - **The new Bookmarks and Notes panels have never been seen.** The Browser pane
   has no book on its shelf, so both were proved by tests, not by eye. **Worth a
   minute on the phone.** Watch the ribbon grow down when a bookmark unfurls.
@@ -80,6 +81,28 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The page turn crosses a section** — 2026-08-17, five commits (`06daff5`,
+  `e1336c4`, `54c215f`, `6d946ba`, `8e44036`), build green, **1459 tests across
+  81 files**. **Signed off by the reader on the phone.** A section is laid out
+  in columns in one strip, so `turn()` returned `null` at the end of it and the
+  drag fell back to a jump. In a book of 100 sections that is about 200 dead
+  pages. Both neighbour sections are now mounted offscreen, laid out but not
+  painted, and the right one is revealed under the sheet. Four faults followed,
+  each found by the reader and each measured before it was fixed:
+  - **The neighbours drew no pictures**, so their columns broke in the wrong
+    places. `shownParagraphs` now gives the picture hook all three sections.
+  - **A picture blinked out on the way back.** The picture hook treated the
+    whole path list as one request, so any change revoked every URL at once
+    while the replacements arrived an `await` later. It holds one URL per path
+    now. This was a regression from the fix above, which made the list change on
+    every turn.
+  - **The landing flashed.** A seam turn took `fadeIn`, which belongs to a jump,
+    on top of a page that had already landed. Text at 0.6 opacity is lighter
+    than the same text at 1.0, which is what looked like the type resizing.
+  - **The page under the sheet was 22px wider than the page.** `.understudy`
+    insets the strip, but `.page` sets `width: 100%` and is written second, so
+    it won on source order. The strip hung 11px off the screen and broke its
+    lines to a different measure. The rule is `.page.understudy` now.
 - **The parser reads the book instead of guessing at it** — 2026-08-16, four
   commits (`f407641`, `9cb387c`, `2a3f5cb`, `7a69627`), build green, **1407
   tests across 81 files**. The reader's brief: "We have parsed at least 20
@@ -518,8 +541,8 @@ Get that loop working before building any breadth.
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (1407, 81 files), `npm run typecheck`, `npm run build` — all
-passing as of 2026-08-16. Precache 34 entries / 1172.01 KiB. **Two tests flaked
+**Gates:** `npm test` (1459, 81 files), `npm run typecheck`, `npm run build` — all
+passing as of 2026-08-17. Precache 34 entries / 1172.01 KiB. **Two tests flaked
 once under parallel load** (`Reader › goes to the next section`, `Library ›
 unfiles a book…`) and passed on re-run and in isolation — timing, not a
 regression, but they exist. **Run the suite as `npm test --workspace web`** — from the repo root it misses `web/`'s Vite config
@@ -538,12 +561,11 @@ type is imported.
   worker problem. Don't raise it again.
 
 ### Next up
-**Judge the parser on the phone.** Re-parse the two books and check the Contents
-tab of each. This needs no code. It is the only way to know if the four parser
-rounds have landed.
+**Judge the parser on the phone.** Accept the rebuild to `PARSER_VERSION` 28 and
+check the Contents tab. This needs no code. It is the only way to know if the
+four parser rounds have landed.
 
-**Then the page-flip seam**, which the reader deferred twice. Lay the next
-section out ahead of time so a drag can cross a section boundary.
+**Then drop caps**, parked this thread and waiting on the reader's screenshot.
 
 **Finish WP-25: something that writes a note.** The Notes tab reads a table that
 nothing fills. Written out in `active-task.md`, with one question to settle

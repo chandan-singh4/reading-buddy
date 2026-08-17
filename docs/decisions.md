@@ -1181,3 +1181,21 @@ sign-in screen.
   the part becomes the division and "Chapter 1" arrives as a section — the words
   print gives a full opening to. Only when the title carries a number: a full
   opening on every subdivision would be relentless. — 2026-08-16
+
+- **A page the reader can turn onto must be laid out before the turn starts.**
+  Both neighbour sections are mounted offscreen, hidden with `visibility` rather
+  than `display`, so they keep their columns and can answer "which page would I
+  land on". They must be drawn from the same function as the live page and given
+  the same pictures, or they break their lines in different places and the page
+  revealed is not the page that arrives. — 2026-08-17
+
+- **A turn across a section is a turn, not a jump.** It loads a section the same
+  way a link or the contents list does, so it collected the jump's fade as well
+  and flashed after it had landed. A jump fades because it has no direction; a
+  turn has already shown the reader where the book went. — 2026-08-17
+
+- **A `blob:` URL is held per picture, not per page.** Holding them per request
+  meant every page turn revoked every URL at once, while the replacements
+  arrived an `await` later. The promise this keeps — that a reader going through
+  a picture book does not accumulate it — is kept by revoking what falls out of
+  reach, not by revoking everything. — 2026-08-17
