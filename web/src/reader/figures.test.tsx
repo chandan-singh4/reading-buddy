@@ -127,6 +127,59 @@ describe('resolving a section’s pictures', () => {
     await waitFor(() => expect(load).toHaveBeenCalledTimes(1))
   })
 
+  it('keeps a picture that is still wanted when the list around it changes', async () => {
+    const { revoked } = stubObjectUrls()
+
+    const load = vi.fn(async (paths: readonly string[]) =>
+      new Map(paths.map((path) => [path, blob] as const)),
+    )
+    const view = render(
+      <Harness paragraphs={[figure('ch01-s01-p001', 'OEBPS/fig1.png')]} load={load} />,
+    )
+    await waitFor(() => expect(screen.getByTestId('urls').textContent).toBe('blob:1'))
+
+    // The reading page turns: the same picture is still on screen, and a
+    // neighbour's picture joins the list. The first one must not be disturbed.
+    // It used to be revoked and fetched again, and in the gap between those two
+    // the figure on screen fell back to its caption.
+    view.rerender(
+      <Harness
+        paragraphs={[figure('ch01-s01-p001', 'OEBPS/fig1.png'), figure('ch01-s02-p001', 'OEBPS/fig2.png')]}
+        load={load}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('urls').textContent).toBe('blob:1,blob:2'))
+    expect(revoked).toEqual([])
+    // Only the one it did not already hold.
+    expect(load).toHaveBeenLastCalledWith(['OEBPS/fig2.png'])
+  })
+
+  it('lets go of a picture once it is out of reach', async () => {
+    const { revoked } = stubObjectUrls()
+
+    const load = vi.fn(async (paths: readonly string[]) =>
+      new Map(paths.map((path) => [path, blob] as const)),
+    )
+    const view = render(
+      <Harness
+        paragraphs={[figure('ch01-s01-p001', 'OEBPS/fig1.png'), figure('ch01-s02-p001', 'OEBPS/fig2.png')]}
+        load={load}
+      />,
+    )
+    await waitFor(() => expect(screen.getByTestId('urls').textContent).toBe('blob:1,blob:2'))
+
+    // The reader has moved far enough that the first picture is neither the page
+    // nor a neighbour. Held URLs pin their bytes, so this is the promise that
+    // stops a picture book accumulating in memory.
+    view.rerender(
+      <Harness paragraphs={[figure('ch01-s02-p001', 'OEBPS/fig2.png')]} load={load} />,
+    )
+
+    await waitFor(() => expect(revoked).toEqual(['blob:1']))
+    expect(screen.getByTestId('urls').textContent).toBe('blob:2')
+  })
+
   it('shows nothing rather than failing when the pictures cannot be read', async () => {
     const load = vi.fn(async () => {
       throw new Error('storage is gone')

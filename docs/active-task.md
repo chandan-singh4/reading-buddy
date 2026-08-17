@@ -199,6 +199,9 @@ For the page turn at a section seam:
 - `web/src/reader/pageTurn.ts` — `beginDrag`, `holdStill`, `settleDrag`.
 - `web/src/reader/columns.ts` — `turn`, `offsetOfPage`, `pageCountOf`.
 - `web/src/pages/Reader.test.tsx`.
+- `web/src/reader/figures.ts` — `useFigureImages`, which holds the pictures the
+  three strips draw.
+- `web/src/reader/figures.test.tsx` — the tests for it.
 
 ### Out of scope
 
@@ -229,3 +232,26 @@ every page load and filled again when the reads came back. That threw away the
 live page's pictures as well, and left a gap where a seam turn could not start.
 They are now replaced in one step, and carry the path of the page they belong
 beside, so a stale pair is never revealed.
+
+### The picture that went away
+
+The fix above had a cost, and it showed at once: the words still moved on the
+first page of a new section, and a picture on a page you turned back to was
+gone. Only the word "Figure" stayed.
+
+**The cause.** `useFigureImages` treated the whole list of paths as one request.
+Any change to the list revoked every URL at once, and the new ones arrived an
+`await` later. That was rare while the list was one section. It became constant
+when the list grew to three, because then the list changes on every page turn —
+even when the picture on screen does not change.
+
+**The fix.** The hook now holds one URL per path:
+
+- A path already held is never fetched again and never revoked.
+- Only a path that falls out of the set is let go.
+- A new book lets go of everything, because a path means different bytes there.
+- Leaving the reader lets go of everything. That promise still stands.
+
+This also fixes the moving words properly. A picture fetched while its section
+was a neighbour is still held when that section becomes the page. So the page
+arrives already laid out, and nothing drops into place after it lands.
