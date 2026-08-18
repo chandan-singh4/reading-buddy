@@ -10,7 +10,7 @@ import {
   Highlights,
   chapterNumber,
   describeRange,
-  rangeOfQuote,
+  rangeOfSelection,
   highlightAt,
   selectionBetween,
   selectionInReader,
@@ -2602,8 +2602,7 @@ export default function Reader() {
       // from coordinates, and the text was taken when the selection was made.
       window.getSelection()?.removeAllRanges()
       const root = strip.current
-      const home = document.getElementById(at.anchor.replace(/[[\]]/g, ''))
-      const fresh = root && home && root.contains(home) ? rangeOfQuote(at.anchor, at.text) : null
+      const fresh = root ? rangeOfSelection(root, at.text, at.anchor) : null
       const now = fresh ? describeRange(fresh, root) : null
       if (!now) {
         setUnit(null)

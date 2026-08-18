@@ -45,6 +45,7 @@ export {
   highlightAt,
   pivotFor,
   rangeOfQuote,
+  rangeOfSelection,
   selectionBetween,
   selectionInReader,
 } from './selection.ts'

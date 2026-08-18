@@ -176,6 +176,41 @@ export function rangeOfSpan(from: Source[], at: number, end: number): Range | nu
   return range
 }
 
+/**
+ * A live selection found again anywhere in the page, across paragraphs.
+ *
+ * `rangeOfQuote` looks inside the one paragraph an anchor names, which is right
+ * for a stored highlight but wrong for a selection a reader has grown with the
+ * chevrons: that one runs over as many paragraphs as they asked for, and it is
+ * never inside any single one of them.
+ *
+ * The page is not a fixed thing either. It holds a few paragraphs at a time, and
+ * a turn swaps some of them out. A DOM range does not report that — it re-points
+ * to the end of its container and the selection silently grows to the foot of
+ * the page. So after every turn the words are looked up afresh, in the whole
+ * page, by the text itself.
+ *
+ * The anchor is still used, as a tie-breaker. A short selection — one word, one
+ * common phrase — can read the same in two places on one page, and the copy that
+ * begins in the paragraph the reader started in is the copy they meant.
+ */
+export function rangeOfSelection(root: Element, quote: string, anchor: Anchor): Range | null {
+  const want = quote.replace(/\s+/g, ' ').trim()
+  if (!want) return null
+
+  const { flat, from } = flatten(root)
+  const home = root.querySelector(`[id="${anchor.replace(/[[\]]/g, '')}"]`)
+
+  let fallback: Range | null = null
+  for (let at = flat.indexOf(want); at >= 0; at = flat.indexOf(want, at + 1)) {
+    const range = rangeOfSpan(from, at, at + want.length)
+    if (!range) continue
+    if (home && home.contains(range.startContainer)) return range
+    fallback ??= range
+  }
+  return fallback
+}
+
 /** How much of the page a reader wants in one tap. */
 export type SelectionGrain = 'sentence' | 'paragraph'
 
