@@ -94,6 +94,11 @@ export function holdOutgoing(
   const built = turnClock.begin()
   const node = copyOf(strip, 1, scale)
   built()
+  // Whichever way the turn goes, this copy is the page being left: forwards it
+  // is the sheet that flies away, backwards it is the one that lies still while
+  // the destination lands on top of it. Both are gone at the end, so both may
+  // travel without their pen. See `HandDrawn.module.css`.
+  node?.setAttribute('data-page-leaving', '')
   return node ? { node, by, scale } : null
 }
 
@@ -716,6 +721,9 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
   const still = held.by === -1 ? held.node : null
   const moving = held.by === -1 ? copyOf(strip, 2, held.scale) : held.node
 
+  // `moving` here is the *arriving* page, and it is the one copy in this module
+  // that is not marked as leaving. See `holdOutgoing` and `HandDrawn.module.css`.
+
   // The second copy couldn't be made (no parent, reduced motion changed under
   // us). Falling back to the instant change beats a half-played turn.
   if (!moving) {
@@ -936,6 +944,10 @@ export function beginDrag(
   const stage = document.createElement('div')
   stage.setAttribute('aria-hidden', 'true')
   stage.dataset.pageSheet = ''
+  // Forwards the bands are the page being left; backwards they are the
+  // destination — see the ordering note above. Only the first kind may have its
+  // pen taken off. See `HandDrawn.module.css`.
+  if (by === 1) stage.dataset.pageLeaving = ''
   stage.style.position = 'absolute'
   stage.style.inset = '0'
   stage.style.pointerEvents = 'none'

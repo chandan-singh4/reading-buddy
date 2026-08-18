@@ -137,7 +137,25 @@
  * one of those is a position or a size, and moving one would make the ink twitch
  * as the sheet lifts. Only paint is dropped, never geometry.
  */
-[data-page-sheet] .stroke::before {
+/*
+ * The dry start and the grain go only from a sheet that is on its way out.
+ *
+ * Turning *back*, the moving sheet is the destination, not the page being left
+ * — see the ordering note in `pageTurn.ts`. The reader watches that sheet
+ * settle and then keeps looking at the same words on the real page underneath.
+ * A pen mark missing from it has to appear at the hand-over, and the eye reads
+ * that as the highlight arriving a moment late. That was the reported fault.
+ *
+ * So `pageTurn.ts` marks every copy of a page being *left*, in both directions,
+ * and only those give up the mask. The one unmarked copy is the backward
+ * arrival, which keeps the shape of its ink and hands over to a page that
+ * already matches.
+ *
+ * The mask is what shows, because it is the shape of the ink. The turbulence
+ * above it is a texture inside a shape that is already right, and it is much
+ * the more expensive of the two, so that still goes from every sheet.
+ */
+[data-page-leaving] .stroke::before {
   mask-image: none;
   background-image: none;
 }
