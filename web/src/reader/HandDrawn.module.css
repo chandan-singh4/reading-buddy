@@ -115,8 +115,14 @@
  * untouched, so nothing moves — a straight-edged stroke for a third of a second
  * of motion, and the pen comes back the moment the page lands.
  */
-[data-page-frame]:has([data-page-sheet]) .stroke::before,
-[data-page-frame]:has([data-page-sheet]) .stroke::after {
+/*
+ * `body:not([data-keep-ink])` is a measuring switch, not a feature. Dropping the
+ * texture is itself a repaint of every stroke, so it may cost more than it
+ * saves. `?ink=keep` holds the rule back so the two can be timed against each
+ * other on a real phone. See `turnClock.ts`. Remove both when the answer is in.
+ */
+body:not([data-keep-ink]) [data-page-frame]:has([data-page-sheet]) .stroke::before,
+body:not([data-keep-ink]) [data-page-frame]:has([data-page-sheet]) .stroke::after {
   filter: none;
 }
 

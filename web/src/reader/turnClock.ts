@@ -59,6 +59,25 @@ export function wanted(): boolean {
   }
 }
 
+/**
+ * Whether the reader has asked to keep the marker texture through a turn.
+ *
+ * A measuring switch, paired with the rule in `HandDrawn.module.css`. `?ink=keep`
+ * holds the texture on; `?ink=drop` returns to the normal behaviour. Both are
+ * remembered, so the two can be compared without retyping the address.
+ */
+export function keepsInk(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const asked = new URLSearchParams(window.location.search).get('ink')
+    if (asked === 'keep') window.localStorage.setItem('rb-keep-ink', '1')
+    if (asked === 'drop') window.localStorage.removeItem('rb-keep-ink')
+    return window.localStorage.getItem('rb-keep-ink') === '1'
+  } catch {
+    return false
+  }
+}
+
 /** Watch the numbers. Returns the way to stop watching. */
 export function watch(listener: Listener): () => void {
   listeners.add(listener)

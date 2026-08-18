@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { watch, wanted } from './turnClock.ts'
+import { keepsInk, watch, wanted } from './turnClock.ts'
 import type { Turn } from './turnClock.ts'
 
 /**
@@ -14,11 +14,19 @@ import type { Turn } from './turnClock.ts'
 export function TurnClock() {
   const [turns, setTurns] = useState<readonly Turn[]>([])
   const [on] = useState(wanted)
+  const [ink] = useState(keepsInk)
 
   useEffect(() => {
     if (!on) return
     return watch((all) => setTurns([...all]))
   }, [on])
+
+  // Outside the `on` guard: the switch has to work whether or not the numbers
+  // are shown, so a normal reading session can carry it too.
+  useEffect(() => {
+    if (ink) document.body.dataset.keepInk = ''
+    else delete document.body.dataset.keepInk
+  }, [ink])
 
   if (!on) return null
 
@@ -41,7 +49,7 @@ export function TurnClock() {
     >
       {turns.length === 0
         ? 'turn clock: flip a page'
-        : `build  paint  ink\n${turns
+        : `ink texture in turn: ${ink ? 'KEPT' : 'dropped'}\nbuild  paint  ink\n${turns
             .map(
               (t) =>
                 `${Math.round(t.build).toString().padStart(5)}${Math.round(t.paint)
