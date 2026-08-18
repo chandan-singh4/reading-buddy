@@ -41,7 +41,7 @@ export function TurnClock() {
     >
       {turns.length === 0
         ? 'turn clock: flip a page'
-        : `dir  still  build  paint   ink` +
+        : `dir  still  build  paint  worst   ink` +
           '\n' +
           turns
             .map((t) => {
@@ -50,7 +50,7 @@ export function TurnClock() {
               const dir = t.by === 1 ? ' ->' : ' <-'
               return (
                 dir + cell(t.still, 7) + cell(t.build, 7) + cell(t.paint, 7) +
-                t.strokes.toString().padStart(6)
+                cell(t.worst, 7) + t.strokes.toString().padStart(6)
               )
             })
             .join('\n')}

@@ -36,6 +36,16 @@ export interface Turn {
   build: number
   /** The browser's work, in milliseconds: the wait for the next drawn frame. */
   paint: number
+  /**
+   * The longest single frame while the sheet was on screen, in milliseconds.
+   *
+   * `build` and `paint` describe the *start* of a turn, and they came out level
+   * in both directions. The reader still reports that turning back stutters the
+   * whole way through, which is a complaint about the frames after the first
+   * one. This is that number. A frame the phone can serve is about 17 ms; a
+   * frame of 50 ms is three dropped in a row, and that is what a stutter is.
+   */
+  worst: number
   /** Lines of ink on the page at the moment of the turn. */
   strokes: number
 }
@@ -94,6 +104,69 @@ export function still(): () => void {
   }
 }
 
+/**
+ * The frame watcher, for the length of one turn.
+ *
+ * `row` is the turn being filled in. It is written to in place, because the row
+ * is recorded two frames into the turn and the worst frame is not known until
+ * the turn ends.
+ */
+let row: Turn | null = null
+let worst = 0
+let watching = false
+
+/** Start counting frames. Called when the sheet goes up. */
+export function frames(): void {
+  if (!wanted() || typeof requestAnimationFrame !== 'function') return
+  worst = 0
+  watching = true
+
+  const step = (last: number) => {
+    if (!watching) return
+    requestAnimationFrame((now) => {
+      const gap = now - last
+      if (gap > worst) worst = gap
+      if (row) row.worst = worst
+      step(now)
+    })
+  }
+  requestAnimationFrame(step)
+}
+
+/** Stop counting. Called when the sheet comes down, however it comes down. */
+export function rest(): void {
+  if (!watching) return
+  watching = false
+  if (row) {
+    row.worst = worst
+    tell()
+  }
+}
+
+/**
+ * Whether to strip the marker texture from the bands of a *backward* turn.
+ *
+ * Turning back, the moving sheet is the page the reader lands on, so it keeps
+ * the shape of its ink on purpose — see `HandDrawn.module.css`. That is also
+ * the one thing a backward turn redraws on every frame and a forward turn does
+ * not. This switch takes it off, so the two can be measured against each other
+ * on the same page.
+ *
+ * `?bands=plain` turns it on, `?bands=inked` puts it back. A measuring switch,
+ * to be deleted with the rest of the stopwatch.
+ */
+export function plainBands(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const asked = new URLSearchParams(window.location.search).get('bands')
+    if (asked === 'plain') window.localStorage.setItem('rb-plain-bands', '1')
+    if (asked === 'inked') window.localStorage.removeItem('rb-plain-bands')
+    return window.localStorage.getItem('rb-plain-bands') === '1'
+  } catch {
+    return false
+  }
+}
+
 /** Watch the numbers. Returns the way to stop watching. */
 export function watch(listener: Listener): () => void {
   listeners.add(listener)
@@ -134,13 +207,16 @@ export function begin(by: 1 | -1): () => void {
     if (typeof requestAnimationFrame !== 'function') return
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        turns.push({
+        const turn: Turn = {
           by,
           still,
           build: built - from,
           paint: performance.now() - built,
+          worst: 0,
           strokes,
-        })
+        }
+        turns.push(turn)
+        row = turn
         while (turns.length > KEPT) turns.shift()
         tell()
       })

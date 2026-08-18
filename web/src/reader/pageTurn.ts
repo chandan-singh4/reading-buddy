@@ -806,6 +806,7 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
 
   const turning = moving.animate(sheet, timing)
   shade?.animate(shading, timing)
+  turnClock.frames()
 
   // Removed on completion *and* on failure — an animation can be cancelled by
   // the element being taken out from under it, and a copy left behind would sit
@@ -817,6 +818,7 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
     clearTimeout(guard)
     moving.remove()
     still?.remove()
+    turnClock.rest()
     // Last, and unconditionally. The real page number has to come back even if
     // the turn was abandoned half-played — a reader left looking at a page with
     // no number on it is a worse outcome than a turn that didn't finish.
@@ -969,7 +971,12 @@ export function beginDrag(
   // Forwards the bands are the page being left; backwards they are the
   // destination — see the ordering note above. Only the first kind may have its
   // pen taken off. See `HandDrawn.module.css`.
-  if (by === 1) stage.dataset.pageLeaving = ''
+  // Backwards the bands are the page the reader lands on, so they keep the
+  // shape of their ink — and they are also the one thing a backward turn
+  // redraws every frame that a forward turn does not. `plainBands` is the
+  // measuring switch that takes it off, so the cost can be read rather than
+  // argued about. It goes with the stopwatch.
+  if (by === 1 || turnClock.plainBands()) stage.dataset.pageLeaving = ''
   stage.style.position = 'absolute'
   stage.style.inset = '0'
   stage.style.pointerEvents = 'none'
@@ -1071,6 +1078,7 @@ export function beginDrag(
   paintDrag(drag, startAt)
 
   built()
+  turnClock.frames()
 
   return drag
 }
@@ -1215,6 +1223,7 @@ export function settleDrag(
     if (guard !== null) clearTimeout(guard)
     drag.frame = null
     dropDrag(drag)
+    turnClock.rest()
     done(commit)
   }
 
