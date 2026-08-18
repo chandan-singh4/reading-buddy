@@ -371,7 +371,21 @@ function pageCopy(strip: HTMLElement): PageCopy {
   const candidate = Math.max(0, search(strip.scrollLeft - pageWidth) - 1)
   const aligned = columnTop(candidate)
   const first = aligned < 0 ? candidate : aligned
-  const last = Math.min(count - 1, search(strip.scrollLeft + pageWidth * 2))
+  /*
+   * The end of the visible page, and not a page past it.
+   *
+   * This used to keep a whole page of slack on this side, mirroring the page
+   * kept in front. The two are not the same, though, and only one of them earns
+   * its keep. Columns flow forwards: what comes *before* the page decides where
+   * its breaks fall, so the leading page is load-bearing. What comes *after* it
+   * decides nothing, is off the sheet's right edge, and is never seen.
+   *
+   * It was a third of everything cloned, and it was cloned once per band. On a
+   * phone that was about 25 ms of a 75 ms turn, spent on words outside the
+   * picture. `search` returns the first child at or past the mark, and `last`
+   * keeps it, so a paragraph straddling the edge is still whole.
+   */
+  const last = Math.min(count - 1, search(strip.scrollLeft + pageWidth))
   if (last <= first) return whole()
 
   const node = strip.cloneNode(false) as HTMLElement

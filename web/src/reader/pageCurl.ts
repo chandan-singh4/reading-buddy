@@ -35,8 +35,14 @@
  * below about ten the bend reads as a folding screen. It is not free — every
  * strip is a copy of the page's DOM — which is why this is a constant to be
  * lowered if a cheap device ever struggles, rather than a number to raise.
+ *
+ * A phone did struggle, and this is that lowering. Measured there, building the
+ * sheets cost about 75 ms of every turn, which is over four frames of a finger
+ * waiting before the page could move. The cost is a straight multiple of this
+ * number. Twelve keeps a clear margin over the ten where the bend goes wrong,
+ * and gives back a quarter of the build.
  */
-export const STRIPS = 16
+export const STRIPS = 12
 
 /**
  * How far the eye is from the page, in pixels. Shallower reads as a pop-up book.
