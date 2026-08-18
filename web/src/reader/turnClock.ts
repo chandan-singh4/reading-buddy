@@ -84,7 +84,7 @@ export function begin(): () => void {
 
   // Counted now, before the copies exist. A moment later the frame holds the
   // page and sixteen sheets cut from it, and the same ink counts seventeen times.
-  const strokes = document.querySelectorAll('[data-page-frame] .stroke').length
+  const strokes = document.querySelectorAll('[data-page-frame] [data-stroke]').length
   const from = performance.now()
 
   return () => {
