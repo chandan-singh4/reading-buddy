@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { PARSER_VERSION } from '../parse/version.ts'
@@ -62,6 +62,38 @@ function openInfo(id: string = BOOK_ID, state?: unknown) {
   )
 }
 
+/**
+ * The whole trail a reader leaves: shelf, then the book, then its About page.
+ *
+ * Needed to prove the Back arrow *pops* rather than pushes. A pushed entry
+ * leaves the phone's own back gesture bouncing between the book and About for
+ * ever, which is exactly the fault this guards.
+ */
+function openInfoFromReader() {
+  return render(
+    <MemoryRouter
+      initialEntries={['/', `/book/${BOOK_ID}`, { pathname: `/book/${BOOK_ID}/info`, state: { fromReader: true } }]}
+      initialIndex={2}
+    >
+      <Routes>
+        <Route path="/" element={<p>The shelf</p>} />
+        <Route path="/book/:bookId" element={<GoBack />} />
+        <Route path="/book/:bookId/info" element={<BookInfo />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+/** Stands in for the reading page, and offers the phone's back gesture. */
+function GoBack() {
+  const navigate = useNavigate()
+  return (
+    <button type="button" onClick={() => navigate(-1)}>
+      The book
+    </button>
+  )
+}
+
 beforeEach(async () => {
   await repository.deleteBook(BOOK_ID)
 })
@@ -90,6 +122,22 @@ describe('BookInfo', () => {
     const back = await screen.findByRole('link', { name: 'Back to the book' })
     expect(back.getAttribute('href')).toBe(`/book/${BOOK_ID}`)
     expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
+  })
+
+  // The arrow must unwind the detour, not add to it. Pushing a third entry
+  // leaves the reader's own back gesture walking between the book and this page
+  // and never reaching the shelf.
+  it('pops the detour rather than pushing the book on top of it', async () => {
+    await repository.saveParsedBook(bookOf())
+    openInfoFromReader()
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Back to the book' }))
+    // The book, where the reader was.
+    const book = await screen.findByRole('button', { name: 'The book' })
+
+    // And now their next back gesture reaches the shelf, which is the fault.
+    fireEvent.click(book)
+    expect(await screen.findByText('The shelf')).toBeTruthy()
   })
 
   it('says a book has not been started when there is no reading position', async () => {

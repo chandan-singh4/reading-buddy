@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useLocation, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
 import { forgetLibraryMemory } from '../app/libraryMemory.ts'
@@ -56,11 +56,35 @@ type CatalogueState =
  * The reading page says where it sent them from in the router's `state`, so
  * this needs no history guessing and behaves the same on a cold load of the URL
  * (no state, so: home).
+ *
+ * ## Back goes back, it does not go *to*
+ *
+ * The arrow pops history rather than navigating to the book, and that is the
+ * whole point of it. Navigating pushes a third entry — book, About, book — so
+ * the phone's own back gesture then walks the reader between the last two for
+ * ever and can never reach the shelf. Popping leaves the stack as it was before
+ * the detour, so the next back gesture goes where it always would have.
+ *
+ * It keeps a real `href` regardless: the link must still be a link to a long
+ * press, to a screen reader, and to anyone opening it in a new tab.
  */
 function ExitControl({ bookId, fromReader }: { bookId: string; fromReader: boolean }) {
+  const navigate = useNavigate()
+
   if (fromReader) {
     return (
-      <Link to={`/book/${bookId}`} className={styles.back} aria-label="Back to the book">
+      <Link
+        to={`/book/${bookId}`}
+        className={styles.back}
+        aria-label="Back to the book"
+        onClick={(event) => {
+          // Leave the modified clicks alone — those are "open it elsewhere",
+          // and the browser's own handling of them is right.
+          if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey) return
+          event.preventDefault()
+          navigate(-1)
+        }}
+      >
         <Icon name="back" />
       </Link>
     )
