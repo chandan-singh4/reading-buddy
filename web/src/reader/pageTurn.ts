@@ -971,12 +971,19 @@ export function beginDrag(
   // Forwards the bands are the page being left; backwards they are the
   // destination — see the ordering note above. Only the first kind may have its
   // pen taken off. See `HandDrawn.module.css`.
-  // Backwards the bands are the page the reader lands on, so they keep the
-  // shape of their ink — and they are also the one thing a backward turn
-  // redraws every frame that a forward turn does not. `plainBands` is the
-  // measuring switch that takes it off, so the cost can be read rather than
-  // argued about. It goes with the stopwatch.
-  if (by === 1 || turnClock.plainBands()) stage.dataset.pageLeaving = ''
+  // Forwards the bands are the page being left, so they may drop the whole pen.
+  //
+  // Backwards they are the page the reader lands on and keep the shape of their
+  // ink — and they are the one thing a backward turn redraws every frame that a
+  // forward turn does not. Measured at a 150 ms frame against a 50 ms floor, so
+  // something has to come off. `bandMode` is the measuring switch that decides
+  // what, and it goes with the stopwatch.
+  if (by === 1) stage.dataset.pageLeaving = ''
+  else {
+    const mode = turnClock.bandMode()
+    if (mode === 'plain') stage.dataset.pageLeaving = ''
+    else if (mode !== 'inked') stage.dataset.bandTest = mode
+  }
   stage.style.position = 'absolute'
   stage.style.inset = '0'
   stage.style.pointerEvents = 'none'

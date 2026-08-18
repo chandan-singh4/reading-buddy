@@ -160,6 +160,23 @@
   background-image: none;
 }
 
+/*
+ * The two halves of the pen, separately, for measuring only.
+ *
+ * `data-page-leaving` above drops both at once. That proved the ink was what
+ * made a backward turn stutter — a 150 ms frame against a 50 ms floor — but it
+ * cannot say which half cost the money, and the two are not equally safe to
+ * lose. The grain is a texture inside a shape that is already right. The mask is
+ * the shape. See `bandMode` in `turnClock.ts`, and delete these with it.
+ */
+[data-band-test='nograin'] .stroke::before {
+  background-image: none;
+}
+
+[data-band-test='nomask'] .stroke::before {
+  mask-image: none;
+}
+
 [data-page-sheet] .stroke::before,
 [data-page-sheet] .stroke::after {
   filter: none;

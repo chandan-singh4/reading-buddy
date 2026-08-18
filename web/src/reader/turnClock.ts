@@ -143,27 +143,41 @@ export function rest(): void {
   }
 }
 
+/** What the bands of a *backward* turn are allowed to give up, for measuring. */
+export type BandMode = 'inked' | 'plain' | 'nograin' | 'nomask'
+
 /**
- * Whether to strip the marker texture from the bands of a *backward* turn.
+ * Which part of the pen to take off the bands of a backward turn.
  *
  * Turning back, the moving sheet is the page the reader lands on, so it keeps
- * the shape of its ink on purpose — see `HandDrawn.module.css`. That is also
- * the one thing a backward turn redraws on every frame and a forward turn does
- * not. This switch takes it off, so the two can be measured against each other
- * on the same page.
+ * the shape of its ink on purpose — see `HandDrawn.module.css`. It is also the
+ * one thing a backward turn redraws on every frame that a forward turn does
+ * not, and it was measured at a 150 ms frame against a 50 ms floor.
  *
- * `?bands=plain` turns it on, `?bands=inked` puts it back. A measuring switch,
- * to be deleted with the rest of the stopwatch.
+ * The pen is two separate costs and they are not equally safe to drop:
+ *
+ * - **The grain** is a repeating gradient. It is a texture *inside* a shape
+ *   that is already right, so losing it for the length of a turn changes
+ *   nothing the eye can follow to the page underneath.
+ * - **The mask** is the dry start, and it is the *shape* of the ink. Losing it
+ *   is what made a highlight look like it arrived a frame late.
+ *
+ * `plain` drops both, which is what proved the ink was the cause. The two modes
+ * after it drop one each, to find out whether the cheap and safe one is enough.
+ * A measuring switch, to be deleted with the rest of the stopwatch.
  */
-export function plainBands(): boolean {
-  if (typeof window === 'undefined') return false
+export function bandMode(): BandMode {
+  if (typeof window === 'undefined') return 'inked'
   try {
     const asked = new URLSearchParams(window.location.search).get('bands')
-    if (asked === 'plain') window.localStorage.setItem('rb-plain-bands', '1')
-    if (asked === 'inked') window.localStorage.removeItem('rb-plain-bands')
-    return window.localStorage.getItem('rb-plain-bands') === '1'
+    if (asked === 'inked') window.localStorage.removeItem('rb-band-mode')
+    else if (asked === 'plain' || asked === 'nograin' || asked === 'nomask') {
+      window.localStorage.setItem('rb-band-mode', asked)
+    }
+    const held = window.localStorage.getItem('rb-band-mode')
+    return held === 'plain' || held === 'nograin' || held === 'nomask' ? held : 'inked'
   } catch {
-    return false
+    return 'inked'
   }
 }
 
