@@ -2587,31 +2587,114 @@ export default function Reader() {
    * the container, and the selection then runs to the foot of the page and
    * swallows every paragraph after the one the reader chose.
    *
-   * So the words are found again from what does not move: the anchor of the
-   * paragraph they start in, and the words themselves. If that paragraph is not
-   * on the page any more, the selection is let go rather than left standing in
-   * the wrong place.
+   * So the words are found again from what does not move: the words themselves,
+   * looked up across the page, with the anchor as a tie-breaker.
+   *
+   * The trigger is the movement itself, watched frame by frame. Two likelier
+   * triggers were tried first and neither one fires:
+   *
+   *  - The page *number*. It is worked out from the reading position, and it can
+   *    hold still across a move the reader plainly sees.
+   *  - The strip's `scroll` event. The strip carries `overflow: hidden`, and an
+   *    element that does not scroll for the user raises no scroll event when its
+   *    `scrollLeft` is set. Measured in the page: zero events for a move of 200
+   *    pixels that carried the words with it.
+   *
+   * So nothing is trusted to announce the turn. The paragraph the selection
+   * starts in is asked where it is, once a frame, and the selection is measured
+   * again when the answer changes. This holds for every way a page can move — a
+   * swipe, an edge tap, a link, a sheet landing at the end of its flight — because
+   * it watches the thing all of them have in common.
+   *
+   * One rect read per frame, and only while something is selected. A rect read on
+   * a clean layout costs about a tenth of a millisecond; nothing is written here,
+   * so the layout stays clean and it never turns into the thrash that made the
+   * highlight painter slow.
    */
-  useEffect(() => {
-    setSelected((at) => {
-      if (!at) return at
-      // The browser's own selection is let go at the first turn. It is a thing
-      // the engine may scroll back into view whenever the strip is touched, and
-      // a reader who turns a page and lands somewhere else has met exactly that.
-      // Nothing here needs it: the marks are drawn by the app, the handles work
-      // from coordinates, and the text was taken when the selection was made.
-      window.getSelection()?.removeAllRanges()
-      const root = strip.current
-      const fresh = root ? rangeOfSelection(root, at.text, at.anchor) : null
-      const now = fresh ? describeRange(fresh, root) : null
-      if (!now) {
-        setUnit(null)
-        return null
-      }
-      return now
+  /**
+   * How often the page under a live selection is asked whether it has moved, in
+   * milliseconds. One rect read, and only while something is selected.
+   */
+  const WATCH = 80
+
+  /** Whether two measured sets of line boxes describe the same place on screen. */
+  const same = (
+    a: readonly { top: number; left: number; width: number; height: number }[],
+    b: readonly { top: number; left: number; width: number; height: number }[],
+  ) =>
+    a.length === b.length &&
+    a.every((box, i) => {
+      const was = b[i]!
+      return (
+        Math.abs(box.top - was.top) < 0.5 &&
+        Math.abs(box.left - was.left) < 0.5 &&
+        Math.abs(box.width - was.width) < 0.5 &&
+        Math.abs(box.height - was.height) < 0.5
+      )
     })
-    // The page number, not the scroll: this should run once the turn has landed.
-  }, [pages?.page])
+
+  useEffect(() => {
+    const root = strip.current
+    if (!selected || !root) return
+
+    const remeasure = () => {
+      setSelected((at) => {
+        if (!at) return at
+        // The browser's own selection is let go at the first turn. It is a thing
+        // the engine may scroll back into view whenever the strip is touched, and
+        // a reader who turns a page and lands somewhere else has met exactly that.
+        // Nothing here needs it: the marks are drawn by the app, the handles work
+        // from coordinates, and the text was taken when the selection was made.
+        window.getSelection()?.removeAllRanges()
+        const fresh = rangeOfSelection(root, at.text, at.anchor)
+        const now = fresh ? describeRange(fresh, root) : null
+        if (!now) {
+          setUnit(null)
+          return null
+        }
+        // The same answer must not become a new object, or this would set state
+        // on every scroll and re-place the card for nothing.
+        return same(now.rects, at.rects) ? at : now
+      })
+    }
+
+    // The paragraph the selection starts in is the witness. It is one element,
+    // it is on the page whenever the selection is, and it moves with the page.
+    const home = root.querySelector(`[id="${selected.anchor.replace(/[[\]]/g, '')}"]`)
+    if (!home) return
+
+    let last = home.getBoundingClientRect()
+
+    const watch = () => {
+      const now = home.getBoundingClientRect()
+      if (Math.abs(now.left - last.left) < 0.5 && Math.abs(now.top - last.top) < 0.5) return
+      // Not while a sheet is in the air. Looking the words up walks the whole
+      // page, which is not work for a turn that is still drawing, and the answer
+      // would be stale again a moment later. The marks and the card are hidden for
+      // exactly this stretch, so nothing is seen out of place.
+      if (document.querySelector('[data-page-sheet]')) return
+      last = now
+      remeasure()
+    }
+
+    /*
+     * A timer, not `requestAnimationFrame`.
+     *
+     * A frame callback is the tidier tool and it is the wrong one here: it is not
+     * called at all while the page is not being drawn — a backgrounded tab, a
+     * phone with the screen off, a window behind another. The watch would then be
+     * asleep at the moment the reader comes back, and the selection would be
+     * standing in the old place again. A timer keeps running.
+     *
+     * `WATCH` is well under the length of a turn, so the marks and the card are
+     * already in the right place by the time the sheet lifts and they are shown.
+     */
+    const timer = window.setInterval(watch, WATCH)
+    return () => window.clearInterval(timer)
+    // Keyed on the anchor, not on the whole selection: the watch has to be rebuilt
+    // when the selection moves to another paragraph, and not once per re-measure —
+    // which is what depending on the object itself would do.
+  }, [selected?.anchor])
 
   const stretchSelection = useCallback((pivot: SelectionPivot, x: number, y: number) => {
     setSelected((at) => (at ? (selectionBetween(pivot, x, y, strip.current) ?? at) : at))
