@@ -247,8 +247,32 @@ export function SelectionMenu({
      * selects near the middle of a full screen scrolls a menu instead of losing
      * the control they were aiming at.
      */
-    const roomBelow = height - MARGIN - (selection.rect.bottom + under)
-    const roomAbove = selection.rect.top - clear - MARGIN
+    /*
+     * Only the lines that are on this screen count.
+     *
+     * `selection.rect` is the union of every line of the selection, and a
+     * selection that began on an earlier page still has those lines in it. The
+     * pages are columns side by side, so a line on the page before is off to the
+     * left at the *same heights* as this one. The union therefore runs from the
+     * top of the screen to the bottom, the placement reads that as "no room
+     * anywhere", and the card is pushed to a corner and lands on the very words
+     * and chevrons it was supposed to keep away from.
+     *
+     * So the placement asks a narrower question: where are the lines the reader
+     * can actually see?
+     */
+    const here = selection.rects.filter(
+      (line) =>
+        line.left < width && line.left + line.width > 0 && line.top < height && line.top + line.height > 0,
+    )
+    const shown = here.length > 0 ? here : selection.rects
+    const first = shown[0]
+    const last = shown[shown.length - 1]
+    const top = first ? Math.min(...shown.map((line) => line.top)) : selection.rect.top
+    const bottom = last ? Math.max(...shown.map((line) => line.top + line.height)) : selection.rect.bottom
+
+    const roomBelow = height - MARGIN - (bottom + under)
+    const roomAbove = top - clear - MARGIN
     // `scrollHeight`, not the rect: once a cap is on, the rect reports the
     // capped height, and measuring that would let the cap shrink itself on every
     // pass. `scrollHeight` is the height the card wants, capped or not.
@@ -261,7 +285,14 @@ export function SelectionMenu({
     )
     const tall = Math.min(wants, room)
 
-    const middle = (selection.rect.left + selection.rect.right) / 2
+    const spread = shown.reduce(
+      (span, line) => ({
+        left: Math.min(span.left, line.left),
+        right: Math.max(span.right, line.left + line.width),
+      }),
+      { left: selection.rect.right, right: selection.rect.left },
+    )
+    const middle = (Math.max(spread.left, 0) + Math.min(spread.right, width)) / 2
     const left = Math.min(Math.max(middle - box.width / 2, MARGIN), width - box.width - MARGIN)
 
     setPlace({
@@ -274,7 +305,7 @@ export function SelectionMenu({
        * top is pulled back inside the window as the last step.
        */
       top: Math.min(
-        Math.max(goesAbove ? selection.rect.top - clear - tall : selection.rect.bottom + under, MARGIN),
+        Math.max(goesAbove ? top - clear - tall : bottom + under, MARGIN),
         Math.max(height - tall - MARGIN, MARGIN),
       ),
       left: Math.max(left, MARGIN),
