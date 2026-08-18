@@ -96,6 +96,41 @@ function ExitControl({ bookId, fromReader }: { bookId: string; fromReader: boole
   )
 }
 
+/**
+ * Google's subject headings, cut into single terms.
+ *
+ * They arrive as paths — `Body, Mind & Spirit / Mindfulness & Meditation` —
+ * and a book carries a dozen of them that overlap heavily, so the card filled
+ * with long chips that said "Philosophy" four times in four different phrases.
+ * Cut on the slash and the same word appears once, which is what a tag is for.
+ *
+ * Two rules beyond the split:
+ *
+ * - Matching is case-insensitive, but the first spelling seen is the one kept.
+ *   Google is not consistent about case and the reader should not see both.
+ * - A bare `General` is dropped. It is the filler at the end of a path
+ *   (`Body, Mind & Spirit / General`) and says nothing on its own; the part of
+ *   the path before it is already a chip.
+ *
+ * Order is first-seen, so the headings Google thought most important stay in
+ * front. A comma is *not* a separator: `Body, Mind & Spirit` is one heading.
+ */
+export function subjectTags(subjects: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const kept: string[] = []
+
+  for (const heading of subjects) {
+    for (const part of heading.split('/')) {
+      const tag = part.trim()
+      const key = tag.toLowerCase()
+      if (!tag || key === 'general' || seen.has(key)) continue
+      seen.add(key)
+      kept.push(tag)
+    }
+  }
+  return kept
+}
+
 function readingStatus(position: ReadingPosition | undefined): string {
   if (!position) return 'Not started'
   if (position.percent !== undefined && position.percent >= 100) return 'Finished'
@@ -251,6 +286,9 @@ export default function BookInfo() {
 
   const { book, position } = state
   const startLabel = position ? 'Continue reading' : 'Read'
+  // Cut and deduplicated here, so the row is hidden when nothing survives the
+  // cut — a book whose only heading was `General` has no subjects to show.
+  const tags = subjectTags(book.subjects ?? [])
 
   return (
     <div className={styles.page}>
@@ -399,13 +437,13 @@ export default function BookInfo() {
           {/* Google's own subject headings, as chips. Finer than the single
               genre pill at the top, and the only place they've ever been shown
               — they have been stored on every matched book all along. */}
-          {book.subjects && book.subjects.length > 0 && (
+          {tags.length > 0 && (
             <div className={`${styles.detail} ${styles.detailWide}`}>
               <Icon name="tag" />
               <div className={styles.detailBody}>
                 <dt className={styles.detailLabel}>Subjects</dt>
                 <dd className={styles.subjects}>
-                  {book.subjects.map((subject) => (
+                  {tags.map((subject) => (
                     <span key={subject} className={styles.subject}>
                       {subject}
                     </span>

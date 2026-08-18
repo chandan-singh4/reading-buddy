@@ -336,14 +336,25 @@ describe('BookInfo', () => {
       expect(await screen.findByText('Google Books has no record of this one.')).toBeTruthy()
     })
 
-    it('lists the subject headings Google returned', async () => {
+    it('lists the subject headings Google returned, cut into single terms', async () => {
       await repository.saveParsedBook(
         bookOf({ subjects: ['Philosophy / Buddhist', 'Religion / Eastern'] }),
       )
       openInfo()
 
-      expect(await screen.findByText('Philosophy / Buddhist')).toBeTruthy()
-      expect(screen.getByText('Religion / Eastern')).toBeTruthy()
+      expect(await screen.findByText('Philosophy')).toBeTruthy()
+      expect(screen.getByText('Buddhist')).toBeTruthy()
+      expect(screen.getByText('Religion')).toBeTruthy()
+      expect(screen.getByText('Eastern')).toBeTruthy()
+      expect(screen.queryByText('Philosophy / Buddhist')).toBeNull()
+    })
+
+    it('says nothing about subjects when none survive the cut', async () => {
+      await repository.saveParsedBook(bookOf({ subjects: ['General'] }))
+      openInfo()
+
+      expect(await screen.findByText('The Fundamental Wisdom')).toBeTruthy()
+      expect(screen.queryByText('Subjects')).toBeNull()
     })
 
     // The file's edition, not the one Google matched — they disagree often.
