@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
 import { forgetLibraryMemory } from '../app/libraryMemory.ts'
@@ -45,6 +45,33 @@ type CatalogueState =
   /** Never asked — the network, not the book. Said differently on purpose. */
   | { status: 'failed'; message: string }
 
+/**
+ * The one control at the top left, which is not always the same control.
+ *
+ * Reached from the shelf, this page is a destination and the way out is home.
+ * Reached from inside the book — by tapping its title in the reading overlay —
+ * it is a detour, and the reader wants the page they were on, not the library.
+ * A home icon there throws away their place in a way that looks deliberate.
+ *
+ * The reading page says where it sent them from in the router's `state`, so
+ * this needs no history guessing and behaves the same on a cold load of the URL
+ * (no state, so: home).
+ */
+function ExitControl({ bookId, fromReader }: { bookId: string; fromReader: boolean }) {
+  if (fromReader) {
+    return (
+      <Link to={`/book/${bookId}`} className={styles.back} aria-label="Back to the book">
+        <Icon name="back" />
+      </Link>
+    )
+  }
+  return (
+    <Link to="/" className={styles.back} aria-label="Home">
+      <Icon name="home" />
+    </Link>
+  )
+}
+
 function readingStatus(position: ReadingPosition | undefined): string {
   if (!position) return 'Not started'
   if (position.percent !== undefined && position.percent >= 100) return 'Finished'
@@ -81,6 +108,8 @@ function publishedLabel(published: string | undefined): string {
 export default function BookInfo() {
   const { bookId } = useParams<{ bookId: string }>()
   const id = bookId as BookId
+  // Set only by the title in the reading overlay. See `ExitControl`.
+  const fromReader = (useLocation().state as { fromReader?: boolean } | null)?.fromReader === true
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [quotes, setQuotes] = useState<StoredQuote[]>([])
   const [updating, setUpdating] = useState<UpdateState>({ status: 'idle' })
@@ -181,9 +210,7 @@ export default function BookInfo() {
   if (state.status === 'loading') {
     return (
       <div className={styles.page}>
-        <Link to="/" className={styles.back} aria-label="Home">
-          <Icon name="home" />
-        </Link>
+        <ExitControl bookId={id} fromReader={fromReader} />
         <p className={styles.pending}>Loading…</p>
       </div>
     )
@@ -192,9 +219,7 @@ export default function BookInfo() {
   if (state.status === 'missing') {
     return (
       <div className={styles.page}>
-        <Link to="/" className={styles.back} aria-label="Home">
-          <Icon name="home" />
-        </Link>
+        <ExitControl bookId={id} fromReader={fromReader} />
         <p className={styles.pending}>This book isn’t on your shelf anymore.</p>
       </div>
     )
@@ -205,9 +230,7 @@ export default function BookInfo() {
 
   return (
     <div className={styles.page}>
-      <Link to="/" className={styles.back} aria-label="Home">
-        <Icon name="home" />
-      </Link>
+      <ExitControl bookId={id} fromReader={fromReader} />
 
       <div className={styles.hero}>
         <div className={styles.coverMedia}>
@@ -467,7 +490,16 @@ function Detail({
   )
 }
 
-type IconName = 'calendar' | 'check' | 'building' | 'barcode' | 'star' | 'tag' | 'refresh' | 'home'
+type IconName =
+  | 'calendar'
+  | 'check'
+  | 'building'
+  | 'barcode'
+  | 'star'
+  | 'tag'
+  | 'refresh'
+  | 'home'
+  | 'back'
 
 /**
  * The line icons in the details card, drawn rather than typed.
@@ -487,6 +519,7 @@ const ICON_PATHS: Readonly<Record<IconName, string>> = {
   tag: 'M3 12.5V4h8.5L21 13.5 12.5 22zM7.5 7.5h.01',
   refresh: 'M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4',
   home: 'M3 10.6L12 3l9 7.6M5.6 9.4V21h12.8V9.4M9.6 21v-6.2h4.8V21',
+  back: 'M15 6l-6 6 6 6',
 }
 
 function Icon({ name }: { name: IconName }) {

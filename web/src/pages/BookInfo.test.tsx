@@ -52,9 +52,9 @@ function bookOf(overrides: Partial<ParsedBook['meta']> = {}): ParsedBook {
   }
 }
 
-function openInfo(id: string = BOOK_ID) {
+function openInfo(id: string = BOOK_ID, state?: unknown) {
   return render(
-    <MemoryRouter initialEntries={[`/book/${id}/info`]}>
+    <MemoryRouter initialEntries={[{ pathname: `/book/${id}/info`, state }]}>
       <Routes>
         <Route path="/book/:bookId/info" element={<BookInfo />} />
       </Routes>
@@ -74,6 +74,22 @@ describe('BookInfo', () => {
     expect(await screen.findByText('The Fundamental Wisdom')).toBeTruthy()
     expect(screen.getByText('Nagarjuna')).toBeTruthy()
     expect(screen.getByText('EPUB')).toBeTruthy()
+  })
+
+  // Reached from the shelf this page is a destination, so the way out is home.
+  // Reached from inside the book it is a detour, and a home icon would throw
+  // away the page the reader was on.
+  it('goes home from the shelf and back to the book from the reader', async () => {
+    await repository.saveParsedBook(bookOf())
+
+    openInfo()
+    expect((await screen.findByRole('link', { name: 'Home' })).getAttribute('href')).toBe('/')
+    cleanup()
+
+    openInfo(BOOK_ID, { fromReader: true })
+    const back = await screen.findByRole('link', { name: 'Back to the book' })
+    expect(back.getAttribute('href')).toBe(`/book/${BOOK_ID}`)
+    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
   })
 
   it('says a book has not been started when there is no reading position', async () => {

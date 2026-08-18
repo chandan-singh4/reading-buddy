@@ -307,6 +307,9 @@ export function Chrome({
         {bookId ? (
           <Link
             to={`/book/${bookId}/info`}
+            /* Tells the About page it was reached from inside the book, so its
+               way out is a Back arrow to this page rather than a home icon. */
+            state={{ fromReader: true }}
             className={styles.bookTitle}
             aria-label={`About ${bookTitle}`}
           >

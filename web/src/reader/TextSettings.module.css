@@ -355,9 +355,11 @@
  * the two the current theme asks for, so the reader can see what Auto means
  * here and now instead of having to try it.
  */
+/* Two, because there are two. The third column is left over from the days when
+   Auto sat beside them, and an empty one reads as a missing option. */
 .choices {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-2);
 }
 
