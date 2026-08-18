@@ -254,14 +254,29 @@ export function SelectionMenu({
     // pass. `scrollHeight` is the height the card wants, capped or not.
     const wants = node.scrollHeight
     const goesAbove = wants > roomBelow && roomAbove > roomBelow
-    const room = Math.max(goesAbove ? roomAbove : roomBelow, MIN_CARD)
+    // Never taller than the window itself, whatever `MIN_CARD` asks for.
+    const room = Math.min(
+      Math.max(goesAbove ? roomAbove : roomBelow, MIN_CARD),
+      height - MARGIN * 2,
+    )
     const tall = Math.min(wants, room)
 
     const middle = (selection.rect.left + selection.rect.right) / 2
     const left = Math.min(Math.max(middle - box.width / 2, MARGIN), width - box.width - MARGIN)
 
     setPlace({
-      top: goesAbove ? selection.rect.top - clear - tall : selection.rect.bottom + under,
+      /*
+       * On the screen, always. Whatever the room beside the selection says, a
+       * card that hangs off the bottom is a card with no rows in it — which is
+       * what a selection running to the foot of the page gave: the swatches
+       * showed and everything under them, "Ask Claude" included, was past the
+       * edge. `MIN_CARD` can ask for more room than a side really has, so the
+       * top is pulled back inside the window as the last step.
+       */
+      top: Math.min(
+        Math.max(goesAbove ? selection.rect.top - clear - tall : selection.rect.bottom + under, MARGIN),
+        Math.max(height - tall - MARGIN, MARGIN),
+      ),
       left: Math.max(left, MARGIN),
       above: goesAbove,
       limit: room,

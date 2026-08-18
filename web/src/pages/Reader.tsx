@@ -10,6 +10,7 @@ import {
   Highlights,
   chapterNumber,
   describeRange,
+  rangeOfQuote,
   highlightAt,
   selectionBetween,
   selectionInReader,
@@ -2580,8 +2581,16 @@ export default function Reader() {
    * placed in screen coordinates, and after the turn those describe the page the
    * reader has just left.
    *
-   * So the range is asked where it is now. One measure per turn, and the boxes
-   * for lines that are no longer on this page simply fall outside the screen.
+   * The range object itself cannot be trusted across a turn. The strip holds only
+   * a few paragraphs at a time, and a turn takes some of them out. A DOM range
+   * whose end node is removed does not fail — it quietly re-points to the end of
+   * the container, and the selection then runs to the foot of the page and
+   * swallows every paragraph after the one the reader chose.
+   *
+   * So the words are found again from what does not move: the anchor of the
+   * paragraph they start in, and the words themselves. If that paragraph is not
+   * on the page any more, the selection is let go rather than left standing in
+   * the wrong place.
    */
   useEffect(() => {
     setSelected((at) => {
@@ -2592,11 +2601,10 @@ export default function Reader() {
       // Nothing here needs it: the marks are drawn by the app, the handles work
       // from coordinates, and the text was taken when the selection was made.
       window.getSelection()?.removeAllRanges()
-      // A turn into another section rebuilds the strip, and the range then points
-      // at nodes no page holds any more. Keeping it would leave the marks and the
-      // card standing in the last page's places, over words they do not belong to,
-      // and every tap after that would only be spent putting them away.
-      const now = describeRange(at.range, strip.current)
+      const root = strip.current
+      const home = document.getElementById(at.anchor.replace(/[[\]]/g, ''))
+      const fresh = root && home && root.contains(home) ? rangeOfQuote(at.anchor, at.text) : null
+      const now = fresh ? describeRange(fresh, root) : null
       if (!now) {
         setUnit(null)
         return null
