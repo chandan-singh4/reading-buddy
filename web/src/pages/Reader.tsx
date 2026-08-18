@@ -7,6 +7,7 @@ import {
   Chrome,
   NoteComposer,
   SelectionMenu,
+  TurnClock,
   Highlights,
   chapterNumber,
   describeRange,
@@ -3541,6 +3542,9 @@ export default function Reader() {
               }}
             />
           )}
+
+          {/* A stopwatch on the page turn. Silent unless `?clock=1` asked for it. */}
+          <TurnClock />
 
           {unbuilt && (
             <p className={styles.unbuilt} role="status">
