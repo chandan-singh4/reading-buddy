@@ -50,6 +50,7 @@ import {
   snapBackEase,
   STRIPS,
 } from './pageCurl.ts'
+import * as turnClock from './turnClock.ts'
 
 /** An outgoing page being held on screen, waiting for the new one to arrive. */
 export interface HeldPage {
@@ -90,7 +91,9 @@ export function holdOutgoing(
   by: 1 | -1,
   scale = 1,
 ): HeldPage | null {
+  const built = turnClock.begin(by)
   const node = copyOf(strip, 1, scale)
+  built()
   // Whichever way the turn goes, this copy is the page being left: forwards it
   // is the sheet that flies away, backwards it is the one that lies still while
   // the destination lands on top of it. Both are gone at the end, so both may
@@ -958,6 +961,8 @@ export function beginDrag(
   const frame = parent.getBoundingClientRect()
   if (frame.width <= 0) return null
 
+  const built = turnClock.begin(by)
+
   const stage = document.createElement('div')
   stage.setAttribute('aria-hidden', 'true')
   stage.dataset.pageSheet = ''
@@ -1065,6 +1070,8 @@ export function beginDrag(
   void stage.getBoundingClientRect().width
   paintDrag(drag, startAt)
 
+  built()
+
   return drag
 }
 
@@ -1106,7 +1113,9 @@ function wash(parent: HTMLElement, colour: string): HTMLElement {
  * measuring is done.
  */
 export function holdStill(strip: HTMLElement | null, scale: number): HTMLElement | null {
+  const timed = turnClock.still()
   const node = copyOf(strip, 1, scale, false)
+  timed()
   if (!node) return null
 
   // Same mark, same reason, as the copy `holdOutgoing` takes: this is a page
