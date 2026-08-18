@@ -515,7 +515,12 @@ export function clearSheets(strip: HTMLElement | null): void {
  * rotated, which keeps the rotation and the scroll from having to share one
  * element's `transform`.
  */
-function copyOf(strip: HTMLElement | null, layer: number, scale: number): HTMLElement | null {
+function copyOf(
+  strip: HTMLElement | null,
+  layer: number,
+  scale: number,
+  attach = true,
+): HTMLElement | null {
   if (!strip || prefersReducedMotion() || typeof document === 'undefined') return null
 
   // The reading screen's own box, which is the sheet's size — and deliberately
@@ -533,9 +538,16 @@ function copyOf(strip: HTMLElement | null, layer: number, scale: number): HTMLEl
   const copy = pageCopy(strip)
   const plan = measureSheet(strip, parent)
   fillSheet(strip, plan, frame, wrapper, scale, copy)
-  parent.append(wrapper)
 
-  concealFurniture(parent)
+  // `attach` false hands the sheet back still detached — built, but not yet in
+  // the document. Everything above is a read of the page followed by writes
+  // into a node the document has never seen, so it costs one layout. Putting
+  // it in is what makes the *next* read expensive, and a backward turn has a
+  // next read. See `holdStill`.
+  if (attach) {
+    parent.append(wrapper)
+    concealFurniture(parent)
+  }
 
   return wrapper
 }
@@ -923,7 +935,9 @@ export interface Drag {
  *   whole difference between a turn and a transition.
  * - **Backwards:** take a still copy with `holdStill` *first*, then scroll the
  *   strip to the destination, then call this. The bands become the arriving
- *   page and the still copy is what they are arriving on top of.
+ *   page and the still copy is what they are arriving on top of. The still copy
+ *   comes back detached and this puts it in, after the measuring — see
+ *   `holdStill` for why that ordering is worth the awkwardness.
  *
  * Returns `null` for a reader who has asked for less movement, or a platform
  * with nothing to hang the sheet on. Both mean the caller should fall back to
@@ -1015,6 +1029,13 @@ export function beginDrag(
   cast.style.zIndex = '2'
   cast.style.opacity = '0'
 
+  // The still copy goes in here, and not in `holdStill` where it was built —
+  // every measurement above had to happen on a document this page of paragraphs
+  // had not yet been added to. See `holdStill`. Appended first of the three, so
+  // the cast shadow and the sheet land on top of it, which is the order their
+  // `z-index` already says.
+  if (still && !still.isConnected) parent.append(still)
+
   parent.append(cast)
   parent.append(stage)
 
@@ -1064,9 +1085,28 @@ function wash(parent: HTMLElement, colour: string): HTMLElement {
  *
  * Must be taken *before* the strip is scrolled to the destination, which is why
  * it is the caller's call and not something `beginDrag` can do for itself.
+ *
+ * ## Why it comes back detached
+ *
+ * This is the second half of why turning back cost more than turning forward.
+ *
+ * A forward turn reads the page once and then writes: `beginDrag` measures a
+ * document nobody has touched, builds its bands, and puts them in. One layout.
+ *
+ * A backward turn used to read, write, read again. This copy went *into* the
+ * document, the strip was then scrolled, and `beginDrag` measured after both —
+ * so the browser had to lay out the reading page plus a whole extra page of
+ * paragraphs that had just arrived, before it could answer the first rectangle
+ * `beginDrag` asked for. The copy is not even visible work: it is a picture,
+ * covered by the sheet a moment later.
+ *
+ * Building it and holding it back costs nothing — the browser lays out no node
+ * that is not in the document — and it takes that whole layout out of the
+ * gesture. `beginDrag` puts it in afterwards, under the sheet, once all the
+ * measuring is done.
  */
 export function holdStill(strip: HTMLElement | null, scale: number): HTMLElement | null {
-  const node = copyOf(strip, 1, scale)
+  const node = copyOf(strip, 1, scale, false)
   if (!node) return null
 
   // Same mark, same reason, as the copy `holdOutgoing` takes: this is a page

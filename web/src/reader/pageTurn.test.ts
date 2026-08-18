@@ -79,6 +79,25 @@ describe('the sheet that turns', () => {
     expect(holdStill(strip, 1)!.hasAttribute('data-page-leaving')).toBe(true)
   })
 
+  it('builds the still copy without putting it in the document', () => {
+    const { frame, status } = readingScreen()
+    const strip = frame.querySelector('article')!
+
+    const still = holdStill(strip, 1)
+    expect(still).not.toBeNull()
+
+    // Built, and held back. `beginDrag` measures the page after this and before
+    // the sheet exists; a page of paragraphs added to the document in between
+    // is a whole extra layout it would have to wait for. That layout is the
+    // rest of why turning back cost more than turning forward.
+    expect(still!.isConnected).toBe(false)
+    expect(still!.textContent).toContain('the text of the page')
+
+    // And the real page is untouched until something does put it in. Hiding the
+    // furniture is `beginDrag`'s job now, on the frame it appends to.
+    expect(status.style.visibility).toBe('')
+  })
+
   it('gives the page number back when the turn is abandoned', () => {
     const { strip, status } = readingScreen()
 
