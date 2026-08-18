@@ -1229,3 +1229,16 @@ sign-in screen.
   temporary in-app readout, screenshotted by the reader, answered in two rounds
   what four rounds of reasoning had not. Build it, read it, delete it. —
   2026-08-17
+
+- **The pen has two halves, and only the grain comes off a page the reader lands
+  on.** The shape of the ink (the mask) must stay, or the highlight appears at
+  the hand-over. The grain inside that shape (a repeating gradient) may go,
+  because the shape it sits in is already right. A backward turn drags the
+  arriving page, so its bands drop the grain only. That took the worst frame of a
+  backward turn from 150 ms to 50 ms, level with a forward turn. — 2026-08-18
+
+- **Time the worst frame, not the start of the gesture.** Build and paint numbers
+  describe one frame — the first. A turn that stutters the whole way through
+  costs its money later, and two fixes were shipped against the wrong number
+  before a `worst` column existed. Ask the reader when it feels slow, then
+  measure that moment. — 2026-08-18

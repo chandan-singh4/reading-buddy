@@ -11,6 +11,8 @@ The last two threads closed on the phone. The reader signed off both:
   `progress.md`.
 - **The page turn is faster, and the ink no longer arrives late** (2026-08-17).
   Measured on the phone with a temporary in-app stopwatch, now deleted.
+- **A backward turn is now as fast as a forward turn** (2026-08-18). The reader
+  signed off on the phone: "the slowness is gone". See below.
 
 Nothing is mid-edit. Build green, 1486 tests across 84 files.
 
@@ -29,8 +31,7 @@ Nothing is mid-edit. Build green, 1486 tests across 84 files.
 
 ## Carried forward — how to work on the reading page
 
-Six lessons earlier threads paid for. The last three are new, and they are the
-expensive ones.
+Eight lessons earlier threads paid for. Lessons 7 and 8 are new.
 
 1. **Measure in a real browser, not by reading the file.**
 2. **Layout is `offsetWidth`, paint is `getBoundingClientRect`.** The turning
@@ -51,6 +52,13 @@ expensive ones.
    the moving sheet is the page being left. Backwards it is the page being
    arrived at. Any optimisation that strips something from a sheet has to know
    which. See `data-page-leaving` in `pageTurn.ts`.
+7. **Measure the worst frame, not the start of the gesture.** Build and paint
+   time only the first frame. A turn that stutters "the whole way through" costs
+   its money in the frames after that, and no start-of-gesture number shows it.
+   Ask the reader *when* it feels slow before you choose what to measure.
+8. **Do not strip two things at once.** A switch that removes the whole pen
+   proves the ink is the cost, but not which half. Split the switch, then keep
+   only the half you must lose. Here the grain paid the whole bill.
 
 ## Turn cost, as measured (2026-08-17, phone, one page, 103 strokes)
 
@@ -65,3 +73,26 @@ Keep these. They are the baseline any future change is judged against.
 Build is the copy work in `pageTurn.ts` and is a straight multiple of `STRIPS`
 (now 12). Paint is the browser drawing the ink. After the fixes, both fell; the
 reader called the result "much faster" and did not ask for a re-measure.
+
+## Worst frame during a turn (2026-08-18, phone, one page, 47 strokes)
+
+A second baseline, and the more useful of the two. It times the longest single
+frame of the whole gesture, not the start.
+
+| bands carry | forward, worst | backward, worst |
+|---|---|---|
+| the whole pen | 50–67 ms | 50–**150** ms |
+| no pen at all | 49–50 ms | 50–67 ms |
+| shape only, no grain (shipped) | 50 ms | 50–67 ms |
+
+About 50 ms is the floor. That is the one frame where the gesture builds the
+sheet, and it is the same in both directions.
+
+The 150 ms frame was the fault. A backward turn drags the page the reader lands
+on, so its 12 bands must keep the shape of their ink. With the grain inside that
+shape as well, the browser redrew about 12 × 47 textured marks every frame. A
+forward turn redrew none, because a page being left may drop the whole pen.
+
+Dropping the grain alone put the two directions level and left nothing missing
+at the hand-over. See `data-page-arriving` in `pageTurn.ts` and the rule of the
+same name in `HandDrawn.module.css`.

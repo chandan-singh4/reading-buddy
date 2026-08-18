@@ -161,20 +161,21 @@
 }
 
 /*
- * The two halves of the pen, separately, for measuring only.
+ * The backward arrival keeps the shape of its ink and gives up only the grain.
  *
- * `data-page-leaving` above drops both at once. That proved the ink was what
- * made a backward turn stutter — a 150 ms frame against a 50 ms floor — but it
- * cannot say which half cost the money, and the two are not equally safe to
- * lose. The grain is a texture inside a shape that is already right. The mask is
- * the shape. See `bandMode` in `turnClock.ts`, and delete these with it.
+ * A backward turn drags the page the reader is landing on, so its bands cannot
+ * drop the mask — that is the shape, and a shape that appears at the hand-over
+ * is the "highlight arrives late" fault above. But the bands are also the one
+ * thing a backward turn repaints every frame that a forward turn does not, and
+ * with the whole pen on them that measured a 150 ms frame against a 50 ms floor.
+ *
+ * Splitting the pen in two settled it: the grain alone was the cost. It is a
+ * texture inside a shape that is already right, it is gone for the length of a
+ * gesture only, and dropping it puts a backward turn level with a forward one
+ * (worst frame 50 ms either way) with nothing missing at the hand-over.
  */
-[data-band-test='nograin'] .stroke::before {
+[data-page-arriving] .stroke::before {
   background-image: none;
-}
-
-[data-band-test='nomask'] .stroke::before {
-  mask-image: none;
 }
 
 [data-page-sheet] .stroke::before,

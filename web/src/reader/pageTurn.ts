@@ -50,7 +50,6 @@ import {
   snapBackEase,
   STRIPS,
 } from './pageCurl.ts'
-import * as turnClock from './turnClock.ts'
 
 /** An outgoing page being held on screen, waiting for the new one to arrive. */
 export interface HeldPage {
@@ -91,9 +90,7 @@ export function holdOutgoing(
   by: 1 | -1,
   scale = 1,
 ): HeldPage | null {
-  const built = turnClock.begin(by)
   const node = copyOf(strip, 1, scale)
-  built()
   // Whichever way the turn goes, this copy is the page being left: forwards it
   // is the sheet that flies away, backwards it is the one that lies still while
   // the destination lands on top of it. Both are gone at the end, so both may
@@ -806,7 +803,6 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
 
   const turning = moving.animate(sheet, timing)
   shade?.animate(shading, timing)
-  turnClock.frames()
 
   // Removed on completion *and* on failure — an animation can be cancelled by
   // the element being taken out from under it, and a copy left behind would sit
@@ -818,7 +814,6 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
     clearTimeout(guard)
     moving.remove()
     still?.remove()
-    turnClock.rest()
     // Last, and unconditionally. The real page number has to come back even if
     // the turn was abandoned half-played — a reader left looking at a page with
     // no number on it is a worse outcome than a turn that didn't finish.
@@ -963,27 +958,19 @@ export function beginDrag(
   const frame = parent.getBoundingClientRect()
   if (frame.width <= 0) return null
 
-  const built = turnClock.begin(by)
-
   const stage = document.createElement('div')
   stage.setAttribute('aria-hidden', 'true')
   stage.dataset.pageSheet = ''
-  // Forwards the bands are the page being left; backwards they are the
-  // destination — see the ordering note above. Only the first kind may have its
-  // pen taken off. See `HandDrawn.module.css`.
   // Forwards the bands are the page being left, so they may drop the whole pen.
   //
-  // Backwards they are the page the reader lands on and keep the shape of their
-  // ink — and they are the one thing a backward turn redraws every frame that a
-  // forward turn does not. Measured at a 150 ms frame against a 50 ms floor, so
-  // something has to come off. `bandMode` is the measuring switch that decides
-  // what, and it goes with the stopwatch.
+  // Backwards they are the page the reader lands on, so they must keep the shape
+  // of their ink — but they are still the one thing a backward turn repaints
+  // every frame that a forward turn does not, and the grain inside that shape is
+  // what made it stutter. So backwards gives up the grain only, which measures
+  // level with a forward turn and leaves nothing to appear at the hand-over.
+  // See `HandDrawn.module.css`.
   if (by === 1) stage.dataset.pageLeaving = ''
-  else {
-    const mode = turnClock.bandMode()
-    if (mode === 'plain') stage.dataset.pageLeaving = ''
-    else if (mode !== 'inked') stage.dataset.bandTest = mode
-  }
+  else stage.dataset.pageArriving = ''
   stage.style.position = 'absolute'
   stage.style.inset = '0'
   stage.style.pointerEvents = 'none'
@@ -1084,9 +1071,6 @@ export function beginDrag(
   void stage.getBoundingClientRect().width
   paintDrag(drag, startAt)
 
-  built()
-  turnClock.frames()
-
   return drag
 }
 
@@ -1128,9 +1112,7 @@ function wash(parent: HTMLElement, colour: string): HTMLElement {
  * measuring is done.
  */
 export function holdStill(strip: HTMLElement | null, scale: number): HTMLElement | null {
-  const timed = turnClock.still()
   const node = copyOf(strip, 1, scale, false)
-  timed()
   if (!node) return null
 
   // Same mark, same reason, as the copy `holdOutgoing` takes: this is a page
@@ -1230,7 +1212,6 @@ export function settleDrag(
     if (guard !== null) clearTimeout(guard)
     drag.frame = null
     dropDrag(drag)
-    turnClock.rest()
     done(commit)
   }
 

@@ -18,9 +18,14 @@ Get that loop working before building any breadth.
   **1486 tests across 84 files** (2026-08-17).
 - **The page turn is measured now, and the numbers are on file.** See *The page
   turn got faster* in Recently done. If a turn ever feels slow again, do not
-  guess: put the stopwatch back (it is one small module, deleted in `2fd0d0a`,
-  recoverable from git) and read `build` against `paint`. Remote profiling from
-  the PC does **not** work — `chrome://inspect` never left "Offline".
+  guess: put the stopwatch back (it is one small module, deleted again on
+  2026-08-18, recoverable from git) and read the `worst` frame first, not `build`
+  and `paint` — those two time the first frame only. Remote profiling from the PC
+  does **not** work — `chrome://inspect` never left "Offline".
+- **A backward turn is now as fast as a forward one** (2026-08-18). The bands of
+  an arriving page drop the grain of the pen and keep its shape. Worst frame fell
+  from 150 ms to 50 ms. The reader signed it off on the phone. Baseline table in
+  `active-task.md`.
 - **`PARSER_VERSION` is 28, so the shelf offers to rebuild every book.** The
   reader should accept the rebuild and check the Contents tab. Expected:
   chapters nested under their parts, the Preface listed, the book's own printed
