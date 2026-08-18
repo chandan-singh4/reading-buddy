@@ -718,6 +718,14 @@ export function playFlip(held: HeldPage | null, strip: HTMLElement | null): void
   const still = held.by === -1 ? held.node : null
   const moving = held.by === -1 ? copyOf(strip, 2, held.scale) : held.node
 
+  // The still copy does not move for the length of the turn — see `holdStill`,
+  // which says the same thing for the dragged half. Rasterized once and re-used,
+  // rather than repainted under every frame of the sheet turning over it.
+  if (still) {
+    still.style.willChange = 'transform'
+    still.style.contain = 'paint'
+  }
+
   // `moving` here is the *arriving* page, and it is the one copy in this module
   // that is not marked as leaving. See `holdOutgoing` and `HandDrawn.module.css`.
 
@@ -1058,7 +1066,27 @@ function wash(parent: HTMLElement, colour: string): HTMLElement {
  * it is the caller's call and not something `beginDrag` can do for itself.
  */
 export function holdStill(strip: HTMLElement | null, scale: number): HTMLElement | null {
-  return copyOf(strip, 1, scale)
+  const node = copyOf(strip, 1, scale)
+  if (!node) return null
+
+  // Same mark, same reason, as the copy `holdOutgoing` takes: this is a page
+  // being left. It is dropped at the end of the turn and the reader never lands
+  // on it, so it may travel without its pen. Missing this mark is what left the
+  // backward turn paying the full cost of the ink after the forward one stopped
+  // paying it — the *moving* sheet is the arriving page here, and that one
+  // rightly keeps its texture. See `HandDrawn.module.css`.
+  node.setAttribute('data-page-leaving', '')
+
+  // Nothing in this copy changes for the whole turn: it is a photograph, held
+  // still while the arriving sheet rotates over it. Saying so lets the browser
+  // rasterize it once and re-use that raster on every frame, instead of
+  // treating each frame of the sheet above as a reason to paint the page below
+  // again. Forwards there is no such layer, which is a second reason a backward
+  // turn cost more than a forward one.
+  node.style.willChange = 'transform'
+  node.style.contain = 'paint'
+
+  return node
 }
 
 /**

@@ -9,7 +9,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { cancelTurn, clearSheets, holdOutgoing, settleDrag } from './pageTurn.ts'
+import { cancelTurn, clearSheets, holdOutgoing, holdStill, settleDrag } from './pageTurn.ts'
 import type { Drag } from './pageTurn.ts'
 
 /**
@@ -63,6 +63,20 @@ describe('the sheet that turns', () => {
     // visible it would hover in place over a page visibly rotating away, which
     // is the whole of the reported fault.
     expect(status.style.visibility).toBe('hidden')
+  })
+
+  it('takes the pen off a page being left, whichever way the reader turns', () => {
+    const { strip } = readingScreen()
+
+    // Forwards and backwards, the copy of the page being *left* is the one that
+    // may give up its texture: it is dropped at the end and the reader never
+    // lands on it. Backwards that copy is the still one under the arriving
+    // sheet, and it was the one going unmarked — which is why only the forward
+    // turn got cheaper. See `HandDrawn.module.css`.
+    expect(holdOutgoing(strip, 1)!.node.hasAttribute('data-page-leaving')).toBe(true)
+    clearSheets(strip)
+
+    expect(holdStill(strip, 1)!.hasAttribute('data-page-leaving')).toBe(true)
   })
 
   it('gives the page number back when the turn is abandoned', () => {
