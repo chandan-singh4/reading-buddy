@@ -1199,3 +1199,33 @@ sign-in screen.
   arrived an `await` later. The promise this keeps — that a reader going through
   a picture book does not accumulate it — is kept by revoking what falls out of
   reach, not by revoking everything. — 2026-08-17
+
+- **A page turn announces itself to nothing, so a live selection watches the
+  geometry instead.** `pages.page` does not reliably change on a turn, and the
+  strip fires no `scroll` event because its overflow is hidden. Both were
+  measured, not assumed. An 80 ms timer on the anchor paragraph's own rectangle
+  is the only signal that proved real. Not `requestAnimationFrame`: a frame
+  callback stops in a page that is not being drawn. — 2026-08-17
+
+- **A DOM Range does not fail loudly when its text is removed.** It re-points to
+  the end of its container, so a windowed strip turns a five-line selection into
+  the whole page. A selection that must outlive a turn is therefore stored as
+  anchor plus words and rebuilt, never carried as a live Range. — 2026-08-17
+
+- **The turning sheet may lose paint, never geometry.** Dropping a filter, a mask
+  or a background during a turn is free to the eye because nothing moves.
+  Dropping an inset, a radius or a transform makes the ink twitch as the sheet
+  lifts. — 2026-08-17
+
+- **A saving during a turn belongs to the page being *left*, not to the sheet
+  that is moving.** The two directions are not mirror images: forwards the moving
+  sheet is the page being left, backwards it is the page being arrived at. Anything
+  taken off a page the reader ends up looking at has to come back, and the eye
+  reads that as the highlight arriving late. — 2026-08-17
+
+- **When a phone feels slow, measure on the phone.** Remote profiling over USB
+  never connected (`chrome://inspect` stayed "Offline"), and the desktop test
+  browser does not composite, so paint cost cannot be read there at all. A small
+  temporary in-app readout, screenshotted by the reader, answered in two rounds
+  what four rounds of reasoning had not. Build it, read it, delete it. —
+  2026-08-17

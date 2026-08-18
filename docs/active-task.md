@@ -3,123 +3,65 @@
 > What is in here: the one task in flight, and the exact files to open for it.
 > Read it at startup, before anything else.
 
-## Task — WP-17 · Selection menu, round 2 — DONE (2026-08-17)
+## Task — none in flight
 
-Built and shipped. Build green, 1481 tests pass. New files: `highlightStyle.ts`,
-`units.ts` (+ tests), `HandDrawn.tsx` (+ css). The style setting lives per book in
-`localStorage`, under the Themes tab of the Aa sheet.
+The last two threads closed on the phone. The reader signed off both:
 
-Two notes for the next session:
+- **The selection menu survives a page turn** (2026-08-17). Six rounds. See
+  `progress.md`.
+- **The page turn is faster, and the ink no longer arrives late** (2026-08-17).
+  Measured on the phone with a temporary in-app stopwatch, now deleted.
 
-1. The hand-drawn ink lives **inside the anchored paragraph** it marks, in that
-   paragraph's own coordinates, at `z-index: -1`. So it goes under the words, and
-   a scale, a scroll or a page-turn clone carries it. Do not move it back to a
-   fixed screen layer: that broke three ways on the phone. There is no blend mode
-   any more — plain translucent ink under the text does the same work.
-2. `flatIndexOf` in `selection.ts` returns index 0 for a boundary past the end of
-   a text node. `units.ts` works around it in `indexIn`. Fix at the source later.
+Nothing is mid-edit. Build green, 1486 tests across 84 files.
 
+## Next up — pick one, then run `/plan-task`
 
-Three changes, from the reader's brief and `design-inspiration/reading_experience_v2.html`
-(Section 1 = the panel, Section 2 option A = the chevrons, Section 3 = the two
-highlight styles).
+1. **Judge `PARSER_VERSION` 28 on the phone.** No code. The reader accepts the
+   rebuild and reads the Contents tab of *The Mountains of My Life* and *The Gay
+   Science*. This is the cheapest open item and it has waited two threads.
+2. **Finish WP-25: something that writes a note.** The Notes tab reads a table
+   that nothing fills. One question to settle first: device-local or cloud.
+   Device-local is the smaller step.
+3. **WP-17's tail: Define and Ask.** The menu, the colours, the chevrons and the
+   two highlight styles are all built. Ask waits on WP-19.
+4. **Drop caps.** Parked, waiting on the reader's screenshot. Note
+   `.opening + p::first-letter` in `Reader.module.css` already floats one.
 
-**1. The colours row.** Drop the "Highlight" label and the eraser swatch. Show
-four swatches only. Tap a colour to highlight. Tap the same colour again to take
-the highlight off. Tap a different colour to change it. The active colour wears a
-ring.
+## Carried forward — how to work on the reading page
 
-**2. Sentence and Paragraph, with chevron handles.** Tap Sentence or Paragraph and
-the selection snaps to the whole unit. Two chevrons then hold the ends: `‹` at the
-start, `›` at the end. Each tap adds one more unit in that direction. Tapping the
-other unit button re-snaps to that unit.
-
-**3. Two highlight styles over one data model.** A highlight is stored as data
-only. A renderer paints it in the current style: *Clean* (flat, rounded,
-`mix-blend-mode: multiply`) or *Hand-drawn* (the marker look). A setting picks
-the style. Switching is instant and destroys nothing.
-
-### Definition of done
-
-1. The four swatches toggle, recolour and remove, and the ring follows the
-   highlight the menu is sitting on.
-2. Sentence and Paragraph snap the selection, and the two chevrons grow it one
-   unit at a time in each direction. A chevron disappears at the first or last
-   unit of the document.
-3. Both highlight styles paint the same stored rows, and the setting switches
-   between them without a re-render of the book or any write to a note.
-4. `npm run build` is green and `npm test --workspace web` passes.
-5. Keyboard and ARIA on the menu, the chevrons and the swatches. Light and dark.
-   Down to 360px. `prefers-reduced-motion` respected.
-
-### Files in scope
-
-Read and edit:
-
-- `web/src/reader/SelectionMenu.tsx` — the panel. The quick row, the colours row,
-  the two handles.
-- `web/src/reader/SelectionMenu.module.css` — its styles, and the chevron handles.
-- `web/src/reader/selection.ts` — `HIGHLIGHT_COLOURS`, `selectAround`,
-  `selectionBetween`, `describe`. The unit walk goes here.
-- `web/src/reader/selection.test.ts`
-- `web/src/reader/Highlights.tsx` — today's painter, the CSS Custom Highlight API.
-  Becomes the *Clean* renderer, or its caller.
-- `web/src/reader/highlights.test.tsx`
-- `web/src/pages/Reader.tsx` — `onSelectionAction`, `touched`, `canSelect`,
-  `stretchSelection`, and the `<Highlights>` / `<SelectionMenu>` mount near
-  line 3247.
-- `web/src/reader/readerSettings.ts` — where a global reading setting lives.
-- `web/src/reader/TextSettings.tsx` + `.module.css` — the Aa sheet, if the
-  setting goes there.
-- `web/src/storage/notes.ts` and `web/src/storage/db.ts` — `StoredNote.colour`.
-- `web/src/styles/theme.css` — colour tokens only.
-
-New files expected:
-
-- `web/src/reader/highlightStyle.ts` — the colour keys, the renderer interface,
-  the seed.
-- `web/src/reader/HandDrawn.tsx` (+ css) — the hand-drawn renderer.
-- `web/src/reader/units.ts` — sentence and paragraph boundaries, pure and tested.
-
-Read for reference, do not edit:
-
-- `design-inspiration/reading_experience_v2.html`
-
-### Out of scope
-
-The parser, the page turn, storage sync, the tutor, every other screen.
-
-### Three things the code already decides, and one it does not
-
-1. **A highlight is a note that keeps its colour** (`decisions.md`, 2026-08-16).
-   There is no highlights table. `StoredNote` carries `quote` and `colour`.
-2. **The colour is stored as a CSS value, not as a key.** `HIGHLIGHT_COLOURS`
-   holds `{id, label, value}` and only `value` reaches the row. The brief asks
-   for a `colorKey`. Rows already written hold hex, so the read path must map a
-   known hex back to its key and keep an unknown one as a literal colour.
-3. **Highlights are painted by the browser, not by us** (`Highlights.tsx`). The
-   CSS Custom Highlight API puts the colour under the words as ink, so it moves
-   with the text for free. The first version drew boxes in screen coordinates and
-   they chased the words visibly.
-4. **The open question: hand-drawn cannot use that API.** `::highlight()` takes a
-   background colour and almost nothing else — no filter, no mask, no blend mode.
-   The marker look needs real boxes over real line rectangles, which is exactly
-   the model that was removed. See the note in the plan.
-
-### Carried forward — how to work on the reading page
-
-Three lessons an earlier thread paid for.
+Six lessons earlier threads paid for. The last three are new, and they are the
+expensive ones.
 
 1. **Measure in a real browser, not by reading the file.**
 2. **Layout is `offsetWidth`, paint is `getBoundingClientRect`.** The turning
    sheet is under a transform, so its rectangles are distorted.
 3. **The Browser pane does not composite.** `requestAnimationFrame` never fires
-   there. Step things synchronously and observe with `setTimeout`.
+   there, and timers are throttled to about 1 Hz — a 600 ms test window sees two
+   ticks and looks broken. Step things synchronously, observe with `setTimeout`,
+   and wait seconds, not milliseconds.
+4. **Check the trigger before writing the fix.** Six rounds went into the
+   selection menu because nobody asked what actually tells the app a page turned.
+   The answer was *nothing*. Two of those rounds were spent explaining a dead
+   probe away as a harness limitation, when it was the bug.
+5. **Paint cost cannot be read on the desktop at all.** The pane does not paint.
+   For anything that feels slow on the phone, build a small readout into the app
+   and ask the reader for a screenshot. Remote USB profiling does not work here —
+   `chrome://inspect` stayed "Offline" through every fix.
+6. **A page turn has two directions and they are not mirror images.** Forwards
+   the moving sheet is the page being left. Backwards it is the page being
+   arrived at. Any optimisation that strips something from a sheet has to know
+   which. See `data-page-leaving` in `pageTurn.ts`.
 
-### Parked
+## Turn cost, as measured (2026-08-17, phone, one page, 103 strokes)
 
-- **Judge `PARSER_VERSION` 28 on the phone.** No code. The reader accepts the
-  rebuild and reads the Contents tab of *The Mountains of My Life* and *The Gay
-  Science*.
-- **Drop caps.** Waiting on the reader's screenshot. Note
-  `.opening + p::first-letter` in `Reader.module.css` already floats one.
+Keep these. They are the baseline any future change is judged against.
+
+| | build | paint |
+|---|---|---|
+| clean ink | ~70 ms | 21 ms |
+| hand-drawn | ~75 ms | 48 ms |
+| hand-drawn, texture forced on | ~104 ms | 94 ms |
+
+Build is the copy work in `pageTurn.ts` and is a straight multiple of `STRIPS`
+(now 12). Paint is the browser drawing the ink. After the fixes, both fell; the
+reader called the result "much faster" and did not ask for a re-measure.

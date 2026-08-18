@@ -15,7 +15,12 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1459 tests across 81 files** (2026-08-17).
+  **1486 tests across 84 files** (2026-08-17).
+- **The page turn is measured now, and the numbers are on file.** See *The page
+  turn got faster* in Recently done. If a turn ever feels slow again, do not
+  guess: put the stopwatch back (it is one small module, deleted in `2fd0d0a`,
+  recoverable from git) and read `build` against `paint`. Remote profiling from
+  the PC does **not** work — `chrome://inspect` never left "Offline".
 - **`PARSER_VERSION` is 28, so the shelf offers to rebuild every book.** The
   reader should accept the rebuild and check the Contents tab. Expected:
   chapters nested under their parts, the Preface listed, the book's own printed
@@ -81,6 +86,54 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The selection menu survives a page turn** — 2026-08-17, six commits
+  (`ee7a4ad`, `c09363b`, `6ab61d9`, `59a2938`, `685569d`, `2f6dbc1`). **Signed
+  off by the reader: "It looks finally fixed."** Six rounds, because the trigger
+  was never checked before the fix was written.
+  - **Nothing announces a page turn.** `pages.page` does not reliably change,
+    and the strip fires no `scroll` event — its overflow is hidden. Both were
+    measured dead, not assumed. The selection now watches the geometry of its own
+    anchor paragraph on an 80 ms timer. A timer, not `requestAnimationFrame`: a
+    frame callback stops in a page that is not being drawn.
+  - **A DOM Range whose end node is removed does not throw.** It re-points to the
+    end of its container, so the whole page reads as selected. The windowed strip
+    removes paragraphs on every turn. The selection is rebuilt from its anchor
+    and its words instead — `rangeOfSelection` in `selection.ts`, which searches
+    the whole root because a grown selection belongs to no single paragraph.
+  - **The card is placed by the lines that are on screen.** `selection.rect`
+    unions line boxes from other columns, which are off to the left at the same
+    heights, so after three flips the card landed on the chevron.
+  - **The two chevrons do not hang by the same amount.** `.handleEnd` carries
+    `translateY(50%)`, so it sits a whole disc below the last line. Two
+    clearances, not one.
+  - The card takes the side with room and scrolls inside it, capped at
+    `scrollHeight` — never at its own measured height, which would let the cap
+    shrink itself.
+- **The page turn got faster, and the ink stopped arriving late** — 2026-08-17,
+  four commits (`3806415`, `60eafa0`, `32661fe`, `2fd0d0a`). **Signed off by the
+  reader on the phone.** A fully highlighted page turned slowly in the hand-drawn
+  style. Remote profiling failed, so a temporary in-app stopwatch was built,
+  read from phone screenshots, and then deleted.
+  - **Measured, one page, 103 strokes, per turn:** clean 70 ms build / 21 ms
+    paint; hand-drawn 75 / 48; hand-drawn with the texture forced on 104 / 94.
+    So the wobble filter is 46 ms and the app was already right to drop it.
+  - **Build, a third of it, was words nobody sees.** The page copy kept a whole
+    page *after* the visible one. Columns flow forwards, so what follows the page
+    decides none of its breaks. The leading page is load-bearing and stays.
+  - **`STRIPS` is 12, not 16.** Every strip is a copy, so the cost is a straight
+    multiple. Its own comment named it the lever for a struggling phone. Ten is
+    where the bend looks like a folding screen, so twelve keeps a margin.
+  - **The mask and the grain now come off a turning sheet too** — the 27 ms that
+    was left after the filter. Only paint is dropped, never geometry, so no ink
+    moves.
+  - **Two scoping faults followed, both reported by the reader, both the same
+    mistake.** The rule was written as `[data-page-frame]:has([data-page-sheet])`,
+    which reached the *real* page under the sheet. Then, scoped to sheets, it
+    still reached the backward arrival. **The two directions are not mirror
+    images:** forwards the moving sheet is the page being left and is gone;
+    backwards it is the page being arrived at, and the reader goes on looking at
+    it. Every copy of a page being *left* now carries `data-page-leaving`, and
+    only those give up the mask. The one unmarked copy is the backward arrival.
 - **The page turn crosses a section** — 2026-08-17, five commits (`06daff5`,
   `e1336c4`, `54c215f`, `6d946ba`, `8e44036`), build green, **1459 tests across
   81 files**. **Signed off by the reader on the phone.** A section is laid out
@@ -541,8 +594,8 @@ Get that loop working before building any breadth.
   and its reasoning in `docs/decisions.md`; the traps they cost are in
   `active-task.md` under "Carried forward".
 
-**Gates:** `npm test` (1459, 81 files), `npm run typecheck`, `npm run build` — all
-passing as of 2026-08-17. Precache 34 entries / 1172.01 KiB. **Two tests flaked
+**Gates:** `npm test` (1486, 84 files), `npm run typecheck`, `npm run build` — all
+passing as of 2026-08-17. Precache 34 entries / 1461.86 KiB. **Two tests flaked
 once under parallel load** (`Reader › goes to the next section`, `Library ›
 unfiles a book…`) and passed on re-run and in isolation — timing, not a
 regression, but they exist. **Run the suite as `npm test --workspace web`** — from the repo root it misses `web/`'s Vite config

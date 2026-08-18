@@ -164,8 +164,6 @@ export type { Drag, HeldPage } from './pageTurn.ts'
 
 export { COMMIT_AT, curlProgress, FLICK } from './pageCurl.ts'
 
-export { TurnClock } from './TurnClock.tsx'
-
 export {
   MOVE_EASING,
   MOVE_MS,

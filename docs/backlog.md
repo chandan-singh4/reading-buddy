@@ -189,7 +189,10 @@
 - [ ] **WP-43 Re-scan a folder + tell me what's new** — added 2026-08-02. Remember the folder that was imported from, offer "Check folder for new books", skip what's already on the shelf (duplicate detection already does this), and name what arrived: "2 new books: …". On iOS the handle can't be remembered between sessions, so it degrades to re-picking the folder · *after 11*
 
 ### Leg 3 — The Tutor (inline explain + Claude)
-- [ ] **WP-17 Selection menu** — Highlight / Copy / Define (local) / Ask · *after 12*
+- [~] **WP-17 Selection menu** — Highlight / Copy / Define (local) / Ask · *after 12*
+  — the menu, the four colours, the sentence/paragraph chevrons and the two
+  highlight styles are built and phone-tested (2026-08-16, 2026-08-17). It also
+  survives a page turn now. Left: **Define** and **Ask**, and Ask waits on WP-19
 - [ ] **WP-18 Retrieval assembler** — manifest + chapter index + one section + learner.md · *after 05,09*
 - [ ] **WP-19 Claude API call shape** — Haiku→Sonnet tier, caching, streaming, retry · *after 18*
 - [ ] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19*

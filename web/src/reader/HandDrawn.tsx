@@ -560,9 +560,6 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
             {mark.strokes.map((stroke) => (
               <span
                 key={stroke.key}
-                // A stable name for one stroke. The class name is hashed by the
-                // build, so counting ink from outside this file needs this.
-                data-stroke=""
                 className={marker ? styles.stroke : `${styles.stroke} ${styles.plain}`}
                 style={{
                   top: stroke.top,
