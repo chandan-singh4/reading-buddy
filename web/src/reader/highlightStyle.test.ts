@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   HIGHLIGHT_COLOURS,
+  HIGHLIGHTER_CHOICES,
   colourOfKey,
   keyOfColour,
   readHighlighter,
@@ -46,6 +47,13 @@ describe('which style to paint in', () => {
     expect(resolveHighlighter('clean', 'paper')).toBe('clean')
     expect(resolveHighlighter('handdrawn', 'dark')).toBe('handdrawn')
     expect(resolveHighlighter('auto', 'paper')).toBe('handdrawn')
+  })
+
+  // The reader asked for the two real looks and nothing else. `auto` survives
+  // as the unset state — books on phones already read back as it — but it is
+  // not a button any more.
+  it('offers the two styles and no Auto', () => {
+    expect(HIGHLIGHTER_CHOICES.map((choice) => choice.value)).toEqual(['handdrawn', 'clean'])
   })
 })
 

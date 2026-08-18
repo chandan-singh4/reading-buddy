@@ -91,6 +91,45 @@ describe('TextSettings', () => {
     )
   })
 
+  // Two looks, no Auto. A book nobody has set reads back as `auto`, so the
+  // button that lights up has to be the one the theme is actually painting —
+  // otherwise the picker shows nothing chosen on a page that plainly has a look.
+  it('offers two highlighters and lights the one on the page', () => {
+    render(
+      <TextSettings
+        settings={{ ...DEFAULT_SETTINGS, theme: 'paper' }}
+        onSettingsChange={vi.fn()}
+        highlighter="auto"
+        onHighlighterChange={vi.fn()}
+      />,
+    )
+    openPane('Themes')
+
+    const styles = screen.getByRole('group', { name: 'Highlighter style' })
+    // Scoped to the group: the themes above have an Auto swatch of their own,
+    // which is a different setting and stays.
+    const names = [...styles.querySelectorAll('button')].map((button) => button.textContent)
+    expect(names).toEqual(['AaHand-drawn', 'AaClean'])
+    expect(screen.getByRole('button', { name: 'Hand-drawn' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+  })
+
+  it('settles the highlighter for the book when one is tapped', () => {
+    const onHighlighterChange = vi.fn()
+    render(
+      <TextSettings
+        settings={DEFAULT_SETTINGS}
+        onSettingsChange={vi.fn()}
+        highlighter="auto"
+        onHighlighterChange={onHighlighterChange}
+      />,
+    )
+    openPane('Themes')
+    fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
+    expect(onHighlighterChange).toHaveBeenCalledWith('clean')
+  })
+
   it('sets the margins from the slider under the drawn page', () => {
     const onSettingsChange = show()
     openPane('Margins')

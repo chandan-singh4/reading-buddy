@@ -149,8 +149,16 @@ const ICONS = {
   translate: 'M3 6h9M7.5 6v-2M9 6c0 4-3 8-6 8m2-4c2 3 4 4 6 4m1 6 4-10 4 10m-6.5-3h5',
   search: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zm5 12 4 4',
   speak: 'M4 10v4h3l4 4V6l-4 4zm11-1a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12',
-  sentence: 'M4 7h16M4 12h11m-11 5h7',
-  paragraph: 'M6 4h13M6 4v16M11 4v16M19 4v8a4 4 0 0 1-4 4h-4',
+  // A line that closes in a full stop reads as one sentence; three stacked
+  // lines, the last one short, is the familiar shape of a paragraph. Both come
+  // from `design-inspiration/reading_experience_v2.html`, drawn there on a 20
+  // grid and scaled by 1.2 for the 24 grid every other icon here uses.
+  //
+  // The dot is an arc pair rather than a `<circle>` because `Icon` takes one
+  // path. It needs `filled`; the straight subpath beside it encloses no area,
+  // so filling the whole path colours the dot alone.
+  sentence: 'M4 12h11M19.8 12a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 1 1 2.4 0',
+  paragraph: 'M5 6h14M5 12h14M5 18h8',
   spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
   chevron: 'M9 6l6 6-6 6',
   back: 'M15 6l-6 6 6 6',
@@ -668,10 +676,10 @@ export function SelectionMenu({
         </button>
         {(
           [
-            ['sentence', 'Sentence', ICONS.sentence],
-            ['paragraph', 'Paragraph', ICONS.paragraph],
+            ['sentence', 'Sentence', ICONS.sentence, true],
+            ['paragraph', 'Paragraph', ICONS.paragraph, false],
           ] as const
-        ).map(([grain, label, path]) => (
+        ).map(([grain, label, path, filled]) => (
           <button
             key={grain}
             type="button"
@@ -682,7 +690,7 @@ export function SelectionMenu({
             data-current={unit === grain || undefined}
             onClick={() => act({ kind: 'select', grain })}
           >
-            <Icon path={path} />
+            <Icon path={path} filled={filled} />
             <span>{label}</span>
           </button>
         ))}

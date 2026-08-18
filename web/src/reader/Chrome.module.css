@@ -121,15 +121,23 @@
 }
 
 /*
- * The book's title, in the gap the toolbar leaves. Quiet on purpose — it is
- * there to tell you which book you have open, not to be read; it is set in the
- * muted colour so the four controls stay the things the eye lands on.
+ * The book's title, in the gap the toolbar leaves.
+ *
+ * It used to be muted and small, on the reasoning that it only says which book
+ * you have open. It is now the name of the thing you are holding *and* the way
+ * to its About page, so it is set in the full text colour at reading size and
+ * in bold — the first thing the eye lands on in the bar, with the four controls
+ * around it as icons.
  */
 .bookTitle {
   flex: 1;
   min-width: 0;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--color-text);
+  /* It is a link now. Underlining a whole title in a toolbar is noise; the
+     weight and the colour already separate it from the muted line beneath. */
+  text-decoration: none;
   /* One line, ellipsised: a long title must not push the controls off screen. */
   overflow: hidden;
   text-overflow: ellipsis;

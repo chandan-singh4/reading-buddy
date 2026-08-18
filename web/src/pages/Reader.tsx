@@ -3108,6 +3108,7 @@ export default function Reader() {
         <>
           <Chrome
             bookTitle={frame.book.title}
+            bookId={frame.book.id}
             manifest={frame.manifest}
             here={here}
             pages={pages}

@@ -68,6 +68,12 @@ export type { BookmarkRow } from './BookmarksPanel.tsx'
 
 export interface ChromeProps {
   bookTitle: string
+  /**
+   * The book's own id, which turns the title in the bar into a link to its
+   * About page — the same page the ⓘ on the shelf opens. Optional so a Chrome
+   * rendered without one (tests, a book still loading) simply shows plain text.
+   */
+  bookId?: string
   manifest: Manifest
   here: SectionRef
   /**
@@ -159,6 +165,7 @@ const MENU_PANELS: SheetTab[] = ['contents', 'bookmarks', 'notes']
 
 export function Chrome({
   bookTitle,
+  bookId,
   manifest,
   here,
   pages,
@@ -292,7 +299,22 @@ export function Chrome({
           <span aria-hidden="true">←</span>
         </Link>
 
-        <span className={styles.bookTitle}>{bookTitle}</span>
+        {/*
+          The title is the way to the book's About page, which until now could
+          only be reached from the shelf. A reader who wants to know what they
+          are holding is already looking at its name, so the name is the door.
+        */}
+        {bookId ? (
+          <Link
+            to={`/book/${bookId}/info`}
+            className={styles.bookTitle}
+            aria-label={`About ${bookTitle}`}
+          >
+            {bookTitle}
+          </Link>
+        ) : (
+          <span className={styles.bookTitle}>{bookTitle}</span>
+        )}
 
         <button
           type="button"

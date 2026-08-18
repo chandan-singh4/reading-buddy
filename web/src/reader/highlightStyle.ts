@@ -72,13 +72,26 @@ export function keyOfColour(value: string | undefined): ColourKey | null {
 /** How highlights are painted. Render-only; never stored on a highlight. */
 export type HighlighterStyle = 'clean' | 'handdrawn'
 
-/** What the reader chose. `auto` means "whatever suits the page I am on". */
+/**
+ * What the reader chose. `auto` means "whatever suits the page I am on".
+ *
+ * `auto` is no longer offered: the reader asked for the two real looks and
+ * nothing else. It stays in the type because it is still what a book that was
+ * never set reads back as, and because it is on phones already. So it is the
+ * unset state now, not a third option — see `HIGHLIGHTER_CHOICES`.
+ */
 export type HighlighterChoice = 'auto' | HighlighterStyle
 
-export const HIGHLIGHTER_CHOICES: readonly { value: HighlighterChoice; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'clean', label: 'Clean' },
+/**
+ * The two the picker offers.
+ *
+ * A book nobody has set is `auto`, which resolves through the theme, so the
+ * picker shows whichever of these two the reader is actually looking at. The
+ * first tap on either one settles it for that book for good.
+ */
+export const HIGHLIGHTER_CHOICES: readonly { value: HighlighterStyle; label: string }[] = [
   { value: 'handdrawn', label: 'Hand-drawn' },
+  { value: 'clean', label: 'Clean' },
 ]
 
 /**

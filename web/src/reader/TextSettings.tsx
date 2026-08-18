@@ -279,8 +279,11 @@ export function TextSettings({
             It belongs on this tab because it is the same kind of choice — how
             the page looks, not what it says — and because its default follows
             the theme directly above it: a paper theme gets marker strokes, a
-            flat one gets a clean wash. Choosing anything but Auto overrules that
-            for this book and is never overwritten.
+            flat one gets a clean wash.
+
+            Two buttons, no Auto. A book nobody has set still starts from the
+            theme, so the button that is lit is the look on the page. Tapping
+            either one settles it for this book and is never overwritten.
           */}
           {highlighter && onHighlighterChange && (
             <div className={styles.row}>
@@ -291,18 +294,10 @@ export function TextSettings({
                     key={option.value}
                     type="button"
                     className={styles.choice}
-                    aria-pressed={highlighter === option.value}
+                    aria-pressed={resolveHighlighter(highlighter, settings.theme) === option.value}
                     onClick={() => onHighlighterChange(option.value)}
                   >
-                    <span
-                      className={styles.choiceMark}
-                      data-style={
-                        option.value === 'auto'
-                          ? resolveHighlighter('auto', settings.theme)
-                          : option.value
-                      }
-                      aria-hidden="true"
-                    >
+                    <span className={styles.choiceMark} data-style={option.value} aria-hidden="true">
                       Aa
                     </span>
                     <span className={styles.choiceName}>{option.label}</span>
