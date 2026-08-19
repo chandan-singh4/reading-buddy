@@ -91,6 +91,19 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+
+- **The text no longer moves when a page turn starts, at any zoom** (2026-08-19).
+  `pageCopy` measured where a paragraph sat with `getBoundingClientRect` and
+  added `scrollLeft` to it. Rectangles are painted pixels. `scrollLeft` is a
+  layout pixel. The stage is scaled to 0.85 while the toolbar is up, so the sum
+  was 15% short: the copy was cut at the wrong paragraph and then slid sideways
+  by the same error. The page showed the tail of the page before along its top.
+  This is the fault the reader reported. Two smaller faults were fixed on the way
+  — an inset block gave the wrong column edge, and the copy was laid out at the
+  scale React believed rather than the scale the screen was drawing, which is not
+  the same for the 0.24 s the stage takes to shrink. Proof: a word fingerprint of
+  every page of *How to Speak Whale*, sections 4 to 6, in all four combinations
+  of drawn scale and told scale. Every page matches.
 - **The text no longer moves when a page turn starts** — 2026-08-18. The reader
   reported it on a backward turn: two lines of the page before appeared at the
   top. An earlier fix had cured the same fault forwards, so this looked like a

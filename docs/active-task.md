@@ -37,7 +37,7 @@ Nothing is mid-edit. Build green, 1486 tests across 84 files.
 
 ## Carried forward — how to work on the reading page
 
-Nine lessons earlier threads paid for. Lesson 9 is new.
+Ten lessons earlier threads paid for. Lessons 9 and 10 are new.
 
 1. **Measure in a real browser, not by reading the file.**
 2. **Layout is `offsetWidth`, paint is `getBoundingClientRect`.** The turning
@@ -72,6 +72,12 @@ Nine lessons earlier threads paid for. Lesson 9 is new.
    a bare page with the real CSS modules. Turn off `scroll-behavior` and any
    entrance animation first — a running animation beats an inline transform, and
    a smooth scroll is read mid-flight.
+10. **Never add a rectangle to `scrollLeft`.** `getBoundingClientRect` answers in
+    painted pixels. `scrollLeft`, `clientWidth` and computed styles answer in
+    layout pixels. The reading stage carries `scale(0.85)` while the toolbar is
+    up, so the two units differ by 15%, and any sum of them is only right when
+    the toolbar is down. This was the reader's bug. Divide the rectangle by the
+    drawn scale first. See `edge` in `pageTurn.ts`.
 
 ## Turn cost, as measured (2026-08-17, phone, one page, 103 strokes)
 

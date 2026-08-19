@@ -290,7 +290,7 @@ interface PageCopy {
  * great deal better than wrong, and a strip with no layout is also a strip with
  * nothing to lay out.
  */
-function pageCopy(strip: HTMLElement): PageCopy {
+function pageCopy(strip: HTMLElement, drawn: number): PageCopy {
   const whole = (): PageCopy => ({ node: strip.cloneNode(true) as HTMLElement, shift: 0 })
 
   const children = strip.children
@@ -316,7 +316,20 @@ function pageCopy(strip: HTMLElement): PageCopy {
   const startOf = (node: Element): DOMRect =>
     node.getClientRects()[0] ?? node.getBoundingClientRect()
 
-  const edge = (i: number) => startOf(children[i]!).left - box.left + strip.scrollLeft
+  /**
+   * Where a child sits along the strip, in the strip's own content pixels.
+   *
+   * `getBoundingClientRect` answers in *painted* pixels: when the toolbar is up
+   * the stage carries a `scale(0.85)`, and every rect inside it comes back 15%
+   * small. `scrollLeft` is never scaled — it is a layout number. Adding the two
+   * as they stand mixes two units, and the sum is only right when the scale
+   * happens to be 1. At 0.85 it undershot by the scale factor: the copy was cut
+   * at the wrong child and then slid sideways by the same error, so the sheet
+   * showed the tail of the page before along the top of the page. Dividing the
+   * painted distance by the scale puts both terms in layout pixels.
+   */
+  const edge = (i: number) =>
+    (startOf(children[i]!).left - box.left) / drawn + strip.scrollLeft
 
   // The monotonicity the search depends on, checked rather than assumed.
   if (edge(0) > edge(count - 1)) return whole()
@@ -336,7 +349,9 @@ function pageCopy(strip: HTMLElement): PageCopy {
   /** How far down its column a child starts, in content pixels. */
   const style = getComputedStyle(strip)
   const inset = parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop)
-  const below = (i: number) => startOf(children[i]!).top - box.top - inset
+  // Painted pixels again, and `inset` is a computed style — a layout number.
+  // Same correction as `edge`.
+  const below = (i: number) => (startOf(children[i]!).top - box.top) / drawn - inset
 
   /**
    * The last child at or before `from` that begins at the top of a column.
@@ -520,6 +535,46 @@ export function clearSheets(strip: HTMLElement | null): void {
 }
 
 /**
+ * The scale the strip is **actually drawn at**, read off the page.
+ *
+ * ## Why the number the caller passes cannot be trusted
+ *
+ * The reading stage shrinks to `PAGE_SCALE` while the toolbar is up, and the
+ * caller works that number out from React state. Two things make that number
+ * disagree with the screen:
+ *
+ * 1. `.stage` *transitions* its transform. For the length of that animation the
+ *    painted scale is somewhere between 1 and 0.85 while the state has already
+ *    snapped to the end value.
+ * 2. State and paint are not the same clock. A turn begun in the same moment as
+ *    the toolbar moves reads one and sees the other.
+ *
+ * The consequence is not subtle. `place` lays the copy out at `box.width /
+ * scale`, so a scale that is 0.85 when the screen says 1 lays 368 px of text out
+ * in 433 px. Every line then breaks somewhere else, and the reader — who is
+ * looking straight at that copy on a backward turn — watches the page re-wrap as
+ * the turn starts. That was the reported fault, and it is why it appeared to
+ * come and go: it needs the toolbar to have moved.
+ *
+ * Measuring removes the disagreement by construction. A computed transform is
+ * the *used* value, so mid-transition it is the interpolated matrix — the scale
+ * on the glass, not the scale that was intended. Read once per turn, not per
+ * band.
+ */
+function drawnScale(element: HTMLElement, fallback: number): number {
+  if (typeof getComputedStyle !== 'function') return fallback
+  let scale = 1
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    const transform = getComputedStyle(node).transform
+    if (!transform || transform === 'none') continue
+    // `DOMMatrix` is absent under jsdom, where there is no layout to scale.
+    if (typeof DOMMatrixReadOnly !== 'function') return fallback
+    scale *= new DOMMatrixReadOnly(transform).a
+  }
+  return scale > 0 ? scale : fallback
+}
+
+/**
  * A still picture of the whole page exactly as it looks now, laid over it.
  *
  * Both halves of a flip are made of these: the page being left, and — turning
@@ -563,13 +618,16 @@ function copyOf(
   const parent = strip.closest<HTMLElement>(FRAME) ?? strip.parentElement
   if (!parent) return null
 
+  // What the screen is doing, not what the caller believes. See `drawnScale`.
+  const drawn = drawnScale(strip, scale)
+
   const frame = parent.getBoundingClientRect()
   const wrapper = sheetBox(frame)
   wrapper.style.zIndex = String(layer)
 
-  const copy = pageCopy(strip)
+  const copy = pageCopy(strip, drawn)
   const plan = measureSheet(strip, parent)
-  fillSheet(strip, plan, frame, wrapper, scale, copy)
+  fillSheet(strip, plan, frame, wrapper, drawn, copy)
 
   // `attach` false hands the sheet back still detached — built, but not yet in
   // the document. Everything above is a read of the page followed by writes
@@ -987,6 +1045,11 @@ export function beginDrag(
   const parent = strip.closest<HTMLElement>(FRAME) ?? strip.parentElement
   if (!parent) return null
 
+  // What the screen is doing, not what the caller believes. See `drawnScale`.
+  // Read once here rather than inside the band loop below: the answer cannot
+  // change between bands, and it costs a style resolution to ask.
+  const drawn = drawnScale(strip, scale)
+
   const frame = parent.getBoundingClientRect()
   if (frame.width <= 0) return null
 
@@ -1018,7 +1081,7 @@ export function beginDrag(
 
   // Once, before the loop. This is the whole fix: sixteen bands used to mean
   // sixteen copies of the entire chapter, each one laid out in full.
-  const copy = pageCopy(strip)
+  const copy = pageCopy(strip, drawn)
   // Likewise once. Every rectangle the sixteen sheets need, read while the
   // document is still untouched — see `measureSheet`.
   const plan = measureSheet(strip, parent)
@@ -1048,7 +1111,7 @@ export function beginDrag(
     sheet.style.left = `${-i * step}px`
     sheet.style.pointerEvents = 'none'
     root.append(sheet)
-    fillSheet(strip, plan, frame, sheet, scale, copy)
+    fillSheet(strip, plan, frame, sheet, drawn, copy)
 
     const back = wash(root, 'var(--color-bg)')
     const dark = wash(root, '#000')
