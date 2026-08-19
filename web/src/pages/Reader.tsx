@@ -94,6 +94,7 @@ import {
   type Spine,
   type Strip,
   type Touch,
+  wordAt,
 } from '../reader/index.ts'
 import { catchUpOnOpen } from '../app/bookCatchUp.ts'
 import { knownBook, noteReading } from '../app/shelvesAhead.ts'
@@ -2464,13 +2465,19 @@ export default function Reader() {
      * the words being chosen. Until the finger is off, the reader is still
      * choosing.
      *
-     * Then the selection is *let go* — and that is the whole trick. A phone
-     * shows its own text menu the moment a selection exists, and there is no
-     * way to ask it not to. Dropping the selection takes that menu away, and
-     * the words are drawn again by `SelectionMenu` so nothing looks lost.
+     * Then the selection is *let go*. A browser shows its own text menu the
+     * moment a selection exists, and there is no way to ask it not to.
+     * Dropping the selection takes that menu away, and the words are drawn
+     * again by `SelectionMenu` so nothing looks lost.
      *
-     * The phone's drag handles go with it, so the app draws its own — see
+     * The browser's drag handles go with it, so the app draws its own — see
      * `stretchSelection` and the handles in `SelectionMenu`.
+     *
+     * On a touch screen none of this runs any more: `.page` turns selection
+     * off there, so the phone never holds one, and the long-press listener
+     * below chooses the first word instead. That closed the last gap — the
+     * menu used to flash in the moment between the phone selecting and this
+     * code dropping it. What is left here is the mouse path.
      */
     const capture = () => {
       const found = selectionInReader(strip.current)
@@ -2525,6 +2532,90 @@ export default function Reader() {
       document.removeEventListener('pointerup', onUp)
       document.removeEventListener('pointercancel', onUp)
       document.removeEventListener('selectionchange', settle)
+    }
+  }, [])
+
+  /**
+   * Choose a word by long press, without the phone choosing it.
+   *
+   * ## Why this exists at all
+   *
+   * A phone selects a word on long press, and the moment it holds a selection
+   * it raises its own text menu. Nothing on the page can stop it. The effect
+   * above answered that by taking the selection away once it had read it, and
+   * the menu went with it — but the reader still saw it flash first, and on a
+   * slow frame the flash was long enough to read.
+   *
+   * So on a touch screen the app does not let the phone select anything at all:
+   * `.page` turns selection off there (`Reader.module.css`), and this listener
+   * finds the word under the finger itself. Everything after the first word was
+   * already the app's own — its own highlight, its own handles, its own menu —
+   * so this is the last piece that was borrowed.
+   *
+   * A mouse keeps the browser's own selection. Dragging across text is how a
+   * desktop selects, there is no menu to hide there, and taking it away would
+   * cost something for nothing.
+   *
+   * ## Why it is not simply a timer
+   *
+   * The same press that chooses a word is also the start of a page turn, so the
+   * two have to be told apart. A finger that has moved more than `WANDER` is
+   * turning a page and never chooses; a finger that has held still for `HOLD`
+   * is choosing and never turns, which the drag reads back through `held`.
+   */
+  useEffect(() => {
+    const page = strip.current
+    if (!page || typeof window === 'undefined') return
+    // Coarse pointers only. See above.
+    if (!window.matchMedia?.('(pointer: coarse)').matches) return
+
+    /** How long a finger must hold still to mean "this word". */
+    const HOLD = 420
+    /** How far it may drift and still be holding still, in pixels. */
+    const WANDER = 10
+
+    let timer = 0
+    let from: { x: number; y: number } | null = null
+
+    const stop = () => {
+      window.clearTimeout(timer)
+      timer = 0
+      from = null
+    }
+
+    const onDown = (event: PointerEvent) => {
+      if (!event.isPrimary || event.pointerType === 'mouse') return
+      from = { x: event.clientX, y: event.clientY }
+      timer = window.setTimeout(() => {
+        if (!from) return
+        const found = wordAt(from.x, from.y, strip.current)
+        stop()
+        if (!found) return
+        // The turn must not also happen. A finger that has chosen a word is not
+        // a finger that is turning the page, and both the threshold swipe and
+        // the dragged sheet read the gesture back through `touchStart`.
+        touchStart.current = null
+        setSelected(found)
+      }, HOLD)
+    }
+
+    const onMove = (event: PointerEvent) => {
+      if (!from) return
+      if (Math.abs(event.clientX - from.x) > WANDER || Math.abs(event.clientY - from.y) > WANDER) {
+        stop()
+      }
+    }
+
+    page.addEventListener('pointerdown', onDown)
+    page.addEventListener('pointermove', onMove)
+    page.addEventListener('pointerup', stop)
+    page.addEventListener('pointercancel', stop)
+    return () => {
+      stop()
+      page.removeEventListener('pointerdown', onDown)
+      page.removeEventListener('pointermove', onMove)
+      page.removeEventListener('pointerup', stop)
+      page.removeEventListener('pointercancel', stop)
     }
   }, [])
 

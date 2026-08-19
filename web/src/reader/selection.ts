@@ -258,6 +258,70 @@ export function selectAround(
   return grown
 }
 
+/**
+ * The word under a point on screen, as a selection the app owns.
+ *
+ * ## Why the app picks the word itself
+ *
+ * A phone selects a word by long press, and the moment *it* holds a selection
+ * it puts its own text menu on the screen. There is no way to ask it not to.
+ * The app used to let that happen and then drop the selection, which took the
+ * menu away again — but not before the reader saw it flash. This picks the word
+ * without ever asking the phone to select anything, so there is nothing for it
+ * to raise a menu over.
+ *
+ * Word boundaries come from `Intl.Segmenter`, the same source the sentence
+ * grain uses, so "don't" and "twenty-one" are one word and the rules change
+ * with the language rather than with our guesses.
+ *
+ * Returns `null` when the point is not on text the app has anchored — the space
+ * between paragraphs, the running head, the margin.
+ */
+export function wordAt(x: number, y: number, root: HTMLElement | null): ReaderSelection | null {
+  if (!root) return null
+
+  const caret = caretAt(x, y)
+  if (!caret || !root.contains(caret.node)) return null
+
+  const anchor = anchorOfNode(caret.node)
+  if (!anchor) return null
+
+  const element = document.getElementById(anchor.replace(/[[\]]/g, ''))
+  if (!element) return null
+
+  const { flat, from } = flatten(element)
+  if (from.length === 0) return null
+
+  const at = flatIndexOf(from, caret.node, caret.offset)
+  if (at < 0) return null
+
+  const segmenter =
+    typeof Intl !== 'undefined' && 'Segmenter' in Intl
+      ? new Intl.Segmenter(undefined, { granularity: 'word' })
+      : null
+  // No Segmenter: run out to the spaces on either side, which is the same
+  // answer for English and a worse one for nothing.
+  if (!segmenter) {
+    let start = at
+    while (start > 0 && !/\s/.test(flat[start - 1] ?? ' ')) start -= 1
+    let end = at
+    while (end < flat.length && !/\s/.test(flat[end] ?? ' ')) end += 1
+    const plain = rangeOfSpan(from, start, end)
+    return plain ? describe(plain, root) : null
+  }
+
+  for (const piece of segmenter.segment(flat)) {
+    const end = piece.index + piece.segment.length
+    if (at >= end) continue
+    // Punctuation and the spaces between words are segments too. Landing on one
+    // means the reader touched between words, and there is no word to give.
+    if (!piece.isWordLike) return null
+    const range = rangeOfSpan(from, piece.index, end)
+    return range ? describe(range, root) : null
+  }
+  return null
+}
+
 /** The sentence holding the start of `selection`. */
 function sentenceIn(flat: string, from: Source[], selection: ReaderSelection): Range | null {
   const at = flatIndexOf(from, selection.range.startContainer, selection.range.startOffset)

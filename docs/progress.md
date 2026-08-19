@@ -92,6 +92,18 @@ Get that loop working before building any breadth.
 
 ### Recently done
 
+- **The phone's own selection panel no longer flashes** (2026-08-19). Before,
+  the app let the phone make a selection and then dropped it. That took the
+  phone's menu away, but the reader saw it for a moment first. Now the phone
+  cannot select at all: `.page` sets `user-select: none` and
+  `-webkit-touch-callout: none` under `@media (pointer: coarse)`. A new
+  long press in `Reader.tsx` finds the word under the finger with `wordAt` in
+  `reader/selection.ts`, and shows the app's own menu. The press must hold for
+  420 ms and move less than 10 px. It also clears `touchStart`, so the page
+  does not turn as well. A mouse keeps the browser's selection, because a
+  desktop has no such menu. **Not proved on a phone yet** — the Browser pane
+  cannot show iOS's menu.
+
 - **The text no longer moves when a page turn starts** (2026-08-19). The copy of
   the page zeroed the top margin of its first paragraph, because a browser
   truncates that margin at a column break. But a margin collapses *through* an

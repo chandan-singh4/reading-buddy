@@ -721,3 +721,26 @@
   box-shadow: var(--shadow-raised);
   cursor: pointer;
 }
+
+/*
+ * The phone's own text menu, removed at the source.
+ *
+ * A phone raises that menu the instant *it* holds a selection, and no page can
+ * ask it not to. The app used to let the selection happen and then drop it,
+ * which took the menu away — but the reader saw it flash first.
+ *
+ * So on a touch screen the phone never selects anything. `Reader.tsx` finds the
+ * word under the finger itself and paints it, which it already did for every
+ * word after the first. `-webkit-touch-callout` covers the other menu, the one
+ * a long press on a link or an image raises.
+ *
+ * A mouse keeps the browser's own selection: dragging across text is how a
+ * desktop selects, and there is no menu to hide there.
+ */
+@media (pointer: coarse) {
+  .page {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}

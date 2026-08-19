@@ -48,6 +48,7 @@ export {
   rangeOfSelection,
   selectionBetween,
   selectionInReader,
+  wordAt,
 } from './selection.ts'
 export type {
   ReaderSelection,
