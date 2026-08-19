@@ -14,8 +14,15 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing mid-edit.** Everything below is merged and pushed; build green,
-  **1486 tests across 84 files** (2026-08-17).
+- **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **The touch selection is new and only half proved** (2026-08-19). On a touch
+  screen the phone can no longer select anything. A long press picks the word,
+  and a back swipe puts the menu away. All three were proved in the Browser
+  pane with the real book. **iOS's own menu cannot be shown there**, so only the
+  phone can tell you the flash is gone. Check these on the phone:
+  1. Long press a word. The app's own menu must open, with no grey flash first.
+  2. Drag a handle. The words must grow, with no flash.
+  3. Swipe back with the menu open. The menu must close and the book must stay.
 - **The page turn is measured now, and the numbers are on file.** See *The page
   turn got faster* in Recently done. If a turn ever feels slow again, do not
   guess: put the stopwatch back (it is one small module, deleted again on
@@ -572,111 +579,8 @@ Get that loop working before building any breadth.
   - **Section-crossing turns stay on the old path** on purpose: at a chapter
     edge the destination is not laid out, so there is nothing honest to scrub
     against. Reduced motion falls back too.
-- **The reading page became a physical book** — 2026-08-14 (`52ed6d6`,
-  `33c5960`, `4320b4e`, `2bd572e`). Four rounds off one brief and two mockups.
-  - **Paper, Vintage and Paperback**, three page themes built from stacked CSS
-    gradients plus an inline SVG `feTurbulence` grain — no image file, so no
-    extra download, no precache entry and no fixed resolution to stretch.
-    **Paper is the default theme now.** Vintage adds foxing (the brown blooms a
-    damp page develops); Paperback keeps a trace of texture so it reads as clean
-    rather than flat.
-  - **Two reading faces** — Libre Caslon and Merriweather, self-hosted from
-    `@fontsource*`, **Latin subset named by hand** (importing a package's own CSS
-    pulls megabytes of alphabets into `dist/`, which the worker then precaches).
-    Fonts are their own axis, not part of a theme.
-  - **A running head** — the book's title in small capitals across the top
-    margin. Built for Vintage, then made the default on the reader's ask; the
-    book title, never the chapter, which is already printed at the chapter head.
-  - **The book around the page** — a gutter shadow that flips with the sheet
-    (`data-page-furniture`) and two decks of paper that do not, because a binding
-    does not. The decks thin on the right and thicken on the left as you read:
-    progress as weight in the hand rather than a percentage to read.
-  - **Section breaks survive the parser now** (`PARSER_VERSION` 19). `<hr>` was
-    dropped silently, running two scenes together; typed asterisks were printed
-    as literal `* * *`. Both are `prose` labelled `break`, drawn by CSS so the
-    ornament belongs to the theme.
-  - **The cascade trap bit twice.** `:root:not([data-theme='light'])` is (0,2,0)
-    and beats a bare `:root`, so on an OS-dark phone every pale theme took the
-    dark values — a black vignette on cream paper, then a black binding on it.
-    Both found by reading computed values out of a live browser, neither
-    findable in the file.
-- **Books catch up on open, and trickle in the background** — 2026-08-14
-  (`95389e9`). The reader's question — "with every update it'll have to reload
-  all the books every time?" A book re-parses the moment it is opened, and one
-  stale book at a time is rebuilt while the app is idle and visible. One
-  serialising promise lane, because parsing is main-thread; a session-scoped
-  give-up set so an unfixable book cannot starve the queue.
-- **A book's own page stopped looking like a database record** — 2026-08-14
-  (`0fb3e76`, `c02e87c`, `6370d91`, `8ce41d5`, `79a6de8`). The reader's brief,
-  with a Google Play Books screenshot: hero cover, title, author, a genre pill
-  where the mock says "Pre-Order"; a three-cell spec strip (Format · Pages ·
-  Published); one glass CTA reading **Continue reading** or **Read**; the
-  description folded to five lines behind a chevron; a tinted details card
-  carrying Added, Last read, Publisher, ISBN, readers' rating + count and the
-  Google subjects; a filled Refresh button; the way home drawn as a house.
-  Progress is stated **once**, under the button it describes.
-  - **The mock is dark-only; this app has seven themes.** Every colour is
-    `color-mix(in srgb, var(--color-accent) N%, …)`, so one rule is warm brown
-    on the light themes and gold on the dark with no per-theme override. Where a
-    solid fill was wanted, the `--color-accent` / `--color-accent-contrast` pair
-    is legible in all seven by construction.
-  - **Subjects and ISBN needed no schema work** — both were already parsed,
-    stored and synced, and had simply never been shown. Existing books show them
-    with no re-fetch.
-  - **No glyphs.** The chevron is CSS borders; every icon is an SVG path. A
-    Unicode character a system font lacks renders as an empty box, silently.
-- **Home asks a question instead of narrating the shelf** — 2026-08-14
-  (`b4bb54c`). "Pick up where you left off" described the shelf directly beneath
-  it, which the shelf was already doing; "What book are you picking up today?"
-  replaces it, set in the reading serif and hung off a short accent rule so it
-  reads as a designed line rather than a caption.
-- **A book reopens on the page that was left, not the paragraph** — 2026-08-12
-  (`7f6ef3d`). A saved place names the paragraph the visible page *begins in* —
-  right to record, and the comment saying why is still there — but reopening
-  scrolled to where that paragraph *starts*, which for anything longer than a
-  column is pages early. Worst at the end of a book, where the last page sits
-  deep inside a long closing paragraph: a finished book reopened eight pages
-  short, identically, every time. Positions now carry `within`, the page offset
-  past the paragraph's first column, end to end: Dexie, the Supabase row +
-  migration `0006`, the cached wrapper, the outbox and export/import. The
-  reading screen already measured this number for footnote round-trips; it was
-  simply never written down.
-  - **A second fault, visible only in a real browser:** the debounced write was
-    keyed on the *paragraph* changing, so reading forty pages through one
-    unbroken paragraph saved nothing at all. The offset is state now, and in the
-    effect's deps, so that movement is something the write can see.
-  - **Absent and null both read as zero** — the old behaviour, which is right
-    for every position saved before this and for a project that has not run
-    `0006`. Old positions can't heal themselves; they land short once more, then
-    write the real number.
-  - Verified in a browser on a book with one paragraph running 57 columns: the
-    same row lands on page 30 with the offset and page 1 without it. **jsdom
-    cannot prove this — it has no columns.**
-- **A book opens onto its cover, the way a book does** — 2026-08-12 (`dbd1d62`).
-  The reader's idea, from Google Books: the fraction of a second before the text
-  is ready was a loading state, and is now the cover, held 550 ms and then faded
-  out. `pages/Opening.tsx`, keyed on the book id so a second book gets a fresh
-  hold. Reduced motion drops the fade to nothing.
-- **The shelves rearrange while the book is still open** — 2026-08-12
-  (`2b43402`). Coming back from a book no longer showed the old shelf order for
-  a beat; `app/shelvesAhead.ts` seeds the shelf and library memories on the way
-  in.
-- **The day a book was finished is now remembered** — 2026-08-10 (`4f9175c`).
-  Groundwork for Stats. "Finished" was already derivable from a 100% position,
-  but only as a *fact*, never as a *date*: a position's `at` is the last page
-  turn, so opening a finished book months later to check a quote moved the day
-  it was finished — harmless on a shelf, a lie in a yearly total.
-  `BookMeta.finishedAt` follows the rule `titleOverridden` already set: written
-  once, never overwritten. **Kept out of `savePosition`** (that runs every
-  paragraph and is a bare single-row put); on the cloud the guard is
-  `.is('finished_at', null)` in the *where* clause, so two devices finishing the
-  same book settle it in Postgres with the first date winning.
-  `backfillFinishedAt` at boot earns its place twice — it dates the books
-  finished before the field existed, and it is the recovery path for a book
-  finished in a tunnel (the 100% page turn is queued like any other write), which
-  is why finishing needs no outbox entry of its own.
-  **Owes one manual step: `supabase/migrations/0003_finished_at.sql`.**
-- **Older rounds — the offline shelf, the four phone-tested pieces, — WP-53, WP-54, WP-55, the first cloud write-up, the sign-in
+- **Older rounds — the physical page themes, the shelf that catches up, the
+  offline shelf, the four phone-tested pieces, — WP-53, WP-54, WP-55, the first cloud write-up, the sign-in
   toggle and the first live setup — dropped
   from here to keep this file short.** Each has a full entry in `docs/backlog.md`
   and its reasoning in `docs/decisions.md`; the traps they cost are in

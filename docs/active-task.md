@@ -5,39 +5,54 @@
 
 ## Task — none in flight
 
-The last three threads closed on the phone. The reader signed off all of them:
+The reading page closed three reports this thread. All are merged and pushed.
 
-- **The selection menu survives a page turn** (2026-08-17). Six rounds. See
-  `progress.md`.
-- **The page turn is faster, and the ink no longer arrives late** (2026-08-17).
-  Measured on the phone with a temporary in-app stopwatch, now deleted.
-- **A backward turn is now as fast as a forward turn** (2026-08-18). The reader
-  signed off on the phone: "the slowness is gone". See below.
+- **The text no longer moves when a page turn starts** (2026-08-19). The reader
+  signed this off: "This looks good now." The copy of the page zeroed the top
+  margin of its first child, but that margin sat on a `<figure>` inside a plain
+  wrapper and collapsed through it. See `progress.md`.
+- **The phone's own selection panel no longer flashes** (2026-08-19). The phone
+  cannot select on a touch screen at all. A long press picks the word instead.
+- **A back swipe closes the selection menu, not the book** (2026-08-19).
 
-Newest, and waiting for the reader to judge it on the phone:
+Nothing is mid-edit. Build and typecheck green.
 
-- **The text no longer moves when a page turn starts** (2026-08-18). The copy of
-  the page was drawn sideways by the inset of a quote. Proved by geometry, not by
-  eye. See lesson 9 and `progress.md`.
+**One thing the reader must judge on the phone.** The Browser pane cannot show
+iOS's own text menu, so the flash is proved gone only in theory. Ask for these
+three:
 
-Nothing is mid-edit. Build green, 1486 tests across 84 files.
+1. Long press a word. The app's menu must open, with no grey flash before it.
+2. Drag a handle to grow the selection. Again, no flash.
+3. Swipe back with the menu open. The menu closes and the book stays.
+
+If a flash survives, the next place to look is the drag handles in
+`SelectionMenu`, not the long press — the press is proved.
 
 ## Next up — pick one, then run `/plan-task`
 
 1. **Judge `PARSER_VERSION` 28 on the phone.** No code. The reader accepts the
-   rebuild and reads the Contents tab of *The Mountains of My Life* and *The Gay
-   Science*. This is the cheapest open item and it has waited two threads.
+   rebuild and reads the Contents tab of *The Mountains of My Life*. This is the
+   cheapest open item and it has now waited three threads.
 2. **Finish WP-25: something that writes a note.** The Notes tab reads a table
    that nothing fills. One question to settle first: device-local or cloud.
    Device-local is the smaller step.
-3. **WP-17's tail: Define and Ask.** The menu, the colours, the chevrons and the
-   two highlight styles are all built. Ask waits on WP-19.
-4. **Drop caps.** Parked, waiting on the reader's screenshot. Note
-   `.opening + p::first-letter` in `Reader.module.css` already floats one.
+3. **Finish WP-17's tail — Define and Ask.** The selection menu shows both
+   buttons. The words are chosen the app's own way now, so the hard part is
+   done.
+4. **Drop caps**, still parked and waiting on the reader's screenshot.
+
+## Files in scope — if the reader reports a selection problem
+
+- `web/src/pages/Reader.tsx` — the long press, `dropSelection`, `layerDepth`
+  and `dismissTopLayer`.
+- `web/src/pages/Reader.module.css` — the `@media (pointer: coarse)` block that
+  turns selection off.
+- `web/src/reader/selection.ts` — `wordAt`, `describe`, `anchorOfNode`.
+- `web/src/reader/useBackDismiss.ts` — one history entry per open layer.
 
 ## Carried forward — how to work on the reading page
 
-Eleven lessons earlier threads paid for. Lessons 9 to 11 are new.
+Fourteen lessons earlier threads paid for. Lessons 12 to 14 are new.
 
 1. **Measure in a real browser, not by reading the file.**
 2. **Layout is `offsetWidth`, paint is `getBoundingClientRect`.** The turning
@@ -84,6 +99,17 @@ Eleven lessons earlier threads paid for. Lessons 9 to 11 are new.
     fault lived in a wrapper. Put the book into the running app instead: fetch
     the file, make a `File`, hand it to the import input, then `import()` the
     module you want to test straight from the dev server.
+
+12. **`strip.current` is empty when an effect with `[]` runs.** A callback ref
+    fills it when the book mounts, which is later. A listener bound that way
+    binds nothing, and the failure is silent — the reader loses the feature
+    completely. Bind to `document` and read the ref at the event instead.
+13. **Clear the screen before you probe a coordinate.** Two probes read `null`
+    from a working function because a leftover selection card and the splash
+    screen sat over the text. `elementFromPoint` tells you what you really hit —
+    check it before you believe the result.
+14. **Anything drawn over the page must be a layer.** A back swipe leaves the
+    book unless `layerDepth` counts it. See `useBackDismiss`.
 
 ## Turn cost, as measured (2026-08-17, phone, one page, 103 strokes)
 

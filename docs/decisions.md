@@ -1242,3 +1242,23 @@ sign-in screen.
   costs its money later, and two fixes were shipped against the wrong number
   before a `worst` column existed. Ask the reader when it feels slow, then
   measure that moment. — 2026-08-18
+
+- **On a touch screen the app selects the word, not the phone.** A phone raises
+  its own text menu the moment it holds a selection, and no page can stop it.
+  Dropping the selection after the fact removed the menu, but the reader saw it
+  flash first. So `.page` sets `user-select: none` under `@media (pointer:
+  coarse)`, and a long press finds the word with `wordAt`. A mouse keeps the
+  browser's selection: a desktop has no such menu, and drag-select is how a
+  desktop chooses text. — 2026-08-19
+
+- **Anything drawn over the page is a layer, and the selection menu is one.**
+  `useBackDismiss` holds one history entry per open layer, so a back swipe eats
+  an entry instead of leaving the book. The selection menu is the topmost layer,
+  above the panels and the toolbar, because it is drawn over them and it is
+  always the last thing raised. — 2026-08-19
+
+- **A `useEffect` with an empty dependency list cannot read `strip.current`.** A
+  callback ref fills that ref when the book mounts, long after the first render.
+  A listener bound that way binds nothing. Put such listeners on `document` and
+  read the ref at the event. — 2026-08-19
+
