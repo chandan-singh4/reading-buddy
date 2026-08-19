@@ -1477,48 +1477,6 @@ export default function Reader() {
     setSearchOpen(false)
   }, [])
 
-  /**
-   * A back gesture closes what is over the book rather than leaving the book.
-   *
-   * Asked of every layer through one flag, not once per layer. Separate calls
-   * would each push and pop their own history entry, and moving from one layer
-   * straight to another would pop one entry while pushing another in the same
-   * commit — a swallowed gesture at best, and at worst a `popstate` arriving a
-   * moment later to close the layer just opened.
-   *
-   * Two bugs from the phone, the same shape both times. First: opening search,
-   * typing nothing, and swiping back threw the reader out of the book — search
-   * had never been wired to this. Then, 2026-08-09: raising the toolbar shrinks
-   * the page, and swiping back left the book rather than putting the page back.
-   *
-   * **The toolbar is a layer.** It is the one that took two reports to see,
-   * because it does not *look* like a panel — but it covers the page, it
-   * changes the page's size, and a reader who raised it has somewhere to come
-   * back to. That is the whole definition.
-   */
-  const dismissTopLayer = useCallback((): void => {
-    // One gesture, one layer. A reader with the sheet open over the toolbar
-    // expects Back to close the sheet and leave them looking at the toolbar —
-    // not to clear the screen in one go, which loses the state they were in.
-    if (sheetOpen || searchOpen) {
-      closeLayers()
-      return
-    }
-
-    setChromeShown(false)
-  }, [sheetOpen, searchOpen, closeLayers])
-
-  /*
-   * How many layers stand between the reader and the bare page. The panel counts
-   * as one however it is dressed — search, contents, bookmarks, notes — because
-   * only one of them is ever up, and the toolbar under it counts as another.
-   *
-   * A count and not a flag: the hook keeps one history entry per layer, pushed
-   * as each opens. See `useBackDismiss` for why it must be that way round.
-   */
-  const layerDepth = (chromeShown ? 1 : 0) + (sheetOpen || searchOpen ? 1 : 0)
-
-  useBackDismiss(layerDepth, dismissTopLayer)
 
   const toggleFocus = useCallback(() => {
     setFocusMode((on) => !on)
@@ -2917,6 +2875,70 @@ export default function Reader() {
     dismissed.current = true
     window.getSelection()?.removeAllRanges()
   }, [])
+
+  /*
+   * Read through refs so `dismissTopLayer` keeps one identity. The hook counts
+   * history entries against it, and a handler that changed whenever a word was
+   * chosen would tear those entries down and build them again mid-gesture.
+   */
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
+  const dropRef = useRef(dropSelection)
+  dropRef.current = dropSelection
+
+  /**
+   * A back gesture closes what is over the book rather than leaving the book.
+   *
+   * Asked of every layer through one flag, not once per layer. Separate calls
+   * would each push and pop their own history entry, and moving from one layer
+   * straight to another would pop one entry while pushing another in the same
+   * commit — a swallowed gesture at best, and at worst a `popstate` arriving a
+   * moment later to close the layer just opened.
+   *
+   * Two bugs from the phone, the same shape both times. First: opening search,
+   * typing nothing, and swiping back threw the reader out of the book — search
+   * had never been wired to this. Then, 2026-08-09: raising the toolbar shrinks
+   * the page, and swiping back left the book rather than putting the page back.
+   *
+   * **The toolbar is a layer.** It is the one that took two reports to see,
+   * because it does not *look* like a panel — but it covers the page, it
+   * changes the page's size, and a reader who raised it has somewhere to come
+   * back to. That is the whole definition.
+   */
+  const dismissTopLayer = useCallback((): void => {
+    // One gesture, one layer. A reader with the sheet open over the toolbar
+    // expects Back to close the sheet and leave them looking at the toolbar —
+    // not to clear the screen in one go, which loses the state they were in.
+    // The selection menu is the topmost layer of all. Reported from the phone
+    // 2026-08-19: with a sentence chosen, a back swipe — plainly "no, forget
+    // it" — threw the reader out of the book instead of letting the words go.
+    // It sits above the panels because it is drawn over them and it is always
+    // the last thing raised.
+    if (selectedRef.current) {
+      dropRef.current()
+      return
+    }
+
+    if (sheetOpen || searchOpen) {
+      closeLayers()
+      return
+    }
+
+    setChromeShown(false)
+  }, [sheetOpen, searchOpen, closeLayers])
+
+  /*
+   * How many layers stand between the reader and the bare page. The panel counts
+   * as one however it is dressed — search, contents, bookmarks, notes — because
+   * only one of them is ever up, and the toolbar under it counts as another.
+   *
+   * A count and not a flag: the hook keeps one history entry per layer, pushed
+   * as each opens. See `useBackDismiss` for why it must be that way round.
+   */
+  const layerDepth =
+    (chromeShown ? 1 : 0) + (sheetOpen || searchOpen ? 1 : 0) + (selected ? 1 : 0)
+
+  useBackDismiss(layerDepth, dismissTopLayer)
 
   /** Write a note or a highlight against the selection, and show it at once. */
   const keepNote = useCallback(

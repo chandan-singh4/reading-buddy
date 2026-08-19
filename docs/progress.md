@@ -92,6 +92,17 @@ Get that loop working before building any breadth.
 
 ### Recently done
 
+- **A back swipe now closes the selection menu, not the book** (2026-08-19).
+  With a sentence chosen, a back swipe took the reader out to the shelf. The
+  selection menu was never counted as a layer. It is now the topmost one in
+  `layerDepth`, and `dismissTopLayer` lets the words go before it touches a
+  panel or the toolbar. `dismissTopLayer` and `layerDepth` moved below the
+  selection state, because they must read it. They reach `selected` and
+  `dropSelection` through refs, so the handler keeps one identity — the hook
+  counts history entries against it. Proved in the running app: a long press
+  adds one history entry, and a back closes the card and stays on the book
+  URL.
+
 - **The phone's own selection panel no longer flashes** (2026-08-19). Before,
   the app let the phone make a selection and then dropped it. That took the
   phone's menu away, but the reader saw it for a moment first. Now the phone
