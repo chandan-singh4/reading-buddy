@@ -101,8 +101,15 @@ Get that loop working before building any breadth.
   `reader/selection.ts`, and shows the app's own menu. The press must hold for
   420 ms and move less than 10 px. It also clears `touchStart`, so the page
   does not turn as well. A mouse keeps the browser's selection, because a
-  desktop has no such menu. **Not proved on a phone yet** — the Browser pane
-  cannot show iOS's menu.
+  desktop has no such menu.
+- **Lesson: `strip.current` is empty on mount.** A callback ref fills it when
+  the book mounts, long after the first render. The first try bound the long
+  press in a `useEffect` with an empty dependency list. It read `null`, bound
+  nothing, and left the reader with no way to select at all. The listener now
+  sits on `document` and reads `strip.current` at the press. Proved in the
+  running app: a long press returns the word and opens the app's own menu; a
+  press that moves 60 px opens nothing. **iOS's own menu is still unproved** —
+  the Browser pane cannot show it.
 
 - **The text no longer moves when a page turn starts** (2026-08-19). The copy of
   the page zeroed the top margin of its first paragraph, because a browser

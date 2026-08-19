@@ -2564,8 +2564,7 @@ export default function Reader() {
    * is choosing and never turns, which the drag reads back through `held`.
    */
   useEffect(() => {
-    const page = strip.current
-    if (!page || typeof window === 'undefined') return
+    if (typeof window === 'undefined') return
     // Coarse pointers only. See above.
     if (!window.matchMedia?.('(pointer: coarse)').matches) return
 
@@ -2585,6 +2584,15 @@ export default function Reader() {
 
     const onDown = (event: PointerEvent) => {
       if (!event.isPrimary || event.pointerType === 'mouse') return
+      /*
+       * The page is read here, at the press, and not once when this effect
+       * runs. `strip.current` is filled by a callback ref when the book
+       * mounts, which is long after the first render — an effect that read it
+       * on mount saw `null`, bound nothing, and left the reader with no way to
+       * choose a word at all.
+       */
+      const page = strip.current
+      if (!page || !(event.target instanceof Node) || !page.contains(event.target)) return
       from = { x: event.clientX, y: event.clientY }
       timer = window.setTimeout(() => {
         if (!from) return
@@ -2606,16 +2614,16 @@ export default function Reader() {
       }
     }
 
-    page.addEventListener('pointerdown', onDown)
-    page.addEventListener('pointermove', onMove)
-    page.addEventListener('pointerup', stop)
-    page.addEventListener('pointercancel', stop)
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', stop)
+    document.addEventListener('pointercancel', stop)
     return () => {
       stop()
-      page.removeEventListener('pointerdown', onDown)
-      page.removeEventListener('pointermove', onMove)
-      page.removeEventListener('pointerup', stop)
-      page.removeEventListener('pointercancel', stop)
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', stop)
+      document.removeEventListener('pointercancel', stop)
     }
   }, [])
 
