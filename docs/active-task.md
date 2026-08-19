@@ -5,7 +5,7 @@
 
 ## Task — none in flight
 
-The last two threads closed on the phone. The reader signed off both:
+The last three threads closed on the phone. The reader signed off all of them:
 
 - **The selection menu survives a page turn** (2026-08-17). Six rounds. See
   `progress.md`.
@@ -13,6 +13,12 @@ The last two threads closed on the phone. The reader signed off both:
   Measured on the phone with a temporary in-app stopwatch, now deleted.
 - **A backward turn is now as fast as a forward turn** (2026-08-18). The reader
   signed off on the phone: "the slowness is gone". See below.
+
+Newest, and waiting for the reader to judge it on the phone:
+
+- **The text no longer moves when a page turn starts** (2026-08-18). The copy of
+  the page was drawn sideways by the inset of a quote. Proved by geometry, not by
+  eye. See lesson 9 and `progress.md`.
 
 Nothing is mid-edit. Build green, 1486 tests across 84 files.
 
@@ -31,7 +37,7 @@ Nothing is mid-edit. Build green, 1486 tests across 84 files.
 
 ## Carried forward — how to work on the reading page
 
-Eight lessons earlier threads paid for. Lessons 7 and 8 are new.
+Nine lessons earlier threads paid for. Lesson 9 is new.
 
 1. **Measure in a real browser, not by reading the file.**
 2. **Layout is `offsetWidth`, paint is `getBoundingClientRect`.** The turning
@@ -59,6 +65,13 @@ Eight lessons earlier threads paid for. Lessons 7 and 8 are new.
 8. **Do not strip two things at once.** A switch that removes the whole pen
    proves the ink is the cost, but not which half. Split the switch, then keep
    only the half you must lose. Here the grain paid the whole bill.
+9. **A word fingerprint settles a "the text moved" report; the eye cannot.**
+   Print every visible word as `word@x,y` for the real page and for the copy, and
+   compare the two lists as strings. This found a 40 px sideways error in one
+   call that four rounds of looking at screenshots had missed. Build the bench on
+   a bare page with the real CSS modules. Turn off `scroll-behavior` and any
+   entrance animation first — a running animation beats an inline transform, and
+   a smooth scroll is read mid-flight.
 
 ## Turn cost, as measured (2026-08-17, phone, one page, 103 strokes)
 

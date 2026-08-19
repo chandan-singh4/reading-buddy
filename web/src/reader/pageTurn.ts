@@ -271,9 +271,12 @@ interface PageCopy {
  * every break after it falls in the same place. See `columnTop` for why no
  * other start works.
  *
- * **Where to scroll it to.** A block child's left edge *is* its column's left
- * edge, so the first kept paragraph's position is a column boundary, and content
- * in the copy sits exactly `shift` pixels left of where it sits in the strip.
+ * **Where to scroll it to.** Content in the copy sits exactly `shift` pixels
+ * left of where it sits in the strip, and `shift` is the left edge of the column
+ * the copy starts in. Not the left edge of the child that starts it: an inset
+ * block — a quote, an epigraph, a centred heading — sits inside its column, and
+ * reading its own edge as the column's slides the whole copy sideways. See
+ * `columnLeft`.
  *
  * ## Finding the paragraphs without reading six thousand rectangles
  *
@@ -416,7 +419,36 @@ function pageCopy(strip: HTMLElement): PageCopy {
     node.append(child)
   }
 
-  return { node, shift: edge(first) }
+  /*
+   * The left edge of the column the copy starts in — not of the child that
+   * starts it.
+   *
+   * These are the same number only when the child runs the full width of the
+   * column. A blockquote, an epigraph, a dedication, a centred heading and a
+   * figure all sit *inside* the column, so their own left edge is short of it by
+   * their inset. Taking the child's edge as the column's makes `place` slide the
+   * whole copy sideways by that inset, which drags the tail of the page before
+   * into view along the leading edge — the reported fault, and the reason it
+   * only showed on pages that begin with an inset block.
+   *
+   * There is no API for a column box, so the edge is recovered from the content:
+   * among the children that start in this same column, the smallest left edge is
+   * the column's. A flush paragraph gives it exactly; the half-page test keeps
+   * the walk inside one column, since a child in the next one starts a full
+   * stride further along.
+   */
+  const columnLeft = () => {
+    const start = edge(first)
+    let left = start
+    for (let i = first; i <= last; i += 1) {
+      const at = edge(i)
+      if (at >= start + pageWidth / 2) break
+      if (at < left) left = at
+    }
+    return left
+  }
+
+  return { node, shift: columnLeft() }
 }
 
 /**

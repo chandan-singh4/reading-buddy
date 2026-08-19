@@ -91,6 +91,33 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+- **The text no longer moves when a page turn starts** — 2026-08-18. The reader
+  reported it on a backward turn: two lines of the page before appeared at the
+  top. An earlier fix had cured the same fault forwards, so this looked like a
+  backward-only bug. It was not.
+  - **The fault is in code both directions share.** `pageCopy` returns `shift`,
+    the number of pixels `place` moves the copy sideways by. It set `shift` to
+    the left edge of the first child it kept, and called that the column's left
+    edge. That is only true for a child that fills the column's width. A quote,
+    an epigraph, a dedication, a centred heading and a figure all sit inside the
+    column. For those, the copy is drawn out by the inset, which pulls the tail
+    of the page before into view.
+  - **Why it looked backward-only.** Forwards, the moving sheet is the page you
+    leave, and your eye follows the page you go to. Backwards, the still copy of
+    the page you leave is the one you are looking at. The same error, on show.
+  - **The fix.** `shift` is now the smallest left edge among the kept children
+    that start in the same column. A flush paragraph gives the column's true
+    edge. Snapping to a computed grid was rejected: the true column width is
+    fractional (392.72 px on the phone) and the error adds up over thirty
+    columns.
+  - **Proved by geometry.** A temporary bench at `/probe.html` built a real
+    strip, and printed every visible word as `word@x,y` for the page and for the
+    copy. Before: 5 of 14 pages differed, all by exactly 40 px, and all of them
+    pages whose copy began at the blockquote. After: `ALL PAGES MATCH`. The bench
+    was run again with `REACH` forced to 0, so every copy took the spacer path
+    instead of a column boundary. That also matched, which clears the vertical
+    half of the same question. The bench is deleted; lesson 9 in
+    `active-task.md` says how to rebuild it.
 - **The selection menu survives a page turn** — 2026-08-17, six commits
   (`ee7a4ad`, `c09363b`, `6ab61d9`, `59a2938`, `685569d`, `2f6dbc1`). **Signed
   off by the reader: "It looks finally fixed."** Six rounds, because the trigger
