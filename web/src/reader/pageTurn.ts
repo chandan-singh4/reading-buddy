@@ -423,7 +423,29 @@ function pageCopy(strip: HTMLElement, drawn: number): PageCopy {
       // A top margin is truncated away at a column break, and it is already
       // counted inside the spacer's height. Either way, kept, it would push the
       // copy's text down by that much and break its columns a line early.
-      child.style.marginTop = '0'
+      //
+      // Zeroed down the first-child chain, not just on the child itself. A
+      // margin collapses *through* an element that has nothing at its top edge
+      // to stop it: a figure inside a plain wrapper `div` puts its 24px on the
+      // wrapper, so the wrapper's own `margin-top` reads 0 and setting it to 0
+      // changes nothing. The copy then began 24px low — the whole page pushed
+      // down, every column below it breaking a line early, and the last line of
+      // the page before dragged into view along the top. That is the fault the
+      // reader reported, and it showed on exactly the pages whose leading child
+      // wraps something with a margin.
+      //
+      // The walk stops at the first element with a top border or padding,
+      // because that is what blocks the collapse — below it no margin can reach
+      // the top edge. Measured on the original, which is in the document and so
+      // has computed styles; the clone is detached and would answer nothing.
+      let source: Element | null = children[i]!
+      for (let node: HTMLElement | null = child; node && source; ) {
+        node.style.marginTop = '0'
+        const own = getComputedStyle(source)
+        if (parseFloat(own.borderTopWidth) > 0 || parseFloat(own.paddingTop) > 0) break
+        node = node.firstElementChild as HTMLElement | null
+        source = source.firstElementChild
+      }
       // The copy's first child has no previous sibling, and the paragraph
       // indent is written as `.prose + .prose`. So the clone loses its indent,
       // the first line starts 1.5em further left, and — because that line now

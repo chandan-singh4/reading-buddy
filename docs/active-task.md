@@ -37,7 +37,7 @@ Nothing is mid-edit. Build green, 1486 tests across 84 files.
 
 ## Carried forward — how to work on the reading page
 
-Ten lessons earlier threads paid for. Lessons 9 and 10 are new.
+Eleven lessons earlier threads paid for. Lessons 9 to 11 are new.
 
 1. **Measure in a real browser, not by reading the file.**
 2. **Layout is `offsetWidth`, paint is `getBoundingClientRect`.** The turning
@@ -78,6 +78,12 @@ Ten lessons earlier threads paid for. Lessons 9 and 10 are new.
     up, so the two units differ by 15%, and any sum of them is only right when
     the toolbar is down. This was the reader's bug. Divide the rectangle by the
     drawn scale first. See `edge` in `pageTurn.ts`.
+11. **Test in the real app, not in a bench you built.** A bare page that renders
+    the same blocks with the same CSS still missed the reader's bug three times.
+    The real page has a chapter header, real furniture and real wrappers, and the
+    fault lived in a wrapper. Put the book into the running app instead: fetch
+    the file, make a `File`, hand it to the import input, then `import()` the
+    module you want to test straight from the dev server.
 
 ## Turn cost, as measured (2026-08-17, phone, one page, 103 strokes)
 

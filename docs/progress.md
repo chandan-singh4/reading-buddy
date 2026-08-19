@@ -92,6 +92,19 @@ Get that loop working before building any breadth.
 
 ### Recently done
 
+- **The text no longer moves when a page turn starts** (2026-08-19). The copy of
+  the page zeroed the top margin of its first paragraph, because a browser
+  truncates that margin at a column break. But a margin collapses *through* an
+  element with nothing at its top edge. A figure inside a plain wrapper `div`
+  puts its 24 px on the wrapper, so the wrapper's own margin reads 0 and setting
+  it to 0 changes nothing. The copy started 24 px low. Every column below broke a
+  line early, and the last line of the page before appeared along the top of the
+  page. The fix zeroes the margin down the first-child chain, and stops at the
+  first element with a top border or padding, because that is what blocks the
+  collapse. Proof: a word fingerprint of the real app, with the reader's own
+  book, over 59 pages of two chapters, with the toolbar up and down. Before the
+  fix 5 pages of the Introduction re-flowed. After it, none.
+
 - **The text no longer moves when a page turn starts, at any zoom** (2026-08-19).
   `pageCopy` measured where a paragraph sat with `getBoundingClientRect` and
   added `scrollLeft` to it. Rectangles are painted pixels. `scrollLeft` is a
