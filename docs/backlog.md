@@ -195,7 +195,7 @@
   survives a page turn now. Left: **Define** and **Ask**, and Ask waits on WP-19
 - [ ] **WP-18 Retrieval assembler** — manifest + chapter index + one section + learner.md · *after 05,09*
 - [ ] **WP-19 Claude API call shape** — Haiku→Sonnet tier, caching, streaming, retry · *after 18*
-- [ ] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19*
+- [~] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19* — the Study Lamp room, saved threads and Notes listing shipped 2026-08-21; streaming waits on WP-19
 - [~] **WP-39 Ask about a picture** — *the sourcing half shipped 2026-08-02: epub images are extracted at import into an `assets` table and shown on the page. What's left is the tutor half (tap a figure → send it to Claude), plus pdf.js region rendering.* — tap a figure/table/formula → send that image + surrounding text to Claude. Source image from the epub/docx archive where it exists; pdf.js renders the region for PDFs. The escape hatch for everything WP-38 can only describe · *after 19,20,38*
 - [ ] **WP-21 Tutor persona + teaching modes** — subject-driven, 12 modes, dense books only · *after 19,10*
 - [ ] **WP-22 learner.md adaptive model** — understood/struggled/analogies/misconceptions · *after 20*

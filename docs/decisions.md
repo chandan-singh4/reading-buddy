@@ -1262,3 +1262,9 @@ sign-in screen.
   A listener bound that way binds nothing. Put such listeners on `document` and
   read the ref at the event. — 2026-08-19
 
+
+- **Tutor threads list as note rows, not a second panel.** Threads merge into
+  the Notes tab through `inNoteOrder`; a `threadId` on the row routes taps to
+  the lamp and delete to the thread store. One list, one order, two shapes. — 2026-08-21
+- **A slip is anchored to its passage's last inked line.** Not to the paragraph
+  corner — two threads in one paragraph must wear two visible slips. — 2026-08-21
