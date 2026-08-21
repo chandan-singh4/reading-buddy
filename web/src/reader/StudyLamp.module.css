@@ -101,7 +101,7 @@
   padding: 8px 4px 4px;
   font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
   font-weight: 500;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.5;
   color: #f2e6c9;
   text-align: center;
@@ -116,11 +116,11 @@
   padding: 6px 2px 0;
   font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
   font-weight: 500;
-  font-size: 17px;
+  font-size: 19px;
   line-height: 1.55;
   color: #f2e6c9;
   text-align: left;
-  max-height: 110px;
+  max-height: 122px;
   overflow: hidden;
   -webkit-mask-image: linear-gradient(to bottom, #000 34%, transparent 96%);
   mask-image: linear-gradient(to bottom, #000 34%, transparent 96%);
@@ -136,7 +136,7 @@
   background: none;
   color: #b79a68;
   font-family: 'EB Garamond', Georgia, serif;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 1.5px;
   cursor: pointer;
 }
@@ -173,7 +173,7 @@
   flex: 1;
   font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
   font-style: italic;
-  font-size: 14px;
+  font-size: 16px;
   color: #bfae8c;
   white-space: nowrap;
   overflow: hidden;
@@ -220,7 +220,7 @@
   background: rgba(240, 214, 150, 0.04);
   color: #d8c9a4;
   font-family: 'EB Garamond', Georgia, serif;
-  font-size: 15px;
+  font-size: 17px;
   text-align: left;
   cursor: pointer;
 }
@@ -236,7 +236,7 @@
   padding-left: 44px;
   font-family: 'Caveat', cursive;
   font-weight: 500;
-  font-size: 20px;
+  font-size: 23px;
   line-height: 1.3;
   color: #b79a68;
   text-align: right;
@@ -251,7 +251,7 @@
   background: #2a2419;
   border: 1px solid #3d3320;
   border-radius: 3px 13px 13px 13px;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.62;
   color: #ece0c4;
   animation: rise 300ms ease both;
@@ -342,7 +342,7 @@
   background: transparent;
   color: #ece0c4;
   font-family: 'EB Garamond', Georgia, serif;
-  font-size: 15px;
+  font-size: 17px;
   outline: none;
 }
 

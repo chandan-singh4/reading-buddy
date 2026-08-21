@@ -11,8 +11,21 @@ the passage, four question chips, and a composer. The conversation is saved on
 the device. A closed conversation leaves an ink line under the passage and a
 small paper slip at its corner. A tap on either one reopens the same thread.
 
+The reader's first-use feedback landed the same day (2026-08-21). Four fixes
+shipped on top:
+
+1. Each slip now sits at the end of its own passage's last inked line. Two
+   threads in one paragraph wear two separate slips. Before, both slips sat on
+   the same corner and only the top one took the tap.
+2. Every note row has a small × to delete it. On a tutor row the × removes the
+   whole thread and its page marks.
+3. Tutor conversations now show in Notes → Claude. A row shows the elided
+   passage and Claude's last reply. A tap reopens the thread under the lamp.
+4. The Study Lamp and Notes fonts are larger. The handwriting size did not
+   change — it must match the 32 px rule pitch.
+
 The whole flow was proved in the running app with a real book. Build, typecheck
-and all 1509 tests are green.
+and all 1512 tests are green.
 
 **What the phone must still judge:**
 
@@ -20,6 +33,9 @@ and all 1509 tests are green.
    Browser pane draws no animation, so all motion is unproved.
 2. The look of the ink line and the slip on real paper themes.
 3. The long press → ASK CLAUDE → chip → reply loop under a real thumb.
+4. The new per-sentence slip positions on real text. Ask two questions in one
+   paragraph and check both slips sit on their own sentence.
+5. The delete × in Notes, and the larger fonts.
 
 **The tutor speaks in a placeholder.** `askTutor` posts to `/api/tutor`, and no
 relay exists yet. The reply says plainly that the tutor is offline. It never

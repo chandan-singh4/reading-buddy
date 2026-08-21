@@ -111,12 +111,47 @@
   margin-bottom: 20px;
 }
 
+.tagRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .tag {
   display: block;
   color: var(--pen2);
   font-family: Kalam, cursive;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.02em;
+}
+
+/*
+ * The delete cross. Faint until wanted — deleting is rare next to reading —
+ * but the target is a full 2.75rem even though the glyph is small.
+ */
+.bin {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: -0.75rem 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-faint);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.bin:hover {
+  color: var(--pen2);
+}
+
+.bin:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -6px;
 }
 
 /* --- Your hand ------------------------------------------------------------ */
@@ -185,7 +220,7 @@
   margin-bottom: 4px;
   color: var(--claude);
   font-family: var(--font-ui);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -195,8 +230,8 @@
   display: block;
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 /* --- Chapter dividers ----------------------------------------------------- */

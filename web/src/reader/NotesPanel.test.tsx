@@ -21,9 +21,21 @@ function note(id: string, author: 'you' | 'claude', chapter = 1): NoteRow {
 
 const NOTES = [note('1', 'you'), note('2', 'claude'), note('3', 'you', 2)]
 
-function draw(notes: NoteRow[] = NOTES, onJumpToNote = vi.fn()) {
-  render(<NotesPanel notes={notes} onJumpToNote={onJumpToNote} />)
-  return onJumpToNote
+function draw(
+  notes: NoteRow[] = NOTES,
+  onJumpToNote = vi.fn(),
+  onDeleteNote = vi.fn(),
+  onOpenThread = vi.fn(),
+) {
+  render(
+    <NotesPanel
+      notes={notes}
+      onJumpToNote={onJumpToNote}
+      onDeleteNote={onDeleteNote}
+      onOpenThread={onOpenThread}
+    />,
+  )
+  return { onJumpToNote, onDeleteNote, onOpenThread }
 }
 
 afterEach(cleanup)
@@ -85,10 +97,38 @@ describe('the notes tab', () => {
   })
 
   it('jumps to the paragraph a note is about', () => {
-    const onJumpToNote = draw()
+    const { onJumpToNote } = draw()
 
     fireEvent.click(screen.getByText('My thought 1'))
 
     expect(onJumpToNote).toHaveBeenCalledWith('[ch01-s01-p001]')
+  })
+
+  it('deletes the note whose cross was pressed', () => {
+    const { onDeleteNote } = draw()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete this note' })[0]!)
+
+    expect(onDeleteNote).toHaveBeenCalledTimes(1)
+    expect(onDeleteNote.mock.calls[0]![0].id).toBe('1')
+  })
+
+  it('reopens a tutor thread instead of jumping', () => {
+    const thread = { ...note('4', 'claude'), threadId: 'thread-4' }
+    const { onJumpToNote, onOpenThread } = draw([...NOTES, thread])
+
+    fireEvent.click(screen.getByText('Claude says 4'))
+
+    expect(onOpenThread).toHaveBeenCalledWith('thread-4')
+    expect(onJumpToNote).not.toHaveBeenCalled()
+  })
+
+  it('names a thread row’s delete after the conversation it takes', () => {
+    const thread = { ...note('4', 'claude'), threadId: 'thread-4' }
+    const { onDeleteNote } = draw([thread])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this conversation' }))
+
+    expect(onDeleteNote.mock.calls[0]![0].threadId).toBe('thread-4')
   })
 })

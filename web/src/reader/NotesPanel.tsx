@@ -34,6 +34,9 @@ export interface NoteRow {
   createdAt: string
   /** A highlight's colour, where the note is one. */
   colour?: string
+  /** Set when the row is a tutor conversation — tapping it reopens the
+   *  thread under the lamp rather than jumping to the paragraph. */
+  threadId?: string
 }
 
 export interface NotesPanelProps {
@@ -41,6 +44,10 @@ export interface NotesPanelProps {
   notes: readonly NoteRow[]
   /** Go to the paragraph a note is about. */
   onJumpToNote: (anchor: Anchor) => void
+  /** Take a note off the page — or a whole tutor thread, where the row is one. */
+  onDeleteNote: (note: NoteRow) => void
+  /** Reopen a tutor conversation under the lamp. */
+  onOpenThread?: (threadId: string) => void
 }
 
 /** "Ch. Breathing · p.91" — the small tag above a note. */
@@ -49,7 +56,28 @@ function whereItIs(note: NoteRow): string {
 }
 
 /** One note, in the hand of whoever wrote it. */
-function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
+function Note({
+  note,
+  onJump,
+  onDelete,
+}: {
+  note: NoteRow
+  onJump: () => void
+  onDelete: () => void
+}) {
+  const bin = (
+    <button
+      type="button"
+      className={styles.bin}
+      aria-label={
+        note.threadId ? 'Delete this conversation' : 'Delete this note'
+      }
+      onClick={onDelete}
+    >
+      ×
+    </button>
+  )
+
   if (note.author === 'claude') {
     return (
       <li className={styles.note}>
@@ -57,14 +85,20 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
           <span className={styles.who}>✦ Claude</span>
           <span className={styles.txt}>{note.text}</span>
         </button>
-        <span className={styles.tag}>{whereItIs(note)}</span>
+        <span className={styles.tagRow}>
+          <span className={styles.tag}>{whereItIs(note)}</span>
+          {bin}
+        </span>
       </li>
     )
   }
 
   return (
     <li className={styles.note}>
-      <span className={styles.tag}>{whereItIs(note)}</span>
+      <span className={styles.tagRow}>
+        <span className={styles.tag}>{whereItIs(note)}</span>
+        {bin}
+      </span>
       {/* The colour the reader chose, carried through to the list. It is the
           only thing telling two highlights apart at a glance, and readers give
           their colours meanings the app is not told about. */}
@@ -80,11 +114,17 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
   )
 }
 
-export function NotesPanel({ notes, onJumpToNote }: NotesPanelProps) {
+export function NotesPanel({ notes, onJumpToNote, onDeleteNote, onOpenThread }: NotesPanelProps) {
   const [filter, setFilter] = useState<NoteFilter>('all')
   const chips = useRef<(HTMLButtonElement | null)[]>([])
 
   const shown = notesUnder(notes, filter)
+
+  /** A tutor row reopens its conversation; every other note goes to its page. */
+  function visit(note: NoteRow) {
+    if (note.threadId && onOpenThread) onOpenThread(note.threadId)
+    else onJumpToNote(note.anchor)
+  }
 
   /**
    * Arrow keys move between chips and choose as they go.
@@ -150,7 +190,12 @@ export function NotesPanel({ notes, onJumpToNote }: NotesPanelProps) {
               </h3>
               <ul className={styles.group}>
                 {group.notes.map((note) => (
-                  <Note key={note.id} note={note} onJump={() => onJumpToNote(note.anchor)} />
+                  <Note
+                    key={note.id}
+                    note={note}
+                    onJump={() => visit(note)}
+                    onDelete={() => onDeleteNote(note)}
+                  />
                 ))}
               </ul>
             </section>
@@ -158,7 +203,12 @@ export function NotesPanel({ notes, onJumpToNote }: NotesPanelProps) {
         ) : (
           <ul className={styles.list}>
             {shown.map((note) => (
-              <Note key={note.id} note={note} onJump={() => onJumpToNote(note.anchor)} />
+              <Note
+                key={note.id}
+                note={note}
+                onJump={() => visit(note)}
+                onDelete={() => onDeleteNote(note)}
+              />
             ))}
           </ul>
         )}

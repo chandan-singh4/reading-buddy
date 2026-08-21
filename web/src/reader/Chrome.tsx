@@ -126,6 +126,10 @@ export interface ChromeProps {
   notes: readonly NoteRow[]
   /** Go to the paragraph a note is about. */
   onJumpToNote: (anchor: Anchor) => void
+  /** Take a note off the page — or a whole tutor thread, where the row is one. */
+  onDeleteNote: (note: NoteRow) => void
+  /** Reopen a tutor conversation under the lamp. */
+  onOpenThread: (threadId: string) => void
 
   /** Whether the search panel is up. */
   searchOpen: boolean
@@ -189,6 +193,8 @@ export function Chrome({
   onDeleteBookmark,
   notes,
   onJumpToNote,
+  onDeleteNote,
+  onOpenThread,
   searchOpen,
   query,
   results,
@@ -654,7 +660,14 @@ export function Chrome({
           )}
 
           {/* The notes, on a ruled sheet. See `NotesPanel.tsx`. */}
-          {sheetTab === 'notes' && <NotesPanel notes={notes} onJumpToNote={onJumpToNote} />}
+          {sheetTab === 'notes' && (
+            <NotesPanel
+              notes={notes}
+              onJumpToNote={onJumpToNote}
+              onDeleteNote={onDeleteNote}
+              onOpenThread={onOpenThread}
+            />
+          )}
         </div>
       )}
 

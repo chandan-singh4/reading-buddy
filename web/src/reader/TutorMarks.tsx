@@ -22,10 +22,12 @@
  * exactly why it is shared rather than re-derived. The stroke itself is the
  * brief's repeating SVG, riding as the element's background.
  *
- * The slip needs none of that: it sits at a fixed corner of the paragraph
- * (`top:-11px; right:14px`), so it is simply an absolutely positioned button
- * in the same portalled layer. Positioned, never in the margin — no text
- * reflows.
+ * The slip is an absolutely positioned button in the same portalled layer —
+ * positioned, never in the margin, so no text reflows. It sits at the end of
+ * the passage's last inked line, not at a fixed corner of the paragraph:
+ * two conversations in one paragraph must wear two visibly separate slips,
+ * each on its own sentence, or the second thread is unreachable under the
+ * first's sticker.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -45,14 +47,15 @@ interface Stroke {
   height: number
 }
 
-/** Everything one paragraph carries: its strokes, and at most one slip. */
+/** Everything one paragraph carries for one thread: strokes, and one slip. */
 interface Mark {
   key: string
   block: HTMLElement
   thread: StoredTutorThread
   strokes: Stroke[]
-  /** Only the first paragraph of a passage wears the slip. */
-  slip: boolean
+  /** Where the slip sits, in the paragraph's own coordinates. `null` on the
+   *  continuation paragraphs of a passage — only its last one wears it. */
+  slip: { top: number; left: number } | null
 }
 
 function same(a: readonly Mark[], b: readonly Mark[]): boolean {
@@ -62,7 +65,8 @@ function same(a: readonly Mark[], b: readonly Mark[]): boolean {
     if (
       one.block !== other.block ||
       one.thread !== other.thread ||
-      one.slip !== other.slip ||
+      one.slip?.top !== other.slip?.top ||
+      one.slip?.left !== other.slip?.left ||
       one.strokes.length !== other.strokes.length
     ) {
       return false
@@ -135,7 +139,7 @@ export function TutorMarks({ threads, root, watch, onOpen }: TutorMarksProps) {
           block,
           thread,
           strokes: [],
-          slip: block === first,
+          slip: null,
         }
 
         let line = 0
@@ -150,6 +154,24 @@ export function TutorMarks({ threads, root, watch, onOpen }: TutorMarksProps) {
             height: rect.height / scale,
           })
           line += 1
+        }
+
+        /*
+         * The slip rides at the end of the passage's own last line, so two
+         * threads in one paragraph each get their sticker on their own
+         * sentence. Clamped inside the paragraph's width so a sentence that
+         * ends flush right does not push its slip into the gutter; on the
+         * rare passage with no measurable lines, the paragraph's top corner
+         * is the fallback.
+         */
+        if (block === last) {
+          const end = mark.strokes[mark.strokes.length - 1]
+          mark.slip = end
+            ? {
+                top: end.top + (end.height - 22) / 2,
+                left: Math.max(0, Math.min(end.left + end.width + 5, block.offsetWidth - 32)),
+              }
+            : { top: -11, left: Math.max(0, block.offsetWidth - 44) }
         }
 
         if (mark.strokes.length > 0 || mark.slip) found.push(mark)
@@ -250,6 +272,7 @@ export function TutorMarks({ threads, root, watch, onOpen }: TutorMarksProps) {
               <button
                 type="button"
                 className={styles.slip}
+                style={{ top: mark.slip.top, left: mark.slip.left }}
                 aria-label="Reopen the conversation about this passage"
                 onClick={() => onOpen(mark.thread)}
               >

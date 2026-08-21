@@ -105,6 +105,22 @@ Get that loop working before building any breadth.
 
 ### Recently done
 
+- **Study Lamp round two — the reader's first-use feedback** (2026-08-21).
+  Four fixes off one report:
+  - **A slip per sentence.** `TutorMarks.tsx` places each thread's slip at the
+    end of its own last inked line, clamped inside the paragraph. Two threads
+    in one paragraph no longer stack their slips on the same corner.
+  - **Notes can be deleted.** Every row in the Notes tab carries a small ×.
+    A tutor row's × deletes the whole thread and its page marks
+    (`dropNoteRow` in `Reader.tsx`).
+  - **Tutor threads show under Notes → Claude.** `Reader.tsx` merges threads
+    into `noteRows` through `inNoteOrder`. A row shows the elided passage and
+    Claude's last reply; a tap reopens the thread under the lamp, not the page.
+  - **Larger fonts** in the Study Lamp and the Notes slips. The Caveat
+    handwriting stayed at 22 px — its line height must equal the 32 px rule.
+  - 4 new NotesPanel tests; 1512 total, all green. The slip positions and the
+    delete feel still need the phone.
+
 - **The Study Lamp — Ask Claude is a room now** (2026-08-21). This is the first
   visible piece of the tutor loop (WP-17 → 20).
   - The selection menu's four Ask rows became one bronze `✦ ASK CLAUDE` entry.

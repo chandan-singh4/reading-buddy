@@ -89,6 +89,7 @@ import {
   writeFocusMode,
   StudyLamp,
   TutorMarks,
+  elide,
   passageKindOf,
   type PassageAnchor,
   type TutorMessage,
@@ -2305,10 +2306,32 @@ export default function Reader() {
     }
   }, [id])
 
-  /** The notes as the panel wants them: in the book's order, placed and named. */
+  /**
+   * The notes as the panel wants them: in the book's order, placed and named.
+   *
+   * The tutor's conversations ride in the same list, under Claude's name —
+   * they are notes on the book in every way that matters to the reader, and a
+   * conversation that could only be found by hunting its slip down on the
+   * page would be as good as lost. Each row shows the passage and the tutor's
+   * last word on it; `threadId` is what tells the panel a tap should reopen
+   * the thread rather than jump to a paragraph.
+   */
   const noteRows: NoteRow[] = useMemo(() => {
     if (frame.status !== 'ready') return []
-    return inNoteOrder(notes).map((row) => {
+
+    const threadRows = threads.map((thread) => {
+      const spoke = [...thread.messages].reverse().find((message) => message.role === 'claude')
+      return {
+        id: thread.id,
+        anchor: thread.anchor,
+        author: 'claude' as const,
+        text: spoke ? `“${elide(thread.excerpt)}” — ${spoke.text}` : `“${elide(thread.excerpt)}”`,
+        createdAt: thread.createdAt,
+        threadId: thread.id,
+      }
+    })
+
+    return inNoteOrder([...notes, ...threadRows]).map((row) => {
       const parts = tryParseAnchor(row.anchor)
       const chapter = parts?.chapter ?? 0
       return {
@@ -2320,10 +2343,11 @@ export default function Reader() {
         chapterTitle: chapterTitle(frame.manifest, chapter) ?? 'Elsewhere',
         page: pageOfAnchor(parts),
         createdAt: row.createdAt,
-        colour: row.colour,
+        colour: 'colour' in row ? row.colour : undefined,
+        threadId: 'threadId' in row ? row.threadId : undefined,
       }
     })
-  }, [notes, frame, pageOfAnchor])
+  }, [notes, threads, frame, pageOfAnchor])
 
   /**
    * The notes that are also marks on the page: the ones with words and a colour.
@@ -3080,6 +3104,32 @@ export default function Reader() {
     [id],
   )
 
+  /**
+   * Delete from the notes panel. A tutor row is a whole conversation: the
+   * thread goes, and with it the ink and the slip on the page.
+   */
+  const dropNoteRow = useCallback(
+    (note: NoteRow) => {
+      if (!id) return
+      if (note.threadId) {
+        void tutorStore.deleteThread(id, note.threadId)
+        setThreads((rows) => rows.filter((row) => row.id !== note.threadId))
+        return
+      }
+      dropNote(note.id)
+    },
+    [id, dropNote],
+  )
+
+  /** From the notes panel back under the lamp: reopen the thread a row names. */
+  const openThreadById = useCallback(
+    (threadId: string) => {
+      const thread = threads.find((row) => row.id === threadId)
+      if (thread) openThread(thread)
+    },
+    [threads, openThread],
+  )
+
   const onSelectionAction = useCallback(
     (action: SelectionAction) => {
       const at = selected
@@ -3383,6 +3433,8 @@ export default function Reader() {
             onDeleteBookmark={deleteBookmark}
             notes={noteRows}
             onJumpToNote={jumpToAnchor}
+            onDeleteNote={dropNoteRow}
+            onOpenThread={openThreadById}
             searchOpen={searchOpen}
             query={query}
             results={results}
