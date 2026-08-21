@@ -706,7 +706,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
       if (bookIds.length === 0) return
 
       // The table list is an array rather than separate arguments: Dexie's
-      // variadic overload stops at five tables, and this touches eight.
+      // variadic overload stops at five tables, and this touches ten.
       await database.transaction(
         'rw',
         [
@@ -719,6 +719,8 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.assets,
           database.quotes,
           database.bookmarks,
+          database.notes,
+          database.tutor,
         ],
         async () => {
           for (const bookId of bookIds) {
@@ -730,6 +732,8 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
             await database.assets.where('bookId').equals(bookId).delete()
             await database.quotes.where('bookId').equals(bookId).delete()
             await database.bookmarks.where('bookId').equals(bookId).delete()
+            await database.notes.where('bookId').equals(bookId).delete()
+            await database.tutor.where('bookId').equals(bookId).delete()
             await database.books.delete(bookId)
           }
         },
@@ -742,7 +746,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
      * would quietly eat a phone's storage quota forever.
      */
     async deleteBook(bookId: BookId): Promise<void> {
-      // Eight tables, so the array form — see `deleteBooks` above.
+      // Ten tables, so the array form — see `deleteBooks` above.
       await database.transaction(
         'rw',
         [
@@ -755,6 +759,8 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.assets,
           database.quotes,
           database.bookmarks,
+          database.notes,
+          database.tutor,
         ],
         async () => {
           await database.sections.where('bookId').equals(bookId).delete()
@@ -765,6 +771,8 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           await database.assets.where('bookId').equals(bookId).delete()
           await database.quotes.where('bookId').equals(bookId).delete()
           await database.bookmarks.where('bookId').equals(bookId).delete()
+          await database.notes.where('bookId').equals(bookId).delete()
+          await database.tutor.where('bookId').equals(bookId).delete()
           await database.books.delete(bookId)
         },
       )

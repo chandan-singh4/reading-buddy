@@ -249,6 +249,43 @@ export interface StoredNote {
   colour?: string
 }
 
+/**
+ * One conversation with the tutor about one passage (WP-17's tail).
+ *
+ * The passage is stored the way every mark in this app is stored: the
+ * paragraph's anchor plus the exact words, never offsets — offsets die on the
+ * first re-parse, the words are re-found with `rangeOfQuote`. `excerpt` also
+ * makes "is there already a thread about these words?" a plain comparison,
+ * which is what keeps it to one thread per passage.
+ *
+ * `messages` ride inside the row rather than in a table of their own. A
+ * conversation is only ever read whole — the lamp opens it, the lamp appends
+ * to it — and rows that are always fetched together should travel together.
+ *
+ * Device-local, like notes, and for the same reason — see `storage/tutor.ts`.
+ */
+export interface StoredTutorThread {
+  bookId: BookId
+  id: string
+  /** The paragraph the passage starts in. */
+  anchor: Anchor
+  /** The exact words the thread is about, copied from the book. */
+  excerpt: string
+  /** How the passage is shown under the lamp: one line, or a shadowed block. */
+  kind: 'sentence' | 'paragraph'
+  messages: {
+    role: NoteAuthor
+    text: string
+    /** The tutor asking back rather than telling — drawn differently. */
+    isProbe?: boolean
+    /** Epoch milliseconds. */
+    ts: number
+  }[]
+  /** ISO 8601. */
+  createdAt: string
+  updatedAt: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -269,6 +306,7 @@ export type ReadingBuddyDB = Dexie & {
   folders: Table<StoredFolder, string>
   bookmarks: Table<StoredBookmark, [BookId, string]>
   notes: Table<StoredNote, [BookId, string]>
+  tutor: Table<StoredTutorThread, [BookId, string]>
 }
 
 /**
@@ -385,6 +423,16 @@ function defineSchema(db: Dexie): void {
 
   db.version(11).stores({
     notes: '[bookId+id], bookId',
+  })
+
+  // v12 — conversations with the tutor. The same shape as notes and for the
+  // same reasons: `[bookId+id]` is the exact address, and the loose `bookId`
+  // is what lets `deleteBook` drop a book's threads without listing them.
+  // The passage's words are a plain field, not an index — "which thread is
+  // about these words?" scans one book's few threads, and an index over long
+  // strings would cost more than it saves.
+  db.version(12).stores({
+    tutor: '[bookId+id], bookId',
   })
 }
 

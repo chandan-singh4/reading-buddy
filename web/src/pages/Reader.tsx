@@ -87,6 +87,11 @@ import {
   useBackDismiss,
   useFigureImages,
   writeFocusMode,
+  StudyLamp,
+  TutorMarks,
+  passageKindOf,
+  type PassageAnchor,
+  type TutorMessage,
   type BarState,
   type ReaderSettings,
   type SectionRef,
@@ -98,7 +103,15 @@ import {
 } from '../reader/index.ts'
 import { catchUpOnOpen } from '../app/bookCatchUp.ts'
 import { knownBook, noteReading } from '../app/shelvesAhead.ts'
-import { noteStore, repository, type StoredBookmark, type StoredNote } from '../storage/index.ts'
+import {
+  findThread,
+  noteStore,
+  repository,
+  tutorStore,
+  type StoredBookmark,
+  type StoredNote,
+  type StoredTutorThread,
+} from '../storage/index.ts'
 import { tryParseAnchor } from '../structure/index.ts'
 import type {
   Anchor,
@@ -2265,6 +2278,33 @@ export default function Reader() {
     }
   }, [id])
 
+  /*
+   * ## The tutor's threads (WP-17's tail — the study lamp)
+   *
+   * Loaded once per book, exactly as the notes are. A thread is a conversation
+   * about one passage; the marks it leaves on the page come from this list,
+   * and reopening a mark hands its thread back to the lamp.
+   */
+  const [threads, setThreads] = useState<StoredTutorThread[]>([])
+
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+
+    void tutorStore
+      .listThreads(id)
+      .then((rows) => {
+        if (!cancelled) setThreads(rows)
+      })
+      .catch(() => {
+        // A bare page is the honest fallback. Reading carries on regardless.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
   /** The notes as the panel wants them: in the book's order, placed and named. */
   const noteRows: NoteRow[] = useMemo(() => {
     if (frame.status !== 'ready') return []
@@ -2402,9 +2442,8 @@ export default function Reader() {
   /**
    * The one-line "not built yet" note.
    *
-   * Define, Translate and the four Ask Claude actions all need something this
-   * app does not have — a dictionary, a translator, and the tutor loop itself
-   * (WP-17 onward). The menu still lists them, because the menu is the design
+   * Define and Translate still need something this app does not have — a
+   * dictionary and a translator. The menu still lists them, because the menu is the design
    * and hiding half of it would settle a question that is not settled. Tapping
    * one says so plainly instead of doing nothing.
    */
@@ -2877,6 +2916,60 @@ export default function Reader() {
   }, [])
 
   /*
+   * ## The study lamp
+   *
+   * `lamp` is the conversation on screen: the passage it is about, the saved
+   * messages when it is a reopened thread, and the thread's id once one
+   * exists. The id starts `null` on a fresh passage and is filled in by the
+   * first save — which is how "one thread per passage" is kept without a
+   * second write path.
+   */
+  const [lamp, setLamp] = useState<{
+    passage: PassageAnchor
+    threadId: string | null
+    saved: TutorMessage[]
+  } | null>(null)
+
+  const lampRef = useRef(lamp)
+  lampRef.current = lamp
+
+  /** A tap on the ink or the slip: the same passage, its thread, reopened. */
+  const openThread = useCallback((thread: StoredTutorThread) => {
+    setLamp({
+      passage: { anchor: thread.anchor, excerpt: thread.excerpt, kind: thread.kind },
+      threadId: thread.id,
+      saved: thread.messages,
+    })
+  }, [])
+
+  /**
+   * Every completed exchange, persisted whole. The first one creates the
+   * row; the rest update it. The threads list is kept in step so the page's
+   * marks appear the moment the lamp closes, not on the next reload.
+   */
+  const keepThread = useCallback(
+    async (messages: TutorMessage[]) => {
+      const open = lampRef.current
+      if (!id || !open) return
+      if (open.threadId) {
+        void tutorStore.setMessages(id, open.threadId, messages)
+        setThreads((rows) =>
+          rows.map((row) =>
+            row.id === open.threadId
+              ? { ...row, messages, updatedAt: new Date().toISOString() }
+              : row,
+          ),
+        )
+        return
+      }
+      const row = await tutorStore.addThread(id, open.passage, messages)
+      setThreads((rows) => [...rows, row])
+      setLamp((current) => (current ? { ...current, threadId: row.id } : current))
+    },
+    [id],
+  )
+
+  /*
    * Read through refs so `dismissTopLayer` keeps one identity. The hook counts
    * history entries against it, and a handler that changed whenever a word was
    * chosen would tear those entries down and build them again mid-gesture.
@@ -2914,6 +3007,14 @@ export default function Reader() {
     // it" — threw the reader out of the book instead of letting the words go.
     // It sits above the panels because it is drawn over them and it is always
     // the last thing raised.
+    // The study lamp is drawn over everything, so it is dismissed first.
+    // Anything over the page must be a layer — lesson 14 — or a back swipe
+    // with the lamp open would throw the reader out of the book.
+    if (lampRef.current) {
+      setLamp(null)
+      return
+    }
+
     if (selectedRef.current) {
       dropRef.current()
       return
@@ -2936,7 +3037,10 @@ export default function Reader() {
    * as each opens. See `useBackDismiss` for why it must be that way round.
    */
   const layerDepth =
-    (chromeShown ? 1 : 0) + (sheetOpen || searchOpen ? 1 : 0) + (selected ? 1 : 0)
+    (chromeShown ? 1 : 0) +
+    (sheetOpen || searchOpen ? 1 : 0) +
+    (selected ? 1 : 0) +
+    (lamp ? 1 : 0)
 
   useBackDismiss(layerDepth, dismissTopLayer)
 
@@ -3051,24 +3155,50 @@ export default function Reader() {
           break
         }
 
+        case 'ask': {
+          // Under the lamp. If these exact words already have a thread, that
+          // thread is resumed — one conversation per passage, so a second tap
+          // on the same sentence never forks a new one.
+          const existing = findThread(threads, { anchor: at.anchor, excerpt: at.text })
+          if (existing) {
+            openThread(existing)
+          } else {
+            setLamp({
+              passage: {
+                anchor: at.anchor,
+                excerpt: at.text,
+                kind: passageKindOf(at.text, unit),
+              },
+              threadId: null,
+              saved: [],
+            })
+          }
+          break
+        }
+
         case 'define':
         case 'translate':
-        case 'ask':
           // Nothing to open yet — see `unbuilt` above.
-          setUnbuilt(
-            action.kind === 'define'
-              ? 'Define'
-              : action.kind === 'translate'
-                ? 'Translate'
-                : 'Ask Claude',
-          )
+          setUnbuilt(action.kind === 'define' ? 'Define' : 'Translate')
           break
       }
 
       if (action.kind !== 'note') dropSelection()
       else setSelected(null)
     },
-    [selected, touched, keepNote, recolour, dropNote, id, openSearch, dropSelection],
+    [
+      selected,
+      touched,
+      keepNote,
+      recolour,
+      dropNote,
+      id,
+      openSearch,
+      dropSelection,
+      threads,
+      unit,
+      openThread,
+    ],
   )
 
   const title =
@@ -3632,6 +3762,26 @@ export default function Reader() {
             style={resolveHighlighter(highlighter, settings.theme)}
           />
 
+          {/*
+            The tutor's traces — the ink stroke and the tucked slip — painted
+            into the same three roots as the highlights, for the same reason:
+            a seam turn flips the understudy itself, and a mark missing from
+            it would blink out for the length of the turn.
+          */}
+          <TutorMarks threads={threads} root={column} watch={here.section} onOpen={openThread} />
+          <TutorMarks
+            threads={threads}
+            root={beforeColumn}
+            watch={beside.previous}
+            onOpen={openThread}
+          />
+          <TutorMarks
+            threads={threads}
+            root={afterColumn}
+            watch={beside.next}
+            onOpen={openThread}
+          />
+
           {selected && !composing && (
             <SelectionMenu
               selection={selected}
@@ -3661,6 +3811,16 @@ export default function Reader() {
                 setComposing(null)
                 dropSelection()
               }}
+            />
+          )}
+
+          {lamp && (
+            <StudyLamp
+              key={lamp.threadId ?? lamp.passage.excerpt}
+              passage={lamp.passage}
+              saved={lamp.saved}
+              onSave={keepThread}
+              onClose={() => setLamp(null)}
             />
           )}
 

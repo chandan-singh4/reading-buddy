@@ -5,50 +5,46 @@
 
 ## Task — none in flight
 
-The reading page closed three reports this thread. All are merged and pushed.
+The Study Lamp shipped this thread (2026-08-21). "Ask Claude" in the selection
+menu is one entry now. It opens a dark, full-screen tutor room. The room shows
+the passage, four question chips, and a composer. The conversation is saved on
+the device. A closed conversation leaves an ink line under the passage and a
+small paper slip at its corner. A tap on either one reopens the same thread.
 
-- **The text no longer moves when a page turn starts** (2026-08-19). The reader
-  signed this off: "This looks good now." The copy of the page zeroed the top
-  margin of its first child, but that margin sat on a `<figure>` inside a plain
-  wrapper and collapsed through it. See `progress.md`.
-- **The phone's own selection panel no longer flashes** (2026-08-19). The phone
-  cannot select on a touch screen at all. A long press picks the word instead.
-- **A back swipe closes the selection menu, not the book** (2026-08-19).
+The whole flow was proved in the running app with a real book. Build, typecheck
+and all 1509 tests are green.
 
-Nothing is mid-edit. Build and typecheck green.
+**What the phone must still judge:**
 
-**One thing the reader must judge on the phone.** The Browser pane cannot show
-iOS's own text menu, so the flash is proved gone only in theory. Ask for these
-three:
+1. The dim-in of the room, the glow, and the collapse of the pinned bar. The
+   Browser pane draws no animation, so all motion is unproved.
+2. The look of the ink line and the slip on real paper themes.
+3. The long press → ASK CLAUDE → chip → reply loop under a real thumb.
 
-1. Long press a word. The app's menu must open, with no grey flash before it.
-2. Drag a handle to grow the selection. Again, no flash.
-3. Swipe back with the menu open. The menu closes and the book stays.
-
-If a flash survives, the next place to look is the drag handles in
-`SelectionMenu`, not the long press — the press is proved.
+**The tutor speaks in a placeholder.** `askTutor` posts to `/api/tutor`, and no
+relay exists yet. The reply says plainly that the tutor is offline. It never
+invents an answer. The relay endpoint is the next tutor task: it holds the
+system prompt and the key, server-side only.
 
 ## Next up — pick one, then run `/plan-task`
 
-1. **Judge `PARSER_VERSION` 28 on the phone.** No code. The reader accepts the
-   rebuild and reads the Contents tab of *The Mountains of My Life*. This is the
-   cheapest open item and it has now waited three threads.
-2. **Finish WP-25: something that writes a note.** The Notes tab reads a table
-   that nothing fills. One question to settle first: device-local or cloud.
-   Device-local is the smaller step.
-3. **Finish WP-17's tail — Define and Ask.** The selection menu shows both
-   buttons. The words are chosen the app's own way now, so the hard part is
-   done.
+1. **Build the `/api/tutor` relay.** One endpoint in `api/` that holds the
+   system prompt and calls Claude. The client is done and waiting.
+2. **Judge `PARSER_VERSION` 28 on the phone.** No code. The reader accepts the
+   rebuild and reads the Contents tab of *The Mountains of My Life*.
+3. **Finish WP-25: something that writes a note.** The Notes tab reads a table
+   that nothing fills.
 4. **Drop caps**, still parked and waiting on the reader's screenshot.
 
-## Files in scope — if the reader reports a selection problem
+## Files in scope — the Study Lamp
 
-- `web/src/pages/Reader.tsx` — the long press, `dropSelection`, `layerDepth`
-  and `dismissTopLayer`.
-- `web/src/pages/Reader.module.css` — the `@media (pointer: coarse)` block that
-  turns selection off.
-- `web/src/reader/selection.ts` — `wordAt`, `describe`, `anchorOfNode`.
-- `web/src/reader/useBackDismiss.ts` — one history entry per open layer.
+- `web/src/reader/tutor.ts` — the passage types, `elide`, `askTutor`, the
+  canned fallback.
+- `web/src/reader/StudyLamp.tsx` + `.module.css` — the room itself.
+- `web/src/reader/TutorMarks.tsx` + `.module.css` — the ink line and the slip.
+- `web/src/storage/tutor.ts` + `db.ts` (`version(12)`) — the saved threads.
+- `web/src/pages/Reader.tsx` — `lamp` state, `openThread`, `keepThread`, the
+  `ask` case, three `TutorMarks` mounts.
 
 ## Carried forward — how to work on the reading page
 

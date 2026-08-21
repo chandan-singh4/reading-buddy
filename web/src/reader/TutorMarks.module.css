@@ -1,0 +1,103 @@
+/*
+ * The traces a tutor conversation leaves on the page.
+ *
+ * Two things, both from `design-inspiration/study-lamp-build-prompt.md` §2/§7
+ * and `page-annotation-markers.html`: a hand-drawn ink stroke under the words
+ * (deliberately not a straight underline — a straight one reads as a link),
+ * and a small paper slip tucked into the paragraph's top edge.
+ *
+ * The bronzes are fixed values, not theme tokens. They are the study lamp's
+ * own colours reaching back onto the page, and they read against every paper
+ * this app ships; a theme with its own bronze can retint them here later.
+ */
+
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/*
+ * One line of the passage. The box covers the line; the ink is a repeating
+ * SVG stroke laid along its bottom edge, which is the brief's `.passage-mark`
+ * verbatim. `pointer-events: auto` because the whole run is the reopen
+ * control.
+ */
+.stroke {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='56'%20height='5'%20viewBox='0%200%2056%205'%3E%3Cpath%20d='M1%203%20Q14%201.6%2028%202.9%20T55%202.6'%20fill='none'%20stroke='%238a6a3b'%20stroke-width='1.6'%20stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+  background-size: 56px 5px;
+}
+
+.stroke:hover {
+  background-color: rgb(138 106 59 / 9%);
+}
+
+/*
+ * The slip: a scrap of lamp-room paper clipped onto the paragraph's top edge.
+ * Positioned against the paragraph, never in the margin — nothing reflows.
+ * `z-index: 20` so it rides over the neighbouring paragraph's first line.
+ */
+.slip {
+  position: absolute;
+  top: -11px;
+  right: 14px;
+  z-index: 20;
+  width: 30px;
+  height: 22px;
+  padding: 0;
+  pointer-events: auto;
+  background: #fbf5e6;
+  border: 1px solid #b79a68;
+  border-radius: 3px 3px 0 3px;
+  box-shadow: 0 3px 7px rgb(58 42 20 / 20%);
+  transform: rotate(2.5deg);
+  cursor: pointer;
+  transition: transform 180ms ease;
+}
+
+.slip:hover {
+  transform: rotate(0) translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slip {
+    transition: none;
+  }
+}
+
+/* The folded corner, as the border trick: two edges of paper, two of shadow. */
+.slip::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  border-style: solid;
+  border-width: 0 7px 7px 0;
+  border-color: transparent #d9c9a6 #d9c9a6 transparent;
+}
+
+.slipMark {
+  position: absolute;
+  top: 3px;
+  left: 9px;
+  color: #c39a5e;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* The slip is small on purpose; the target is not. */
+.slip::before {
+  content: '';
+  position: absolute;
+  inset: -0.6875rem;
+}
+
+.slip:focus-visible {
+  outline: 2px solid #c39a5e;
+  outline-offset: 2px;
+}

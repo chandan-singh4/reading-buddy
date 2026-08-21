@@ -1,0 +1,268 @@
+/**
+ * The marks a conversation leaves on the page: an ink stroke under the words
+ * that were discussed, and a small paper slip tucked into the top edge of the
+ * paragraph. Tapping either reopens that passage's thread under the lamp.
+ *
+ * ## Why this is HandDrawn's machinery and not a CSS class
+ *
+ * The brief writes the ink as `.passage-mark`, a class on "the anchored text
+ * run" — which assumes a text run that can carry a class. This page has no
+ * such element: the passage is a quote inside a paragraph the parser owns,
+ * and wrapping its text nodes in a span would mutate the book's own DOM,
+ * which every measurer in this file's neighbourhood watches. The browser's
+ * highlight API cannot draw it either — `::highlight()` takes a colour, not a
+ * background image.
+ *
+ * So the stroke is painted the way `HandDrawn` paints marker ink, with the
+ * same exported helpers: real elements portalled *into* the anchored
+ * paragraph, one per line of the passage, placed in the paragraph's own
+ * coordinates. Everything that made that survive page turns, the toolbar's
+ * scale and column-broken paragraphs — the scale division, the fold/pitch
+ * arithmetic, the origin on the first fragment — applies unchanged, which is
+ * exactly why it is shared rather than re-derived. The stroke itself is the
+ * brief's repeating SVG, riding as the element's background.
+ *
+ * The slip needs none of that: it sits at a fixed corner of the paragraph
+ * (`top:-11px; right:14px`), so it is simply an absolutely positioned button
+ * in the same portalled layer. Positioned, never in the margin — no text
+ * reflows.
+ */
+
+import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+import { blockOf, blocksOf, clipTo, linesOf } from './HandDrawn.tsx'
+import { rangeOfQuote } from './selection.ts'
+import type { StoredTutorThread } from '../storage/db.ts'
+import styles from './TutorMarks.module.css'
+
+/** One line of one passage's ink, in its paragraph's own coordinates. */
+interface Stroke {
+  key: string
+  top: number
+  left: number
+  width: number
+  height: number
+}
+
+/** Everything one paragraph carries: its strokes, and at most one slip. */
+interface Mark {
+  key: string
+  block: HTMLElement
+  thread: StoredTutorThread
+  strokes: Stroke[]
+  /** Only the first paragraph of a passage wears the slip. */
+  slip: boolean
+}
+
+function same(a: readonly Mark[], b: readonly Mark[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((one, index) => {
+    const other = b[index]!
+    if (
+      one.block !== other.block ||
+      one.thread !== other.thread ||
+      one.slip !== other.slip ||
+      one.strokes.length !== other.strokes.length
+    ) {
+      return false
+    }
+    return one.strokes.every((stroke, at) => {
+      const twin = other.strokes[at]!
+      return (
+        stroke.top === twin.top &&
+        stroke.left === twin.left &&
+        stroke.width === twin.width &&
+        stroke.height === twin.height
+      )
+    })
+  })
+}
+
+export interface TutorMarksProps {
+  threads: readonly StoredTutorThread[]
+  root: HTMLElement | null
+  /** Anything whose change should force a re-measure — the section on screen. */
+  watch?: unknown
+  onOpen: (thread: StoredTutorThread) => void
+}
+
+export function TutorMarks({ threads, root, watch, onOpen }: TutorMarksProps) {
+  const [marks, setMarks] = useState<Mark[]>([])
+
+  const measure = useCallback(() => {
+    if (!root || threads.length === 0) {
+      setMarks((current) => (current.length === 0 ? current : []))
+      return
+    }
+
+    const found: Mark[] = []
+
+    for (const thread of threads) {
+      const range = rangeOfQuote(thread.anchor, thread.excerpt)
+      if (!range || !root.contains(range.commonAncestorContainer)) continue
+
+      const first = blockOf(range.startContainer)
+      const last = blockOf(range.endContainer) ?? first
+      if (!first || !root.contains(first)) continue
+
+      for (const block of blocksOf(first, last)) {
+        if (!root.contains(block)) continue
+        const part = clipTo(range, block)
+        if (!part) continue
+
+        const bounds = block.getBoundingClientRect()
+        const scale = block.offsetWidth > 0 ? bounds.width / block.offsetWidth : 1
+        if (scale <= 0) continue
+
+        // The column-fold arithmetic, exactly as HandDrawn documents it: the
+        // origin is the paragraph's first fragment, and a line in a later
+        // fragment gets the offset that folds onto it.
+        const frags = block.getClientRects()
+        const box = frags[0] ?? bounds
+        const pitch = frags.length > 1 ? frags[1]!.left - frags[0]!.left : 0
+        const fold = frags.length > 1 ? frags[0]!.bottom - frags[1]!.top : 0
+        const fragmentOf = (rect: DOMRect): number => {
+          for (let i = frags.length - 1; i > 0; i -= 1) {
+            const frag = frags[i]!
+            if (rect.left >= frag.left - 1 && rect.top >= frag.top - 1) return i
+          }
+          return 0
+        }
+
+        const mark: Mark = {
+          key: `${thread.id}:${block.id}`,
+          block,
+          thread,
+          strokes: [],
+          slip: block === first,
+        }
+
+        let line = 0
+        for (const rect of linesOf(part)) {
+          if (rect.width <= 0 || rect.height <= 0) continue
+          const column = fragmentOf(rect)
+          mark.strokes.push({
+            key: `${thread.id}:${line}`,
+            top: (rect.top - box.top + column * fold) / scale,
+            left: (rect.left - box.left - column * pitch) / scale,
+            width: rect.width / scale,
+            height: rect.height / scale,
+          })
+          line += 1
+        }
+
+        if (mark.strokes.length > 0 || mark.slip) found.push(mark)
+      }
+    }
+
+    // An empty measure while threads still exist is a bad moment mid-turn,
+    // not an answer — the same rule, and the same reason, as HandDrawn.
+    if (found.length === 0) return
+    setMarks((current) => (same(current, found) ? current : found))
+  }, [threads, root])
+
+  useEffect(() => {
+    if (!root) return
+
+    measure()
+
+    // One coalesced pass per burst, on a timer rather than a frame — a frame
+    // callback never fires in a backgrounded tab. Same wiring as HandDrawn.
+    let pending = 0
+    const soon = () => {
+      if (pending) return
+      pending = window.setTimeout(() => {
+        pending = 0
+        measure()
+      }, 0)
+    }
+
+    const ours = (node: Node): boolean =>
+      node instanceof Element
+        ? node.closest(`.${styles.layer}`) !== null
+        : node.parentElement?.closest(`.${styles.layer}`) !== null
+
+    const changes =
+      typeof MutationObserver === 'function'
+        ? new MutationObserver((records) => {
+            if (records.every((record) => ours(record.target))) return
+            soon()
+          })
+        : null
+    changes?.observe(root, { childList: true, subtree: true, characterData: true })
+
+    const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(soon) : null
+    sizes?.observe(root)
+
+    window.addEventListener('resize', soon, { passive: true })
+    root.addEventListener('load', soon, { capture: true })
+
+    return () => {
+      if (pending) window.clearTimeout(pending)
+      changes?.disconnect()
+      sizes?.disconnect()
+      window.removeEventListener('resize', soon)
+      root.removeEventListener('load', soon, { capture: true })
+    }
+  }, [measure, root, watch])
+
+  // The paragraph becomes the positioned box the marks hang off, exactly as
+  // HandDrawn does it — and `isolation` for the same page-turn reason.
+  useEffect(() => {
+    const touched = marks.map((mark) => mark.block)
+    for (const block of touched) {
+      block.style.position = 'relative'
+      block.style.isolation = 'isolate'
+    }
+    return () => {
+      for (const block of touched) {
+        block.style.position = ''
+        block.style.isolation = ''
+      }
+    }
+  }, [marks])
+
+  if (typeof document === 'undefined' || marks.length === 0) return null
+
+  return (
+    <>
+      {marks.map((mark) =>
+        createPortal(
+          <span className={styles.layer}>
+            {mark.strokes.map((stroke) => (
+              <span
+                key={stroke.key}
+                className={styles.stroke}
+                // The strokes of one passage are one control, not one per
+                // line — the slip carries the accessible name for the lot.
+                aria-hidden="true"
+                style={{
+                  top: stroke.top,
+                  left: stroke.left,
+                  width: stroke.width,
+                  height: stroke.height,
+                }}
+                onClick={() => onOpen(mark.thread)}
+              />
+            ))}
+            {mark.slip && (
+              <button
+                type="button"
+                className={styles.slip}
+                aria-label="Reopen the conversation about this passage"
+                onClick={() => onOpen(mark.thread)}
+              >
+                <span className={styles.slipMark} aria-hidden="true">
+                  ✦
+                </span>
+              </button>
+            )}
+          </span>,
+          mark.block,
+          mark.key,
+        ),
+      )}
+    </>
+  )
+}

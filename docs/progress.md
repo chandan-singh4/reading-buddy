@@ -15,6 +15,12 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **The Study Lamp is new and its motion is unproved** (2026-08-21). The whole
+  flow works in the Browser pane: long press → ASK CLAUDE → the dark room →
+  chip → reply → close → ink line + slip → tap reopens the thread. The pane
+  draws no animation, so the dim-in, the glow and the collapse need the phone.
+  The tutor answers with an honest offline placeholder until the `/api/tutor`
+  relay exists — that relay is the next tutor task.
 - **The touch selection is new and only half proved** (2026-08-19). On a touch
   screen the phone can no longer select anything. A long press picks the word,
   and a back swipe puts the menu away. All three were proved in the Browser
@@ -98,6 +104,28 @@ Get that loop working before building any breadth.
     suspected, which is also why the update panel got its safety net.
 
 ### Recently done
+
+- **The Study Lamp — Ask Claude is a room now** (2026-08-21). This is the first
+  visible piece of the tutor loop (WP-17 → 20).
+  - The selection menu's four Ask rows became one bronze `✦ ASK CLAUDE` entry.
+  - It opens a full-screen, always-dark room over the page: the passage in
+    Cormorant Garamond, four question chips, and a composer. A long passage
+    fades into shadow with `▴ TAP TO PIN`; after the first exchange the passage
+    collapses to a one-line pinned bar.
+  - Your words are handwriting; Claude's are a printed slip with a ✦ badge.
+  - Threads live in a new `tutor` table (Dexie `version(12)`), device-local
+    like notes. One thread per passage — asking again reopens it.
+  - Closing the room leaves a hand-drawn ink line under the passage and a tiny
+    tucked slip at its corner. `TutorMarks.tsx` paints them with the same
+    column-fold measuring machinery as `HandDrawn.tsx`, now shared via exports.
+  - `askTutor` posts to `/api/tutor`. No relay exists yet, so a canned reply
+    says the tutor is offline. It never fakes an answer. The system prompt and
+    the key belong to the relay, server-side only, never a `VITE_` variable.
+  - The lamp counts as a layer: back swipe and Escape close it first.
+  - Proved in the running app: the full loop, persistence across a reload, and
+    the marks returning from the database. 8 new tests cover `elide`,
+    `passageKindOf` and the store. Deleting a book now clears its notes and
+    tutor threads too — the notes cascade was a pre-existing gap.
 
 - **A back swipe now closes the selection menu, not the book** (2026-08-19).
   With a sentence chosen, a back swipe took the reader out to the shelf. The

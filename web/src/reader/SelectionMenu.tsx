@@ -15,7 +15,6 @@
 
 import {
   useEffect,
-  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -47,7 +46,7 @@ export type SelectionAction =
   | { kind: 'translate' }
   | { kind: 'search' }
   | { kind: 'speak' }
-  | { kind: 'ask'; ask: 'explain' | 'simply' | 'quiz' | 'discuss' }
+  | { kind: 'ask' }
 
 export interface SelectionMenuProps {
   selection: ReaderSelection
@@ -199,8 +198,6 @@ export function SelectionMenu({
     above: boolean
     limit: number
   } | null>(null)
-  const [asking, setAsking] = useState(true)
-  const askId = useId()
 
   /*
    * Placed after measuring, because where it goes depends on how tall it is:
@@ -320,7 +317,7 @@ export function SelectionMenu({
       above: goesAbove,
       limit: room,
     })
-  }, [selection, asking, unit])
+  }, [selection, unit])
 
   // Focus goes to the card itself, not to the first item: the reader is holding
   // a finger on the page, and moving focus onto "Highlight" would announce a
@@ -720,44 +717,22 @@ export function SelectionMenu({
         ))}
       </ul>
 
-      {/* The tutor's own block, kept apart and labelled, because these four do
-          something the rest of the menu does not: they start a conversation. */}
+      {/* The tutor's way in, kept apart and dressed in its own bronze because
+          it does something the rest of the menu does not: it starts a
+          conversation. One entry, not four — the choices (explain, quiz,
+          discuss…) belong under the study lamp, where there is room to read
+          them against the passage. */}
       <div className={styles.ask}>
         <button
           type="button"
           data-item
+          role="menuitem"
           className={styles.askHeader}
-          aria-expanded={asking}
-          aria-controls={askId}
-          onClick={() => setAsking((open) => !open)}
+          onClick={() => act({ kind: 'ask' })}
         >
           <Icon path={ICONS.spark} filled />
           <span>Ask Claude</span>
-          <Icon path={ICONS.chevron} />
         </button>
-
-        <ul id={askId} className={styles.rows} hidden={!asking}>
-          {(
-            [
-              ['explain', 'Explain this passage'],
-              ['simply', 'Explain simply'],
-              ['quiz', 'Quiz me on this'],
-              ['discuss', 'Discuss & ask questions'],
-            ] as const
-          ).map(([ask, label]) => (
-            <li key={ask}>
-              <button
-                type="button"
-                data-item
-                role="menuitem"
-                className={`${styles.row} ${styles.askRow}`}
-                onClick={() => act({ kind: 'ask', ask })}
-              >
-                <span>{label}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
       </div>
       </div>
     </>,

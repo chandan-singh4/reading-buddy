@@ -1,0 +1,391 @@
+/*
+ * The study lamp. Always dark — its own palette, never the theme's, because
+ * the whole point of the overlay is that the reader has stepped out of the
+ * book's light. Every colour in here is deliberate and local.
+ *
+ * The reference designs are `design-inspiration/study-lamp-paragraph.html`
+ * and `study-lamp-conversation.html`; the values below are theirs.
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  /* Above everything the book owns, the selection card (12) included. */
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: #1c1712;
+  color: #ece0c4;
+  font-family: 'EB Garamond', Georgia, serif;
+  overflow: hidden;
+  /* The dim-in: the room's light going down, not a panel arriving. */
+  animation: dim 450ms ease both;
+  /* The phone's own safe areas — the lamp covers the whole screen. */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes dim {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .anchorBar,
+  .passageSentence,
+  .passageParagraph,
+  .you,
+  .slip {
+    animation: none !important;
+  }
+}
+
+/* The lamp itself: a pool of warm light from the top of the screen. It dims
+   to half once the passage is pinned — the light follows the reading. */
+.glow {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 340px;
+  height: 270px;
+  background: radial-gradient(ellipse at top, rgba(240, 214, 150, 0.32), transparent 68%);
+  pointer-events: none;
+  transition: opacity 500ms ease;
+}
+
+.glowDim {
+  opacity: 0.5;
+}
+
+.close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 6px);
+  right: 8px;
+  z-index: 2;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  background: none;
+  color: #8a7c60;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #c39a5e;
+}
+
+/* --- The passage ----------------------------------------------------------- */
+
+.anchor {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  padding: 44px 24px 0;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* A sentence: whole, centred, relit. */
+.passageSentence {
+  margin: 0;
+  padding: 8px 4px 4px;
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.5;
+  color: #f2e6c9;
+  text-align: center;
+  text-shadow: 0 1px 20px rgba(240, 214, 150, 0.22);
+  animation: rise 400ms ease both;
+}
+
+/* A paragraph: fading into shadow, never cut. The mask is the design — a long
+   passage visibly continues below the light rather than ending. */
+.passageParagraph {
+  margin: 0;
+  padding: 6px 2px 0;
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 1.55;
+  color: #f2e6c9;
+  text-align: left;
+  max-height: 110px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 34%, transparent 96%);
+  mask-image: linear-gradient(to bottom, #000 34%, transparent 96%);
+  animation: rise 400ms ease both;
+}
+
+.pin {
+  display: block;
+  margin: 6px auto 0;
+  min-height: 2.5rem;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: #b79a68;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+}
+
+.pin:hover {
+  color: #c39a5e;
+}
+
+/* Pinned: one line, both ends of the passage, a tap to relight it. */
+.anchorBar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 2px;
+  padding: 9px 12px;
+  background: rgba(240, 214, 150, 0.05);
+  border: 1px solid #3d3320;
+  border-radius: 12px;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  animation: rise 300ms ease both;
+}
+
+.anchorMark {
+  flex: 0 0 auto;
+  color: #c39a5e;
+  font-size: 12px;
+}
+
+.anchorBarText {
+  flex: 1;
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: 14px;
+  color: #bfae8c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.anchorChevron {
+  color: #8a7c60;
+  font-size: 12px;
+}
+
+.divider {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 1px;
+  margin: 14px auto 6px;
+  background: #b79a68;
+  opacity: 0.55;
+}
+
+/* --- The conversation ------------------------------------------------------ */
+
+.flow {
+  flex: 1 1 auto;
+  z-index: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 22px 4px;
+}
+
+/* The four ways in, on a fresh passage. */
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 8px 0 14px;
+}
+
+.option {
+  min-height: 2.75rem;
+  padding: 10px 14px;
+  border: 1px solid #3d3320;
+  border-radius: 12px;
+  background: rgba(240, 214, 150, 0.04);
+  color: #d8c9a4;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover:enabled {
+  border-color: #8a6a3b;
+  color: #f0e3c4;
+}
+
+/* The reader's side: handwriting, right-aligned, no bubble. */
+.you {
+  margin: 0 0 13px;
+  padding-left: 44px;
+  font-family: 'Caveat', cursive;
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1.3;
+  color: #b79a68;
+  text-align: right;
+  animation: rise 300ms ease both;
+}
+
+/* The tutor's side: a printed slip, badged. */
+.slip {
+  position: relative;
+  margin: 0 24px 13px 0;
+  padding: 11px 13px;
+  background: #2a2419;
+  border: 1px solid #3d3320;
+  border-radius: 3px 13px 13px 13px;
+  font-size: 14px;
+  line-height: 1.62;
+  color: #ece0c4;
+  animation: rise 300ms ease both;
+}
+
+.slip::before {
+  content: '✦';
+  position: absolute;
+  top: -9px;
+  left: 11px;
+  padding: 0 4px;
+  border-radius: 50%;
+  background: #2a2419;
+  color: #c39a5e;
+  font-size: 11px;
+}
+
+/* A probe — the tutor asking back. Warmer, italic, so a question reads as an
+   invitation rather than more explanation. */
+.probe {
+  background: rgba(195, 154, 94, 0.09);
+  border-color: rgba(195, 154, 94, 0.3);
+  font-style: italic;
+  color: #e6d8b8;
+}
+
+.probe::before {
+  background: #241d13;
+}
+
+/* Three slow dots while the tutor writes. */
+.thinking {
+  display: inline-flex;
+  gap: 5px;
+  padding: 2px 0;
+}
+
+.thinking i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #8a7c60;
+  animation: breathe 1.2s ease-in-out infinite;
+}
+
+.thinking i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking i {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* --- The composer ---------------------------------------------------------- */
+
+.composer {
+  flex: 0 0 auto;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 11px 22px 14px;
+  border-top: 1px solid #3d3320;
+}
+
+.input {
+  flex: 1;
+  min-height: 2.5rem;
+  border: 0;
+  background: transparent;
+  color: #ece0c4;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 15px;
+  outline: none;
+}
+
+.input::placeholder {
+  color: #7a6d52;
+  font-style: italic;
+}
+
+.send {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #8a6a3b;
+  color: #fff8ea;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* A 44px target around the 34px disc. */
+.send::before {
+  content: '';
+  position: absolute;
+  inset: calc((34px - 2.75rem) / 2);
+}
+
+/* --- Focus ----------------------------------------------------------------- */
+
+.close:focus-visible,
+.pin:focus-visible,
+.anchorBar:focus-visible,
+.option:focus-visible,
+.send:focus-visible,
+.input:focus-visible {
+  outline: 2px solid #c39a5e;
+  outline-offset: 2px;
+}

@@ -44,7 +44,9 @@ import { ANCHOR_ID, rangeOfQuote } from './selection.ts'
 import styles from './HandDrawn.module.css'
 
 /** The anchored paragraph a node sits in, if it is in one. */
-function blockOf(node: Node | null): HTMLElement | null {
+// The four measuring helpers below are exported for `TutorMarks`, which paints
+// the tutor's ink with exactly this machinery and must not re-derive it.
+export function blockOf(node: Node | null): HTMLElement | null {
   let element = node instanceof Element ? node : (node?.parentElement ?? null)
   while (element) {
     if (element instanceof HTMLElement && ANCHOR_ID.test(element.id)) return element
@@ -93,7 +95,7 @@ const VARIANTS = [0, 1, 2, 3]
  * because a range whose end is somehow not after its start must not become a
  * walk to the end of the chapter.
  */
-function blocksOf(first: HTMLElement, last: HTMLElement | null): HTMLElement[] {
+export function blocksOf(first: HTMLElement, last: HTMLElement | null): HTMLElement[] {
   const blocks: HTMLElement[] = [first]
   if (!last || last === first) return blocks
 
@@ -128,7 +130,7 @@ const SPAN_BLOCKS = 64
  * pieces that share a line are joined back together. Text boundaries only, so
  * there is only ever the one answer.
  */
-function linesOf(part: Range): DOMRect[] {
+export function linesOf(part: Range): DOMRect[] {
   const found: DOMRect[] = []
 
   const holder =
@@ -195,7 +197,7 @@ function join(rects: readonly DOMRect[]): DOMRect[] {
  * three, and those boxes have to be placed in three different paragraphs. Cut
  * the range at the block's own edges and each piece measures where it belongs.
  */
-function clipTo(range: Range, block: HTMLElement): Range | null {
+export function clipTo(range: Range, block: HTMLElement): Range | null {
   const whole = document.createRange()
   whole.selectNodeContents(block)
 

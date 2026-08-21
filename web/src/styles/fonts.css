@@ -203,6 +203,32 @@
     format('woff2-variations');
 }
 
+/* --- Cormorant Garamond ---------------------------------------------------- */
+/*
+ * The passage under the study lamp — the words the tutor conversation is
+ * about, relit in a display Garamond so they read as *quoted*, not as more
+ * page. Not offered as a reading face: at text sizes its hairlines are too
+ * fine for a phone. Latin only, as everywhere here. SIL OFL 1.1.
+ */
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('@fontsource-variable/cormorant-garamond/files/cormorant-garamond-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Cormorant Garamond';
+  font-style: italic;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('@fontsource-variable/cormorant-garamond/files/cormorant-garamond-latin-wght-italic.woff2')
+    format('woff2-variations');
+}
+
 /* --- Kalam ---------------------------------------------------------------- */
 /*
  * The second hand, for the small chapter tag above a note — a marker rather

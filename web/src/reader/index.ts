@@ -39,6 +39,19 @@ export { SelectionMenu } from './SelectionMenu.tsx'
 export type { SelectionAction, SelectionMenuProps } from './SelectionMenu.tsx'
 export { Highlights, canPaintHighlights } from './Highlights.tsx'
 export type { HighlightLike, HighlightsProps } from './Highlights.tsx'
+export { StudyLamp } from './StudyLamp.tsx'
+export type { StudyLampProps } from './StudyLamp.tsx'
+export { TutorMarks } from './TutorMarks.tsx'
+export type { TutorMarksProps } from './TutorMarks.tsx'
+export { askTutor, elide, INTENT_LABELS, passageKindOf } from './tutor.ts'
+export type {
+  AskTutorReply,
+  AskTutorRequest,
+  PassageAnchor,
+  PassageKind,
+  TutorIntent,
+  TutorMessage,
+} from './tutor.ts'
 export {
   describeRange,
   selectAround,

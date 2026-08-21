@@ -325,42 +325,33 @@ body:has([data-page-sheet]) .card {
   background: var(--color-accent-wash);
 }
 
+/*
+ * One row, bronze and letterspaced — the study lamp's own colour, on purpose:
+ * the entry previews the room it opens, whatever theme the page is wearing.
+ * The bronze holds AA against both the light wash and the dark surfaces.
+ */
 .askHeader {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: var(--space-2) var(--space-4);
   border: 0;
   background: none;
-  color: var(--color-accent);
+  /* Every theme declares its `color-scheme`, so `light-dark()` picks the deep
+     bronze on paper and the lamplit one on the dark surfaces. */
+  color: light-dark(#8a6a3b, #c39a5e);
   font: inherit;
   font-size: var(--text-xs);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
 }
 
-/* The chevron is the last child and turns to face the open state. */
-.askHeader svg:last-child {
-  margin-left: auto;
-  transition: transform 120ms ease;
-}
-
-.askHeader[aria-expanded='true'] svg:last-child {
-  transform: rotate(90deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .askHeader svg:last-child {
-    transition: none;
-  }
-}
-
-.askRow {
-  padding-left: var(--space-4);
+.askHeader:hover {
+  background: var(--color-surface-raised);
 }
 
 /* --- Focus ----------------------------------------------------------------- */
