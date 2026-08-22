@@ -48,6 +48,7 @@ import {
 import { createPortal } from 'react-dom'
 
 import {
+  chainFrom,
   chosenFrom,
   loadModels,
   rememberPick,
@@ -211,7 +212,10 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         intent: intent.current,
         history,
         userMessage: asked,
-        ...(pick ? { model: pick } : {}),
+        // The whole chain, not just the pick. If the reader's choice will not
+        // answer, the next thing tried should be the strongest model on the
+        // roster — not whatever fixed list the server happens to carry.
+        ...(models.length > 0 ? { models: chainFrom(models, pick) } : {}),
       }).then((reply) => {
         if (reply.failed) {
           // The question stays — the reader can see what went unanswered and
@@ -258,7 +262,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         onSave(whole)
       })
     },
-    [messages, passage, context, pending, pick, onSave],
+    [messages, passage, context, pending, models, pick, onSave],
   )
 
   /* The nearest question at or above a message. Retrying an answer means

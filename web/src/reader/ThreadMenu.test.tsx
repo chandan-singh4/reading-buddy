@@ -36,26 +36,26 @@ describe('the held-mark menu', () => {
   it('offers continuing and deleting, and nothing else', () => {
     open()
     const labels = screen.getAllByRole('button').map((button) => button.textContent)
-    expect(labels).toEqual(['Continue the conversation', 'Delete the conversation'])
+    expect(labels).toEqual(['Continue', 'Delete'])
   })
 
   it('continues the conversation', () => {
     const { onContinue, onDelete } = open()
-    fireEvent.click(screen.getByText('Continue the conversation'))
+    fireEvent.click(screen.getByText('Continue'))
     expect(onContinue).toHaveBeenCalledTimes(1)
     expect(onDelete).not.toHaveBeenCalled()
   })
 
   it('deletes the conversation', () => {
     const { onDelete, onContinue } = open()
-    fireEvent.click(screen.getByText('Delete the conversation'))
+    fireEvent.click(screen.getByText('Delete'))
     expect(onDelete).toHaveBeenCalledTimes(1)
     expect(onContinue).not.toHaveBeenCalled()
   })
 
   it('closes on a tap outside, and deletes nothing', () => {
     const { onClose, onDelete } = open()
-    const backdrop = document.querySelector('[aria-hidden="true"]')
+    const backdrop = document.querySelector(`[aria-hidden="true"]:not(svg)`)
     fireEvent.pointerDown(backdrop!)
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(onDelete).not.toHaveBeenCalled()
@@ -79,6 +79,6 @@ describe('the held-mark menu', () => {
   it('keeps clear of the screen edges', () => {
     open({ x: 2, y: 100 })
     const menu = screen.getByRole('dialog') as HTMLElement
-    expect(menu.style.left).toBe('100px')
+    expect(menu.style.left).toBe('120px')
   })
 })

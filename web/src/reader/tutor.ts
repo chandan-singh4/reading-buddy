@@ -145,10 +145,14 @@ export interface AskTutorRequest {
   history: TutorMessage[]
   userMessage: string
   /**
-   * The reader's chosen model slug. Stage B's picker fills this; the relay
-   * puts it at the head of its fallback chain. Left out, the relay picks.
+   * Which models to try, strongest-first after the reader's own pick. Built by
+   * `chainFrom`. Left out, the relay falls back to its own list.
+   *
+   * A chain rather than one slug because a free model refusing is the normal
+   * case, not the exception — and when it happens, *which* model catches the
+   * question is the difference between a good answer and a poor one.
    */
-  model?: string
+  models?: string[]
 }
 
 export interface AskTutorReply {
@@ -236,7 +240,7 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
         intent: request.intent,
         history: request.history.map(({ role, text, isProbe }) => ({ role, text, isProbe })),
         userMessage: request.userMessage,
-        ...(request.model ? { model: request.model } : {}),
+        ...(request.models && request.models.length > 0 ? { models: request.models } : {}),
       }),
     })
     if (!response.ok) return cannedReply(reasonFor(response.status))

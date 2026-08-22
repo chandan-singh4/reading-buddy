@@ -1,7 +1,10 @@
 /*
- * The held-mark menu. Lamp-room paper on the reading page — the same bronzes
- * as `TutorMarks.module.css`, because it belongs to the same conversation and
- * not to the book's theme.
+ * The held-slip menu, drawn as the platform's own context menu.
+ *
+ * Translucent, heavily rounded, hairline-separated, and blurred over whatever
+ * it covers. The colours are iOS's system values rather than this app's paper
+ * bronzes on purpose: the card is not part of the book, it is the phone's
+ * furniture appearing over it, and it should read that way.
  */
 
 .backdrop {
@@ -15,49 +18,131 @@
   z-index: 91;
   display: flex;
   flex-direction: column;
-  width: 13.75rem;
-  padding: 0.5rem;
+  width: 15rem;
+  overflow: hidden;
   transform: translateX(-50%);
-  background: #fbf5e6;
-  border: 1px solid #b79a68;
-  border-radius: 0.5rem;
-  box-shadow: 0 0.5rem 1.5rem rgb(58 42 20 / 28%);
+  background: rgb(249 249 249 / 82%);
+  border-radius: 0.875rem;
+  box-shadow:
+    0 0.75rem 2rem rgb(0 0 0 / 24%),
+    0 0 0 0.5px rgb(0 0 0 / 8%);
+  backdrop-filter: blur(1.5rem) saturate(180%);
+  -webkit-backdrop-filter: blur(1.5rem) saturate(180%);
+  animation: rise 140ms ease-out;
+  transform-origin: top center;
 }
 
-/* One line of the passage, so a reader with two marks in a paragraph can tell
-   which one they are holding. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
+}
+
+/*
+ * One line of the passage, as the menu's title. iOS puts a small grey caption
+ * at the head of a context menu for exactly this job: saying what the menu is
+ * about, when the thing held is off under the reader's own finger.
+ */
 .about {
-  margin: 0 0 0.375rem;
-  padding: 0 0.375rem;
+  margin: 0;
+  padding: 0.625rem 1rem 0.5rem;
   overflow: hidden;
-  color: #7a6d52;
+  color: rgb(60 60 67 / 60%);
   font-size: 0.8125rem;
-  font-style: italic;
   line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-bottom: 0.5px solid rgb(60 60 67 / 18%);
+}
+
+/*
+ * A row: label leading, glyph trailing, a hairline between. 44px tall, which
+ * is the platform's minimum target and not a coincidence.
+ */
+.action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  color: #000;
+  font-size: 1.0625rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.action + .action {
+  border-top: 0.5px solid rgb(60 60 67 / 18%);
+}
+
+.action:active {
+  background: rgb(0 0 0 / 8%);
+}
+
+.action:focus-visible {
+  outline: 2px solid #0a84ff;
+  outline-offset: -2px;
+}
+
+.label {
+  overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.action {
-  padding: 0.6875rem 0.5rem;
-  color: #3a2a14;
-  font-size: 1rem;
-  text-align: left;
-  background: none;
-  border: 0;
-  border-radius: 0.375rem;
-  cursor: pointer;
-}
-
-.action:active {
-  background: rgb(138 106 59 / 12%);
-}
-
+/* The destructive row. Red label, red glyph — the glyph inherits it. */
 .remove {
-  color: #8f2f22;
+  color: #ff3b30;
 }
 
-.action:focus-visible {
-  outline: 2px solid #c39a5e;
-  outline-offset: -2px;
+.glyph {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: 0.75rem;
+}
+
+/*
+ * Dark mode. The reading page has its own themes, but this card belongs to the
+ * phone, so it follows the phone.
+ */
+@media (prefers-color-scheme: dark) {
+  .menu {
+    background: rgb(37 37 39 / 82%);
+  }
+
+  .about {
+    color: rgb(235 235 245 / 60%);
+    border-bottom-color: rgb(235 235 245 / 18%);
+  }
+
+  .action {
+    color: #fff;
+  }
+
+  .action + .action {
+    border-top-color: rgb(235 235 245 / 18%);
+  }
+
+  .action:active {
+    background: rgb(255 255 255 / 10%);
+  }
+
+  .remove {
+    color: #ff453a;
+  }
 }

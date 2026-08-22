@@ -100,16 +100,98 @@ export function fitForReading(model: TutorModel): boolean {
 }
 
 /**
+ * How big a model says it is, in billions of parameters.
+ *
+ * ## What OpenRouter actually gives us
+ *
+ * Not a benchmark score. The roster carries an id, a name, a description, a
+ * context length, a price and a list of supported parameters — and nothing
+ * that ranks one model against another on knowledge or reasoning. There is no
+ * field to sort by, so one has to be inferred.
+ *
+ * The one real signal in the roster is the **parameter count in the model's
+ * own name**: `nemotron-3-super-120b-a12b`, `gemma-4-31b-it`, `qwen3-8b`. Size
+ * is a coarse proxy for how much a model knows, and knowing things is most of
+ * what a reading tutor does.
+ *
+ * Two rules, both from how vendors name things:
+ *
+ *   - The **largest** number wins. A mixture-of-experts model writes both its
+ *     total and its active size (`120b-a12b`); the total is the one that tracks
+ *     what it has read.
+ *   - `k` and `m` suffixes are ignored. They are context windows and token
+ *     counts, never parameter counts.
+ */
+export function sizeOf(model: TutorModel): number {
+  const said = `${model.id} ${model.name}`.toLowerCase()
+  let largest = 0
+  for (const [, digits] of said.matchAll(/(\d+(?:\.\d+)?)\s?b(?![a-z0-9])/g)) {
+    largest = Math.max(largest, Number(digits))
+  }
+  return largest
+}
+
+/**
+ * What a model with no size in its name is assumed to be worth.
+ *
+ * Plenty of good models never state a size — `glm-5.2`, `deepseek-chat`. Two
+ * shabby options and one reasonable one: rank them last (which would bury
+ * strong models under any 8B that happens to say so), rank them first (which
+ * would do the reverse), or give them a middle value and let the ones that
+ * *do* announce themselves as large sort above them. This is that middle value.
+ *
+ * Deliberately not tuned. It is a placeholder for a missing fact, and the day
+ * OpenRouter publishes a real quality signal it should be deleted, not
+ * adjusted.
+ */
+export const ASSUMED_SIZE = 70
+
+/** Bigger first, and a model that states nothing sits in the middle. */
+function strength(model: TutorModel): number {
+  if (model.paid) return Number.POSITIVE_INFINITY
+  const stated = sizeOf(model)
+  return stated > 0 ? stated : ASSUMED_SIZE
+}
+
+/**
  * The roster, filtered and ordered for the dropdown.
  *
  * Paid first because it is the deliberate choice and belongs where a reader
- * looking for it will find it. The rest keep OpenRouter's own order, which
- * puts newer models first — the closest thing to a quality signal the roster
- * carries, and better than sorting by a name nobody chose.
+ * looking for it will find it. The rest go strongest first, by `strength`.
+ *
+ * The sort is **stable**, which is the point of using one sort rather than
+ * bucketing: models of equal stated size keep OpenRouter's own order, which
+ * puts newer first. So the ordering reads as "biggest, and newest among
+ * equals" — and never as an alphabet nobody chose.
  */
 export function offerable(rows: readonly TutorModel[]): TutorModel[] {
-  const fit = rows.filter(fitForReading)
-  return [...fit.filter((row) => row.paid), ...fit.filter((row) => !row.paid)]
+  return rows.filter(fitForReading).sort((a, b) => strength(b) - strength(a))
+}
+
+/**
+ * The models to try, in order: the reader's pick, then the strongest others.
+ *
+ * ## The complaint this answers
+ *
+ * The reader chose GLM 5.2 and kept being answered by Nemotron. The pick was
+ * being honoured — GLM was simply refusing, and the relay fell through to a
+ * **fixed list** written into the server, which had nothing to do with the
+ * roster in front of the reader. So the fallback was arbitrary: it could as
+ * easily land on a weaker model as a stronger one.
+ *
+ * Now the fallback is the roster's own top of the list, minus the pick.
+ * If the first choice will not answer, the next thing tried is the largest
+ * model on offer, then the one after it.
+ *
+ * Three, because OpenRouter rejects a longer chain with a 400.
+ */
+export const MAX_CHAIN = 3
+
+export function chainFrom(rows: readonly TutorModel[], pick: string | undefined): string[] {
+  const ordered = offerable(rows).map((row) => row.id)
+  const rest = ordered.filter((id) => id !== pick)
+  const whole = pick ? [pick, ...rest] : rest
+  return whole.slice(0, MAX_CHAIN)
 }
 
 /**

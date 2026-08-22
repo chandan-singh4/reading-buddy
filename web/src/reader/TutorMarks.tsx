@@ -249,21 +249,53 @@ export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksP
         }
 
         /*
-         * The slip rides at the end of the passage's own last line, so two
-         * threads in one paragraph each get their sticker on their own
-         * sentence. Clamped inside the paragraph's width so a sentence that
-         * ends flush right does not push its slip into the gutter; on the
-         * rare passage with no measurable lines, the paragraph's top corner
-         * is the fallback.
+         * ## Where the slip sits, and why it moved
+         *
+         * It used to ride at the end of the passage's own last line. That put
+         * it on top of the words that follow whenever a passage ended
+         * mid-line, which is most of the time — reported from the phone.
+         *
+         * There is nowhere outside the paragraph to put it: the page clips at
+         * the paragraph's own width, so the margin is not ours to use.
+         *
+         * So it goes to the end of the paragraph's **last line**, in the
+         * whitespace a paragraph almost always leaves there. If that line runs
+         * too close to the edge, it tucks just under the paragraph instead, in
+         * the gap before the next one. Both places hold no words.
+         *
+         * The cost is real and worth naming: two threads in one paragraph no
+         * longer wear their slips on their own sentences. They sit side by
+         * side at the paragraph's end instead, stacked leftwards. The ink still
+         * shows which words each is about, and the hold menu names the passage.
          */
         if (block === last) {
-          const end = mark.strokes[mark.strokes.length - 1]
-          mark.slip = end
-            ? {
-                top: end.top + (end.height - 22) / 2,
-                left: Math.max(0, Math.min(end.left + end.width + 5, block.offsetWidth - 32)),
-              }
-            : { top: -11, left: Math.max(0, block.offsetWidth - 44) }
+          const home = document.createRange()
+          home.selectNodeContents(block)
+          const lines = linesOf(home)
+          const tail = lines[lines.length - 1]
+
+          // One slip is 30px wide; 34 leaves a hair of daylight between two.
+          const already = found.filter((one) => one.block === block && one.slip).length
+          const shift = already * 34
+
+          if (tail) {
+            const column = fragmentOf(tail)
+            const top = (tail.top - box.top + column * fold) / scale
+            const right = (tail.right - box.left - column * pitch) / scale
+            const room = block.offsetWidth - right - 6 - shift
+
+            mark.slip =
+              room >= 30
+                ? { top: top + (tail.height / scale - 22) / 2, left: right + 6 + shift }
+                : // No room on the line. The gap under the paragraph is the
+                  // next place with no words in it.
+                  {
+                    top: top + tail.height / scale + 2,
+                    left: Math.max(0, block.offsetWidth - 32 - shift),
+                  }
+          } else {
+            mark.slip = { top: -11, left: Math.max(0, block.offsetWidth - 44 - shift) }
+          }
         }
 
         if (mark.strokes.length > 0 || mark.slip) found.push(mark)
@@ -348,8 +380,14 @@ export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksP
               <span
                 key={stroke.key}
                 className={styles.stroke}
-                // The strokes of one passage are one control, not one per
-                // line — the slip carries the accessible name for the lot.
+                /*
+                 * Ink, and nothing else. It used to be the reopen control as
+                 * well, and that was a conflict rather than a convenience: the
+                 * words under it are the book's own text, and a reader reaching
+                 * for them to highlight, copy or look up instead reopened a
+                 * conversation. The slip is the control now — one target, one
+                 * meaning, and the sentence goes back to being a sentence.
+                 */
                 aria-hidden="true"
                 style={{
                   top: stroke.top,
@@ -357,8 +395,6 @@ export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksP
                   width: stroke.width,
                   height: stroke.height,
                 }}
-                onClick={() => tap(mark.thread)}
-                {...holding(mark.thread)}
               />
             ))}
             {mark.slip && (

@@ -50,7 +50,7 @@ describe('when the relay answers', () => {
   it('carries the model that really produced the text, not the one asked for', async () => {
     answering(relay({ text: 'Here is the idea.', model: 'meta-llama/llama-3.3-70b-instruct:free' }))
 
-    const reply = await askTutor({ ...request, model: 'z-ai/glm-4.6:free' })
+    const reply = await askTutor({ ...request, models: ['z-ai/glm-4.6:free'] })
 
     // The reader picked GLM and a different model served it. The label has to
     // say so — that is the entire reason the field exists.
@@ -72,13 +72,22 @@ describe('when the relay answers', () => {
     expect((await askTutor({ ...request, intent: 'define' })).probe).toBeUndefined()
   })
 
-  it('sends the reader s pick so the relay can lead its chain with it', async () => {
+  it('sends the whole chain, not just the pick, so the fallback is chosen too', async () => {
     const fetch = answering(relay({ text: 'ok', model: 'a' }))
 
-    await askTutor({ ...request, model: 'z-ai/glm-4.6:free' })
+    await askTutor({ ...request, models: ['z-ai/glm-4.6:free', 'big', 'next'] })
 
-    const sent = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as { model?: string }
-    expect(sent.model).toBe('z-ai/glm-4.6:free')
+    const sent = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as { models?: string[] }
+    expect(sent.models).toEqual(['z-ai/glm-4.6:free', 'big', 'next'])
+  })
+
+  it('leaves the chain out when it is empty, so the relay uses its own list', async () => {
+    const fetch = answering(relay({ text: 'ok', model: 'a' }))
+
+    await askTutor({ ...request, models: [] })
+
+    const sent = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as { models?: string[] }
+    expect(sent.models).toBeUndefined()
   })
 
   it('signs the request, because the relay is a spend control', async () => {

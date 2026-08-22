@@ -289,6 +289,49 @@ first save.
 - `web/src/reader/ThreadMenu.test.tsx` — 8 tests. **New.**
 - `web/src/reader/TutorMarks.tsx` — hold detection on the ink and the slip.
 
+## Done next — the slip alone takes the tap, and the chain is ranked
+
+Four changes, all from one round of feedback.
+
+**Only the slip takes a tap.** The ink under the words was also a button. A tap
+on the words opened the lamp, so the reader could not select that sentence
+again. Now the ink is decoration: `pointer-events: none`. The taped slip is the
+one control.
+
+**The slip covers no words.** It used to sit at the end of the passage, which is
+in the middle of a paragraph. Now it goes after the last character of the
+paragraph's last line. If that line has less than 30 px of room, the slip drops
+under the paragraph instead. More than one slip on the same paragraph steps
+34 px to the side. Proved in the browser: no character is under the slip.
+
+**The menu looks like iOS.** A translucent card with a blur, rounded corners, a
+quiet caption of the passage, and two rows with icons — *Continue* with a speech
+bubble, *Delete* in red with a bin. It rises with a short animation, and the
+animation stops under `prefers-reduced-motion`.
+
+**The fallback model is ranked, not arbitrary.** The reader picked GLM 5.2 and
+kept getting answers from Nemotron. The pick was honoured; GLM refused, and the
+relay fell through to a **fixed list written into the server**. That list had
+nothing to do with the roster the reader saw.
+
+OpenRouter publishes no benchmark score and no parameter-count field. The only
+real signal is the size a model states in its own name —
+`nemotron-3-super-120b-a12b`, `qwen3-8b`. `sizeOf` reads it, and takes the
+largest number, because a mixture-of-experts model writes its total and its
+active size together. A model that states no size gets `ASSUMED_SIZE` and sorts
+in the middle. Paid sorts first.
+
+`chainFrom` then builds the chain: the reader's pick, then the largest models
+after it, cut to three — OpenRouter refuses a longer array with a 400. The
+client sends the chain, and the relay uses it when it is there.
+
+**New files in scope:**
+
+- `web/src/reader/models.ts` — `sizeOf`, `ASSUMED_SIZE`, a sorted `offerable`,
+  `chainFrom`. 34 tests.
+- `api/tutor.ts` — `slugs()` reads the client chain; `body.model` still works.
+- `web/src/reader/TutorMarks.tsx` and `.module.css` — slip placement, dead ink.
+
 ## Carried forward — how to work on the reading page
 
 Fourteen lessons earlier threads paid for. They are unchanged and still apply.

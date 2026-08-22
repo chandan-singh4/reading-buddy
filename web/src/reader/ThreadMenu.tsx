@@ -1,5 +1,5 @@
 /**
- * The little menu a *held* conversation mark raises: continue it, or throw it
+ * The little menu a *held* conversation slip raises: continue it, or throw it
  * away.
  *
  * ## Why it exists
@@ -11,18 +11,29 @@
  *
  * ## Why a hold and not a tap
  *
- * A tap already means "reopen", and that is the thing the reader does a hundred
- * times more often than deleting. It keeps the tap. A hold is the phone's own
- * idiom for "show me what else I can do with this", and it costs the common
- * action nothing.
+ * A tap on the slip already means "reopen", and that is the thing the reader
+ * does a hundred times more often than deleting. It keeps the tap. A hold is
+ * the phone's own idiom for "show me what else I can do with this", and it
+ * costs the common action nothing.
+ *
+ * ## Why it looks like iOS and not like the study lamp
+ *
+ * It is the platform's context menu, borrowed on purpose: a rounded translucent
+ * card, a hairline between rows, the label at the leading edge and the glyph at
+ * the trailing edge, and the destructive row in red. A reader who has used a
+ * phone already knows what this is and which row is the dangerous one, and none
+ * of that knowledge has to be taught by a house style.
+ *
+ * The glyphs are drawn as inline SVG rather than set as text. An emoji is a
+ * different picture on every platform and a font icon is a download; these are
+ * two paths, they inherit `currentColor`, and so the delete row's glyph turns
+ * red with its label for free.
  *
  * ## Why it is placed by hand rather than anchored
  *
- * It appears at the finger, not at the mark. The mark can be three lines of ink
- * across a column break, which has no single sensible corner to hang a menu
- * off; the finger has exactly one position and the reader is already looking at
- * it. It flips to sit above the finger in the lower half of the screen, so it
- * never opens under the hand that raised it.
+ * It appears at the finger, not at the slip. It flips to sit above the finger
+ * in the lower half of the screen, so it never opens under the hand that
+ * raised it.
  */
 
 import { createPortal } from 'react-dom'
@@ -30,7 +41,7 @@ import { createPortal } from 'react-dom'
 import styles from './ThreadMenu.module.css'
 
 export interface ThreadMenuProps {
-  /** The first words of the passage, so the reader can see what they are about to delete. */
+  /** The first words of the passage, so the reader can see what they hold. */
   excerpt: string
   /** Where the finger was, in viewport coordinates. */
   at: { x: number; y: number }
@@ -39,8 +50,39 @@ export interface ThreadMenuProps {
   onClose: () => void
 }
 
-/** Kept clear of the screen edges — the menu is about 180px wide. */
-const EDGE = 100
+/** Kept clear of the screen edges — the card is about 15rem wide. */
+const EDGE = 120
+
+/** A speech bubble: the conversation, carried on. */
+function BubbleGlyph() {
+  return (
+    <svg className={styles.glyph} viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M4 3.5h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9.5L6 17.5V14.5H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/** A waste basket, as every phone draws it. */
+function TrashGlyph() {
+  return (
+    <svg className={styles.glyph} viewBox="0 0 20 20" aria-hidden="true">
+      <path
+        d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.7 10a1.5 1.5 0 0 0 1.5 1.4h4.6a1.5 1.5 0 0 0 1.5-1.4l.7-10M8.5 8.5v6M11.5 8.5v6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 export function ThreadMenu({ excerpt, at, onContinue, onDelete, onClose }: ThreadMenuProps) {
   const width = typeof window === 'undefined' ? 360 : window.innerWidth
@@ -60,18 +102,16 @@ export function ThreadMenu({ excerpt, at, onContinue, onDelete, onClose }: Threa
         className={styles.menu}
         role="dialog"
         aria-label="This conversation"
-        style={
-          below
-            ? { top: at.y + 16, left }
-            : { bottom: height - at.y + 16, left }
-        }
+        style={below ? { top: at.y + 16, left } : { bottom: height - at.y + 16, left }}
       >
         <p className={styles.about}>“{excerpt}”</p>
         <button type="button" className={styles.action} onClick={onContinue}>
-          Continue the conversation
+          <span className={styles.label}>Continue</span>
+          <BubbleGlyph />
         </button>
         <button type="button" className={`${styles.action} ${styles.remove}`} onClick={onDelete}>
-          Delete the conversation
+          <span className={styles.label}>Delete</span>
+          <TrashGlyph />
         </button>
       </div>
     </>,

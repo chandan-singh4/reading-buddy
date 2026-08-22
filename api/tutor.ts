@@ -227,6 +227,29 @@ interface Body {
   userMessage?: unknown
   /** Stage B: the reader's pick, put at the head of the fallback chain. */
   model?: unknown
+  /**
+   * The whole chain the client wants tried, in order. It knows the roster and
+   * which models on it are strongest; this file only knows a list it was
+   * configured with. So when the client sends one, it wins.
+   */
+  models?: unknown
+}
+
+/**
+ * A list of model slugs from the request, made safe.
+ *
+ * Trusted for *order* and nothing else: a slug that is not on OpenRouter comes
+ * back as an error from OpenRouter, which is already handled, and a slug is
+ * never interpolated into a prompt. Length and count are still capped, because
+ * this endpoint is reachable by anything that can sign in.
+ */
+function slugs(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .slice(0, MAX_CHAIN)
 }
 
 function json(body: unknown, status: number, origin: string | null): Response {
@@ -505,9 +528,20 @@ export default async function handler(request: Request): Promise<Response> {
   // takes. Failing the request instead would strand a reader on an old client.
   const module = typeof body.intent === 'string' ? MODULES[body.intent] : undefined
 
-  // The reader's pick leads, and the chain is trimmed to fit around it — the
-  // whole request 400s if the array is any longer.
-  const models = chain()
+  /*
+   * Which models to try, in order.
+   *
+   * The client's chain wins when it sends one, because it is the only side that
+   * knows what is on today's roster and how the models on it compare. This file
+   * has a hardcoded list, which was fine as a floor and wrong as a fallback:
+   * the reader picked GLM, GLM refused, and the question fell through to
+   * whatever slug happened to be second in a server constant.
+   *
+   * Everything after is the same as before — the pick leads, duplicates go, and
+   * the array is cut to three, because OpenRouter 400s a longer one.
+   */
+  const asked = slugs(body.models)
+  const models = asked.length > 0 ? asked : chain()
   const picked = text(body.model, 120).trim()
   if (picked) {
     const rest = models.filter((slug) => slug !== picked)
