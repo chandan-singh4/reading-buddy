@@ -94,6 +94,7 @@ import {
   type PassageAnchor,
   type TutorMessage,
   passageContext,
+  ThreadMenu,
   type BarState,
   type ReaderSettings,
   type SectionRef,
@@ -2950,6 +2951,18 @@ export default function Reader() {
    * second write path.
    */
   const [lamp, setLamp] = useState<{
+    /**
+     * What React keys the lamp on — one value per *opening*, fixed for as long
+     * as that opening lasts.
+     *
+     * It used to be `threadId ?? excerpt`, and that was a bug with a very
+     * specific shape. A fresh passage has no thread id, so the key was the
+     * excerpt; the first answer saved the thread, which filled the id in, which
+     * changed the key, which unmounted the lamp mid-conversation and built a
+     * new one from `saved`. The reader watched the room blink and their answer
+     * disappear, and had to go to Notes to read what the tutor had said.
+     */
+    key: string
     passage: PassageAnchor
     threadId: string | null
     saved: TutorMessage[]
@@ -2980,6 +2993,7 @@ export default function Reader() {
   /** A tap on the ink or the slip: the same passage, its thread, reopened. */
   const openThread = useCallback((thread: StoredTutorThread) => {
     setLamp({
+      key: thread.id,
       passage: { anchor: thread.anchor, excerpt: thread.excerpt, kind: thread.kind },
       threadId: thread.id,
       saved: thread.messages,
@@ -2997,6 +3011,7 @@ export default function Reader() {
       if (!id || !open) return
       if (open.threadId) {
         void tutorStore.setMessages(id, open.threadId, messages)
+        setLamp((current) => (current ? { ...current, saved: messages } : current))
         setThreads((rows) =>
           rows.map((row) =>
             row.id === open.threadId
@@ -3008,9 +3023,31 @@ export default function Reader() {
       }
       const row = await tutorStore.addThread(id, open.passage, messages)
       setThreads((rows) => [...rows, row])
-      setLamp((current) => (current ? { ...current, threadId: row.id } : current))
+      setLamp((current) => (current ? { ...current, threadId: row.id, saved: messages } : current))
     },
     [id],
+  )
+
+  /*
+   * ## Holding a conversation mark
+   *
+   * `markMenu` is the little menu on the page: which thread it is about, and
+   * where the finger was. It exists because deleting a conversation used to
+   * mean leaving the book — Notes, the Claude tab, find the row — for something
+   * that is drawn on the page in front of the reader.
+   *
+   * The tap on a mark still reopens it. Only a hold raises this. It is declared
+   * up here, with the refs, because `dismissTopLayer` reads it and everything
+   * that hook watches has to exist before it.
+   */
+  const [markMenu, setMarkMenu] = useState<{
+    thread: StoredTutorThread
+    at: { x: number; y: number }
+  } | null>(null)
+
+  const holdMark = useCallback(
+    (thread: StoredTutorThread, at: { x: number; y: number }) => setMarkMenu({ thread, at }),
+    [],
   )
 
   /*
@@ -3020,6 +3057,8 @@ export default function Reader() {
    */
   const selectedRef = useRef(selected)
   selectedRef.current = selected
+  const markMenuRef = useRef(markMenu)
+  markMenuRef.current = markMenu
   const dropRef = useRef(dropSelection)
   dropRef.current = dropSelection
 
@@ -3054,6 +3093,13 @@ export default function Reader() {
     // The study lamp is drawn over everything, so it is dismissed first.
     // Anything over the page must be a layer — lesson 14 — or a back swipe
     // with the lamp open would throw the reader out of the book.
+    // The held-mark menu is the smallest and the newest thing on screen, and a
+    // back swipe with it up plainly means "forget it".
+    if (markMenuRef.current) {
+      setMarkMenu(null)
+      return
+    }
+
     if (lampRef.current) {
       setLamp(null)
       return
@@ -3084,7 +3130,8 @@ export default function Reader() {
     (chromeShown ? 1 : 0) +
     (sheetOpen || searchOpen ? 1 : 0) +
     (selected ? 1 : 0) +
-    (lamp ? 1 : 0)
+    (lamp ? 1 : 0) +
+    (markMenu ? 1 : 0)
 
   useBackDismiss(layerDepth, dismissTopLayer)
 
@@ -3139,6 +3186,19 @@ export default function Reader() {
       dropNote(note.id)
     },
     [id, dropNote],
+  )
+
+  /** Delete from the page. The row goes, and with it the ink and the slip. */
+  const dropThread = useCallback(
+    (thread: StoredTutorThread) => {
+      setMarkMenu(null)
+      if (!id) return
+      void tutorStore.deleteThread(id, thread.id)
+      setThreads((rows) => rows.filter((row) => row.id !== thread.id))
+      // The lamp may be open on the very thread being thrown away.
+      setLamp((current) => (current?.threadId === thread.id ? null : current))
+    },
+    [id],
   )
 
   /** From the notes panel back under the lamp: reopen the thread a row names. */
@@ -3234,6 +3294,7 @@ export default function Reader() {
             openThread(existing)
           } else {
             setLamp({
+              key: `${at.anchor}:${Date.now()}`,
               passage: {
                 anchor: at.anchor,
                 excerpt: at.text,
@@ -3840,18 +3901,26 @@ export default function Reader() {
             a seam turn flips the understudy itself, and a mark missing from
             it would blink out for the length of the turn.
           */}
-          <TutorMarks threads={threads} root={column} watch={here.section} onOpen={openThread} />
+          <TutorMarks
+            threads={threads}
+            root={column}
+            watch={here.section}
+            onOpen={openThread}
+            onHold={holdMark}
+          />
           <TutorMarks
             threads={threads}
             root={beforeColumn}
             watch={beside.previous}
             onOpen={openThread}
+            onHold={holdMark}
           />
           <TutorMarks
             threads={threads}
             root={afterColumn}
             watch={beside.next}
             onOpen={openThread}
+            onHold={holdMark}
           />
 
           {selected && !composing && (
@@ -3886,9 +3955,23 @@ export default function Reader() {
             />
           )}
 
+          {markMenu && (
+            <ThreadMenu
+              excerpt={elide(markMenu.thread.excerpt)}
+              at={markMenu.at}
+              onContinue={() => {
+                const thread = markMenu.thread
+                setMarkMenu(null)
+                openThread(thread)
+              }}
+              onDelete={() => dropThread(markMenu.thread)}
+              onClose={() => setMarkMenu(null)}
+            />
+          )}
+
           {lamp && (
             <StudyLamp
-              key={lamp.threadId ?? lamp.passage.excerpt}
+              key={lamp.key}
               passage={lamp.passage}
               context={lampContext}
               saved={lamp.saved}

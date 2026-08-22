@@ -256,6 +256,39 @@ Rules that hold this in place:
 - `web/src/reader/context.test.ts` — 15 tests. **New.**
 - `web/src/pages/Reader.tsx` — `lampContext`, handed to the lamp.
 
+## Done next — the lamp blinked, and marks can now be deleted from the page
+
+**The blink.** The reader asked a question, the answer arrived, and the room
+reset to the passage and the question with no answer. They had to open Notes to
+read the reply.
+
+Cause: `<StudyLamp key={lamp.threadId ?? lamp.passage.excerpt}>`. A fresh
+passage has no thread id, so the key was the excerpt. The first answer saved the
+thread. The save filled the id in. The key changed. React unmounted the lamp and
+built a new one from `saved`, which was still empty.
+
+Fix: the lamp state carries its own `key`, set once for each opening. `saved` is
+also kept in step with each save, so any later remount still shows the
+conversation.
+
+**Delete from the page.** A hold on the ink or the slip raises a small menu:
+*Continue the conversation* or *Delete the conversation*. A tap still reopens.
+The hold is 500 ms with a 10 px slop, so a scroll that starts on a mark is not a
+hold. The lift after a hold does not also count as a tap.
+
+Deleting removes the thread, the ink, and the slip. If the lamp is open on that
+thread, the lamp closes.
+
+Both were proved in the browser, not by reading the file. The hold raised the
+menu, delete took the marks from two to one, and a fresh question survived the
+first save.
+
+**New files in scope:**
+
+- `web/src/reader/ThreadMenu.tsx` and `.module.css` — the held-mark menu. **New.**
+- `web/src/reader/ThreadMenu.test.tsx` — 8 tests. **New.**
+- `web/src/reader/TutorMarks.tsx` — hold detection on the ink and the slip.
+
 ## Carried forward — how to work on the reading page
 
 Fourteen lessons earlier threads paid for. They are unchanged and still apply.

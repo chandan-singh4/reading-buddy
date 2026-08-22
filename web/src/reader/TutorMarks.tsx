@@ -30,7 +30,7 @@
  * first's sticker.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { blockOf, blocksOf, clipTo, linesOf } from './HandDrawn.tsx'
@@ -89,10 +89,102 @@ export interface TutorMarksProps {
   /** Anything whose change should force a re-measure — the section on screen. */
   watch?: unknown
   onOpen: (thread: StoredTutorThread) => void
+  /**
+   * A hold on the ink or the slip, with the finger's position. The page raises
+   * a small menu there — continue, or delete. Left out, a hold does nothing and
+   * the mark keeps its tap.
+   */
+  onHold?: (thread: StoredTutorThread, at: { x: number; y: number }) => void
 }
 
-export function TutorMarks({ threads, root, watch, onOpen }: TutorMarksProps) {
+/** How long a press has to last to be a hold. The platform figure. */
+const HOLD_MS = 500
+
+/**
+ * How far the finger may travel and still be holding.
+ *
+ * A finger resting on glass drifts a few pixels; a finger starting a scroll
+ * does not stop at ten. Below this the press is still a press.
+ */
+const SLOP = 10
+
+export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksProps) {
   const [marks, setMarks] = useState<Mark[]>([])
+
+  /*
+   * The hold, in three refs and no state: nothing here draws, and a press that
+   * re-rendered the whole ink layer on every pointermove would be measurably
+   * worse than one that does not.
+   *
+   * `fired` is the important one. A hold ends with the finger lifting, and a
+   * lift on the same element is also a click — so without it, holding a mark
+   * would raise the menu and reopen the thread underneath it.
+   */
+  const timer = useRef<number | undefined>(undefined)
+  const from = useRef({ x: 0, y: 0 })
+  const fired = useRef(false)
+
+  const stopHold = useCallback(() => {
+    if (timer.current !== undefined) window.clearTimeout(timer.current)
+    timer.current = undefined
+  }, [])
+
+  // A mark can be measured away mid-press — a page turn, a font change — and a
+  // timer that outlived its element would raise a menu about nothing.
+  useEffect(() => stopHold, [stopHold])
+
+  const startHold = useCallback(
+    (thread: StoredTutorThread, event: React.PointerEvent) => {
+      if (!onHold) return
+      fired.current = false
+      from.current = { x: event.clientX, y: event.clientY }
+      const at = { x: event.clientX, y: event.clientY }
+      stopHold()
+      timer.current = window.setTimeout(() => {
+        timer.current = undefined
+        fired.current = true
+        onHold(thread, at)
+      }, HOLD_MS)
+    },
+    [onHold, stopHold],
+  )
+
+  const moveHold = useCallback(
+    (event: React.PointerEvent) => {
+      if (timer.current === undefined) return
+      const travelled = Math.hypot(event.clientX - from.current.x, event.clientY - from.current.y)
+      if (travelled > SLOP) stopHold()
+    },
+    [stopHold],
+  )
+
+  /** A tap reopens — unless the hold already fired, in which case it is the
+   *  same finger lifting and the menu is already up. */
+  const tap = useCallback(
+    (thread: StoredTutorThread) => {
+      stopHold()
+      if (fired.current) {
+        fired.current = false
+        return
+      }
+      onOpen(thread)
+    },
+    [onOpen, stopHold],
+  )
+
+  /** The same five handlers on the ink and on the slip. */
+  const holding = useCallback(
+    (thread: StoredTutorThread) => ({
+      onPointerDown: (event: React.PointerEvent) => startHold(thread, event),
+      onPointerMove: moveHold,
+      onPointerUp: stopHold,
+      onPointerCancel: stopHold,
+      // The browser's own long-press menu would open over ours. This is a
+      // control, not text to be copied.
+      onContextMenu: (event: React.MouseEvent) => event.preventDefault(),
+    }),
+    [startHold, moveHold, stopHold],
+  )
 
   const measure = useCallback(() => {
     if (!root || threads.length === 0) {
@@ -265,7 +357,8 @@ export function TutorMarks({ threads, root, watch, onOpen }: TutorMarksProps) {
                   width: stroke.width,
                   height: stroke.height,
                 }}
-                onClick={() => onOpen(mark.thread)}
+                onClick={() => tap(mark.thread)}
+                {...holding(mark.thread)}
               />
             ))}
             {mark.slip && (
@@ -274,7 +367,8 @@ export function TutorMarks({ threads, root, watch, onOpen }: TutorMarksProps) {
                 className={styles.slip}
                 style={{ top: mark.slip.top, left: mark.slip.left }}
                 aria-label="Reopen the conversation about this passage"
-                onClick={() => onOpen(mark.thread)}
+                onClick={() => tap(mark.thread)}
+                {...holding(mark.thread)}
               >
                 <span className={styles.slipMark} aria-hidden="true">
                   ✦
