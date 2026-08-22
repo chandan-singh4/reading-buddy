@@ -49,8 +49,13 @@ const MODELS_URL: string =
  * picker falls through to the first fit model instead. That is the whole
  * reason it is written as a search rather than an assignment — the free roster
  * churns weekly and this name will eventually stop existing.
+ *
+ * It was `z-ai/glm-5.2:free`, which turned out to be a poor default twice
+ * over: it is rate-limited upstream most of the time, and it is a reasoning
+ * model that spends its token budget thinking and can return `content: null`
+ * with the working-out in `reasoning`. An empty bubble is not an answer.
  */
-export const PREFERRED_MODEL = 'z-ai/glm-5.2:free'
+export const PREFERRED_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free'
 
 const PICK_KEY = 'reading-buddy:tutor-model'
 

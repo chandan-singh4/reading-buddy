@@ -10,6 +10,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { PREFERRED_MODEL } from './models.ts'
 import { StudyLamp } from './StudyLamp.tsx'
 import type { PassageAnchor, TutorMessage } from './tutor.ts'
 
@@ -19,7 +20,7 @@ vi.mock('./models.ts', async () => {
     ...real,
     loadModels: () =>
       Promise.resolve([
-        { id: 'z-ai/glm-5.2:free', name: 'GLM 5.2', description: '', contextLength: 131_072 },
+        { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super', description: '', contextLength: 131_072 },
         { id: 'google/gemma-4-31b-it:free', name: 'Gemma 4 31B', description: '', contextLength: 131_072 },
       ]),
   }
@@ -81,8 +82,11 @@ describe('the study lamp', () => {
   it('offers the roster in the composer', async () => {
     lamp([])
     const picker = (await screen.findByLabelText('Which model answers')) as HTMLSelectElement
-    expect([...picker.options].map((option) => option.text)).toEqual(['GLM 5.2', 'Gemma 4 31B'])
+    expect([...picker.options].map((option) => option.text)).toEqual([
+      'Nemotron 3 Super',
+      'Gemma 4 31B',
+    ])
     // The preferred model, since nothing has been chosen before.
-    await waitFor(() => expect(picker.value).toBe('z-ai/glm-5.2:free'))
+    await waitFor(() => expect(picker.value).toBe(PREFERRED_MODEL))
   })
 })

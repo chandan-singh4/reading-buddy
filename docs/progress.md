@@ -25,6 +25,19 @@ Get that loop working before building any breadth.
   not run `api/`, so every reply in the pane is still the honest offline line.
   To prove it: sign in on the phone, open a passage, tap "Explain simply". Two
   bubbles must arrive, each with a name above it.
+- **The tutor answered nothing at all until 2026-08-22, and the cause was
+  ours.** The relay sent a four-model fallback chain. OpenRouter rejects any
+  `models` array longer than three with a `400`, so every question failed, for
+  every model the reader picked. The relay flattened all failures to `502`, and
+  the client printed one generic line for all of them, so the bug looked like an
+  outage. Fixed three ways: the chain is capped at three, the upstream status is
+  carried through, and a rate-limited model now says so.
+- **Free models are unreliable, and that is normal.** A probe on 2026-08-22
+  found `z-ai/glm-5.2:free` and `google/gemma-4-31b-it:free` returning `429`,
+  `thinkingmachines/inkling:free` returning `403`, and only
+  `nvidia/nemotron-3-super-120b-a12b:free` answering. The preferred model is now
+  that one. GLM was also a bad default for a second reason: it is a reasoning
+  model and can return `content: null` with the working-out in `reasoning`.
 - **Two things wait on OpenRouter credits** (2026-08-22). A live probe of the
   key returned `402 Insufficient credits` for the web plugin and for every paid
   slug. So Stage C's "Still true?" and "Historical context" cannot search, and

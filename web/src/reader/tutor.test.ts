@@ -163,3 +163,18 @@ describe('modelLabel', () => {
     expect(modelLabel('inkling')).toBe('Inkling')
   })
 })
+
+describe('the failure the free tier actually produces', () => {
+  it('tells the reader to pick another model when none would answer', async () => {
+    answering(new Response(JSON.stringify({ error: 'OpenRouter answered 429' }), { status: 502 }))
+    const reply = await askTutor(request)
+    expect(reply.text).toMatch(/pick a different one/i)
+    expect(reply.model).toBeUndefined()
+  })
+
+  it('says a busy model is the free tier, not the reader', async () => {
+    answering(new Response('{}', { status: 429 }))
+    const reply = await askTutor(request)
+    expect(reply.text).toMatch(/free tier/i)
+  })
+})

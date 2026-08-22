@@ -187,9 +187,11 @@ function reasonFor(status: number): string {
     case 401:
       return 'The tutor needs you signed in. Sign in from Settings, then ask again — nothing you typed is lost.'
     case 429:
-      return 'The tutor has been asked too much too quickly. Give it a minute, then ask again.'
+      return 'The free model is busy right now — that is the free tier, not you. Give it a minute, or pick a different model below and ask again.'
     case 500:
       return 'The tutor relay has no key set, so it cannot reach a model. This one needs fixing on the server, not here.'
+    case 502:
+      return 'No model would answer that just now. Pick a different one below and ask again — I would rather say nothing than guess at the passage.'
     default:
       return 'The tutor could not be reached just now. Ask again in a moment — I would rather say nothing than guess at the passage.'
   }

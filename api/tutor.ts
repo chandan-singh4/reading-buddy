@@ -76,18 +76,28 @@ const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions'
  * deliberately absent.
  */
 const DEFAULT_MODELS = [
-  'z-ai/glm-5.2:free',
-  'google/gemma-4-31b-it:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
-  'thinkingmachines/inkling:free',
+  'google/gemma-4-31b-it:free',
+  'z-ai/glm-5.2:free',
 ]
+
+/**
+ * OpenRouter rejects a `models` array longer than this.
+ *
+ * Found the hard way: a four-entry chain returns `400 'models' array must have
+ * 3 items or fewer` for *every* request, and the reader sees the generic "could
+ * not be reached" line no matter which model they pick. The cap is enforced
+ * here rather than trusted to whoever edits `TUTOR_MODELS`, because getting it
+ * wrong takes the tutor down completely and looks exactly like an outage.
+ */
+const MAX_CHAIN = 3
 
 function chain(): string[] {
   const configured = (process.env.TUTOR_MODELS ?? '')
     .split(',')
     .map((slug) => slug.trim())
     .filter(Boolean)
-  return configured.length > 0 ? configured : DEFAULT_MODELS
+  return (configured.length > 0 ? configured : DEFAULT_MODELS).slice(0, MAX_CHAIN)
 }
 
 /** How long an answer may take before we stop waiting. Free models are slow. */
@@ -321,6 +331,16 @@ interface Completion {
  * One call to OpenRouter. Throws with a readable reason; never returns a
  * half-answer.
  */
+/** A failure that came from OpenRouter, carrying the status it reported. */
+class Upstream extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+  }
+}
+
 async function complete(
   turns: Turn[],
   models: string[],
@@ -357,12 +377,30 @@ async function complete(
     const payload = (await response.json().catch(() => null)) as {
       choices?: { message?: { content?: unknown } }[]
       model?: unknown
-      error?: { message?: unknown }
+      error?: { message?: unknown; code?: unknown }
     } | null
+
+    // A rate-limited provider comes back as HTTP 200 with an error envelope
+    // and no `choices` at all. Without this it reads as an empty answer, which
+    // sends the reader a "try again" for a problem retrying will not fix.
+    if (payload?.error) {
+      const reason = typeof payload.error.message === 'string' ? payload.error.message : 'refused'
+      throw new Upstream(
+        `OpenRouter answered ${reason}`,
+        typeof payload.error.code === 'number' ? payload.error.code : 502,
+      )
+    }
 
     if (!response.ok) {
       const reason = typeof payload?.error?.message === 'string' ? payload.error.message : ''
-      throw new Error(`OpenRouter answered ${response.status}${reason ? `: ${reason}` : ''}`)
+      throw new Upstream(
+        `OpenRouter answered ${response.status}${reason ? `: ${reason}` : ''}`,
+        // OpenRouter reports a provider rate-limit as a 200-shaped envelope
+        // with `error.code`, and a real HTTP status otherwise. Prefer whichever
+        // one is actually there — the reader gets a different sentence for a
+        // busy model than for a broken relay.
+        typeof payload?.error?.code === 'number' ? payload.error.code : response.status,
+      )
     }
 
     const answer = payload?.choices?.[0]?.message?.content
@@ -414,9 +452,15 @@ export default async function handler(request: Request): Promise<Response> {
   // takes. Failing the request instead would strand a reader on an old client.
   const module = typeof body.intent === 'string' ? MODULES[body.intent] : undefined
 
+  // The reader's pick leads, and the chain is trimmed to fit around it — the
+  // whole request 400s if the array is any longer.
   const models = chain()
   const picked = text(body.model, 120).trim()
-  if (picked && !models.includes(picked)) models.unshift(picked)
+  if (picked) {
+    const rest = models.filter((slug) => slug !== picked)
+    models.length = 0
+    models.push(picked, ...rest.slice(0, MAX_CHAIN - 1))
+  }
 
   const turns = assemble(body, module)
 
@@ -424,10 +468,12 @@ export default async function handler(request: Request): Promise<Response> {
   try {
     answer = await complete(turns, models, key, module?.search === true)
   } catch (error) {
-    // Passed through rather than flattened. The client turns this into a line
-    // that says the tutor could not be reached — it never invents an answer.
+    // The upstream status is carried out, not flattened to 502. A busy free
+    // model and a misconfigured relay both used to arrive as the same sentence,
+    // which made a two-minute wait look identical to a broken deploy.
     const reason = error instanceof Error ? error.message : 'the tutor could not be reached'
-    return json({ error: reason }, 502, origin)
+    const status = error instanceof Upstream && error.status === 429 ? 429 : 502
+    return json({ error: reason }, status, origin)
   }
 
   // The check that the explanation landed, as its own turn. Best-effort: a
