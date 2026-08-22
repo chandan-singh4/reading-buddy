@@ -370,6 +370,66 @@ were both proved live.
 - `web/src/reader/dictation.ts` — the Web Speech API wrapper. **New.**
 - `web/src/reader/dictation.test.ts` — 13 tests. **New.**
 
+## Done next — the marks, the keyboard, the reasoning, and the tokens
+
+**The taped note went invisible.** The reader left the page and came back, and
+the note flickered and disappeared. Cause: the measurer keeps its marks when a
+measure finds nothing, because an empty measure is usually a bad moment during
+a page turn. But the Reader had thrown the paragraphs away and built new ones.
+The kept marks pointed at paragraphs no longer in the document, so they drew
+into nothing, and nothing measured again.
+
+Now the measurer looks at the paragraphs it is holding. If they are still in the
+document, it keeps the marks — the old rule, unchanged. If they are gone, it
+drops them and looks again, up to six times, 80 ms apart.
+
+**The taped note sat at the foot of the paragraph.** Both notes did, away from
+their own sentences. They were put there because a note at the end of a sentence
+covers the words that follow. The room was measured wrong: it measured to the
+paragraph's right edge, and all of that space is the next sentence.
+
+Three places now, in this order, and none holds a word:
+
+1. After the line's own last word, when that line ends short.
+2. In the gap between that line and the next. The gap is about 9 px at the
+   reader's own type size, so the note is drawn down to a small tab with no star
+   on it. Its tap target stays a finger wide.
+3. Under the paragraph, when the line-height is too tight for a tab.
+
+Measured live on the reading page with three threads in one paragraph: 0 book
+characters covered, all three inside the paragraph, each on its own sentence.
+
+**The keyboard opened on its own.** Tapping a note opened the room with the
+keyboard already up, covering the passage. The lamp focused the box on mount.
+It now focuses the room itself, so Tab and Escape still work and the keyboard
+waits to be asked.
+
+**The reasoning.** The relay asks OpenRouter for it, and passes it through.
+Each answer draws a folded line above it — "How it thought this through" — that
+opens on a tap. It is stored with the message, so it is still there a week
+later.
+
+**The tokens.** The relay asks for `usage` and sums the answer and the probe.
+The lamp prints the last exchange under the message bar: in, out, total. All
+three zero counts as no answer and prints nothing.
+
+**The effort.** A second control sits beside the model. It opens the same iOS
+sheet with three levels. `High` is the default for every model, because they are
+free — thinking is billed as output tokens and there is nothing to ration. One
+honest note: OpenRouter's scale stops at `high`. There is no level called "Max".
+A paid model adds "costs more" to the top row.
+
+**New files in scope:**
+
+- `web/src/reader/Sheet.tsx` and `Sheet.module.css` — the iOS sheet, lifted out
+  of `ModelSheet` so two sheets share it. **New** (the CSS was renamed).
+- `web/src/reader/EffortSheet.tsx` + `.test.tsx` — 5 tests. **New.**
+- `web/src/reader/effort.ts` + `.test.ts` — the stored level, 7 tests. **New.**
+- `web/src/reader/TutorMarks.tsx` — the retry ladder and the slip placement.
+- `web/src/reader/StudyLamp.tsx` and `.module.css` — the fold, the token line,
+  the effort control, and the focus on open.
+- `api/tutor.ts` — asks for reasoning and usage, and takes an effort.
+
 ## Carried forward — how to work on the reading page
 
 Fourteen lessons earlier threads paid for. They are unchanged and still apply.

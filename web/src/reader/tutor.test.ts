@@ -90,6 +90,39 @@ describe('when the relay answers', () => {
     expect(sent.models).toBeUndefined()
   })
 
+  it('carries the working-out and what the exchange cost', async () => {
+    answering(
+      relay({
+        text: 'Here is the idea.',
+        model: 'a',
+        reasoning: 'First I read the sentence twice.',
+        usage: { input: 1200, output: 340, total: 1540 },
+      }),
+    )
+
+    const reply = await askTutor(request)
+
+    expect(reply.reasoning).toBe('First I read the sentence twice.')
+    expect(reply.usage).toEqual({ input: 1200, output: 340, total: 1540 })
+  })
+
+  it('treats all-zero counts as no counts at all', async () => {
+    // A provider that reports nothing sends zeroes. "0 tokens" under a
+    // paragraph of explanation reads as a bug, not as a figure.
+    answering(relay({ text: 'ok', model: 'a', usage: { input: 0, output: 0, total: 0 } }))
+
+    expect((await askTutor(request)).usage).toBeUndefined()
+  })
+
+  it('sends the effort when the reader chose one', async () => {
+    const fetch = answering(relay({ text: 'ok', model: 'a' }))
+
+    await askTutor({ ...request, effort: 'low' })
+
+    const sent = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as { effort?: string }
+    expect(sent.effort).toBe('low')
+  })
+
   it('signs the request, because the relay is a spend control', async () => {
     const fetch = answering(relay({ text: 'ok', model: 'a' }))
 

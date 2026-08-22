@@ -63,9 +63,18 @@ import {
   type PassageAnchor,
   type TutorIntent,
   type TutorMessage,
+  type TutorUsage,
 } from './tutor.ts'
 import type { PassageContext } from './context.ts'
 import { ModelSheet } from './ModelSheet.tsx'
+import { EffortSheet } from './EffortSheet.tsx'
+import {
+  DEFAULT_EFFORT,
+  effortLabel,
+  rememberEffort,
+  storedEffort,
+  type Effort,
+} from './effort.ts'
 import { useDictation } from './dictation.ts'
 import styles from './StudyLamp.module.css'
 
@@ -111,6 +120,27 @@ function MicGlyph() {
   )
 }
 
+/**
+ * Token counts, in the order they happen: what went in, what came back, the sum.
+ *
+ * Written in full words rather than as `1.2k`. This is a small honest number
+ * under a message bar, not a dashboard, and rounding it would hide exactly the
+ * thing a reader watching a budget wants to see.
+ */
+function spentLine(usage: TutorUsage): string {
+  const count = (n: number) => n.toLocaleString()
+  return `${count(usage.input)} in · ${count(usage.output)} out · ${count(usage.total)} total`
+}
+
+/** The most recent exchange that reported a cost, if any did. */
+function lastUsage(messages: readonly TutorMessage[]): TutorUsage | undefined {
+  for (let at = messages.length - 1; at >= 0; at -= 1) {
+    const spent = messages[at]?.usage
+    if (spent) return spent
+  }
+  return undefined
+}
+
 export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLampProps) {
   const [messages, setMessages] = useState<TutorMessage[]>(saved ?? [])
   // A reopened thread starts pinned — the reader came back for the
@@ -129,8 +159,24 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
    */
   const [models, setModels] = useState<TutorModel[]>([])
   const [pick, setPick] = useState<string | undefined>(undefined)
-  /** Whether the model sheet is up. It is a layer above the lamp, not in it. */
-  const [sheet, setSheet] = useState(false)
+  /**
+   * Which sheet is up, if either. A layer above the lamp, not in it.
+   *
+   * One value rather than two flags, because the two sheets are the same slot:
+   * opening one has to close the other, and two booleans can both be true.
+   */
+  const [sheet, setSheet] = useState<'model' | 'effort' | null>(null)
+  /**
+   * How hard the model is asked to think.
+   *
+   * Starts at the highest setting for everyone. Every model on the roster is
+   * free, so the thing usually traded away — money — is not being spent, and
+   * the reader gets the best answer the model has by default. The control is
+   * there to turn it *down*, and to matter later when a paid model is picked.
+   */
+  const [effort, setEffort] = useState<Effort>(() => storedEffort() ?? DEFAULT_EFFORT)
+  /** Which answers have their working-out unfolded. Folded is the default. */
+  const [shown, setShown] = useState<number[]>([])
   /** The last attempt's failure, if it failed. One at a time, never stored. */
   const [failure, setFailure] = useState<string | undefined>(undefined)
   /** Which message just went to the clipboard, so the button can say so. */
@@ -157,7 +203,11 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
    */
   useEffect(() => {
     const before = document.activeElement
-    input.current?.focus({ preventScroll: true })
+    // The overlay, not the input. Focusing the input raises the phone keyboard
+    // the instant the lamp opens, which covers half the passage the reader came
+    // to read — and they may only want to read the saved thread. The keyboard
+    // now waits to be asked, by a tap on the box.
+    overlay.current?.focus({ preventScroll: true })
     return () => {
       if (before instanceof HTMLElement) before.focus({ preventScroll: true })
     }
@@ -265,6 +315,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         // answer, the next thing tried should be the strongest model on the
         // roster — not whatever fixed list the server happens to carry.
         ...(models.length > 0 ? { models: chainFrom(models, pick) } : {}),
+        effort,
       }).then((reply) => {
         if (reply.failed) {
           // The question stays — the reader can see what went unanswered and
@@ -285,6 +336,8 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
           text: reply.text,
           ...(reply.isProbe ? { isProbe: true } : {}),
           ...(reply.model ? { model: reply.model } : {}),
+          ...(reply.reasoning ? { reasoning: reply.reasoning } : {}),
+          ...(reply.usage ? { usage: reply.usage } : {}),
           ts: Date.now(),
         }
         // The check that the explanation landed is a *second* bubble, not a
@@ -311,7 +364,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         onSave(whole)
       })
     },
-    [messages, passage, context, pending, models, pick, onSave],
+    [messages, passage, context, pending, models, pick, effort, onSave],
   )
 
   /* The nearest question at or above a message. Retrying an answer means
@@ -366,6 +419,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
     <div
       ref={overlay}
       className={styles.overlay}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label="Ask Claude about this passage"
@@ -477,6 +531,33 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
                     modelLabel(message.model)}
                 </p>
               )}
+              {/* The working-out, folded. Above the answer because that is the
+                  order it happened in, and folded because it is the model
+                  talking to itself — offered, never imposed. */}
+              {message.reasoning && (
+                <div className={styles.thought}>
+                  <button
+                    type="button"
+                    className={styles.thoughtTop}
+                    aria-expanded={shown.includes(message.ts)}
+                    onClick={() =>
+                      setShown((current) =>
+                        current.includes(message.ts)
+                          ? current.filter((ts) => ts !== message.ts)
+                          : [...current, message.ts],
+                      )
+                    }
+                  >
+                    <span className={styles.thoughtChevron} aria-hidden="true">
+                      {shown.includes(message.ts) ? '⌃' : '⌄'}
+                    </span>
+                    How it thought this through
+                  </button>
+                  {shown.includes(message.ts) && (
+                    <p className={styles.thoughtText}>{message.reasoning}</p>
+                  )}
+                </div>
+              )}
               <div className={`${styles.slip} ${message.isProbe ? styles.probe : ''}`}>
                 {message.text}
               </div>
@@ -537,6 +618,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         }}
       >
         {models.length > 0 && (
+          <div className={styles.pickers}>
           <button
             type="button"
             className={styles.picker}
@@ -545,14 +627,28 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
                no answer, which is worse than a `<select>` was. */
             aria-label={`Which model answers: ${models.find((row) => row.id === pick)?.name ?? 'not chosen'}`}
             aria-haspopup="dialog"
-            aria-expanded={sheet}
-            onClick={() => setSheet(true)}
+            aria-expanded={sheet === 'model'}
+            onClick={() => setSheet('model')}
           >
             {models.find((row) => row.id === pick)?.name ?? 'Choose a model'}
             <span className={styles.chevron} aria-hidden="true">
               ⌄
             </span>
           </button>
+          <button
+            type="button"
+            className={`${styles.picker} ${styles.effort}`}
+            aria-label={`How hard it thinks: ${effortLabel(effort)}`}
+            aria-haspopup="dialog"
+            aria-expanded={sheet === 'effort'}
+            onClick={() => setSheet('effort')}
+          >
+            {effortLabel(effort)}
+            <span className={styles.chevron} aria-hidden="true">
+              ⌄
+            </span>
+          </button>
+          </div>
         )}
         {dictation.supported && (
           <button
@@ -583,16 +679,39 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         </button>
       </form>
 
-      {sheet && (
+      {/* Under the bar, in the quietest type in the room. What the last
+          exchange cost — not a running total, because the number a reader can
+          act on is the one attached to the question they just asked. */}
+      {lastUsage(messages) && (
+        <p className={styles.spent}>
+          <span className={styles.srOnly}>Tokens used: </span>
+          {spentLine(lastUsage(messages)!)}
+        </p>
+      )}
+
+      {sheet === 'model' && (
         <ModelSheet
           models={models}
           pick={pick}
           onPick={(id) => {
             setPick(id)
             rememberPick(id)
-            setSheet(false)
+            setSheet(null)
           }}
-          onClose={() => setSheet(false)}
+          onClose={() => setSheet(null)}
+        />
+      )}
+
+      {sheet === 'effort' && (
+        <EffortSheet
+          pick={effort}
+          paid={models.find((row) => row.id === pick)?.paid === true}
+          onPick={(level) => {
+            setEffort(level)
+            rememberEffort(level)
+            setSheet(null)
+          }}
+          onClose={() => setSheet(null)}
         />
       )}
     </div>,

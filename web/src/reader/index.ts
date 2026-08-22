@@ -43,6 +43,19 @@ export { StudyLamp } from './StudyLamp.tsx'
 export type { StudyLampProps } from './StudyLamp.tsx'
 export { ModelSheet } from './ModelSheet.tsx'
 export type { ModelSheetProps } from './ModelSheet.tsx'
+export { Sheet } from './Sheet.tsx'
+export type { SheetProps, SheetRow } from './Sheet.tsx'
+export { EffortSheet } from './EffortSheet.tsx'
+export type { EffortSheetProps } from './EffortSheet.tsx'
+export {
+  DEFAULT_EFFORT,
+  EFFORTS,
+  effortLabel,
+  isEffort,
+  rememberEffort,
+  storedEffort,
+} from './effort.ts'
+export type { Effort } from './effort.ts'
 export { dictationSupported, joinSaid, useDictation } from './dictation.ts'
 export { ThreadMenu } from './ThreadMenu.tsx'
 export type { ThreadMenuProps } from './ThreadMenu.tsx'
@@ -58,6 +71,7 @@ export type {
   PassageKind,
   TutorIntent,
   TutorMessage,
+  TutorUsage,
 } from './tutor.ts'
 export {
   describeRange,

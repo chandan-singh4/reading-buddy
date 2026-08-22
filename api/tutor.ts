@@ -91,6 +91,15 @@ const DEFAULT_MODELS = [
  * wrong takes the tutor down completely and looks exactly like an outage.
  */
 const MAX_CHAIN = 3
+/**
+ * The most working-out that is passed on.
+ *
+ * A reasoning model can think for far longer than it answers, and the whole of
+ * it is stored with the thread. This is generous enough to hold a real train of
+ * thought and small enough that a runaway one cannot bloat the reader's own
+ * saved conversation.
+ */
+const MAX_REASONING = 20_000
 
 function chain(): string[] {
   const configured = (process.env.TUTOR_MODELS ?? '')
@@ -228,11 +237,41 @@ interface Body {
   /** Stage B: the reader's pick, put at the head of the fallback chain. */
   model?: unknown
   /**
+   * How hard the model should think: `low`, `medium` or `high`. Anything else,
+   * including nothing at all, means `high`.
+   */
+  effort?: unknown
+  /**
    * The whole chain the client wants tried, in order. It knows the roster and
    * which models on it are strongest; this file only knows a list it was
    * configured with. So when the client sends one, it wins.
    */
   models?: unknown
+}
+
+/** Two counts as one. Either may be missing. */
+function added(one: Usage | undefined, two: Usage | undefined): Usage {
+  return {
+    input: (one?.input ?? 0) + (two?.input ?? 0),
+    output: (one?.output ?? 0) + (two?.output ?? 0),
+    total: (one?.total ?? 0) + (two?.total ?? 0),
+  }
+}
+
+/**
+ * What the exchange cost, read out of OpenRouter's own numbers.
+ *
+ * `total` is trusted when it is there and added up when it is not — some
+ * providers send the two halves and no sum.
+ */
+function counted(usage: {
+  prompt_tokens?: unknown
+  completion_tokens?: unknown
+  total_tokens?: unknown
+}): Usage {
+  const input = Number(usage.prompt_tokens) || 0
+  const output = Number(usage.completion_tokens) || 0
+  return { input, output, total: Number(usage.total_tokens) || input + output }
 }
 
 /**
@@ -401,6 +440,24 @@ function assemble(body: Body, module: Module | undefined): Turn[] {
 interface Completion {
   text: string
   model: string
+  /**
+   * The model's working-out, when it publishes one.
+   *
+   * Reasoning models think in a separate channel and OpenRouter hands it back
+   * beside the answer rather than inside it. It is passed through unchanged and
+   * drawn folded away, because it is interesting and it is not the answer — a
+   * reader who wanted the thinking can open it, and one who did not never sees
+   * it. Most free models publish none, and then there is nothing to draw.
+   */
+  reasoning?: string
+  /** What the exchange cost, in tokens. Absent when OpenRouter reports none. */
+  usage?: Usage
+}
+
+export interface Usage {
+  input: number
+  output: number
+  total: number
 }
 
 /**
@@ -417,11 +474,39 @@ class Upstream extends Error {
   }
 }
 
+/**
+ * How hard the model should think, as OpenRouter words it.
+ *
+ * The API takes `low`, `medium` or `high` and translates each into whatever the
+ * provider underneath calls it. There is no level above `high`, so `high` is
+ * what "as much as it will give" means here.
+ */
+type Effort = 'low' | 'medium' | 'high'
+
+const EFFORTS = new Set<Effort>(['low', 'medium', 'high'])
+
+/**
+ * The default, and why it is the top one.
+ *
+ * Thinking is charged as output tokens, and every model this app offers by
+ * default is free — so the usual reason to ration reasoning does not apply. A
+ * reader asking what a paragraph of Jung means is better served by a model that
+ * thinks first. A paid model is the reader's own money, which is why the client
+ * can send something else.
+ */
+const DEFAULT_EFFORT: Effort = 'high'
+
+function effortOf(value: unknown): Effort {
+  const said = text(value, 12).trim().toLowerCase()
+  return EFFORTS.has(said as Effort) ? (said as Effort) : DEFAULT_EFFORT
+}
+
 async function complete(
   turns: Turn[],
   models: string[],
   key: string,
   search: boolean,
+  effort: Effort,
 ): Promise<Completion> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -444,6 +529,12 @@ async function complete(
         // Warmth is the point, but a wandering tutor is worse than a plain
         // one — this is the middle of OpenRouter's range, not the top.
         temperature: 0.7,
+        // Ask for the working-out. A model with no reasoning channel ignores
+        // this, which is why it is sent to every model rather than guessed at
+        // from the slug — the roster gives no way to tell them apart.
+        reasoning: { effort, exclude: false },
+        // Some providers report usage only when it is asked for.
+        usage: { include: true },
         // OpenRouter runs the search itself and feeds the results in. The
         // model still decides whether the results are worth using.
         ...(search ? { plugins: [{ id: 'web' }] } : {}),
@@ -451,8 +542,9 @@ async function complete(
     })
 
     const payload = (await response.json().catch(() => null)) as {
-      choices?: { message?: { content?: unknown } }[]
+      choices?: { message?: { content?: unknown; reasoning?: unknown } }[]
       model?: unknown
+      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown }
       error?: { message?: unknown; code?: unknown }
     } | null
 
@@ -486,9 +578,16 @@ async function complete(
       throw new Error('the model returned an empty answer')
     }
 
+    const thought = payload?.choices?.[0]?.message?.reasoning
+    const spent = payload?.usage
+
     return {
       text: answer.trim(),
       model: typeof payload?.model === 'string' ? payload.model : models[0],
+      ...(typeof thought === 'string' && thought.trim().length > 0
+        ? { reasoning: thought.trim().slice(0, MAX_REASONING) }
+        : {}),
+      ...(spent ? { usage: counted(spent) } : {}),
     }
   } finally {
     clearTimeout(timer)
@@ -553,7 +652,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   let answer: Completion
   try {
-    answer = await complete(turns, models, key, module?.search === true)
+    answer = await complete(turns, models, key, module?.search === true, effortOf(body.effort))
   } catch (error) {
     // The upstream status is carried out, not flattened to 502. A busy free
     // model and a misconfigured relay both used to arrive as the same sentence,
@@ -578,6 +677,8 @@ export default async function handler(request: Request): Promise<Response> {
         models,
         key,
         false,
+        // The probe is one short question, not a problem to be reasoned about.
+        'low',
       )
     } catch {
       probe = undefined
@@ -588,6 +689,12 @@ export default async function handler(request: Request): Promise<Response> {
     {
       text: answer.text,
       model: answer.model,
+      ...(answer.reasoning ? { reasoning: answer.reasoning } : {}),
+      // The probe's own tokens are counted in: the reader paid for both, and a
+      // number that leaves half the exchange out is worse than none.
+      ...(answer.usage || probe?.usage
+        ? { usage: added(answer.usage, probe?.usage) }
+        : {}),
       ...(probe ? { probe: probe.text, probeModel: probe.model } : {}),
     },
     200,

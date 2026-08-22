@@ -1,5 +1,5 @@
 /*
- * The model sheet, in the phone's dark idiom.
+ * The choice sheet, in the phone's dark idiom.
  *
  * Same furniture as `ThreadMenu.module.css` — translucent, blurred, hairline
  * rules — but in iOS's dark system colours rather than its light ones, because
@@ -115,6 +115,14 @@
 
 .name {
   display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  padding: 0.5rem 0;
+}
+
+.said {
+  display: flex;
   align-items: baseline;
   gap: 0.4375rem;
   min-width: 0;
@@ -123,7 +131,15 @@
   white-space: nowrap;
 }
 
-.paid {
+/* One line saying what a choice will do. Only the effort sheet uses it — a
+   model's name is its own explanation, and "high" is not. */
+.note {
+  color: rgb(235 235 245 / 60%);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.tag {
   flex: 0 0 auto;
   color: #ffd60a;
   font-size: 0.6875rem;

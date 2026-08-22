@@ -461,9 +461,20 @@
  * white browser list over a deliberately dark room, in the page's fonts and
  * none of its light. Now the closed state is this line of text and the open
  * state is `ModelSheet`. */
-.picker {
+/* Both pickers share one line above the box. A row of their own, because the
+   box needs the whole width of the phone and these two are captions, not
+   controls the reader reaches for often. */
+.pickers {
   order: -1;
   flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.picker {
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -483,6 +494,94 @@
 
 .picker:hover {
   color: #b79a68;
+}
+
+/* The model can be a long name and takes what room there is; the effort word
+   is short and never gets squeezed out by it. */
+.picker:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.effort {
+  flex: 0 0 auto;
+  padding-left: 14px;
+  border-left: 1px solid #3d3320;
+}
+
+/*
+ * The working-out, folded above the answer.
+ *
+ * Deliberately the plainest thing in the room — no slip, no paper, no glow.
+ * It is the model's notes to itself, and it must never compete with the answer
+ * standing underneath it.
+ */
+.thought {
+  margin: 0 24px 6px 2px;
+}
+
+.thoughtTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: #7a6d52;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  outline: none;
+}
+
+.thoughtTop:hover {
+  color: #b79a68;
+}
+
+.thoughtTop:focus-visible {
+  outline: 2px solid #c39a5e;
+  outline-offset: 2px;
+}
+
+.thoughtChevron {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.thoughtText {
+  margin: 4px 0 0;
+  padding: 8px 12px;
+  border-left: 2px solid #3d3320;
+  color: #8d8068;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  animation: rise 240ms ease both;
+}
+
+/* What the last exchange cost. Under the bar, in the quietest type here. */
+.spent {
+  flex: 0 0 auto;
+  z-index: 1;
+  margin: 0;
+  padding: 0 22px 10px;
+  color: #6a5e47;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-align: right;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* The one thing that says the line opens something. Nudged up because the

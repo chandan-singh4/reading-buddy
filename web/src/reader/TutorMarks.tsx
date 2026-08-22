@@ -53,9 +53,13 @@ interface Mark {
   block: HTMLElement
   thread: StoredTutorThread
   strokes: Stroke[]
-  /** Where the slip sits, in the paragraph's own coordinates. `null` on the
-   *  continuation paragraphs of a passage — only its last one wears it. */
-  slip: { top: number; left: number } | null
+  /**
+   * Where the slip sits and how big it is, in the paragraph's own coordinates.
+   * `null` on the continuation paragraphs of a passage — only its last one
+   * wears it. The size varies: a slip tucked into the gap between two lines is
+   * drawn to fit that gap.
+   */
+  slip: { top: number; left: number; width: number; height: number } | null
 }
 
 function same(a: readonly Mark[], b: readonly Mark[]): boolean {
@@ -67,6 +71,7 @@ function same(a: readonly Mark[], b: readonly Mark[]): boolean {
       one.thread !== other.thread ||
       one.slip?.top !== other.slip?.top ||
       one.slip?.left !== other.slip?.left ||
+      one.slip?.height !== other.slip?.height ||
       one.strokes.length !== other.strokes.length
     ) {
       return false
@@ -108,8 +113,58 @@ const HOLD_MS = 500
  */
 const SLOP = 10
 
+/** The slip's drawn size, in the paragraph's own pixels. */
+const SLIP_W = 30
+const SLIP_H = 22
+
+/**
+ * How small a slip may be drawn when it tucks into the gap between two lines.
+ *
+ * The gap is the leading, and it is smaller than it looks: at the reader's own
+ * 18px on 30.6px, two lines of ink are about 9px apart. A slip that fits there
+ * is a tab rather than a sticker — no star on it, just a scrap of bronze-edged
+ * paper. That is the whole trade: the mark shrinks, and in exchange it sits on
+ * its own sentence and covers no word.
+ *
+ * Its *target* does not shrink with it. `.slip::before` holds that at a
+ * finger's width whatever the paper is doing.
+ *
+ * Below this there is no gap worth using and the slip goes under the paragraph
+ * instead.
+ */
+const MIN_SLIP_H = 7
+
+/** A slip smaller than this has no room for the star, and wears none. */
+const MARK_MIN_H = 16
+
+/** Narrower than this, a tab stops reading as paper and starts reading as dirt. */
+const MIN_SLIP_W = 14
+
+/**
+ * How a re-entered page is waited for: six looks, 80ms apart.
+ *
+ * Long enough — about half a second — to cover a section being parsed and laid
+ * out again, and short enough that the reader does not watch it happen. The
+ * ladder stops on the first measure that finds anything.
+ */
+const RETRIES = 6
+const RETRY_MS = 80
+
 export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksProps) {
   const [marks, setMarks] = useState<Mark[]>([])
+
+  /*
+   * The marks as they stand, readable from inside `measure` without listing
+   * them as a dependency — which would rebuild the measurer every time it
+   * measured.
+   */
+  const held = useRef<Mark[]>([])
+  held.current = marks
+
+  /** The re-measure ladder: see the empty-measure branch below. */
+  const tries = useRef(0)
+  const later = useRef<number | undefined>(undefined)
+  const again = useRef<() => void>(() => {})
 
   /*
    * The hold, in three refs and no state: nothing here draws, and a press that
@@ -249,52 +304,121 @@ export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksP
         }
 
         /*
-         * ## Where the slip sits, and why it moved
+         * ## Where the slip sits
          *
-         * It used to ride at the end of the passage's own last line. That put
-         * it on top of the words that follow whenever a passage ended
-         * mid-line, which is most of the time — reported from the phone.
+         * Back on its own sentence, which is where it belongs: two threads in
+         * one paragraph have to wear two visibly separate slips or the second
+         * one is unreachable, and a reader looking at a mark wants to know
+         * *which* words it is about without reading the ink.
          *
-         * There is nowhere outside the paragraph to put it: the page clips at
-         * the paragraph's own width, so the margin is not ours to use.
+         * It went to the paragraph's foot for one round, because the passage
+         * usually ends mid-line and a slip there sat on top of the words that
+         * follow. There is nowhere outside the paragraph to escape to: the page
+         * clips at the paragraph's own width, so the margin is not ours.
          *
-         * So it goes to the end of the paragraph's **last line**, in the
-         * whitespace a paragraph almost always leaves there. If that line runs
-         * too close to the edge, it tucks just under the paragraph instead, in
-         * the gap before the next one. Both places hold no words.
+         * Three places, in order of preference, and none of them holds a word:
          *
-         * The cost is real and worth naming: two threads in one paragraph no
-         * longer wear their slips on their own sentences. They sit side by
-         * side at the paragraph's end instead, stacked leftwards. The ink still
-         * shows which words each is about, and the hold menu names the passage.
+         *   1. The trailing whitespace of the passage's own last line, when the
+         *      passage ends near the line's end and there is room for a slip.
+         *   2. The gap between that line and the next — the leading, which is
+         *      empty by construction. The slip is drawn down to fit it, and its
+         *      tap target stays full size (see `.slip::before`).
+         *   3. Under the paragraph, when the passage ends on its last line.
+         *
+         * A second slip landing on the same row steps to the left of the first.
          */
         if (block === last) {
-          const home = document.createRange()
-          home.selectNodeContents(block)
-          const lines = linesOf(home)
-          const tail = lines[lines.length - 1]
+          const ink = mark.strokes[mark.strokes.length - 1]
 
-          // One slip is 30px wide; 34 leaves a hair of daylight between two.
-          const already = found.filter((one) => one.block === block && one.slip).length
-          const shift = already * 34
+          if (ink) {
+            const home = document.createRange()
+            home.selectNodeContents(block)
+            // Every line of the paragraph, in the block's own coordinates — the
+            // same fold arithmetic as the ink.
+            const rows = linesOf(home)
+              .map((rect) => {
+                const column = fragmentOf(rect)
+                return {
+                  top: (rect.top - box.top + column * fold) / scale,
+                  right: (rect.right - box.left - column * pitch) / scale,
+                }
+              })
+              .sort((a, b) => a.top - b.top)
 
-          if (tail) {
-            const column = fragmentOf(tail)
-            const top = (tail.top - box.top + column * fold) / scale
-            const right = (tail.right - box.left - column * pitch) / scale
-            const room = block.offsetWidth - right - 6 - shift
+            const foot = ink.top + ink.height
+            const under = rows.find((row) => row.top > ink.top + ink.height / 2)?.top
+            /*
+             * The room on this line is measured from the end of *the line's own
+             * words*, not from the end of the passage.
+             *
+             * Measuring from the passage was the first attempt and it was
+             * wrong in the ordinary case: a sentence usually ends in the middle
+             * of a line, so there is plenty of space between it and the
+             * paragraph's right edge — and every pixel of that space is the
+             * next sentence. The slip landed on top of it.
+             */
+            const line = rows.reduce(
+              (best, row) =>
+                Math.abs(row.top - ink.top) < Math.abs(best.top - ink.top) ? row : best,
+              rows[0] ?? { top: ink.top, right: ink.left + ink.width },
+            )
 
-            mark.slip =
-              room >= 30
-                ? { top: top + (tail.height / scale - 22) / 2, left: right + 6 + shift }
-                : // No room on the line. The gap under the paragraph is the
-                  // next place with no words in it.
-                  {
-                    top: top + tail.height / scale + 2,
-                    left: Math.max(0, block.offsetWidth - 32 - shift),
-                  }
+            let place: { top: number; left: number; width: number; height: number }
+            if (block.offsetWidth - line.right - 6 >= SLIP_W) {
+              place = {
+                top: ink.top + (ink.height - SLIP_H) / 2,
+                left: line.right + 6,
+                width: SLIP_W,
+                height: SLIP_H,
+              }
+            } else if (under === undefined) {
+              place = {
+                top: foot + 2,
+                left: Math.max(0, block.offsetWidth - SLIP_W - 2),
+                width: SLIP_W,
+                height: SLIP_H,
+              }
+            } else if (under - foot - 1 >= MIN_SLIP_H) {
+              const gap = under - foot
+              const height = Math.min(SLIP_H, gap - 1)
+              const width = Math.max(MIN_SLIP_W, Math.round((height * SLIP_W) / SLIP_H))
+              place = {
+                top: foot + Math.max(0, (gap - height) / 2),
+                left: Math.max(
+                  0,
+                  Math.min(ink.left + ink.width - width, block.offsetWidth - width),
+                ),
+                width,
+                height,
+              }
+            } else {
+              // A line-height too tight to tuck anything into. The foot of the
+              // paragraph is the only empty place left.
+              place = {
+                top: foot + 2,
+                left: Math.max(0, block.offsetWidth - SLIP_W - 2),
+                width: SLIP_W,
+                height: SLIP_H,
+              }
+            }
+
+            // Two threads whose slips landed on the same row: the later one
+            // steps left, so both stay visible and both stay tappable.
+            const crowd = found.filter(
+              (one) =>
+                one.block === block &&
+                one.slip &&
+                Math.abs(one.slip.top - place.top) < place.height,
+            ).length
+            place.left = Math.max(0, place.left - crowd * (place.width + 4))
+            mark.slip = place
           } else {
-            mark.slip = { top: -11, left: Math.max(0, block.offsetWidth - 44 - shift) }
+            mark.slip = {
+              top: -11,
+              left: Math.max(0, block.offsetWidth - 44),
+              width: SLIP_W,
+              height: SLIP_H,
+            }
           }
         }
 
@@ -302,11 +426,45 @@ export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksP
       }
     }
 
-    // An empty measure while threads still exist is a bad moment mid-turn,
-    // not an answer — the same rule, and the same reason, as HandDrawn.
-    if (found.length === 0) return
+    /*
+     * An empty measure has two very different causes.
+     *
+     * **A bad moment mid-turn.** The page is between paragraphs and the quotes
+     * are briefly unfindable. Holding the marks is right, and it is the same
+     * rule, for the same reason, as HandDrawn.
+     *
+     * **A page the reader came back to.** They left this page and returned, so
+     * the Reader threw the paragraphs away and built new ones. The marks still
+     * held point at nodes that are no longer in the document — so they portal
+     * into nothing and the reader sees no slip at all. That is the reported
+     * bug, and the flicker is the mark being drawn once before its paragraph
+     * is replaced under it. Nothing measures again, because from the page's
+     * point of view nothing has changed since.
+     *
+     * So: hold them while their paragraphs are still in the document. When the
+     * paragraphs are gone, drop the marks and look again in a moment — the new
+     * paragraphs may not be laid out yet.
+     */
+    if (found.length === 0) {
+      const stranded = held.current.some((mark) => !mark.block.isConnected)
+      if (!stranded) return
+      setMarks((current) => (current.length === 0 ? current : []))
+      if (tries.current < RETRIES) {
+        tries.current += 1
+        if (later.current !== undefined) window.clearTimeout(later.current)
+        later.current = window.setTimeout(() => {
+          later.current = undefined
+          again.current()
+        }, RETRY_MS)
+      }
+      return
+    }
+
+    tries.current = 0
     setMarks((current) => (same(current, found) ? current : found))
   }, [threads, root])
+
+  again.current = measure
 
   useEffect(() => {
     if (!root) return
@@ -346,6 +504,7 @@ export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksP
 
     return () => {
       if (pending) window.clearTimeout(pending)
+      if (later.current !== undefined) window.clearTimeout(later.current)
       changes?.disconnect()
       sizes?.disconnect()
       window.removeEventListener('resize', soon)
@@ -401,14 +560,23 @@ export function TutorMarks({ threads, root, watch, onOpen, onHold }: TutorMarksP
               <button
                 type="button"
                 className={styles.slip}
-                style={{ top: mark.slip.top, left: mark.slip.left }}
+                style={{
+                  top: mark.slip.top,
+                  left: mark.slip.left,
+                  width: mark.slip.width,
+                  height: mark.slip.height,
+                }}
                 aria-label="Reopen the conversation about this passage"
                 onClick={() => tap(mark.thread)}
                 {...holding(mark.thread)}
               >
-                <span className={styles.slipMark} aria-hidden="true">
-                  ✦
-                </span>
+                {/* A tab in the gap between two lines is a few pixels tall.
+                    The star does not fit, and half a star is worse than none. */}
+                {mark.slip.height >= MARK_MIN_H && (
+                  <span className={styles.slipMark} aria-hidden="true">
+                    ✦
+                  </span>
+                )}
               </button>
             )}
           </span>,

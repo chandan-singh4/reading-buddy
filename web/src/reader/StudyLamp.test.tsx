@@ -198,4 +198,60 @@ describe('the message actions', () => {
     expect(screen.queryByText('An older answer.')).toBeNull()
     expect(screen.queryByText('Jung meant the unconscious.')).toBeNull()
   })
+
+  it('opens without raising the keyboard', async () => {
+    lamp([{ role: 'claude', text: 'An answer.', ts: 2 }])
+    // The box is not focused, so a phone shows no keyboard. Focus is on the
+    // overlay instead, which keeps Tab and Escape working.
+    const composer = await screen.findByLabelText('Ask about this passage')
+    expect(document.activeElement).not.toBe(composer)
+    expect((document.activeElement as HTMLElement | null)?.getAttribute('role')).toBe('dialog')
+  })
+
+  it('folds the working-out away, and opens it on a tap', async () => {
+    lamp([
+      {
+        role: 'claude',
+        text: 'The mind talks in pictures.',
+        reasoning: 'First I checked what a symbol is.',
+        ts: 2,
+      },
+    ])
+    // Folded: the answer is there, the thinking is not.
+    expect(screen.queryByText('First I checked what a symbol is.')).toBeNull()
+    const fold = await screen.findByRole('button', { name: /How it thought this through/ })
+    expect(fold.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(fold)
+    expect(await screen.findByText('First I checked what a symbol is.')).toBeTruthy()
+    expect(fold.getAttribute('aria-expanded')).toBe('true')
+
+    fireEvent.click(fold)
+    expect(screen.queryByText('First I checked what a symbol is.')).toBeNull()
+  })
+
+  it('draws no fold when the model published no thinking', async () => {
+    lamp([{ role: 'claude', text: 'An answer.', ts: 2 }])
+    await screen.findByText('An answer.')
+    expect(screen.queryByRole('button', { name: /How it thought this through/ })).toBeNull()
+  })
+
+  it('says what the last exchange cost', async () => {
+    lamp([
+      { role: 'you', text: 'Why?', ts: 1 },
+      {
+        role: 'claude',
+        text: 'An answer.',
+        usage: { input: 1200, output: 340, total: 1540 },
+        ts: 2,
+      },
+    ])
+    expect(await screen.findByText(/1,200 in · 340 out · 1,540 total/)).toBeTruthy()
+  })
+
+  it('says nothing about tokens when nothing reported them', async () => {
+    lamp([{ role: 'claude', text: 'An answer.', ts: 2 }])
+    await screen.findByText('An answer.')
+    expect(screen.queryByText(/total/)).toBeNull()
+  })
 })

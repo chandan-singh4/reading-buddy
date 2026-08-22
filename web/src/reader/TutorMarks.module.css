@@ -47,8 +47,11 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-  width: 30px;
-  height: 22px;
+  /* Width and height arrive inline: a slip tucked into the gap between two
+     lines is drawn down to fit it. The star centres itself at any size. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   pointer-events: auto;
   background: #fbf5e6;
@@ -82,9 +85,6 @@
 }
 
 .slipMark {
-  position: absolute;
-  top: 3px;
-  left: 9px;
   color: #c39a5e;
   font-size: 10px;
   line-height: 1;

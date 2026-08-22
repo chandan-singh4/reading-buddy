@@ -27,6 +27,7 @@
 
 import { accessToken } from '../storage/cloud/client.ts'
 import type { PassageContext } from './context.ts'
+import type { Effort } from './effort.ts'
 import type { Anchor } from '../structure/index.ts'
 
 /** How much of the page the reader pinned under the lamp. */
@@ -63,12 +64,29 @@ export const INTENT_LABELS: Record<TutorIntent, string> = {
   define: 'Define a term',
 }
 
+/** What one exchange cost, in tokens. */
+export interface TutorUsage {
+  input: number
+  output: number
+  total: number
+}
+
 /** One turn of the conversation. */
 export interface TutorMessage {
   role: 'you' | 'claude'
   text: string
   /** A Socratic question back, drawn warmer and in italic. */
   isProbe?: boolean
+  /**
+   * The model's working-out, when it published one.
+   *
+   * Stored with the message rather than shown and thrown away: a reader who
+   * reopens a thread a week later is entitled to the same thing they could have
+   * opened at the time. It is drawn folded, above the answer.
+   */
+  reasoning?: string
+  /** What this exchange cost. Only on the tutor's side, and only if reported. */
+  usage?: TutorUsage
   /**
    * The model that actually wrote this. Absent means unknown — either the
    * reader's own words, or a message stored before the app recorded it.
@@ -145,6 +163,11 @@ export interface AskTutorRequest {
   history: TutorMessage[]
   userMessage: string
   /**
+   * How hard the model should think. Left out, the relay uses its own default,
+   * which is the same as this client's.
+   */
+  effort?: Effort
+  /**
    * Which models to try, strongest-first after the reader's own pick. Built by
    * `chainFrom`. Left out, the relay falls back to its own list.
    *
@@ -158,6 +181,10 @@ export interface AskTutorRequest {
 export interface AskTutorReply {
   text: string
   isProbe?: boolean
+  /** The model's working-out, when it published one. */
+  reasoning?: string
+  /** What the exchange cost, when OpenRouter reported it. */
+  usage?: TutorUsage
   /**
    * True when `text` is our own canned line rather than a model's words.
    *
@@ -219,6 +246,22 @@ function reasonFor(status: number): string {
 }
 
 /**
+ * The token counts, if the relay sent three real numbers.
+ *
+ * All-zero counts are treated as no answer. A provider that reports nothing
+ * sends zeroes, and "0 tokens" under a paragraph of explanation reads as a bug
+ * rather than as a missing figure.
+ */
+function usageOf(value: unknown): TutorUsage | undefined {
+  const spent = value as Partial<TutorUsage> | null
+  if (!spent || typeof spent !== 'object') return undefined
+  const input = Number(spent.input) || 0
+  const output = Number(spent.output) || 0
+  const total = Number(spent.total) || input + output
+  return total > 0 ? { input, output, total } : undefined
+}
+
+/**
  * One question to the tutor. Resolves to the reply; never rejects — the lamp
  * always gets something it can print.
  */
@@ -240,6 +283,7 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
         intent: request.intent,
         history: request.history.map(({ role, text, isProbe }) => ({ role, text, isProbe })),
         userMessage: request.userMessage,
+        ...(request.effort ? { effort: request.effort } : {}),
         ...(request.models && request.models.length > 0 ? { models: request.models } : {}),
       }),
     })
@@ -249,6 +293,8 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
       text?: unknown
       isProbe?: unknown
       model?: unknown
+      reasoning?: unknown
+      usage?: unknown
       probe?: unknown
       probeModel?: unknown
     }
@@ -264,6 +310,10 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
         ? { probe: data.probe }
         : {}),
       ...(typeof data.probeModel === 'string' ? { probeModel: data.probeModel } : {}),
+      ...(typeof data.reasoning === 'string' && data.reasoning.length > 0
+        ? { reasoning: data.reasoning }
+        : {}),
+      ...(usageOf(data.usage) ? { usage: usageOf(data.usage)! } : {}),
     }
   } catch {
     // `fetch` rejects with a bare "Failed to fetch" for every network-level
