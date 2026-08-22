@@ -243,6 +243,25 @@
   animation: rise 300ms ease both;
 }
 
+/* Who wrote the slip below.
+ *
+ * A typeset caption, not a badge: it must be readable when the reader looks
+ * for it and invisible when they are reading the answer. So it takes the
+ * room's quietest colour and the smallest size the lamp uses, and it sits
+ * outside the slip rather than inside it — inside, it would read as the first
+ * line of the explanation.
+ *
+ * Old messages carry no model and draw no caption at all — a wrong name is
+ * worse than none. */
+.byline {
+  margin: 0 24px 3px 2px;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #7a6d52;
+  animation: rise 300ms ease both;
+}
+
 /* The tutor's side: a printed slip, badged. */
 .slip {
   position: relative;
@@ -329,10 +348,48 @@
   z-index: 1;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 9px;
   margin: 0;
-  padding: 11px 22px 14px;
+  padding: 8px 22px 14px;
   border-top: 1px solid #3d3320;
+}
+
+/* Who will answer.
+ *
+ * On its own line above the input rather than beside it — `order: -1` with a
+ * full-width basis — because sharing the row would take space from the one
+ * control the reader uses every time. This one is set once and then forgotten.
+ *
+ * Native `<select>` on purpose. A custom dropdown inside an overlay that
+ * already traps focus is a keyboard-handling problem for no gain, and the
+ * phone's own picker sheet is better than anything drawn here. Only the closed
+ * state is styled; the open list belongs to the platform. */
+.picker {
+  order: -1;
+  flex: 0 0 100%;
+  max-width: 100%;
+  min-height: 1.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #7a6d52;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  outline: none;
+}
+
+.picker:hover {
+  color: #b79a68;
+}
+
+/* The platform paints the list with its own background, which on a light phone
+   is white — so the options need a colour that is legible there, not the
+   room's. */
+.picker option {
+  color: #1c1712;
 }
 
 .input {
@@ -385,6 +442,7 @@
 .anchorBar:focus-visible,
 .option:focus-visible,
 .send:focus-visible,
+.picker:focus-visible,
 .input:focus-visible {
   outline: 2px solid #c39a5e;
   outline-offset: 2px;

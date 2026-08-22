@@ -67,7 +67,7 @@ environment variable, not a deploy. That is why the chain is a variable.
 
 ---
 
-## Stage B — the model picker and the bubble labels
+## Stage B — the model picker and the bubble labels — DONE
 
 **Goal.** The reader chooses the model, and every answer says who wrote it.
 
@@ -94,9 +94,56 @@ Steps, in order:
    never from what was asked for. During a failover the two differ, and that
    difference is the whole point of the label.
 
-**Files:** `api/models.ts` (new), `web/src/reader/tutor.ts`,
-`web/src/reader/StudyLamp.tsx` and `.module.css`, `web/src/storage/db.ts`,
-`web/src/storage/tutor.ts`.
+**Files:** `api/models.ts` (new), `web/src/reader/models.ts` (new),
+`web/src/reader/tutor.ts`, `web/src/reader/StudyLamp.tsx` and `.module.css`,
+`web/src/storage/db.ts`.
+
+### What stage B changed from the plan
+
+- **The roster endpoint also returns `description` and `contextLength`.** The
+  plan said `[{ id, name }]`. That is not enough to judge a model. The choosing
+  moved to `web/src/reader/models.ts`, because `api/` is built on its own and
+  cannot hold a test. The judgment now has 19.
+- **The picker hides models built for one narrow job.** A live probe found two
+  free tool-capable models that answer a reading question in the wrong genre: a
+  coding agent, and a safety classifier that answered "say the word: ok" with
+  "User Safety: safe". Neither returns an error. A reader cannot see the
+  failure. So `fitForReading` removes models that announce themselves as
+  single-purpose, and removes models with less than 16k of context.
+- **`openrouter/free` is gone from the relay.** It auto-routes across every
+  free model, the two above included. `api/tutor.ts` now falls back through
+  four named general models.
+- **The picker sits above the input, not beside it.** Beside it, it takes room
+  from the one control the reader uses every time.
+
+### What stage B does not prove
+
+The label is only correct if the relay reports the model. That path needs a
+live answer, and no live answer has been seen yet — see the credit problem
+below.
+
+---
+
+## Blocked — the OpenRouter account has no credits
+
+A live probe of the key returned `402 Insufficient credits. This account never
+purchased credits.` for two things:
+
+1. The web plugin (`plugins: [{ id: 'web' }]`). Search is a paid add-on even on
+   a free model.
+2. `openrouter/auto` and any paid slug, Claude included.
+
+Free models still answer. So stages A and B work, but two things wait on a
+credit purchase:
+
+- **Stage C's "Still true?" and "Historical context".** Both need search.
+- **The Claude row in the picker.** It is drawn only when
+  `TUTOR_MODEL_CLAUDE` is set. Leave it unset until credits exist, or the
+  reader can pick a model that always fails.
+
+Free models also rate-limit. `z-ai/glm-5.2:free` returned `429` during the
+probe. This is why the relay carries a fallback chain and why the label names
+the model that answered, not the one that was asked for.
 
 ---
 

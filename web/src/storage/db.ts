@@ -278,6 +278,15 @@ export interface StoredTutorThread {
     text: string
     /** The tutor asking back rather than telling — drawn differently. */
     isProbe?: boolean
+    /**
+     * The model that actually produced this message, as the relay read it off
+     * the response — not the one that was asked for. The two differ whenever a
+     * failover happened, which is exactly when the reader wants to know.
+     *
+     * Absent on the reader's own messages, and on every message stored before
+     * v13. Absent means "unknown", never "the current model".
+     */
+    model?: string
     /** Epoch milliseconds. */
     ts: number
   }[]
@@ -434,6 +443,19 @@ function defineSchema(db: Dexie): void {
   db.version(12).stores({
     tutor: '[bookId+id], bookId',
   })
+
+  // v13 — the model that wrote each tutor message.
+  //
+  // No `stores` change: the field rides inside `messages`, which is already a
+  // plain field on the row, so there is nothing to index and nothing to
+  // migrate. The version bump exists to mark the shape change for anyone
+  // reading this list.
+  //
+  // Old messages have no `model`, and that is the correct state for them
+  // rather than a gap to backfill — nothing recorded which model answered, so
+  // any value written in now would be a guess presented as a fact. They draw
+  // with no label. See `StudyLamp`.
+  db.version(13).stores({})
 }
 
 export function createDb(name: string = DB_NAME): ReadingBuddyDB {

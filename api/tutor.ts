@@ -46,19 +46,48 @@ export const config = { runtime: 'edge' }
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions'
 
 /**
- * Where the fallback chain comes from, and what it falls back to.
+ * The fallback chain, when the reader's own pick has not been put at its head.
  *
- * `openrouter/free` auto-routes to whatever free model is up right now, which
- * makes it the right *last* entry and a poor only entry — it gives up the
- * reader's choice of voice. Stage B's picker puts a real slug at the head of
- * this chain; until then this is the whole list.
+ * ## Why `openrouter/free` is not in this list
+ *
+ * The build brief suggested ending the chain with `openrouter/free`, which
+ * auto-routes to whatever free model is up. We tried it, twice, and it is a
+ * trap. It routes across *every* free model, including ones that are not
+ * general chat at all:
+ *
+ *   - the first call landed on `cohere/north-mini-code:free`, a coding agent;
+ *   - the second landed on `nvidia/nemotron-3.5-content-safety:free`, a safety
+ *     classifier, which answered the question "say the word: ok" with
+ *     "User Safety: safe".
+ *
+ * A classifier does not fail. It answers confidently in the wrong genre, and
+ * the reader would see that where an explanation should be. A last resort that
+ * can quietly stop being a tutor is worse than a visible failure, so the chain
+ * is named models only, and running out of them is an error the reader is told
+ * about.
+ *
+ * ## Why the default is in code at all
+ *
+ * `TUTOR_MODELS` overrides this, and should. The free roster churns weekly, so
+ * these slugs *will* go stale — but a stale named default degrades into an
+ * honest "could not be reached", which is recoverable, whereas an empty
+ * default is a tutor that never worked. Every entry is general-purpose,
+ * instruction-tuned, and tool-capable. Coding and classifier models are
+ * deliberately absent.
  */
+const DEFAULT_MODELS = [
+  'z-ai/glm-5.2:free',
+  'google/gemma-4-31b-it:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'thinkingmachines/inkling:free',
+]
+
 function chain(): string[] {
   const configured = (process.env.TUTOR_MODELS ?? '')
     .split(',')
     .map((slug) => slug.trim())
     .filter(Boolean)
-  return configured.length > 0 ? configured : ['openrouter/free']
+  return configured.length > 0 ? configured : DEFAULT_MODELS
 }
 
 /** How long an answer may take before we stop waiting. Free models are slow. */

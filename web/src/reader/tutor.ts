@@ -68,8 +68,41 @@ export interface TutorMessage {
   text: string
   /** A Socratic question back, drawn warmer and in italic. */
   isProbe?: boolean
+  /**
+   * The model that actually wrote this. Absent means unknown — either the
+   * reader's own words, or a message stored before the app recorded it.
+   */
+  model?: string
   /** Epoch milliseconds. */
   ts: number
+}
+
+/**
+ * A model slug as a caption the reader can read.
+ *
+ * `z-ai/glm-5.2:free` becomes `GLM 5.2`. The vendor prefix and the `:free`
+ * suffix are ours to worry about, not the reader's — the label sits above a
+ * bubble in a quiet room and has to read like a name, not a package id.
+ *
+ * The `name` from the roster is preferred when the caller has it. This is the
+ * fallback, and it is needed often: a failover reports a slug we never asked
+ * for and so may never have seen in the roster at all.
+ */
+export function modelLabel(slug: string): string {
+  const tail = (slug.split('/').pop() ?? slug).replace(/:free$/, '').trim()
+  if (!tail) return slug
+
+  return tail
+    .split('-')
+    .map((part) => {
+      // Anything starting with a digit is a version or a size — `5.2`, `31b`,
+      // `a12b` — and reads correctly as it was written.
+      if (/^\d/.test(part)) return part
+      // Short all-letter runs are acronyms: glm, it, vl.
+      if (part.length <= 3) return part.toUpperCase()
+      return part.charAt(0).toUpperCase() + part.slice(1)
+    })
+    .join(' ')
 }
 
 /**

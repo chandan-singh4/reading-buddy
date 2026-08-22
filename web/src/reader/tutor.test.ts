@@ -20,7 +20,7 @@ vi.mock('../storage/cloud/client.ts', () => ({
   CloudError: class CloudError extends Error {},
 }))
 
-const { askTutor, INTENT_LABELS } = await import('./tutor.ts')
+const { askTutor, INTENT_LABELS, modelLabel } = await import('./tutor.ts')
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -147,5 +147,19 @@ describe('the chips', () => {
     // module falls through to a bare answer with no teaching instruction at
     // all — and it does so silently.
     expect(Object.keys(INTENT_LABELS).sort()).toEqual(['define', 'discuss', 'friend', 'simply'])
+  })
+})
+
+describe('modelLabel', () => {
+  it('reads a slug as a name', () => {
+    expect(modelLabel('z-ai/glm-5.2:free')).toBe('GLM 5.2')
+  })
+
+  it('keeps versions and sizes as they were written', () => {
+    expect(modelLabel('google/gemma-4-31b-it:free')).toBe('Gemma 4 31b IT')
+  })
+
+  it('handles a slug with no vendor', () => {
+    expect(modelLabel('inkling')).toBe('Inkling')
   })
 })

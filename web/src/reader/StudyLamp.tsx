@@ -38,9 +38,17 @@ import {
 import { createPortal } from 'react-dom'
 
 import {
+  chosenFrom,
+  loadModels,
+  rememberPick,
+  storedPick,
+  type TutorModel,
+} from './models.ts'
+import {
   askTutor,
   elide,
   INTENT_LABELS,
+  modelLabel,
   type PassageAnchor,
   type TutorIntent,
   type TutorMessage,
@@ -72,6 +80,17 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
   const [collapsed, setCollapsed] = useState((saved?.length ?? 0) > 0)
   const [pending, setPending] = useState(false)
   const [draft, setDraft] = useState('')
+  /*
+   * The roster, and the reader's choice from it.
+   *
+   * Both start empty and may stay empty: the roster needs a network and a
+   * signed-in reader, and neither is a condition the lamp refuses to open in.
+   * With no roster the picker is not drawn and no model is sent, which is
+   * exactly the stage-A behaviour — the relay chooses. So the picker is an
+   * addition to the lamp, never a gate on it.
+   */
+  const [models, setModels] = useState<TutorModel[]>([])
+  const [pick, setPick] = useState<string | undefined>(undefined)
   /** Which chip started it — sent along with every later message. */
   const intent = useRef<TutorIntent | undefined>(undefined)
 
@@ -93,6 +112,25 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
     input.current?.focus({ preventScroll: true })
     return () => {
       if (before instanceof HTMLElement) before.focus({ preventScroll: true })
+    }
+  }, [])
+
+  /* The roster, once the lamp is open. It is cached for the session, so
+     reopening the lamp costs nothing. A failure is silent on purpose: the
+     reader loses a dropdown, not the tutor. */
+  useEffect(() => {
+    let live = true
+    void loadModels()
+      .then((rows) => {
+        if (!live) return
+        setModels(rows)
+        setPick(chosenFrom(rows, storedPick()))
+      })
+      .catch(() => {
+        /* no roster, no picker */
+      })
+    return () => {
+      live = false
     }
   }, [])
 
@@ -148,11 +186,16 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
         intent: intent.current,
         history,
         userMessage: asked,
+        ...(pick ? { model: pick } : {}),
       }).then((reply) => {
+        // `reply.model` is what answered, not what was asked for. On a failover
+        // the two differ, and the label has to name the one that wrote the
+        // words. A canned failure line carries no model and so draws no name.
         const answer: TutorMessage = {
           role: 'claude',
           text: reply.text,
           ...(reply.isProbe ? { isProbe: true } : {}),
+          ...(reply.model ? { model: reply.model } : {}),
           ts: Date.now(),
         }
         // The check that the explanation landed is a *second* bubble, not a
@@ -160,7 +203,15 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
         // the tutor asking rather than telling — and the room already draws
         // those differently.
         const check: TutorMessage[] = reply.probe
-          ? [{ role: 'claude', text: reply.probe, isProbe: true, ts: Date.now() + 1 }]
+          ? [
+              {
+                role: 'claude',
+                text: reply.probe,
+                isProbe: true,
+                ...(reply.probeModel ? { model: reply.probeModel } : {}),
+                ts: Date.now() + 1,
+              },
+            ]
           : []
         const whole = [...history, yours, answer, ...check]
         setMessages(whole)
@@ -171,7 +222,7 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
         onSave(whole)
       })
     },
-    [messages, passage, pending, onSave],
+    [messages, passage, pending, pick, onSave],
   )
 
   const bar = passage.kind === 'sentence' && passage.excerpt.length <= 40
@@ -255,11 +306,19 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
               {message.text}
             </p>
           ) : (
-            <div
-              key={message.ts}
-              className={`${styles.slip} ${message.isProbe ? styles.probe : ''}`}
-            >
-              {message.text}
+            <div key={message.ts}>
+              {/* Only when the message itself recorded a model. Threads saved
+                  before stage B have none, and a caption naming today's model
+                  over yesterday's words would be a plain lie. */}
+              {message.model && (
+                <p className={styles.byline}>
+                  {models.find((row) => row.id === message.model)?.name ??
+                    modelLabel(message.model)}
+                </p>
+              )}
+              <div className={`${styles.slip} ${message.isProbe ? styles.probe : ''}`}>
+                {message.text}
+              </div>
             </div>
           ),
         )}
@@ -282,6 +341,23 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
           send(draft)
         }}
       >
+        {models.length > 0 && (
+          <select
+            className={styles.picker}
+            aria-label="Which model answers"
+            value={pick ?? ''}
+            onChange={(event) => {
+              setPick(event.target.value)
+              rememberPick(event.target.value)
+            }}
+          >
+            {models.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.paid ? `${row.name} · paid` : row.name}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           ref={input}
           className={styles.input}

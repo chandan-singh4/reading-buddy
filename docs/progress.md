@@ -15,22 +15,25 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
-- **The tutor relay is written and has never reached a model** (2026-08-22).
-  `api/tutor.ts` exists. It holds the OpenRouter key and the whole prompt
-  library, sends a `models` fallback chain, and reports which model really
-  answered. **None of that is proved.** Vite does not run `api/`, and no
-  `OPENROUTER_API_KEY` is set anywhere yet, so every reply in the pane is still
-  the honest offline line. To prove it:
-  1. Put `OPENROUTER_API_KEY` in Vercel → Settings → Environment Variables.
-     Get the key at <https://openrouter.ai/keys>.
-  2. Optionally set `TUTOR_MODELS` to a comma-separated chain. Left empty the
-     relay uses `openrouter/free`. **Check that slug is real** — it comes from
-     the build brief and nothing here has called it.
-  3. Sign in on the phone. The relay 401s a signed-out reader on purpose; it
-     is a spend control, because the Claude slug on the same path costs money.
-  4. Ask a passage "Explain simply". Two bubbles must arrive: the explanation,
-     then a gentle check that it landed.
-  Stage A of four. Stages B, C and D are written out in `docs/active-task.md`.
+- **The tutor is built and the key is live, but no answer has been seen**
+  (2026-08-22). `api/tutor.ts` holds the OpenRouter key and the whole prompt
+  library. `api/models.ts` fetches the free tool-capable roster.
+  `web/src/reader/models.ts` decides which of those a reader may pick, and hides
+  models built for one narrow job. The Study Lamp draws a picker above the input
+  and a small caption above each tutor bubble naming the model that wrote it.
+  **The picker and the caption have never drawn from a real answer.** Vite does
+  not run `api/`, so every reply in the pane is still the honest offline line.
+  To prove it: sign in on the phone, open a passage, tap "Explain simply". Two
+  bubbles must arrive, each with a name above it.
+- **Two things wait on OpenRouter credits** (2026-08-22). A live probe of the
+  key returned `402 Insufficient credits` for the web plugin and for every paid
+  slug. So Stage C's "Still true?" and "Historical context" cannot search, and
+  the Claude row must stay out of the picker. Keep `TUTOR_MODEL_CLAUDE` unset
+  until credits exist. Free models answer normally.
+- **`openrouter/free` is not safe as a fallback** (2026-08-22). It auto-routes
+  across every free model. The probe landed on a coding agent and on a safety
+  classifier that answered "say the word: ok" with "User Safety: safe". Neither
+  errors. The relay now falls back through four named general models.
 - **The Study Lamp chips changed** (2026-08-22). They now name real prompt
   modules: Explain simply, Explain to a friend, Discuss, Define a term. The old
   `explain` and `quiz` chips matched no prompt and are gone — "quiz" is now the
