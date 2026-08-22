@@ -148,6 +148,16 @@ export interface AskTutorReply {
   text: string
   isProbe?: boolean
   /**
+   * True when `text` is our own canned line rather than a model's words.
+   *
+   * The caller needs this to keep the failure *out* of the thread. A failure
+   * that is stored as a message stacks up one bubble per attempt, survives a
+   * reopen, and — worst of the three — gets replayed to the model as its own
+   * previous turn, so the tutor reads "The tutor could not be reached" as
+   * something it once said.
+   */
+  failed?: true
+  /**
    * The model that **actually** produced this text, as the relay read it off
    * the response — not the one that was asked for. During a failover the two
    * differ, which is exactly when the label matters.
@@ -178,7 +188,7 @@ const TUTOR_URL: string =
  * wrong" would leave the reader pressing the same button forever.
  */
 function cannedReply(reason: string): AskTutorReply {
-  return { text: reason }
+  return { text: reason, failed: true }
 }
 
 /** The failure, in words that suggest what to do about it. */

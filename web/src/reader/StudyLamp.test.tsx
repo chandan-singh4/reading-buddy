@@ -7,7 +7,7 @@
 // know draws no name at all. The second is the one a refactor breaks — falling
 // back to "the current model" is the obvious convenience, and it would label
 // every thread saved before this feature with a model that never saw it.
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { PREFERRED_MODEL } from './models.ts'
@@ -88,5 +88,100 @@ describe('the study lamp', () => {
     ])
     // The preferred model, since nothing has been chosen before.
     await waitFor(() => expect(picker.value).toBe(PREFERRED_MODEL))
+  })
+})
+
+/* --- what happens when the tutor cannot be reached ------------------------ */
+
+function relay(...answers: Response[]) {
+  let at = 0
+  const fetch = vi.fn(() => {
+    const answer = answers[Math.min(at, answers.length - 1)]!
+    at += 1
+    return Promise.resolve(answer.clone())
+  })
+  vi.stubGlobal('fetch', fetch)
+  return fetch
+}
+
+const refused = () => new Response(JSON.stringify({ error: 'all busy' }), { status: 502 })
+const answered = () =>
+  new Response(
+    JSON.stringify({ text: 'Jung meant the unconscious.', model: 'google/gemma-4-31b-it:free' }),
+    { status: 200 },
+  )
+
+async function ask(label = 'Explain simply') {
+  fireEvent.click(await screen.findByRole('button', { name: label }))
+}
+
+afterEach(() => vi.unstubAllGlobals())
+
+describe('a failure the reader can see', () => {
+  it('does not stack when the tutor keeps refusing', async () => {
+    relay(refused())
+    lamp([])
+    await ask()
+    await screen.findByText(/no model would answer/i)
+
+    // Ask again, and again. One note, never a pile of identical bubbles.
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getAllByText(/no model would answer/i)).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.getAllByText(/no model would answer/i)).toHaveLength(1))
+  })
+
+  it('disappears as soon as a model answers', async () => {
+    relay(refused(), answered())
+    lamp([])
+    await ask()
+    await screen.findByText(/no model would answer/i)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('Jung meant the unconscious.')).toBeTruthy()
+    expect(screen.queryByText(/no model would answer/i)).toBeNull()
+  })
+
+  it('is never saved into the thread', async () => {
+    // The failure must not reach storage, because from storage it would be
+    // replayed to the model as one of its own previous turns.
+    const saved: TutorMessage[][] = []
+    relay(refused())
+    render(
+      <StudyLamp passage={passage} saved={[]} onSave={(m) => void saved.push(m)} onClose={() => {}} />,
+    )
+    await ask()
+    await screen.findByText(/no model would answer/i)
+    await waitFor(() => expect(saved.length).toBe(1))
+    expect(saved[0]!.map((m) => m.role)).toEqual(['you'])
+  })
+})
+
+describe('the message actions', () => {
+  it('re-asks a question and replaces its old answer', async () => {
+    relay(answered())
+    lamp([
+      { role: 'you', text: 'Who is the great psychologist?', ts: 1 },
+      { role: 'claude', text: 'An older answer.', model: 'google/gemma-4-31b-it:free', ts: 2 },
+    ])
+    fireEvent.click(await screen.findByRole('button', { name: 'Answer this again' }))
+    expect(await screen.findByText('Jung meant the unconscious.')).toBeTruthy()
+    // One answer to one question, not two.
+    expect(screen.queryByText('An older answer.')).toBeNull()
+    expect(screen.getAllByText('Who is the great psychologist?')).toHaveLength(1)
+  })
+
+  it('puts an edited question back in the composer and rewinds the thread', async () => {
+    relay(answered())
+    lamp([
+      { role: 'you', text: 'Who is the great psychologist?', ts: 1 },
+      { role: 'claude', text: 'An older answer.', model: 'google/gemma-4-31b-it:free', ts: 2 },
+    ])
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit your question' }))
+    const composer = screen.getByLabelText('Ask about this passage') as HTMLInputElement
+    expect(composer.value).toBe('Who is the great psychologist?')
+    // Editing does not send. The reader decides when it is ready.
+    expect(screen.queryByText('An older answer.')).toBeNull()
+    expect(screen.queryByText('Jung meant the unconscious.')).toBeNull()
   })
 })

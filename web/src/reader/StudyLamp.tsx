@@ -25,6 +25,16 @@
  * The lamp owns the conversation while it is open and reports every completed
  * exchange upward through `onSave`; the Reader persists and repaints. It never
  * touches storage itself, so a scratch test can mount it dry.
+ *
+ * ## A failure is not a turn
+ *
+ * When the tutor cannot be reached, the line saying so is held in component
+ * state, never in `messages`. It therefore cannot stack — a second failed
+ * attempt replaces the first rather than adding to it — it clears the moment
+ * anything succeeds, it is never saved, and it is never replayed to the model
+ * as one of its own previous turns. It is also drawn as a plain note rather
+ * than as a slip, because it did not come from a model and must not wear a
+ * model's clothes.
  */
 
 import {
@@ -91,6 +101,10 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
    */
   const [models, setModels] = useState<TutorModel[]>([])
   const [pick, setPick] = useState<string | undefined>(undefined)
+  /** The last attempt's failure, if it failed. One at a time, never stored. */
+  const [failure, setFailure] = useState<string | undefined>(undefined)
+  /** Which message just went to the clipboard, so the button can say so. */
+  const [copied, setCopied] = useState<number | undefined>(undefined)
   /** Which chip started it — sent along with every later message. */
   const intent = useRef<TutorIntent | undefined>(undefined)
 
@@ -168,16 +182,23 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
   }, [messages, pending])
 
   const send = useCallback(
-    (text: string, chip?: TutorIntent) => {
+    /**
+     * `base` replaces the thread this question is asked against. A retry passes
+     * everything up to the question being re-asked, which drops that question's
+     * old answer and anything after it — the alternative is a thread that holds
+     * two answers to the same question and no way to tell which one is live.
+     */
+    (text: string, chip?: TutorIntent, base?: TutorMessage[]) => {
       if (pending) return
       const asked = text.trim()
       if (!asked) return
       if (chip) intent.current = chip
 
       const yours: TutorMessage = { role: 'you', text: asked, ts: Date.now() }
-      const history = messages
+      const history = base ?? messages
       setMessages([...history, yours])
       setDraft('')
+      setFailure(undefined)
       setPending(true)
 
       void askTutor({
@@ -188,6 +209,17 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
         userMessage: asked,
         ...(pick ? { model: pick } : {}),
       }).then((reply) => {
+        if (reply.failed) {
+          // The question stays — the reader can see what went unanswered and
+          // retry it. The failure itself goes beside the thread, not into it.
+          const kept = [...history, yours]
+          setMessages(kept)
+          setFailure(reply.text)
+          setPending(false)
+          if (history.length === 0) setCollapsed(true)
+          onSave(kept)
+          return
+        }
         // `reply.model` is what answered, not what was asked for. On a failover
         // the two differ, and the label has to name the one that wrote the
         // words. A canned failure line carries no model and so draws no name.
@@ -224,6 +256,50 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
     },
     [messages, passage, pending, pick, onSave],
   )
+
+  /* The nearest question at or above a message. Retrying an answer means
+     asking its question again, and an answer may be followed by a probe. */
+  const questionAt = useCallback(
+    (index: number): number => {
+      for (let at = index; at >= 0; at -= 1) if (messages[at]?.role === 'you') return at
+      return -1
+    },
+    [messages],
+  )
+
+  const retry = useCallback(
+    (index: number) => {
+      const at = questionAt(index)
+      if (at < 0) return
+      send(messages[at]!.text, undefined, messages.slice(0, at))
+    },
+    [messages, questionAt, send],
+  )
+
+  /* Edit puts the words back in the composer and rewinds the thread to just
+     before them. It does not send — the reader is editing, so they decide when
+     it is ready. */
+  const edit = useCallback(
+    (index: number) => {
+      setMessages(messages.slice(0, index))
+      setFailure(undefined)
+      setDraft(messages[index]?.text ?? '')
+      input.current?.focus()
+    },
+    [messages],
+  )
+
+  const copy = useCallback((message: TutorMessage) => {
+    void navigator.clipboard
+      ?.writeText(message.text)
+      .then(() => {
+        setCopied(message.ts)
+        setTimeout(() => setCopied(undefined), 1400)
+      })
+      .catch(() => {
+        /* No clipboard permission. Nothing to say about it. */
+      })
+  }, [])
 
   const bar = passage.kind === 'sentence' && passage.excerpt.length <= 40
     ? passage.excerpt
@@ -300,11 +376,39 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
           </div>
         )}
 
-        {messages.map((message) =>
+        {messages.map((message, index) =>
           message.role === 'you' ? (
-            <p key={message.ts} className={styles.you}>
-              {message.text}
-            </p>
+            <div key={message.ts}>
+              <p className={styles.you}>{message.text}</p>
+              <div className={`${styles.actions} ${styles.actionsYou}`}>
+                <button
+                  type="button"
+                  className={styles.action}
+                  aria-label="Copy your question"
+                  onClick={() => copy(message)}
+                >
+                  {copied === message.ts ? <span className={styles.copied}>Copied</span> : '⧉'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.action}
+                  aria-label="Edit your question"
+                  disabled={pending}
+                  onClick={() => edit(index)}
+                >
+                  ✎
+                </button>
+                <button
+                  type="button"
+                  className={styles.action}
+                  aria-label="Ask this again"
+                  disabled={pending}
+                  onClick={() => retry(index)}
+                >
+                  ↻
+                </button>
+              </div>
+            </div>
           ) : (
             <div key={message.ts}>
               {/* Only when the message itself recorded a model. Threads saved
@@ -319,8 +423,42 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
               <div className={`${styles.slip} ${message.isProbe ? styles.probe : ''}`}>
                 {message.text}
               </div>
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.action}
+                  aria-label="Copy this answer"
+                  onClick={() => copy(message)}
+                >
+                  {copied === message.ts ? <span className={styles.copied}>Copied</span> : '⧉'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.action}
+                  aria-label="Answer this again"
+                  disabled={pending}
+                  onClick={() => retry(index)}
+                >
+                  ↻
+                </button>
+              </div>
             </div>
           ),
+        )}
+
+        {/* Beside the thread, never in it. One at a time, and gone the moment
+            an answer arrives. */}
+        {failure && !pending && (
+          <p className={styles.failure} role="status">
+            {failure}{' '}
+            <button
+              type="button"
+              className={styles.failureRetry}
+              onClick={() => retry(messages.length - 1)}
+            >
+              Try again
+            </button>
+          </p>
         )}
 
         {pending && (

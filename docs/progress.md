@@ -25,6 +25,15 @@ Get that loop working before building any breadth.
   not run `api/`, so every reply in the pane is still the honest offline line.
   To prove it: sign in on the phone, open a passage, tap "Explain simply". Two
   bubbles must arrive, each with a name above it.
+- **The Study Lamp has message actions** (2026-08-22). Copy, edit and ask again
+  sit under each of the reader's questions. Copy and answer again sit under each
+  tutor answer. Edit and retry both drop everything after the question they act
+  on, so a thread never holds two answers to one question.
+- **A failure is no longer a message** (2026-08-22). The "could not be reached"
+  line lives in component state. Before this it was stored as a tutor turn. It
+  stacked up one bubble per attempt, it survived a reopen, and it was replayed
+  to the model as words the tutor had said. It is now drawn as a plain centred
+  note with no ✦ badge and no bubble, so it cannot be mistaken for an answer.
 - **The tutor answered nothing at all until 2026-08-22, and the cause was
   ours.** The relay sent a four-model fallback chain. OpenRouter rejects any
   `models` array longer than three with a `400`, so every question failed, for

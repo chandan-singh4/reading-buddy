@@ -232,7 +232,7 @@
 
 /* The reader's side: handwriting, right-aligned, no bubble. */
 .you {
-  margin: 0 0 13px;
+  margin: 0 0 1px;
   padding-left: 44px;
   font-family: 'Caveat', cursive;
   font-weight: 500;
@@ -265,7 +265,7 @@
 /* The tutor's side: a printed slip, badged. */
 .slip {
   position: relative;
-  margin: 0 24px 13px 0;
+  margin: 0 24px 1px 0;
   padding: 11px 13px;
   background: #2a2419;
   border: 1px solid #3d3320;
@@ -299,6 +299,88 @@
 
 .probe::before {
   background: #241d13;
+}
+
+/* What you can do with a message.
+ *
+ * Under the message rather than on it, and in the room's quietest colour: a
+ * reading app is not a chat app, and a row of controls competing with the
+ * words would change what the lamp is for. They are always drawn, never
+ * revealed on hover — this is a phone first, and there is no hover there.
+ *
+ * The buttons are 40px, not the 44px used elsewhere in the app. Three 44px
+ * targets under every single message adds a lot of height to a thread, and
+ * these are all reversible: the worst outcome of a mis-tap is a copy the
+ * reader did not want. The two that are not reversible — edit and retry, which
+ * both drop what came after — are the ones spaced furthest from the edge. */
+.actions {
+  display: flex;
+  gap: 2px;
+  margin: 0 0 10px;
+}
+
+.actionsYou {
+  justify-content: flex-end;
+}
+
+.action {
+  display: grid;
+  place-items: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #6d6149;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.action:hover:enabled {
+  color: #c39a5e;
+}
+
+.action:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.copied {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #b79a68;
+}
+
+/* The tutor could not be reached.
+ *
+ * Deliberately not a slip. It carries no ✦ badge and no bubble, because it did
+ * not come from a model, and for a reading tutor that difference is the whole
+ * point — a reader must never have to wonder whether the thing in the bubble
+ * came from the book's tutor or from us. */
+.failure {
+  margin: 2px 0 13px;
+  padding: 6px 8px;
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.55;
+  color: #9a8a68;
+  text-align: center;
+}
+
+.failureRetry {
+  min-height: 2.5rem;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: #c39a5e;
+  font-family: inherit;
+  font-size: 14px;
+  font-style: normal;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 /* Three slow dots while the tutor writes. */
@@ -443,6 +525,8 @@
 .option:focus-visible,
 .send:focus-visible,
 .picker:focus-visible,
+.action:focus-visible,
+.failureRetry:focus-visible,
 .input:focus-visible {
   outline: 2px solid #c39a5e;
   outline-offset: 2px;
