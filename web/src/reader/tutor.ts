@@ -14,13 +14,18 @@
  *
  * ## The AI call is one function
  *
- * `askTutor` is the only place the network is touched. It posts to a relay —
- * the Anthropic key lives server-side, never in this bundle — and when no
- * relay answers it falls back to a canned line that *says it is canned*. The
- * UI cannot tell the difference and does not need to: swap the relay in and
- * nothing above this file changes.
+ * `askTutor` is the only place the network is touched. It posts to
+ * `api/tutor.ts`, which holds both the key and every word of the system
+ * prompt — nothing about the tutor's voice is in this bundle, and nothing
+ * above this file knows which provider answered.
+ *
+ * When the relay cannot be reached, the reply is a canned line that *says it
+ * is canned*. It never guesses at the passage. A plausible invented answer is
+ * the one failure mode a reading tutor must not have: the reader would carry
+ * it away as something the book said.
  */
 
+import { accessToken } from '../storage/cloud/client.ts'
 import type { Anchor } from '../structure/index.ts'
 
 /** How much of the page the reader pinned under the lamp. */
@@ -35,14 +40,26 @@ export interface PassageAnchor {
   kind: PassageKind
 }
 
-/** The four ways in, in the order the lamp offers them. */
-export type TutorIntent = 'explain' | 'simply' | 'quiz' | 'discuss'
+/**
+ * The four ways in, in the order the lamp offers them.
+ *
+ * These name **task modules in the relay's prompt library**, not labels. The
+ * earlier set (`explain`, `quiz`) was invented before the prompt file existed
+ * and matched nothing in it; `quiz` in particular is now the explain-back
+ * probe, which fires on its own after an explanation rather than as a chip the
+ * reader has to remember to press.
+ *
+ * Four more are genre-conditional — "Still true?", "Historical context",
+ * "What's happening here?", "Interpret this" — and wait on the book carrying a
+ * genre. See stage C in `docs/active-task.md`.
+ */
+export type TutorIntent = 'simply' | 'friend' | 'discuss' | 'define'
 
 export const INTENT_LABELS: Record<TutorIntent, string> = {
-  explain: 'Explain this passage',
   simply: 'Explain simply',
-  quiz: 'Quiz me on this',
+  friend: 'Explain to a friend',
   discuss: 'Discuss & ask questions',
+  define: 'Define a term',
 }
 
 /** One turn of the conversation. */
@@ -87,11 +104,28 @@ export interface AskTutorRequest {
   intent?: TutorIntent
   history: TutorMessage[]
   userMessage: string
+  /**
+   * The reader's chosen model slug. Stage B's picker fills this; the relay
+   * puts it at the head of its fallback chain. Left out, the relay picks.
+   */
+  model?: string
 }
 
 export interface AskTutorReply {
   text: string
   isProbe?: boolean
+  /**
+   * The model that **actually** produced this text, as the relay read it off
+   * the response — not the one that was asked for. During a failover the two
+   * differ, which is exactly when the label matters.
+   */
+  model?: string
+  /**
+   * The gentle check that the explanation landed, when the task module carries
+   * one. A whole second turn, drawn as its own bubble with `isProbe`.
+   */
+  probe?: string
+  probeModel?: string
 }
 
 /**
@@ -103,24 +137,28 @@ const TUTOR_URL: string =
   (import.meta.env.VITE_TUTOR_URL as string | undefined) ?? '/api/tutor'
 
 /**
- * What the lamp says when no relay answers.
+ * What the lamp says when the tutor cannot be reached.
  *
- * Honest about being offline, and never dressed as the model: an invented
- * "answer" would put words in the tutor's mouth. It still varies by intent so
- * the lamp is exercisable end to end without a server.
+ * Honest about the failure, and never dressed as the model. It says *which*
+ * failure, because the three have three different remedies: sign in, wait for
+ * a signal, or tell someone the server is misconfigured. "Something went
+ * wrong" would leave the reader pressing the same button forever.
  */
-function cannedReply(request: AskTutorRequest): AskTutorReply {
-  const opening: Record<TutorIntent, string> = {
-    explain: 'I can’t reach the tutor right now, so here is no real reading of the passage — only this placeholder.',
-    simply: 'The tutor is offline, so no simple version yet — this is a placeholder.',
-    quiz: 'The tutor is offline, so no quiz yet — this is a placeholder.',
-    discuss: 'The tutor is offline, so no discussion yet — this is a placeholder.',
-  }
-  const first = request.history.length === 0
-  return {
-    text: first
-      ? `${opening[request.intent ?? 'discuss']} When the connection returns, ask again and the passage will get a real answer.`
-      : 'Still offline — your message is on screen but the tutor cannot answer it yet. Try again when the connection returns.',
+function cannedReply(reason: string): AskTutorReply {
+  return { text: reason }
+}
+
+/** The failure, in words that suggest what to do about it. */
+function reasonFor(status: number): string {
+  switch (status) {
+    case 401:
+      return 'The tutor needs you signed in. Sign in from Settings, then ask again — nothing you typed is lost.'
+    case 429:
+      return 'The tutor has been asked too much too quickly. Give it a minute, then ask again.'
+    case 500:
+      return 'The tutor relay has no key set, so it cannot reach a model. This one needs fixing on the server, not here.'
+    default:
+      return 'The tutor could not be reached just now. Ask again in a moment — I would rather say nothing than guess at the passage.'
   }
 }
 
@@ -130,9 +168,13 @@ function cannedReply(request: AskTutorRequest): AskTutorReply {
  */
 export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply> {
   try {
+    const token = await accessToken()
     const response = await fetch(TUTOR_URL, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         anchor: request.anchor.anchor,
         excerpt: request.anchor.excerpt,
@@ -141,15 +183,34 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
         intent: request.intent,
         history: request.history.map(({ role, text, isProbe }) => ({ role, text, isProbe })),
         userMessage: request.userMessage,
+        ...(request.model ? { model: request.model } : {}),
       }),
     })
-    if (!response.ok) throw new Error(`tutor relay answered ${response.status}`)
-    const data = (await response.json()) as { text?: unknown; isProbe?: unknown }
-    if (typeof data.text !== 'string' || data.text.length === 0) {
-      throw new Error('tutor relay answered without text')
+    if (!response.ok) return cannedReply(reasonFor(response.status))
+
+    const data = (await response.json()) as {
+      text?: unknown
+      isProbe?: unknown
+      model?: unknown
+      probe?: unknown
+      probeModel?: unknown
     }
-    return { text: data.text, ...(data.isProbe === true ? { isProbe: true } : {}) }
+    if (typeof data.text !== 'string' || data.text.length === 0) {
+      return cannedReply(reasonFor(0))
+    }
+
+    return {
+      text: data.text,
+      ...(data.isProbe === true ? { isProbe: true } : {}),
+      ...(typeof data.model === 'string' ? { model: data.model } : {}),
+      ...(typeof data.probe === 'string' && data.probe.length > 0
+        ? { probe: data.probe }
+        : {}),
+      ...(typeof data.probeModel === 'string' ? { probeModel: data.probeModel } : {}),
+    }
   } catch {
-    return cannedReply(request)
+    // `fetch` rejects with a bare "Failed to fetch" for every network-level
+    // problem, which on a phone means one thing far more often than not.
+    return cannedReply('You’re offline, so the tutor can’t answer yet. Your question stays here — ask again when you have a signal.')
   }
 }

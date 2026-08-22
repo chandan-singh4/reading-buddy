@@ -3,159 +3,186 @@
 > What is in here: the one task in flight, and the exact files to open for it.
 > Read it at startup, before anything else.
 
-## Task — none in flight
+## Task — the AI tutor engine, stage A of four
 
-The Study Lamp shipped this thread (2026-08-21). "Ask Claude" in the selection
-menu is one entry now. It opens a dark, full-screen tutor room. The room shows
-the passage, four question chips, and a composer. The conversation is saved on
-the device. A closed conversation leaves an ink line under the passage and a
-small paper slip at its corner. A tap on either one reopens the same thread.
+The reader gave a build brief and a prompt library on 2026-08-22:
 
-The reader's first-use feedback landed the same day (2026-08-21). Four fixes
-shipped on top:
+- `design-inspiration/reading-buddy-claude-code-brief.md` — the engine.
+- `design-inspiration/reading-buddy-prompts.md` — the prompt text. This is the
+  source of truth for every word the model is told.
+- `design-inspiration/tutor-memory-layer.html` — the recap layer's look.
 
-1. Each slip now sits at the end of its own passage's last inked line. Two
-   threads in one paragraph wear two separate slips. Before, both slips sat on
-   the same corner and only the top one took the tap.
-2. Every note row has a small × to delete it. On a tutor row the × removes the
-   whole thread and its page marks.
-3. Tutor conversations now show in Notes → Claude. A row shows the elided
-   passage and Claude's last reply. A tap reopens the thread under the lamp.
-4. The Study Lamp and Notes fonts are larger. The handwriting size did not
-   change — it must match the 32 px rule pitch.
+The brief is large. We cut it into four stages. **Stage A is this thread.**
+Stages B, C and D are written out below so a later thread can start cold.
 
-The whole flow was proved in the running app with a real book. Build, typecheck
-and all 1512 tests are green.
+### The state before this thread
 
-**What the phone must still judge:**
+The client half was already built. `askTutor` in `web/src/reader/tutor.ts` is
+the single choke point. It posts to `/api/tutor`. No relay existed, so every
+answer was an honest "the tutor is offline" placeholder.
 
-1. The dim-in of the room, the glow, and the collapse of the pinned bar. The
-   Browser pane draws no animation, so all motion is unproved.
-2. The look of the ink line and the slip on real paper themes.
-3. The long press → ASK CLAUDE → chip → reply loop under a real thumb.
-4. The new per-sentence slip positions on real text. Ask two questions in one
-   paragraph and check both slips sit on their own sentence.
-5. The delete × in Notes, and the larger fonts.
+### Three places the brief and this repo disagree
 
-**The tutor speaks in a placeholder.** `askTutor` posts to `/api/tutor`, and no
-relay exists yet. The reply says plainly that the tutor is offline. It never
-invents an answer. The relay endpoint is the next tutor task: it holds the
-system prompt and the key, server-side only.
+1. **The provider.** `api/README.md` said the endpoint holds an Anthropic key.
+   The brief says OpenRouter. We follow the brief. Claude is one more slug on
+   the same path.
+2. **The task modules.** The lamp offered four chips that no prompt matched.
+   The prompt file is the source of truth, so the chips now match it.
+3. **The anchor.** The brief sketches `startOffset` and `endOffset`. This app
+   stores the quote instead, on purpose. We keep the app's rule. The brief
+   permits this.
 
-## Next up — pick one, then run `/plan-task`
+---
 
-1. **Build the `/api/tutor` relay.** One endpoint in `api/` that holds the
-   system prompt and calls Claude. The client is done and waiting.
-2. **Judge `PARSER_VERSION` 28 on the phone.** No code. The reader accepts the
-   rebuild and reads the Contents tab of *The Mountains of My Life*.
-3. **Finish WP-25: something that writes a note.** The Notes tab reads a table
-   that nothing fills.
-4. **Drop caps**, still parked and waiting on the reader's screenshot.
+## Stage A — the relay (this thread)
 
-## Files in scope — the Study Lamp
+**Goal.** The tutor speaks for real. The reader taps a chip and gets a warm,
+plain-language answer from a live model, followed by one gentle check that the
+answer landed.
 
-- `web/src/reader/tutor.ts` — the passage types, `elide`, `askTutor`, the
-  canned fallback.
-- `web/src/reader/StudyLamp.tsx` + `.module.css` — the room itself.
-- `web/src/reader/TutorMarks.tsx` + `.module.css` — the ink line and the slip.
-- `web/src/storage/tutor.ts` + `db.ts` (`version(12)`) — the saved threads.
-- `web/src/pages/Reader.tsx` — `lamp` state, `openThread`, `keepThread`, the
-  `ask` case, three `TutorMarks` mounts.
+**Done when:**
+
+1. `api/tutor.ts` holds the OpenRouter key and the whole prompt library.
+2. A chip press returns a real answer, not a placeholder.
+3. The explain-back probe fires after "Explain simply" and "Explain to a
+   friend". It does not fire after "Discuss" or "Define a term".
+4. A dead primary model fails over to the next one with no visible break.
+5. The relay reports which model really answered. The client carries it.
+6. Signed out, or offline, the reply says so plainly and invents nothing.
+
+**What is proved.** Points 1, 3 and 6. The four new chips draw, a chip press
+runs the whole path, and the reply is the honest offline line. Fourteen new
+tests in `web/src/reader/tutor.test.ts` hold the failure paths down — every one
+of them exists to stop a later refactor from adding a plausible guess.
+
+**What is not proved.** Points 2, 4 and 5, and none of them can be proved from
+this machine. Vite does not run `api/`, and no `OPENROUTER_API_KEY` exists here.
+The relay has never reached a model. The steps to prove it are in
+`docs/progress.md` under *In flight*.
+
+**One slug to check.** The relay falls back to `openrouter/free`. That name
+comes from the build brief and nothing in this project has ever called it. If
+it is wrong, the reader sees the relay's own error and the fix is one
+environment variable, not a deploy. That is why the chain is a variable.
+
+---
+
+## Stage B — the model picker and the bubble labels
+
+**Goal.** The reader chooses the model, and every answer says who wrote it.
+
+Steps, in order:
+
+1. **New endpoint `api/models.ts`.** It calls
+   `GET https://openrouter.ai/api/v1/models?supported_parameters=tools` and
+   keeps only rows where `pricing.prompt == 0` and `pricing.completion == 0`.
+   It returns `[{ id, name }]`. Do not hardcode a list — the free roster
+   changes every week. Cache the answer for about an hour.
+2. **Add the Claude row by hand.** It is paid, so it is not in the free list.
+   The slug comes from `TUTOR_MODEL_CLAUDE`.
+3. **Client store.** Keep the reader's pick in `localStorage`. Keep the fetched
+   roster in memory with a timestamp. Refresh when it is stale.
+4. **The dropdown.** It sits in the Study Lamp composer row. Warm-paper style,
+   small and quiet. Match `study-lamp-conversation.html`.
+5. **Send the pick.** `askTutor` already passes `model` through. The relay
+   already puts it at the head of the fallback chain. Only the UI is missing.
+6. **Store the model on the message.** `StoredTutorThread.messages[]` gains
+   `model?: string`. Dexie `version(13)`. Old rows have no model. They must
+   draw with no label, not with a wrong one.
+7. **Draw the label.** A small muted caption above each tutor bubble, mirroring
+   how "Chandan" sits above the reader's own. Read it from the stored `model`,
+   never from what was asked for. During a failover the two differ, and that
+   difference is the whole point of the label.
+
+**Files:** `api/models.ts` (new), `web/src/reader/tutor.ts`,
+`web/src/reader/StudyLamp.tsx` and `.module.css`, `web/src/storage/db.ts`,
+`web/src/storage/tutor.ts`.
+
+---
+
+## Stage C — web search and the genre chips
+
+**Goal.** "Still true?" checks a claim against what is known now.
+
+Steps, in order:
+
+1. **Turn the search flag on.** `api/tutor.ts` already carries `search: true`
+   on the modules that need it, and already sends `plugins: [{ id: 'web' }]`
+   when the flag is set. Prove it end to end with a dated claim.
+2. **Add the four genre modules** to the prompt table. The text is in the
+   prompt file, sections 6 to 9: Still true?, Historical context, What's
+   happening here?, Interpret this.
+3. **Genre.** The book has no genre field yet. There are two ways:
+   - Ask the reader once, on import. Cheap and certain.
+   - Use the classifier prompt at the end of the prompt file.
+   Prefer asking. A personal app has one reader and few books.
+4. **Show the right chips.** The lamp shows the four neutral chips always, plus
+   the genre ones the book earns. Keep the row to about six.
+5. **Note the source.** A searched answer must say where the check came from.
+
+**Files:** `api/tutor.ts`, `web/src/reader/StudyLamp.tsx`,
+`web/src/storage/db.ts` (a genre field on `BookMeta`).
+
+---
+
+## Stage D — the digest and recap pipeline
+
+**Goal.** Leaving a chapter leaves a faithful page-length recap behind, plus a
+terse list of what the reader got stuck on. Coming back shows both with no
+model call at all.
+
+This is the largest stage. Steps, in order:
+
+1. **New table `digests`.** Dexie `version(14)`.
+   `{ bookId, chapterId, contentRecap, conversationDigest,
+   coversNConversations, generatedAt }`. Device-local, like `tutor` and
+   `notes`.
+2. **The size branch.** Read the stored `words` count on each section.
+   - Under about 4,000 words: digest the section as one unit. Map step only.
+   - Over that: cut it into blocks of about 3,000 to 4,000 words. This is pure
+     arithmetic over the stored section list. **Do not re-parse the book.**
+     Digest each block, then stitch the block digests.
+   - Under about 50 words, such as a bare heading: no digest at all.
+3. **The block is not a reading unit.** It must never touch `positions`. Keep
+   the two ideas of "chunk" apart, or the reader's place will move.
+4. **Length is coverage, not brevity.** The map prompt targets 150 to 250 words
+   per block. The reduce prompt targets 800 to 1,200 words for a long chapter,
+   and it **joins** rather than shrinks. A vague half-page is a failure here.
+5. **The conversation digest is the exception.** It stays terse. One line per
+   distinct confusion, `problem → resolution`, duplicates merged.
+6. **Triggers.** Generate at a section boundary, or when the reader closes the
+   book. Do not wait for chapter end. A 70,000-word chapter spans many
+   sittings.
+7. **Staleness.** Rebuild a chapter digest only when it has gained
+   conversations since `generatedAt`. Compare against `coversNConversations`.
+8. **The "Last time on…" screen.** Assemble it from the stored digests plus the
+   `positions` pointer. **Zero model calls. Ship this mode first.** The layout
+   is the dark `.welcome` block in `tutor-memory-layer.html`.
+9. **The optional warm paragraph.** One extra call that feeds only the chapter
+   digests, never raw text, to the "Welcome back" prompt. A toggle, not the
+   default.
+
+**Files:** `web/src/tutor/digest.ts` (new), `web/src/storage/digests.ts` (new),
+`web/src/storage/db.ts`, `api/tutor.ts` (three more modules), and a new return
+screen under `web/src/pages/`.
+
+---
+
+## Files in scope — stage A
+
+- `api/tutor.ts` — the relay, the prompt library, the fallback chain. **New.**
+- `web/src/reader/tutor.ts` — `askTutor`, the intents, the honest fallback.
+- `web/src/reader/StudyLamp.tsx` — the chips and the probe bubble.
+- `.env.example` and `api/README.md` — the key.
 
 ## Carried forward — how to work on the reading page
 
-Fourteen lessons earlier threads paid for. Lessons 12 to 14 are new.
+Fourteen lessons earlier threads paid for. They are unchanged and still apply.
+Read the git history of this file at commit `b826646` for the full list. These
+three bite hardest:
 
 1. **Measure in a real browser, not by reading the file.**
-2. **Layout is `offsetWidth`, paint is `getBoundingClientRect`.** The turning
-   sheet is under a transform, so its rectangles are distorted.
-3. **The Browser pane does not composite.** `requestAnimationFrame` never fires
-   there, and timers are throttled to about 1 Hz — a 600 ms test window sees two
-   ticks and looks broken. Step things synchronously, observe with `setTimeout`,
-   and wait seconds, not milliseconds.
-4. **Check the trigger before writing the fix.** Six rounds went into the
-   selection menu because nobody asked what actually tells the app a page turned.
-   The answer was *nothing*. Two of those rounds were spent explaining a dead
-   probe away as a harness limitation, when it was the bug.
-5. **Paint cost cannot be read on the desktop at all.** The pane does not paint.
-   For anything that feels slow on the phone, build a small readout into the app
-   and ask the reader for a screenshot. Remote USB profiling does not work here —
-   `chrome://inspect` stayed "Offline" through every fix.
-6. **A page turn has two directions and they are not mirror images.** Forwards
-   the moving sheet is the page being left. Backwards it is the page being
-   arrived at. Any optimisation that strips something from a sheet has to know
-   which. See `data-page-leaving` in `pageTurn.ts`.
-7. **Measure the worst frame, not the start of the gesture.** Build and paint
-   time only the first frame. A turn that stutters "the whole way through" costs
-   its money in the frames after that, and no start-of-gesture number shows it.
-   Ask the reader *when* it feels slow before you choose what to measure.
-8. **Do not strip two things at once.** A switch that removes the whole pen
-   proves the ink is the cost, but not which half. Split the switch, then keep
-   only the half you must lose. Here the grain paid the whole bill.
-9. **A word fingerprint settles a "the text moved" report; the eye cannot.**
-   Print every visible word as `word@x,y` for the real page and for the copy, and
-   compare the two lists as strings. This found a 40 px sideways error in one
-   call that four rounds of looking at screenshots had missed. Build the bench on
-   a bare page with the real CSS modules. Turn off `scroll-behavior` and any
-   entrance animation first — a running animation beats an inline transform, and
-   a smooth scroll is read mid-flight.
-10. **Never add a rectangle to `scrollLeft`.** `getBoundingClientRect` answers in
-    painted pixels. `scrollLeft`, `clientWidth` and computed styles answer in
-    layout pixels. The reading stage carries `scale(0.85)` while the toolbar is
-    up, so the two units differ by 15%, and any sum of them is only right when
-    the toolbar is down. This was the reader's bug. Divide the rectangle by the
-    drawn scale first. See `edge` in `pageTurn.ts`.
-11. **Test in the real app, not in a bench you built.** A bare page that renders
-    the same blocks with the same CSS still missed the reader's bug three times.
-    The real page has a chapter header, real furniture and real wrappers, and the
-    fault lived in a wrapper. Put the book into the running app instead: fetch
-    the file, make a `File`, hand it to the import input, then `import()` the
-    module you want to test straight from the dev server.
-
-12. **`strip.current` is empty when an effect with `[]` runs.** A callback ref
-    fills it when the book mounts, which is later. A listener bound that way
-    binds nothing, and the failure is silent — the reader loses the feature
-    completely. Bind to `document` and read the ref at the event instead.
-13. **Clear the screen before you probe a coordinate.** Two probes read `null`
-    from a working function because a leftover selection card and the splash
-    screen sat over the text. `elementFromPoint` tells you what you really hit —
-    check it before you believe the result.
-14. **Anything drawn over the page must be a layer.** A back swipe leaves the
-    book unless `layerDepth` counts it. See `useBackDismiss`.
-
-## Turn cost, as measured (2026-08-17, phone, one page, 103 strokes)
-
-Keep these. They are the baseline any future change is judged against.
-
-| | build | paint |
-|---|---|---|
-| clean ink | ~70 ms | 21 ms |
-| hand-drawn | ~75 ms | 48 ms |
-| hand-drawn, texture forced on | ~104 ms | 94 ms |
-
-Build is the copy work in `pageTurn.ts` and is a straight multiple of `STRIPS`
-(now 12). Paint is the browser drawing the ink. After the fixes, both fell; the
-reader called the result "much faster" and did not ask for a re-measure.
-
-## Worst frame during a turn (2026-08-18, phone, one page, 47 strokes)
-
-A second baseline, and the more useful of the two. It times the longest single
-frame of the whole gesture, not the start.
-
-| bands carry | forward, worst | backward, worst |
-|---|---|---|
-| the whole pen | 50–67 ms | 50–**150** ms |
-| no pen at all | 49–50 ms | 50–67 ms |
-| shape only, no grain (shipped) | 50 ms | 50–67 ms |
-
-About 50 ms is the floor. That is the one frame where the gesture builds the
-sheet, and it is the same in both directions.
-
-The 150 ms frame was the fault. A backward turn drags the page the reader lands
-on, so its 12 bands must keep the shape of their ink. With the grain inside that
-shape as well, the browser redrew about 12 × 47 textured marks every frame. A
-forward turn redrew none, because a page being left may drop the whole pen.
-
-Dropping the grain alone put the two directions level and left nothing missing
-at the hand-over. See `data-page-arriving` in `pageTurn.ts` and the rule of the
-same name in `HandDrawn.module.css`.
+2. **The Browser pane does not composite.** `requestAnimationFrame` never fires
+   there, and timers run at about 1 Hz. Wait seconds, not milliseconds.
+3. **Test in the real app, not in a bench you built.** A bare page with the
+   same CSS missed the reader's bug three times.

@@ -15,12 +15,29 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
-- **The Study Lamp is new and its motion is unproved** (2026-08-21). The whole
-  flow works in the Browser pane: long press → ASK CLAUDE → the dark room →
-  chip → reply → close → ink line + slip → tap reopens the thread. The pane
-  draws no animation, so the dim-in, the glow and the collapse need the phone.
-  The tutor answers with an honest offline placeholder until the `/api/tutor`
-  relay exists — that relay is the next tutor task.
+- **The tutor relay is written and has never reached a model** (2026-08-22).
+  `api/tutor.ts` exists. It holds the OpenRouter key and the whole prompt
+  library, sends a `models` fallback chain, and reports which model really
+  answered. **None of that is proved.** Vite does not run `api/`, and no
+  `OPENROUTER_API_KEY` is set anywhere yet, so every reply in the pane is still
+  the honest offline line. To prove it:
+  1. Put `OPENROUTER_API_KEY` in Vercel → Settings → Environment Variables.
+     Get the key at <https://openrouter.ai/keys>.
+  2. Optionally set `TUTOR_MODELS` to a comma-separated chain. Left empty the
+     relay uses `openrouter/free`. **Check that slug is real** — it comes from
+     the build brief and nothing here has called it.
+  3. Sign in on the phone. The relay 401s a signed-out reader on purpose; it
+     is a spend control, because the Claude slug on the same path costs money.
+  4. Ask a passage "Explain simply". Two bubbles must arrive: the explanation,
+     then a gentle check that it landed.
+  Stage A of four. Stages B, C and D are written out in `docs/active-task.md`.
+- **The Study Lamp chips changed** (2026-08-22). They now name real prompt
+  modules: Explain simply, Explain to a friend, Discuss, Define a term. The old
+  `explain` and `quiz` chips matched no prompt and are gone — "quiz" is now the
+  explain-back probe, which arrives on its own after an explanation. Proved in
+  the Browser pane with the real book.
+- **The Study Lamp motion is still unproved** (2026-08-21). The pane draws no
+  animation, so the dim-in, the glow and the collapse still need the phone.
 - **The touch selection is new and only half proved** (2026-08-19). On a touch
   screen the phone can no longer select anything. A long press picks the word,
   and a back swipe puts the menu away. All three were proved in the Browser

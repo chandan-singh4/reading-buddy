@@ -56,7 +56,14 @@ export interface StudyLampProps {
   onClose: () => void
 }
 
-const INTENTS: TutorIntent[] = ['explain', 'simply', 'quiz', 'discuss']
+/**
+ * The chips, in the order they are offered.
+ *
+ * Explaining comes first because it is why the reader stopped reading. The two
+ * explainers sit together, then the two that do something else with the
+ * passage. Four genre-conditional chips join this row in stage C.
+ */
+const INTENTS: TutorIntent[] = ['simply', 'friend', 'discuss', 'define']
 
 export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
   const [messages, setMessages] = useState<TutorMessage[]>(saved ?? [])
@@ -148,7 +155,14 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
           ...(reply.isProbe ? { isProbe: true } : {}),
           ts: Date.now(),
         }
-        const whole = [...history, yours, answer]
+        // The check that the explanation landed is a *second* bubble, not a
+        // paragraph tacked onto the first. It is a different kind of thing —
+        // the tutor asking rather than telling — and the room already draws
+        // those differently.
+        const check: TutorMessage[] = reply.probe
+          ? [{ role: 'claude', text: reply.probe, isProbe: true, ts: Date.now() + 1 }]
+          : []
+        const whole = [...history, yours, answer, ...check]
         setMessages(whole)
         setPending(false)
         // The first exchange pins the passage on its own: the thread has
