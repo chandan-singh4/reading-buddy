@@ -65,6 +65,8 @@ import {
   type TutorMessage,
 } from './tutor.ts'
 import type { PassageContext } from './context.ts'
+import { ModelSheet } from './ModelSheet.tsx'
+import { useDictation } from './dictation.ts'
 import styles from './StudyLamp.module.css'
 
 export interface StudyLampProps {
@@ -87,6 +89,28 @@ export interface StudyLampProps {
  */
 const INTENTS: TutorIntent[] = ['simply', 'friend', 'discuss', 'define']
 
+/**
+ * A microphone, drawn rather than typed. The 🎤 emoji is a different size, a
+ * different colour and a different century in every font that has it.
+ */
+function MicGlyph() {
+  return (
+    <svg
+      className={styles.micGlyph}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="9" y="2.5" width="6" height="11" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+    </svg>
+  )
+}
+
 export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLampProps) {
   const [messages, setMessages] = useState<TutorMessage[]>(saved ?? [])
   // A reopened thread starts pinned — the reader came back for the
@@ -105,6 +129,8 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
    */
   const [models, setModels] = useState<TutorModel[]>([])
   const [pick, setPick] = useState<string | undefined>(undefined)
+  /** Whether the model sheet is up. It is a layer above the lamp, not in it. */
+  const [sheet, setSheet] = useState(false)
   /** The last attempt's failure, if it failed. One at a time, never stored. */
   const [failure, setFailure] = useState<string | undefined>(undefined)
   /** Which message just went to the clipboard, so the button can say so. */
@@ -115,6 +141,10 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
   const overlay = useRef<HTMLDivElement | null>(null)
   const flow = useRef<HTMLDivElement | null>(null)
   const input = useRef<HTMLInputElement | null>(null)
+  /* What is in the box right now, for the recogniser — which starts once and
+     must not be rebuilt every keystroke to see it. */
+  const draftRef = useRef('')
+  draftRef.current = draft
 
   const fresh = messages.length === 0
 
@@ -185,6 +215,23 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
     if (node) node.scrollTop = node.scrollHeight
   }, [messages, pending])
 
+  /*
+   * Speaking instead of typing.
+   *
+   * The words land in the same box the reader would have typed into, so a
+   * dictated question can be corrected by hand before it is sent — which is
+   * most of them, because a recogniser hears "Nietzsche" as "Nietzsche" about
+   * half the time.
+   */
+  const dictation = useDictation({
+    baseText: () => draftRef.current,
+    onText: setDraft,
+  })
+  /* `send` must be able to end a run without listing the whole dictation in
+     its dependencies — it is rebuilt on every keystroke otherwise. */
+  const stopSaying = useRef(dictation.stop)
+  stopSaying.current = dictation.stop
+
   const send = useCallback(
     /**
      * `base` replaces the thread this question is asked against. A retry passes
@@ -196,6 +243,8 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
       if (pending) return
       const asked = text.trim()
       if (!asked) return
+      // A question that has gone must not keep collecting words behind it.
+      stopSaying.current()
       if (chip) intent.current = chip
 
       const yours: TutorMessage = { role: 'you', text: asked, ts: Date.now() }
@@ -488,27 +537,39 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         }}
       >
         {models.length > 0 && (
-          <select
+          <button
+            type="button"
             className={styles.picker}
-            aria-label="Which model answers"
-            value={pick ?? ''}
-            onChange={(event) => {
-              setPick(event.target.value)
-              rememberPick(event.target.value)
-            }}
+            /* The name of the control *and* its current value. A button
+               labelled only "Which model answers" reads out as a question with
+               no answer, which is worse than a `<select>` was. */
+            aria-label={`Which model answers: ${models.find((row) => row.id === pick)?.name ?? 'not chosen'}`}
+            aria-haspopup="dialog"
+            aria-expanded={sheet}
+            onClick={() => setSheet(true)}
           >
-            {models.map((row) => (
-              <option key={row.id} value={row.id}>
-                {row.paid ? `${row.name} · paid` : row.name}
-              </option>
-            ))}
-          </select>
+            {models.find((row) => row.id === pick)?.name ?? 'Choose a model'}
+            <span className={styles.chevron} aria-hidden="true">
+              ⌄
+            </span>
+          </button>
+        )}
+        {dictation.supported && (
+          <button
+            type="button"
+            className={`${styles.mic} ${dictation.listening ? styles.hearing : ''}`}
+            aria-label={dictation.listening ? 'Stop dictating' : 'Ask out loud'}
+            aria-pressed={dictation.listening}
+            onClick={dictation.toggle}
+          >
+            <MicGlyph />
+          </button>
         )}
         <input
           ref={input}
           className={styles.input}
           value={draft}
-          placeholder="Ask into the quiet…"
+          placeholder={dictation.listening ? 'Listening…' : 'Ask into the quiet…'}
           aria-label="Ask about this passage"
           onChange={(event) => setDraft(event.target.value)}
         />
@@ -521,6 +582,19 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
           ↑
         </button>
       </form>
+
+      {sheet && (
+        <ModelSheet
+          models={models}
+          pick={pick}
+          onPick={(id) => {
+            setPick(id)
+            rememberPick(id)
+            setSheet(false)
+          }}
+          onClose={() => setSheet(false)}
+        />
+      )}
     </div>,
     document.body,
   )

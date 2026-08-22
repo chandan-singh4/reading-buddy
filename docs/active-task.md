@@ -332,6 +332,44 @@ client sends the chain, and the relay uses it when it is there.
 - `api/tutor.ts` — `slugs()` reads the client chain; `body.model` still works.
 - `web/src/reader/TutorMarks.tsx` and `.module.css` — slip placement, dead ink.
 
+## Done next — the model sheet, the fonts, and speaking a question
+
+**The model sheet.** The picker was a native `<select>`. Tapping it threw a
+white browser list over a dark room. `ModelSheet.tsx` draws it instead: a sheet
+at the bottom edge, translucent, blurred, with iOS dark colours, a tick on the
+current choice, and a Cancel row. Escape and the scrim both close it. Escape is
+caught with a capture listener, so one press does not also close the lamp.
+
+The closed control is now a line of text with a chevron. It carries the model's
+name, so the reader reads their choice without opening anything.
+
+**The fonts.** The reader's own words were Caveat, a handwriting face, at 23 px.
+It read as decoration and it did not match the box the words were typed into.
+Now it is the room's Garamond, italic, at 18 px. The tutor's answer went from
+16 px to 17 px — it is the longest thing in the room.
+
+**Speaking a question.** `dictation.ts` wraps the browser's Web Speech API. No
+audio reaches this app or the relay: the phone hands back text. A microphone
+button sits left of the box, and it is drawn only where the browser has the API.
+Firefox does not, so Firefox sees no button.
+
+A run remembers what was in the box when it started, and rewrites everything
+after that point on each event. That is why interim words tidy themselves
+instead of being typed twice. A refused microphone, no microphone, or silence
+all end the run, so the button never stays lit.
+
+**What I could not prove in the browser:** the sheet itself. The roster needs a
+signed-in session and the dev browser has none, so the picker is not drawn
+there. It is covered by 10 tests. The reader's font and the microphone button
+were both proved live.
+
+**New files in scope:**
+
+- `web/src/reader/ModelSheet.tsx` and `.module.css` — the picker sheet. **New.**
+- `web/src/reader/ModelSheet.test.tsx` — 10 tests. **New.**
+- `web/src/reader/dictation.ts` — the Web Speech API wrapper. **New.**
+- `web/src/reader/dictation.test.ts` — 13 tests. **New.**
+
 ## Carried forward — how to work on the reading page
 
 Fourteen lessons earlier threads paid for. They are unchanged and still apply.

@@ -75,19 +75,33 @@ describe('the study lamp', () => {
     expect(await screen.findByText('An older answer.')).toBeTruthy()
     // The picker has loaded by now, so a caption drawn from "the current
     // model" rather than from the message would show up here.
-    await screen.findByLabelText('Which model answers')
+    await screen.findByLabelText(/Which model answers/)
     expect(paragraphs()).toEqual([])
   })
 
-  it('offers the roster in the composer', async () => {
+  it('offers the roster in a sheet, and says which one is chosen', async () => {
     lamp([])
-    const picker = (await screen.findByLabelText('Which model answers')) as HTMLSelectElement
-    expect([...picker.options].map((option) => option.text)).toEqual([
-      'Nemotron 3 Super',
-      'Gemma 4 31B',
-    ])
-    // The preferred model, since nothing has been chosen before.
-    await waitFor(() => expect(picker.value).toBe(PREFERRED_MODEL))
+    const picker = await screen.findByLabelText(/Which model answers/)
+    // The preferred model, since nothing has been chosen before. It is on the
+    // closed control, so the reader can read it without opening anything.
+    await waitFor(() => expect(picker.textContent).toContain('Nemotron 3 Super'))
+    expect(PREFERRED_MODEL).toBe('nvidia/nemotron-3-super-120b-a12b:free')
+
+    fireEvent.click(picker)
+    const sheet = await screen.findByRole('dialog', { name: 'Which model answers' })
+    const rows = [...sheet.querySelectorAll('button')].map((row) => row.textContent)
+    expect(rows).toEqual(['Nemotron 3 Super', 'Gemma 4 31B', 'Cancel'])
+  })
+
+  it('takes a choice from the sheet and closes it', async () => {
+    lamp([])
+    fireEvent.click(await screen.findByLabelText(/Which model answers/))
+    fireEvent.click(await screen.findByRole('button', { name: 'Gemma 4 31B' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Which model answers' })).toBeNull()
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Which model answers/).textContent).toContain('Gemma 4 31B'),
+    )
   })
 })
 
