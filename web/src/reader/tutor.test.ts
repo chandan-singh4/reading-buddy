@@ -178,3 +178,39 @@ describe('the failure the free tier actually produces', () => {
     expect(reply.text).toMatch(/free tier/i)
   })
 })
+
+describe('what the relay is told about the passage', () => {
+  it('sends the book, the place in it, and the text either side', async () => {
+    const fetch = answering(relay({ text: 'ok' }))
+
+    await askTutor({
+      ...request,
+      context: {
+        title: 'Memories',
+        author: 'C. G. Jung',
+        chapter: 'First Years',
+        section: 'The Cathedral',
+        before: 'The sentence before.',
+        after: 'The sentence after.',
+      },
+    })
+
+    const sent = JSON.parse((fetch.mock.calls[0][1] as RequestInit).body as string)
+    expect(sent.context.title).toBe('Memories')
+    expect(sent.context.author).toBe('C. G. Jung')
+    expect(sent.context.chapter).toBe('First Years')
+    expect(sent.context.section).toBe('The Cathedral')
+    expect(sent.context.before).toBe('The sentence before.')
+    expect(sent.context.after).toBe('The sentence after.')
+    expect(sent.excerpt).toBe('Entropy always rises.')
+  })
+
+  it('leaves the field out entirely when there is no context', async () => {
+    const fetch = answering(relay({ text: 'ok' }))
+
+    await askTutor(request)
+
+    const sent = JSON.parse((fetch.mock.calls[0][1] as RequestInit).body as string)
+    expect('context' in sent).toBe(false)
+  })
+})

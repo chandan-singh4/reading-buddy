@@ -222,6 +222,40 @@ screen under `web/src/pages/`.
 - `web/src/reader/StudyLamp.tsx` — the chips and the probe bubble.
 - `.env.example` and `api/README.md` — the key.
 
+## Done after stage B — what the tutor is told about the passage
+
+The reader asked what the model receives. The answer was: the selected words
+and an anchor id, and nothing else. An id like `[ch02-s03-p013]` means nothing
+to a model. So the model had no book, no author, no chapter, and no sentence
+either side. It answered from what it knows about the world instead of from the
+page. That is why it gave a fact from the end of the book.
+
+Every question now carries a frame:
+
+- book title and author;
+- chapter title and section title;
+- the text immediately before and after the selection.
+
+A tapped paragraph takes the paragraph before and after it. A tapped sentence
+takes the sentences either side inside its own paragraph. If it is the first or
+the last sentence there, it reaches into the next paragraph.
+
+Rules that hold this in place:
+
+- Each side is capped at 600 characters in the client and 800 in the relay. A
+  long neighbour must not crowd out the passage.
+- The prompt labels the neighbours `TEXT BEFORE (context only, do not explain
+  it)`. The model must explain the selection, not the frame.
+- The anchor id is no longer sent to the model. It stays in the app.
+- A thread reopened from Notes may name a passage on another page. The book and
+  the author still go. The neighbours are left out, never guessed.
+
+**New files in scope:**
+
+- `web/src/reader/context.ts` — builds the frame. **New.**
+- `web/src/reader/context.test.ts` — 15 tests. **New.**
+- `web/src/pages/Reader.tsx` — `lampContext`, handed to the lamp.
+
 ## Carried forward — how to work on the reading page
 
 Fourteen lessons earlier threads paid for. They are unchanged and still apply.

@@ -63,10 +63,13 @@ import {
   type TutorIntent,
   type TutorMessage,
 } from './tutor.ts'
+import type { PassageContext } from './context.ts'
 import styles from './StudyLamp.module.css'
 
 export interface StudyLampProps {
   passage: PassageAnchor
+  /** Where the passage sits in the book. Sent with every question. */
+  context?: PassageContext
   /** The saved conversation, when the lamp is reopening one. */
   saved?: TutorMessage[]
   /** Every completed exchange, whole. The Reader persists it. */
@@ -83,7 +86,7 @@ export interface StudyLampProps {
  */
 const INTENTS: TutorIntent[] = ['simply', 'friend', 'discuss', 'define']
 
-export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
+export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLampProps) {
   const [messages, setMessages] = useState<TutorMessage[]>(saved ?? [])
   // A reopened thread starts pinned — the reader came back for the
   // conversation, and the passage is one tap away.
@@ -203,6 +206,7 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
 
       void askTutor({
         anchor: passage,
+        ...(context ? { context } : {}),
         mode: history.length === 0 ? 'fresh' : 'reopen',
         intent: intent.current,
         history,
@@ -254,7 +258,7 @@ export function StudyLamp({ passage, saved, onSave, onClose }: StudyLampProps) {
         onSave(whole)
       })
     },
-    [messages, passage, pending, pick, onSave],
+    [messages, passage, context, pending, pick, onSave],
   )
 
   /* The nearest question at or above a message. Retrying an answer means

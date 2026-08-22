@@ -26,6 +26,7 @@
  */
 
 import { accessToken } from '../storage/cloud/client.ts'
+import type { PassageContext } from './context.ts'
 import type { Anchor } from '../structure/index.ts'
 
 /** How much of the page the reader pinned under the lamp. */
@@ -131,6 +132,12 @@ export function passageKindOf(text: string, unit?: PassageKind | null): PassageK
 
 export interface AskTutorRequest {
   anchor: PassageAnchor
+  /**
+   * Where the passage sits in the book — title, author, chapter, section, and
+   * the text either side of it. Built by `context.ts`. Left out only when the
+   * caller genuinely does not know, which is rare.
+   */
+  context?: PassageContext
   /** 'fresh' on a first exchange, 'reopen' when the thread already exists. */
   mode: 'fresh' | 'reopen'
   /** The entry chip that started it, when one did. */
@@ -224,6 +231,7 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
         anchor: request.anchor.anchor,
         excerpt: request.anchor.excerpt,
         kind: request.anchor.kind,
+        ...(request.context ? { context: request.context } : {}),
         mode: request.mode,
         intent: request.intent,
         history: request.history.map(({ role, text, isProbe }) => ({ role, text, isProbe })),

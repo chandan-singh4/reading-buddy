@@ -108,6 +108,13 @@ const MAX_TOKENS = 1200
 const MAX_EXCERPT = 8000
 const MAX_MESSAGE = 4000
 const MAX_HISTORY = 40
+/**
+ * Per side, for the text around the passage. The client caps this too; this is
+ * the copy that has to hold, because the client is not the only caller.
+ */
+const MAX_NEIGHBOUR = 800
+/** Title, author, chapter, section — a heading, not a paragraph. */
+const MAX_FIELD = 200
 
 /* ------------------------------------------------------------------ prompts */
 
@@ -132,7 +139,10 @@ HOW YOU SOUND
 - A companion, never a professor. Don't condescend, don't pad, don't flatter.
 
 WHAT YOU WORK FROM
-- You're given the exact passage the reader selected and where it sits in the book. Explain THAT. Don't wander beyond it, and never reveal what happens later in the book.
+- You're given the book's title and author, the chapter and section the reader is in, the exact passage they selected, and the text immediately before and after it.
+- Explain THE SELECTED PASSAGE. The text before and after is there so you can resolve a "this", a "he", or a name introduced a sentence earlier. It is context, not the subject — do not explain it and do not summarise it.
+- Stay inside what you were given. Don't wander beyond it, and never reveal what happens later in the book.
+- The title and author tell you which book this is. They are not an invitation to talk about the book as a whole, the author's life, or how the book ends. If the reader would meet a fact later in the book, they meet it later — not from you.
 - If the passage looks garbled or cut off (these are parsed from EPUB files), work with what's there and say plainly that some text may be missing.
 - If you're genuinely unsure what a passage means, say so instead of inventing.
 
@@ -206,6 +216,11 @@ interface Body {
   anchor?: unknown
   excerpt?: unknown
   kind?: unknown
+  /**
+   * Where the passage sits: title, author, chapter, section, and the text
+   * either side of it. See `web/src/reader/context.ts`, which builds it.
+   */
+  context?: unknown
   mode?: unknown
   intent?: unknown
   history?: unknown
@@ -304,21 +319,59 @@ function priorTurns(history: unknown): Turn[] {
  * words, and wrapping them in "explain this simply" would answer a question
  * they did not ask.
  */
+/**
+ * Where the passage sits, written out for the model.
+ *
+ * Labelled lines rather than a sentence, and the two neighbours are labelled
+ * as context in the label itself. A model that is handed three blocks of prose
+ * with no labels will happily explain all three; one that reads "TEXT BEFORE
+ * (context only)" mostly will not.
+ *
+ * Everything is optional. A reopened thread about a passage the reader has
+ * read past carries the book but no neighbours, and a book with untitled
+ * sections carries no section.
+ */
+function frame(value: unknown): string {
+  const at = value as Record<string, unknown> | null
+  if (!at || typeof at !== 'object') return ''
+
+  const lines: string[] = []
+  const field = (label: string, key: string) => {
+    const said = text(at[key], MAX_FIELD)
+    if (said) lines.push(`${label}: ${said}`)
+  }
+
+  field('BOOK', 'title')
+  field('AUTHOR', 'author')
+  field('CHAPTER', 'chapter')
+  field('SECTION', 'section')
+
+  const before = text(at.before, MAX_NEIGHBOUR)
+  const after = text(at.after, MAX_NEIGHBOUR)
+  if (before) lines.push(`TEXT BEFORE (context only, do not explain it): ${before}`)
+  if (after) lines.push(`TEXT AFTER (context only, do not explain it): ${after}`)
+
+  return lines.length > 0 ? `${lines.join('\n')}\n\n` : ''
+}
+
 function assemble(body: Body, module: Module | undefined): Turn[] {
   const excerpt = text(body.excerpt, MAX_EXCERPT)
-  const anchor = text(body.anchor, 120)
   const asked = text(body.userMessage, MAX_MESSAGE)
+  const where = frame(body.context)
 
   const turns: Turn[] = [{ role: 'system', content: BASE_PROMPT }]
   if (module) turns.push({ role: 'system', content: module.prompt })
   turns.push(...priorTurns(body.history))
 
-  const where = anchor ? ` (${anchor})` : ''
+  // The passage comes last of the three, closest to the question, because it
+  // is the thing being asked about. The anchor id is deliberately not sent:
+  // `[ch02-s03-p013]` means nothing to a model, and a line it cannot read is a
+  // line that teaches it the rest may be noise too.
   const passage = excerpt
-    ? `The passage the reader selected${where}:\n\n"""\n${excerpt}\n"""\n\n`
+    ? `THE PASSAGE THE READER SELECTED — explain this one:\n\n"""\n${excerpt}\n"""\n\n`
     : ''
 
-  turns.push({ role: 'user', content: `${passage}${asked}` })
+  turns.push({ role: 'user', content: `${where}${passage}${asked}` })
   return turns
 }
 

@@ -93,6 +93,7 @@ import {
   passageKindOf,
   type PassageAnchor,
   type TutorMessage,
+  passageContext,
   type BarState,
   type ReaderSettings,
   type SectionRef,
@@ -2957,6 +2958,25 @@ export default function Reader() {
   const lampRef = useRef(lamp)
   lampRef.current = lamp
 
+  /*
+   * What the tutor is told about *where* the passage is.
+   *
+   * Built from the book, the manifest and the section on screen — title,
+   * author, chapter, section, and the text either side of the selection. Only
+   * the words used to go, which left the model nothing to resolve a pronoun
+   * with and pushed it towards answering from outside the book.
+   *
+   * A thread reopened from Notes can name a passage the reader is nowhere
+   * near. The anchor then matches nothing in the live section and the
+   * neighbours are simply left out — the book and its title still go, because
+   * those are still true.
+   */
+  const lampContext = useMemo(() => {
+    if (!lamp || frame.status !== 'ready') return undefined
+    const section = page.status === 'ready' ? page.section : undefined
+    return passageContext(frame.book, frame.manifest, section, lamp.passage)
+  }, [lamp, frame, page])
+
   /** A tap on the ink or the slip: the same passage, its thread, reopened. */
   const openThread = useCallback((thread: StoredTutorThread) => {
     setLamp({
@@ -3870,6 +3890,7 @@ export default function Reader() {
             <StudyLamp
               key={lamp.threadId ?? lamp.passage.excerpt}
               passage={lamp.passage}
+              context={lampContext}
               saved={lamp.saved}
               onSave={keepThread}
               onClose={() => setLamp(null)}

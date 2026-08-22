@@ -44,6 +44,8 @@ export type { StudyLampProps } from './StudyLamp.tsx'
 export { TutorMarks } from './TutorMarks.tsx'
 export type { TutorMarksProps } from './TutorMarks.tsx'
 export { askTutor, elide, INTENT_LABELS, passageKindOf } from './tutor.ts'
+export { neighboursOf, passageContext, sentences } from './context.ts'
+export type { PassageContext } from './context.ts'
 export type {
   AskTutorReply,
   AskTutorRequest,
