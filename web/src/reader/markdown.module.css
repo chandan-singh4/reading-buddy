@@ -1,0 +1,117 @@
+/*
+ * The formatting inside a tutor answer.
+ *
+ * Everything here sits inside the slip, so nothing sets a colour or a face of
+ * its own unless it means to differ from the surrounding words. The spacing is
+ * tight on purpose: this is a chat bubble on a phone, and document-sized gaps
+ * between a heading and its paragraph would push the answer off the screen.
+ */
+
+.paragraph {
+  margin: 0 0 0.7em;
+  /* The model breaks lines mid-sentence. Keeping them costs nothing and
+     preserves an address or a line of verse it meant to set out. */
+  white-space: pre-wrap;
+}
+
+.paragraph:last-child {
+  margin-bottom: 0;
+}
+
+/* Every heading level, one size. See the note in `markdown.tsx`. */
+.heading {
+  margin: 0.9em 0 0.35em;
+  font-weight: 600;
+  color: #f3e6c8;
+}
+
+.heading:first-child {
+  margin-top: 0;
+}
+
+.list {
+  margin: 0 0 0.7em;
+  padding-left: 1.35em;
+}
+
+.list:last-child {
+  margin-bottom: 0;
+}
+
+.item {
+  margin-bottom: 0.25em;
+}
+
+.item::marker {
+  color: #c39a5e;
+}
+
+.quote {
+  margin: 0 0 0.7em;
+  padding-left: 0.8em;
+  border-left: 2px solid rgba(195, 154, 94, 0.45);
+  color: #ddd0b0;
+  font-style: italic;
+  white-space: pre-wrap;
+}
+
+.code {
+  padding: 0.1em 0.32em;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Monospace runs large next to Garamond; this brings the two back level. */
+  font-size: 0.88em;
+  color: #e8d9b4;
+}
+
+.block {
+  margin: 0 0 0.7em;
+  padding: 9px 11px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  /* A long line scrolls inside the block. Without this the whole lamp scrolls
+     sideways, and the answer beside it goes with it. */
+  overflow-x: auto;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  line-height: 1.5;
+  color: #e8d9b4;
+}
+
+.block code {
+  white-space: pre;
+}
+
+/* A formula. Set apart and legible, not typeset — see `markdown.tsx`. */
+.formula {
+  padding: 0.05em 0.3em;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  color: #f0dcae;
+}
+
+.display {
+  margin: 0.5em 0 0.75em;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(195, 154, 94, 0.08);
+  overflow-x: auto;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  color: #f0dcae;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.rule {
+  margin: 0.9em 0;
+  border: 0;
+  border-top: 1px solid rgba(195, 154, 94, 0.25);
+}
+
+.link {
+  color: #d9b475;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

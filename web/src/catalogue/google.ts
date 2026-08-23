@@ -21,17 +21,67 @@ import type { VolumeInfo } from './volume.ts'
 const BOOKS_URL =
   (import.meta.env.VITE_BOOKS_URL as string | undefined)?.trim() || '/api/books/google'
 
+/**
+ * How long a lookup may take before it is called a failure.
+ *
+ * There has to be a number, because `fetch` has no timeout of its own. A
+ * request to a host that accepts the connection and then says nothing — a
+ * captive wifi portal, a proxy, a phone that lost its signal mid-request —
+ * never rejects and never resolves. The reader sees "Looking…" and it stays
+ * there, which is exactly the bug this constant exists to prevent.
+ *
+ * Twenty seconds is long enough for a cold serverless function and two Google
+ * round trips, and short enough that a stuck request still gives the reader a
+ * sentence to read rather than a spinner to stare at.
+ */
+const TIMEOUT_MS = 20_000
+
+/** The same deadline, applied to a promise that has no timeout of its own. */
+async function within<T>(work: Promise<T>, reason: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new CloudError(reason)), TIMEOUT_MS)
+      }),
+    ])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
 async function post(body: unknown): Promise<Response> {
-  const token = await accessToken()
+  // Racing the token too, not only the request. `getSession` refreshes an
+  // expired token over the network, so it is a second thing that can hang.
+  const token = await within(accessToken(), 'signing in took too long')
+
+  // The deadline is a race, not the abort signal. `fetch` is expected to reject
+  // when a request is aborted, but the guarantee the reader needs — that the
+  // button always comes back — must not rest on somebody else's promise
+  // settling. The race settles on its own timer whatever `fetch` does.
+  //
+  // The abort is then housekeeping: once the race is lost, nothing will ever
+  // read the reply, so the socket is closed rather than left receiving bytes
+  // the phone is paying for.
+  const stop = new AbortController()
 
   let response: Response
   try {
-    response = await fetch(BOOKS_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-    })
-  } catch {
+    response = await within(
+      fetch(BOOKS_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+        signal: stop.signal,
+      }),
+      'Google Books did not answer in time',
+    )
+  } catch (error) {
+    if (error instanceof CloudError) {
+      stop.abort()
+      throw error
+    }
     // `fetch` rejects with a bare "Failed to fetch" for every network-level
     // problem, which on a phone means one thing far more often than not.
     throw new CloudError('you’re offline')

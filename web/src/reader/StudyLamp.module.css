@@ -336,6 +336,21 @@
   justify-content: flex-end;
 }
 
+/* What one answer cost, on the same line as the buttons that act on it.
+   `margin-left: auto` pushes it to the far edge, so the eye reads icons on the
+   left and the number on the right, the same way every row in the room does.
+   It is a number to glance at, never one to reach for. */
+.exchange {
+  margin-left: auto;
+  align-self: center;
+  padding-right: 24px;
+  color: #6a5e47;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
 .action {
   display: grid;
   place-items: center;
@@ -695,11 +710,28 @@
   outline-offset: 2px;
 }
 
+/* The globe sits with the model and the effort, so it is built as a picker
+   rather than as a second microphone. Round, because it is a switch with two
+   states and needs somewhere for the lit colour to live. */
+.globe {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
 /* The globe, lit. Blue is the one colour the lamp does not otherwise use, which
    is why it reads instantly as "this question leaves the room". */
 .searching {
   background: rgba(96, 165, 250, 0.18);
   color: #93c5fd;
+}
+
+.globe .micGlyph {
+  width: 16px;
+  height: 16px;
 }
 
 /* Where a searched answer looked. Under the slip, quiet, and indented to the

@@ -68,6 +68,7 @@ import {
 import type { PassageContext } from './context.ts'
 import { ModelSheet } from './ModelSheet.tsx'
 import { EffortSheet } from './EffortSheet.tsx'
+import { Markdown } from './markdown.tsx'
 import {
   DEFAULT_EFFORT,
   effortLabel,
@@ -161,13 +162,28 @@ function spentLine(usage: TutorUsage): string {
   return `${count(usage.input)} in · ${count(usage.output)} out · ${count(usage.total)} total`
 }
 
-/** The most recent exchange that reported a cost, if any did. */
-function lastUsage(messages: readonly TutorMessage[]): TutorUsage | undefined {
-  for (let at = messages.length - 1; at >= 0; at -= 1) {
-    const spent = messages[at]?.usage
-    if (spent) return spent
+/**
+ * Everything this conversation has cost so far.
+ *
+ * A sum rather than the last exchange. Each answer now carries its own count
+ * beside its buttons, so the number under the bar is the one those add up to —
+ * and a reader watching a budget is watching the total, not the last line.
+ *
+ * `undefined` when nothing reported a cost, which is not the same as zero: a
+ * model that sends no usage must not be drawn as a free one.
+ */
+function totalUsage(messages: readonly TutorMessage[]): TutorUsage | undefined {
+  const sum = { input: 0, output: 0, total: 0 }
+  let any = false
+
+  for (const message of messages) {
+    if (!message.usage) continue
+    any = true
+    sum.input += message.usage.input
+    sum.output += message.usage.output
+    sum.total += message.usage.total
   }
-  return undefined
+  return any ? sum : undefined
 }
 
 export function StudyLamp({
@@ -603,13 +619,18 @@ export function StudyLamp({
                     How it thought this through
                   </button>
                   {shown.includes(message.ts) && (
-                    <p className={styles.thoughtText}>{message.reasoning}</p>
+                    <Markdown className={styles.thoughtText} text={message.reasoning} />
                   )}
                 </div>
               )}
-              <div className={`${styles.slip} ${message.isProbe ? styles.probe : ''}`}>
-                {message.text}
-              </div>
+              {/* Markdown, not raw text. The model writes `**like this**`
+                  whether or not anyone asked, and the asterisks land exactly
+                  where the emphasis was meant to be. Rendered at draw time, so
+                  every answer already stored is redrawn too. */}
+              <Markdown
+                className={`${styles.slip} ${message.isProbe ? styles.probe : ''}`}
+                text={message.text}
+              />
               {/* Where the check came from. Printed rather than folded away:
                   "Still true?" tells the reader in so many words that it looked
                   something up, and a claim with a hidden source is worse than
@@ -648,6 +669,15 @@ export function StudyLamp({
                 >
                   ↻
                 </button>
+                {/* What this one exchange cost, beside the buttons that act on
+                    it. The line under the bar adds these up; this says which
+                    question the money went on, which the sum cannot. */}
+                {message.usage && (
+                  <span className={styles.exchange}>
+                    <span className={styles.srOnly}>Tokens used for this answer: </span>
+                    {spentLine(message.usage)}
+                  </span>
+                )}
               </div>
             </div>
           ),
@@ -686,8 +716,13 @@ export function StudyLamp({
           send(draft)
         }}
       >
-        {models.length > 0 && (
-          <div className={styles.pickers}>
+        {/* The three controls that decide how the answer is made — which model,
+            how hard it thinks, and whether it may look things up — sit
+            together. The microphone belongs to the message bar instead: it is
+            about how the question is typed, not about how it is answered. */}
+        <div className={styles.pickers}>
+          {models.length > 0 && (
+            <>
           <button
             type="button"
             className={styles.picker}
@@ -717,20 +752,23 @@ export function StudyLamp({
               ⌄
             </span>
           </button>
-          </div>
-        )}
-        {/* The globe. Lit blue while it is on, and on for one question only.
-            `aria-pressed` is what makes it a switch rather than a button to a
-            screen reader, which is exactly what it is. */}
-        <button
-          type="button"
-          className={`${styles.mic} ${searching ? styles.searching : ''}`}
-          aria-label={searching ? 'Web search is on for this question' : 'Search the web for this question'}
-          aria-pressed={searching}
-          onClick={() => setSearching((on) => !on)}
-        >
-          <GlobeGlyph />
-        </button>
+            </>
+          )}
+          {/* The globe. Lit blue while it is on, and on for one question only.
+              `aria-pressed` is what makes it a switch rather than a button to a
+              screen reader, which is exactly what it is. */}
+          <button
+            type="button"
+            className={`${styles.picker} ${styles.globe} ${searching ? styles.searching : ''}`}
+            aria-label={
+              searching ? 'Web search is on for this question' : 'Search the web for this question'
+            }
+            aria-pressed={searching}
+            onClick={() => setSearching((on) => !on)}
+          >
+            <GlobeGlyph />
+          </button>
+        </div>
         {dictation.supported && (
           <button
             type="button"
@@ -760,13 +798,13 @@ export function StudyLamp({
         </button>
       </form>
 
-      {/* Under the bar, in the quietest type in the room. What the last
-          exchange cost — not a running total, because the number a reader can
-          act on is the one attached to the question they just asked. */}
-      {lastUsage(messages) && (
+      {/* Under the bar, in the quietest type in the room. The whole
+          conversation's cost, which is what the per-answer counts above add
+          up to. */}
+      {totalUsage(messages) && (
         <p className={styles.spent}>
-          <span className={styles.srOnly}>Tokens used: </span>
-          {spentLine(lastUsage(messages)!)}
+          <span className={styles.srOnly}>Tokens used in this conversation: </span>
+          {spentLine(totalUsage(messages)!)}
         </p>
       )}
 

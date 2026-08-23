@@ -5,7 +5,7 @@ import 'fake-indexeddb/auto'
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PARSER_VERSION } from '../parse/version.ts'
 import { repository, type ParsedBook } from '../storage/index.ts'
@@ -13,6 +13,22 @@ import { chapterPath, formatAnchor, sectionPath, type BookId } from '../structur
 import BookInfo from './BookInfo.tsx'
 
 afterEach(cleanup)
+
+/**
+ * The catalogue, held at arm's length.
+ *
+ * Only the Refresh button reaches it, and only the tests at the bottom of this
+ * file press that button. Everything above runs against the real database with
+ * this stub sitting unused.
+ */
+const catalogue = vi.hoisted(() => ({
+  answer: async (): Promise<{ status: string; reason?: string }> => ({ status: 'unmatched' }),
+}))
+
+vi.mock('../catalogue/index.ts', () => ({
+  catalogueDeps: () => ({}),
+  refreshBook: () => catalogue.answer(),
+}))
 
 const BOOK_ID = 'book-1' as BookId
 
@@ -410,5 +426,56 @@ describe('BookInfo', () => {
       expect(screen.queryByText('“Take this one away.”')).toBeNull()
     })
     expect(await repository.listQuotes(BOOK_ID)).toEqual([])
+  })
+
+  /**
+   * The button that would not stop saying "Looking…".
+   *
+   * A lookup reports a network failure as a value rather than by throwing, so
+   * the page only ever left `busy` when a value came back. Anything that threw
+   * instead — an expired session, a failed save, a request to a server that
+   * accepted the connection and then went quiet — left the button spinning for
+   * ever, and nothing on the page ever said why.
+   */
+  describe('refreshing from Google Books', () => {
+    afterEach(() => {
+      catalogue.answer = async () => ({ status: 'unmatched' })
+    })
+
+    async function press() {
+      await repository.saveParsedBook(bookOf())
+      openInfo()
+      await screen.findByText('The Fundamental Wisdom')
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh from Google Books' }))
+    }
+
+    it('comes back and says why when the lookup throws', async () => {
+      catalogue.answer = async () => {
+        throw new Error('you’re signed out')
+      }
+      await press()
+
+      expect(await screen.findByText(/you’re signed out/)).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Refresh from Google Books' })).toBeTruthy()
+    })
+
+    it('never leaves the button stuck, whatever was thrown', async () => {
+      catalogue.answer = async () => {
+        throw 'not even an error'
+      }
+      await press()
+
+      // The words do not matter here. That the button is offered again does.
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Refresh from Google Books' })).toBeTruthy()
+      })
+    })
+
+    it('says so plainly when Google has no record', async () => {
+      await press()
+      expect(
+        await screen.findByText(/Google Books has no record of this one\. Nothing/),
+      ).toBeTruthy()
+    })
   })
 })

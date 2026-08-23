@@ -15,6 +15,15 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **Four changes to the tutor panel and the book page** (2026-08-23). The
+  conversation panel now reads markdown, so bold, lists and formulas draw as
+  themselves and old answers redraw formatted. Each exchange shows its own
+  token count beside the copy and retry buttons, and the line under the message
+  bar is the sum of them. The globe sits with the model and the effort. The
+  "Refresh from Google Books" button can no longer stick on "Looking…": every
+  request now has a 20 second deadline, and the page always says why it failed.
+  **The deadline answers a hang, not a refusal.** If the button now names a
+  reason, that reason is the next thing to fix.
 - **Stages C and D of the tutor engine are built** (2026-08-22). Search, the
   globe switch, the genre chips, and the whole digest and recap pipeline. A
   live call proved search: five sources and a claim dated April 2026. A live

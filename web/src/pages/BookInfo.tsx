@@ -154,6 +154,19 @@ function dateOf(iso: string): string {
  * of a phone wide. The year is the part anyone reads at a glance; the full date
  * is still in the catalogue if it ever matters.
  */
+/**
+ * A thrown error, as the lowercase fragment the failure line needs.
+ *
+ * `CloudError` already carries a sentence written for a reader ("you’re
+ * offline"), so its message is used as it is. Anything else is a bug rather
+ * than a condition, and the reader gets told that something went wrong without
+ * being shown a stack trace's worth of nouns.
+ */
+function reasonFrom(error: unknown): string {
+  const message = error instanceof Error ? error.message.trim() : ''
+  return message.length > 0 && message.length < 120 ? message : 'something went wrong'
+}
+
 function publishedLabel(published: string | undefined): string {
   if (!published) return '—'
   return /^\d{4}-/.test(published) ? published.slice(0, 4) : published
@@ -247,18 +260,29 @@ export default function BookInfo() {
     if (state.status !== 'ready') return
     setCatalogue({ status: 'busy' })
 
-    const outcome = await refreshBook(state.book, catalogueDeps())
-    if (outcome.status === 'failed') {
-      setCatalogue({ status: 'failed', message: outcome.reason })
-      return
-    }
+    // Everything from here down is inside the catch, on purpose. `lookupBook`
+    // reports a network failure as `failed` rather than throwing, so the only
+    // way out of `busy` used to be a value coming back. Anything that threw
+    // instead — a save that failed, a session that expired, a request that hung
+    // — left the button reading "Looking…" with nothing on its way to replace
+    // it, and the caller is `void refreshFromCatalogue()`, so the rejection went
+    // nowhere. A button that can get stuck is worse than one that says no.
+    try {
+      const outcome = await refreshBook(state.book, catalogueDeps())
+      if (outcome.status === 'failed') {
+        setCatalogue({ status: 'failed', message: outcome.reason })
+        return
+      }
 
-    // A fetched cover lands in the book's assets, so this book's cached art is
-    // stale — and only this book's.
-    forgetCovers([id])
-    const book = await repository.getBook(id)
-    if (book) setState({ ...state, book })
-    setCatalogue({ status: outcome.status })
+      // A fetched cover lands in the book's assets, so this book's cached art is
+      // stale — and only this book's.
+      forgetCovers([id])
+      const book = await repository.getBook(id)
+      if (book) setState({ ...state, book })
+      setCatalogue({ status: outcome.status })
+    } catch (error) {
+      setCatalogue({ status: 'failed', message: reasonFrom(error) })
+    }
   }
 
   /**

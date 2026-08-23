@@ -53,7 +53,11 @@ function lamp(saved: TutorMessage[], over: Partial<Parameters<typeof StudyLamp>[
  * whole list rather than asking whether a name is present anywhere.
  */
 function paragraphs(): string[] {
-  return [...document.body.querySelectorAll('p')].map((node) => node.textContent ?? '')
+  return [...document.body.querySelectorAll('p')]
+    // A tutor answer is markdown now, so it is drawn as paragraphs of its own.
+    // Those are the message, not a caption about it.
+    .filter((node) => !node.closest('[data-markdown]'))
+    .map((node) => node.textContent ?? '')
 }
 
 describe('the study lamp', () => {
@@ -248,7 +252,33 @@ describe('the message actions', () => {
         ts: 2,
       },
     ])
-    expect(await screen.findByText(/1,200 in · 340 out · 1,540 total/)).toBeTruthy()
+    // Twice over: once beside that answer's own buttons, once in the total
+    // under the message bar. One exchange means the two agree.
+    expect(await screen.findAllByText(/1,200 in · 340 out · 1,540 total/)).toHaveLength(2)
+  })
+
+  it('adds every exchange up under the message bar', async () => {
+    lamp([
+      { role: 'you', text: 'One?', ts: 1 },
+      {
+        role: 'claude',
+        text: 'The first answer.',
+        usage: { input: 1000, output: 200, total: 1200 },
+        ts: 2,
+      },
+      { role: 'you', text: 'Two?', ts: 3 },
+      {
+        role: 'claude',
+        text: 'The second answer.',
+        usage: { input: 1500, output: 300, total: 1800 },
+        ts: 4,
+      },
+    ])
+    // Each answer says what it cost on its own …
+    expect(await screen.findByText('1,000 in · 200 out · 1,200 total')).toBeTruthy()
+    expect(screen.getByText('1,500 in · 300 out · 1,800 total')).toBeTruthy()
+    // … and the line under the bar is the sum of them, not the last one.
+    expect(screen.getByText('2,500 in · 500 out · 3,000 total')).toBeTruthy()
   })
 
   it('says nothing about tokens when nothing reported them', async () => {

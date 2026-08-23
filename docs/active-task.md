@@ -493,6 +493,60 @@ one chapter is built for each trigger.
 - `web/src/pages/BookInfo.tsx` — the "Last time on…" link.
 - `api/tutor.ts` — the recorder prompt and four memory modules.
 
+## Done after stage D — four changes the reader asked for (2026-08-23)
+
+1. **The conversation panel reads markdown.** A tutor answer showed its own
+   asterisks. It now draws bold, italic, strikethrough, code, links, headings,
+   lists, quotes, rules and formulas. Stored answers redraw formatted, because
+   the raw text is what is stored and the formatting happens at draw time.
+2. **Each exchange shows its own tokens.** The count sits in the row with the
+   copy and retry buttons. The line under the message bar is now the sum of
+   every exchange, not the last one.
+3. **The globe moved.** It sits with the model and the effort, because all
+   three change what the next question costs.
+4. **"Refresh from Google Books" cannot stick.** See below.
+
+**Why the markdown is written here and not installed.** The panel needs eight
+constructs. One of the eight is raw HTML, and it must be **refused**: the text
+comes from a model and lands in a page. Nothing in `web/src/reader/markdown.tsx`
+builds HTML from a string. Every element is a React node, so a `<script>` in an
+answer can only ever be text. A markdown library brings a document parser and
+an HTML pass-through this app must not have.
+
+**Formulas are set apart, not typeset.** `$x$` and `$$…$$` are drawn in a
+monospaced face. Real typesetting means KaTeX, which is a large download for a
+phone that is usually offline.
+
+**The stuck Refresh button.** The reader reported that the button says
+"Looking…" for ever. Two faults, and each one alone is enough to cause it:
+
+- `fetch` has no timeout. A server that accepts the connection and then says
+  nothing gives a promise that never settles. `web/src/catalogue/google.ts` now
+  races every request against 20 seconds, and races `accessToken()` too,
+  because a token refresh is a second network call that can hang.
+- The page only left `busy` when a value came back. `lookupBook` reports a
+  network failure as a value, so this looked safe. Anything that **threw**
+  instead — an expired session, a failed save — left the button spinning, and
+  the caller is `void refreshFromCatalogue()`, so the rejection went nowhere.
+  `web/src/pages/BookInfo.tsx` now catches, and always says something.
+
+The deadline is a race, not the abort signal. The signal is housekeeping: it
+closes the socket after the race is lost. The guarantee the reader needs must
+not depend on somebody else's promise settling.
+
+**Files in scope — 2026-08-23:**
+
+- `web/src/reader/markdown.tsx` + `.module.css` + `.test.tsx` — 25 tests. **New.**
+- `web/src/reader/StudyLamp.tsx` + `.module.css` + `.test.tsx` — the token line
+  and the globe, 22 tests.
+- `web/src/catalogue/google.ts` + `.test.ts` — the deadline, 14 tests.
+- `web/src/pages/BookInfo.tsx` + `.test.tsx` — the button that cannot stick,
+  30 tests.
+
+**Not proved on a real phone.** The timeout answers a hang. It does not make
+Google answer. If the button now reports a reason, that reason is the next
+thing to fix.
+
 ## Carried forward — how to work on the reading page
 
 Fourteen lessons earlier threads paid for. They are unchanged and still apply.
