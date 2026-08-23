@@ -111,10 +111,21 @@ function ExitControl({ bookId, fromReader }: { bookId: string; fromReader: boole
  * - A bare `General` is dropped. It is the filler at the end of a path
  *   (`Body, Mind & Spirit / General`) and says nothing on its own; the part of
  *   the path before it is already a chip.
+ * - A machine token is dropped. An EPUB's `dc:subject` is copied out of the
+ *   file verbatim, and a publishing pipeline sometimes leaves its own field
+ *   names in there — `review_metadata` turned up as the only "subject" on a
+ *   real book. The test is deliberately narrow: no space *and* an underscore.
+ *   A heading a person wrote is words, so it has a space or it is a plain one;
+ *   `Self-Help` and `Philosophy` are untouched by this.
  *
  * Order is first-seen, so the headings Google thought most important stay in
  * front. A comma is *not* a separator: `Body, Mind & Spirit` is one heading.
  */
+/** `review_metadata`, `book_id` — a field name that escaped a publisher's tools. */
+function isMachineToken(tag: string): boolean {
+  return !/\s/.test(tag) && tag.includes('_')
+}
+
 export function subjectTags(subjects: readonly string[]): string[] {
   const seen = new Set<string>()
   const kept: string[] = []
@@ -123,7 +134,7 @@ export function subjectTags(subjects: readonly string[]): string[] {
     for (const part of heading.split('/')) {
       const tag = part.trim()
       const key = tag.toLowerCase()
-      if (!tag || key === 'general' || seen.has(key)) continue
+      if (!tag || key === 'general' || isMachineToken(tag) || seen.has(key)) continue
       seen.add(key)
       kept.push(tag)
     }

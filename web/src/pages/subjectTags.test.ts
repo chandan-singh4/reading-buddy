@@ -47,4 +47,21 @@ describe('subjectTags', () => {
   it('gives nothing back for nothing', () => {
     expect(subjectTags([])).toEqual([])
   })
+
+  it('drops a field name the publisher left in the file', () => {
+    // A real book arrived with this as its only "subject".
+    expect(subjectTags(['review_metadata'])).toEqual([])
+    expect(subjectTags(['Philosophy', 'book_id', 'Hindu'])).toEqual(['Philosophy', 'Hindu'])
+  })
+
+  it('keeps the headings a person actually wrote', () => {
+    // The rule needs both halves: no space AND an underscore. These have one
+    // or neither, so none of them may be touched.
+    expect(subjectTags(['Self-Help', 'Philosophy', 'Body, Mind & Spirit'])).toEqual([
+      'Self-Help',
+      'Philosophy',
+      'Body, Mind & Spirit',
+    ])
+    expect(subjectTags(['Mind _ Body'])).toEqual(['Mind _ Body'])
+  })
 })
