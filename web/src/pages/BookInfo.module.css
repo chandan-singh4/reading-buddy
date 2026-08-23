@@ -656,3 +656,43 @@
     ),
     var(--color-surface);
 }
+
+/* What kind of book, for the tutor. A row of small pressable labels — a
+   `<select>` would hide four of the five behind a tap. */
+.genreNote {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.genreRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.genrePick {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.genreOn {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+/* The way in to the return screen. Shaped like a genre pick because it is the
+   same kind of thing to a thumb — one small pressable label — but it is a link,
+   so it needs the two properties an anchor does not inherit from a button. */
+.returnLink {
+  composes: genrePick;
+  display: inline-block;
+  text-decoration: none;
+}

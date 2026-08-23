@@ -414,10 +414,17 @@ The lamp prints the last exchange under the message bar: in, out, total. All
 three zero counts as no answer and prints nothing.
 
 **The effort.** A second control sits beside the model. It opens the same iOS
-sheet with three levels. `High` is the default for every model, because they are
-free — thinking is billed as output tokens and there is nothing to ration. One
-honest note: OpenRouter's scale stops at `high`. There is no level called "Max".
-A paid model adds "costs more" to the top row.
+sheet. `Max` is the default for every model, because the free ones cost nothing
+— thinking is billed as output tokens and there is nothing to ration. A paid
+model adds "costs more" to the top row.
+
+**Correction, 2026-08-22.** An earlier version of this paragraph said
+OpenRouter's scale stops at `high`, and that no level called "Max" exists. That
+was a guess, and it was wrong. The documented values are `none`, `minimal`,
+`low`, `medium`, `high`, `xhigh` and `max`. The source is
+<https://openrouter.ai/docs/use-cases/reasoning-tokens>. A live call with
+`reasoning: { effort: 'max' }` returns `200` and reports reasoning tokens.
+**Check a claim like this against the documentation before you write it down.**
 
 **New files in scope:**
 
@@ -429,6 +436,62 @@ A paid model adds "costs more" to the top row.
 - `web/src/reader/StudyLamp.tsx` and `.module.css` — the fold, the token line,
   the effort control, and the focus on open.
 - `api/tutor.ts` — asks for reasoning and usage, and takes an effort.
+
+## Done after stage C — search, the globe, and the genre chips
+
+**Search is proved live.** A call with `plugins: [{ id: 'web', max_results: 5 }]`
+came back with five `url_citation` annotations and a claim dated April 2026.
+The relay drops the scraped page body and keeps the title and the URL. The lamp
+prints them under the answer as links.
+
+**The globe.** Search is not automatic. A globe button sits beside the message
+bar. It is grey when off and blue when on. A tap turns it on for the next
+question only. Two chips — "Still true?" and "Historical context" — turn it on
+by themselves, because the answer is worthless without it.
+
+**The genre.** The book gets a `genre` field: `fiction`, `nonfiction`, or
+absent. The import guesses it instead of asking. A dropped folder can import
+thirty books at once, and thirty questions is not a cheap step.
+
+**Action for the reader.** Run `supabase/migrations/0008_tutor_genre.sql` by
+hand in the Supabase SQL editor. Nothing runs it for you.
+
+## Done after stage D — the digest and recap pipeline
+
+Built as planned, with three deviations. Each one is written into the code it
+affects.
+
+1. **Recaps are off until the reader asks.** Every recap is a paid model call
+   that starts on its own, while the reader reads. The checkbox is on the
+   "Last time on…" screen. Plan step 6 did not say this, and it must.
+2. **Only a closed block is digested, and the block digests are kept.** A block
+   is closed when the reader has read past its end. This stops the recap from
+   describing a page the reader has not turned. Keeping each block digest means
+   reading on costs one call, not a rebuild of the whole chapter.
+3. **One extra file.** `web/src/tutor/refresh.ts` holds the database and the
+   network. `web/src/tutor/digest.ts` holds the rules and touches neither, so
+   the block arithmetic is tested without a database.
+
+**Not built yet.** Step 9, the warm paragraph. The `welcome` module is in the
+relay and no screen calls it.
+
+**The cost, in calls.** One `recap` call for each new closed block. One
+`rollup` call to join them, and none when the chapter is one block. One
+`confusions` call when the reader asks a new question in that chapter. At most
+one chapter is built for each trigger.
+
+**New files in scope — stages C and D:**
+
+- `web/src/tutor/digest.ts` + `.test.ts` — the rules, 29 tests. **New.**
+- `web/src/tutor/refresh.ts` + `.test.ts` — the wiring, 10 tests. **New.**
+- `web/src/storage/digests.ts` + `.test.ts` — the store, 5 tests. **New.**
+- `web/src/pages/LastTime.tsx`, `.module.css`, `.test.tsx` — the return screen,
+  7 tests. **New.**
+- `web/src/storage/db.ts` — `StoredDigest` and `version(14)`.
+- `web/src/storage/repository.ts` — the delete cascade takes the new table.
+- `web/src/pages/Reader.tsx` — the trigger, at a section boundary and on close.
+- `web/src/pages/BookInfo.tsx` — the "Last time on…" link.
+- `api/tutor.ts` — the recorder prompt and four memory modules.
 
 ## Carried forward — how to work on the reading page
 

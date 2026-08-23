@@ -694,3 +694,33 @@
   outline: 2px solid #c39a5e;
   outline-offset: 2px;
 }
+
+/* The globe, lit. Blue is the one colour the lamp does not otherwise use, which
+   is why it reads instantly as "this question leaves the room". */
+.searching {
+  background: rgba(96, 165, 250, 0.18);
+  color: #93c5fd;
+}
+
+/* Where a searched answer looked. Under the slip, quiet, and indented to the
+   slip's own left edge so it reads as a footnote to it rather than as a turn. */
+.sources {
+  margin: 4px 24px 2px 0;
+  padding: 0 13px;
+  list-style: none;
+}
+
+.sources li {
+  margin: 0 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source {
+  color: #93c5fd;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 12px;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(147, 197, 253, 0.3);
+}

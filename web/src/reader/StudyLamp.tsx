@@ -75,6 +75,7 @@ import {
   storedEffort,
   type Effort,
 } from './effort.ts'
+import { intentsFor, type BookGenre } from './genre.ts'
 import { useDictation } from './dictation.ts'
 import styles from './StudyLamp.module.css'
 
@@ -82,6 +83,11 @@ export interface StudyLampProps {
   passage: PassageAnchor
   /** Where the passage sits in the book. Sent with every question. */
   context?: PassageContext
+  /**
+   * What kind of book this is. It decides which extra chips the reader gets.
+   * Left out, they get the four that suit any book.
+   */
+  genre?: BookGenre
   /** The saved conversation, when the lamp is reopening one. */
   saved?: TutorMessage[]
   /** Every completed exchange, whole. The Reader persists it. */
@@ -90,11 +96,12 @@ export interface StudyLampProps {
 }
 
 /**
- * The chips, in the order they are offered.
+ * The chips every book gets, in the order they are offered.
  *
  * Explaining comes first because it is why the reader stopped reading. The two
  * explainers sit together, then the two that do something else with the
- * passage. Four genre-conditional chips join this row in stage C.
+ * passage. `genre.ts` adds at most two more after these, chosen by the kind of
+ * book it is.
  */
 const INTENTS: TutorIntent[] = ['simply', 'friend', 'discuss', 'define']
 
@@ -121,6 +128,28 @@ function MicGlyph() {
 }
 
 /**
+ * A globe. Drawn for the same reason the microphone is: 🌐 is a different size
+ * and a different century in every font that has it.
+ */
+function GlobeGlyph() {
+  return (
+    <svg
+      className={styles.micGlyph}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z" />
+    </svg>
+  )
+}
+
+/**
  * Token counts, in the order they happen: what went in, what came back, the sum.
  *
  * Written in full words rather than as `1.2k`. This is a small honest number
@@ -141,7 +170,14 @@ function lastUsage(messages: readonly TutorMessage[]): TutorUsage | undefined {
   return undefined
 }
 
-export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLampProps) {
+export function StudyLamp({
+  passage,
+  context,
+  genre,
+  saved,
+  onSave,
+  onClose,
+}: StudyLampProps) {
   const [messages, setMessages] = useState<TutorMessage[]>(saved ?? [])
   // A reopened thread starts pinned — the reader came back for the
   // conversation, and the passage is one tap away.
@@ -177,6 +213,15 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
   const [effort, setEffort] = useState<Effort>(() => storedEffort() ?? DEFAULT_EFFORT)
   /** Which answers have their working-out unfolded. Folded is the default. */
   const [shown, setShown] = useState<number[]>([])
+  /**
+   * Whether the next question goes to the web.
+   *
+   * Off by default, and off again the moment a question is sent. A search costs
+   * real money on every engine OpenRouter offers, so it is a decision the
+   * reader makes once per question — never a switch that quietly stays on
+   * behind a conversation.
+   */
+  const [searching, setSearching] = useState(false)
   /** The last attempt's failure, if it failed. One at a time, never stored. */
   const [failure, setFailure] = useState<string | undefined>(undefined)
   /** Which message just went to the clipboard, so the button can say so. */
@@ -303,6 +348,8 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
       setDraft('')
       setFailure(undefined)
       setPending(true)
+      // The globe is spent on this question. See the state above.
+      setSearching(false)
 
       void askTutor({
         anchor: passage,
@@ -316,6 +363,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         // roster — not whatever fixed list the server happens to carry.
         ...(models.length > 0 ? { models: chainFrom(models, pick) } : {}),
         effort,
+        ...(searching ? { search: true } : {}),
       }).then((reply) => {
         if (reply.failed) {
           // The question stays — the reader can see what went unanswered and
@@ -338,6 +386,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
           ...(reply.model ? { model: reply.model } : {}),
           ...(reply.reasoning ? { reasoning: reply.reasoning } : {}),
           ...(reply.usage ? { usage: reply.usage } : {}),
+          ...(reply.sources ? { sources: reply.sources } : {}),
           ts: Date.now(),
         }
         // The check that the explanation landed is a *second* bubble, not a
@@ -364,7 +413,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
         onSave(whole)
       })
     },
-    [messages, passage, context, pending, models, pick, effort, onSave],
+    [messages, passage, context, pending, models, pick, effort, searching, onSave],
   )
 
   /* The nearest question at or above a message. Retrying an answer means
@@ -473,7 +522,7 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
       <div ref={flow} className={styles.flow} aria-live="polite">
         {fresh && (
           <div className={styles.options}>
-            {INTENTS.map((chip) => (
+            {intentsFor(genre ?? 'general', INTENTS).map((chip) => (
               <button
                 key={chip}
                 type="button"
@@ -561,6 +610,26 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
               <div className={`${styles.slip} ${message.isProbe ? styles.probe : ''}`}>
                 {message.text}
               </div>
+              {/* Where the check came from. Printed rather than folded away:
+                  "Still true?" tells the reader in so many words that it looked
+                  something up, and a claim with a hidden source is worse than
+                  one with none. */}
+              {message.sources && message.sources.length > 0 && (
+                <ul className={styles.sources}>
+                  {message.sources.map((source) => (
+                    <li key={source.url}>
+                      <a
+                        className={styles.source}
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        {source.title ?? source.url}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className={styles.actions}>
                 <button
                   type="button"
@@ -650,6 +719,18 @@ export function StudyLamp({ passage, context, saved, onSave, onClose }: StudyLam
           </button>
           </div>
         )}
+        {/* The globe. Lit blue while it is on, and on for one question only.
+            `aria-pressed` is what makes it a switch rather than a button to a
+            screen reader, which is exactly what it is. */}
+        <button
+          type="button"
+          className={`${styles.mic} ${searching ? styles.searching : ''}`}
+          aria-label={searching ? 'Web search is on for this question' : 'Search the web for this question'}
+          aria-pressed={searching}
+          onClick={() => setSearching((on) => !on)}
+        >
+          <GlobeGlyph />
+        </button>
         {dictation.supported && (
           <button
             type="button"

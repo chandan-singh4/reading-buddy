@@ -123,6 +123,48 @@ describe('when the relay answers', () => {
     expect(sent.effort).toBe('low')
   })
 
+  it('asks for a web search only when the reader turned the globe on', async () => {
+    const fetch = answering(relay({ text: 'ok', model: 'a' }))
+
+    await askTutor({ ...request, search: true })
+    const on = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as { search?: boolean }
+    expect(on.search).toBe(true)
+
+    await askTutor(request)
+    const off = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)) as { search?: boolean }
+    // Absent, not `false`. A search costs money, so the request never carries a
+    // switch the reader did not throw.
+    expect('search' in off).toBe(false)
+  })
+
+  it('carries where a searched answer looked', async () => {
+    answering(
+      relay({
+        text: 'Still true.',
+        model: 'a',
+        sources: [
+          { url: 'https://example.org/paper', title: 'A paper' },
+          { url: 'https://example.org/other' },
+        ],
+      }),
+    )
+
+    const reply = await askTutor({ ...request, search: true })
+
+    expect(reply.sources).toEqual([
+      { url: 'https://example.org/paper', title: 'A paper' },
+      { url: 'https://example.org/other' },
+    ])
+  })
+
+  it('drops a citation with no address, which is a source nobody can follow', async () => {
+    answering(relay({ text: 'ok', model: 'a', sources: [{ title: 'Somewhere' }, 'nonsense'] }))
+
+    const reply = await askTutor({ ...request, search: true })
+
+    expect(reply.sources).toBeUndefined()
+  })
+
   it('signs the request, because the relay is a spend control', async () => {
     const fetch = answering(relay({ text: 'ok', model: 'a' }))
 
@@ -188,7 +230,16 @@ describe('the chips', () => {
     // The relay keys its prompt library on these exact strings. A chip with no
     // module falls through to a bare answer with no teaching instruction at
     // all — and it does so silently.
-    expect(Object.keys(INTENT_LABELS).sort()).toEqual(['define', 'discuss', 'friend', 'simply'])
+    expect(Object.keys(INTENT_LABELS).sort()).toEqual([
+      'define',
+      'discuss',
+      'friend',
+      'happening',
+      'historical',
+      'interpret',
+      'simply',
+      'stilltrue',
+    ])
   })
 })
 

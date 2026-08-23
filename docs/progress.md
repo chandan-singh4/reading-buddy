@@ -15,6 +15,16 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **Stages C and D of the tutor engine are built** (2026-08-22). Search, the
+  globe switch, the genre chips, and the whole digest and recap pipeline. A
+  live call proved search: five sources and a claim dated April 2026. A live
+  call also proved `reasoning: { effort: 'max' }`, which an earlier note in
+  `docs/active-task.md` wrongly said does not exist. **Recaps are off until the
+  reader switches them on**, on the "Last time on…" screen, because each one is
+  a paid call that starts while the reader reads. See `docs/active-task.md` for
+  the two other deviations from the plan.
+- **One step needs the reader's hands** (2026-08-22). Run
+  `supabase/migrations/0008_tutor_genre.sql` in the Supabase SQL editor.
 - **The tutor is built and the key is live, but no answer has been seen**
   (2026-08-22). `api/tutor.ts` holds the OpenRouter key and the whole prompt
   library. `api/models.ts` fetches the free tool-capable roster.

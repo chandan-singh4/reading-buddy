@@ -1,0 +1,172 @@
+/*
+ * The return screen. Dark on purpose, and the only dark page outside the study
+ * lamp — coming back to a book is a different moment from browsing the shelf,
+ * and the design file draws it as its own room rather than as another card.
+ */
+
+.page {
+  min-height: 100dvh;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  background: #1c1610;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.welcome {
+  background: linear-gradient(180deg, #2c241b, #231c14);
+  color: #f0e6d3;
+  border-radius: 14px;
+  padding: 24px 22px;
+  box-shadow: 0 6px 24px rgba(40, 28, 12, 0.28);
+}
+
+.kicker {
+  font-size: 20px;
+  color: #d9b475;
+}
+
+.title {
+  font-weight: 600;
+  font-size: 23px;
+  margin: 2px 0 4px;
+  color: #f8efdc;
+}
+
+.place {
+  font-size: 14px;
+  color: #c9b48f;
+  font-style: italic;
+  margin: 0 0 16px;
+}
+
+.bar {
+  height: 7px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 0 0 18px;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #c08a3e, #d9b475);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+/* One column on a phone, two once there is room. The phone is the default. */
+@media (min-width: 700px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.col h2 {
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #d9b475;
+  margin: 0 0 10px;
+}
+
+.none {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #9c8a6b;
+  font-style: italic;
+  margin: 0;
+}
+
+.chapter {
+  margin-bottom: 10px;
+}
+
+.chapter summary {
+  font-size: 15px;
+  color: #e3d7bf;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.chapter p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #d8cbb2;
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+.line {
+  font-size: 15px;
+  color: #e3d7bf;
+  margin-bottom: 9px;
+  padding-left: 14px;
+  position: relative;
+  line-height: 1.45;
+}
+
+.line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c08a3e;
+}
+
+.foot {
+  margin: 18px 0 0;
+  font-size: 12.5px;
+  color: #9c8a6b;
+  font-style: italic;
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 12px;
+}
+
+.toggle {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: #e3d7bf;
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 4px 2px;
+}
+
+.toggle input {
+  margin-top: 3px;
+  width: 20px;
+  height: 20px;
+  accent-color: #c08a3e;
+}
+
+.toggle em {
+  display: block;
+  font-size: 13px;
+  color: #9c8a6b;
+  font-style: normal;
+  margin-top: 3px;
+}
+
+.back {
+  align-self: flex-start;
+  color: #d9b475;
+  font-size: 15px;
+  text-decoration: none;
+  padding: 8px 2px;
+}
+
+.empty {
+  color: #c9b48f;
+  font-size: 16px;
+}

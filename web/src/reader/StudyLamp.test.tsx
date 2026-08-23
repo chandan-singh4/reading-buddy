@@ -38,8 +38,10 @@ const passage: PassageAnchor = {
   kind: 'sentence',
 }
 
-function lamp(saved: TutorMessage[]) {
-  return render(<StudyLamp passage={passage} saved={saved} onSave={() => {}} onClose={() => {}} />)
+function lamp(saved: TutorMessage[], over: Partial<Parameters<typeof StudyLamp>[0]> = {}) {
+  return render(
+    <StudyLamp passage={passage} saved={saved} onSave={() => {}} onClose={() => {}} {...over} />,
+  )
 }
 
 /*
@@ -253,5 +255,57 @@ describe('the message actions', () => {
     lamp([{ role: 'claude', text: 'An answer.', ts: 2 }])
     await screen.findByText('An answer.')
     expect(screen.queryByText(/total/)).toBeNull()
+  })
+
+  it('starts with the web switched off', async () => {
+    lamp([])
+    const globe = await screen.findByRole('button', { name: /Search the web/ })
+    expect(globe.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('turns the web on for one question when the globe is tapped', async () => {
+    lamp([])
+    const globe = await screen.findByRole('button', { name: /Search the web/ })
+    fireEvent.click(globe)
+    // The label changes with the state, so a reader who cannot see the colour
+    // is told the same thing the colour says.
+    const on = await screen.findByRole('button', { name: /Web search is on/ })
+    expect(on.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(on)
+    expect(
+      (await screen.findByRole('button', { name: /Search the web/ })).getAttribute('aria-pressed'),
+    ).toBe('false')
+  })
+
+  it('offers a novel the story chip and never the fact-checking one', async () => {
+    lamp([], { genre: 'fiction' })
+    expect(await screen.findByRole('button', { name: /What’s happening here/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Still true/ })).toBeNull()
+  })
+
+  it('offers a science book the fact-checking chip and never the story one', async () => {
+    lamp([], { genre: 'nonfiction' })
+    expect(await screen.findByRole('button', { name: /Still true/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /What’s happening here/ })).toBeNull()
+  })
+
+  it('gives a book of unknown kind the four that suit anything', async () => {
+    lamp([])
+    expect(await screen.findByRole('button', { name: 'Explain simply' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Still true/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Interpret this/ })).toBeNull()
+  })
+
+  it('prints where a searched answer looked', async () => {
+    lamp([
+      {
+        role: 'claude',
+        text: 'Still true, with one correction.',
+        sources: [{ url: 'https://example.org/paper', title: 'A 2024 review' }],
+        ts: 2,
+      },
+    ])
+    const link = await screen.findByRole('link', { name: 'A 2024 review' })
+    expect(link.getAttribute('href')).toBe('https://example.org/paper')
   })
 })

@@ -43,7 +43,7 @@ export interface PassageAnchor {
 }
 
 /**
- * The four ways in, in the order the lamp offers them.
+ * The eight ways in.
  *
  * These name **task modules in the relay's prompt library**, not labels. The
  * earlier set (`explain`, `quiz`) was invented before the prompt file existed
@@ -51,17 +51,30 @@ export interface PassageAnchor {
  * probe, which fires on its own after an explanation rather than as a chip the
  * reader has to remember to press.
  *
- * Four more are genre-conditional — "Still true?", "Historical context",
- * "What's happening here?", "Interpret this" — and wait on the book carrying a
- * genre. See stage C in `docs/active-task.md`.
+ * The first four suit any book and the lamp always offers them. The last four
+ * are genre-conditional: `genre.ts` decides which of them a book has earned,
+ * and a novel never sees "Still true?". Two of them can search the web —
+ * see `search` on `AskTutorRequest`.
  */
-export type TutorIntent = 'simply' | 'friend' | 'discuss' | 'define'
+export type TutorIntent =
+  | 'simply'
+  | 'friend'
+  | 'discuss'
+  | 'define'
+  | 'stilltrue'
+  | 'historical'
+  | 'happening'
+  | 'interpret'
 
 export const INTENT_LABELS: Record<TutorIntent, string> = {
   simply: 'Explain simply',
   friend: 'Explain to a friend',
   discuss: 'Discuss & ask questions',
   define: 'Define a term',
+  stilltrue: 'Still true?',
+  historical: 'Historical context',
+  happening: 'What’s happening here?',
+  interpret: 'Interpret this',
 }
 
 /** What one exchange cost, in tokens. */
@@ -69,6 +82,18 @@ export interface TutorUsage {
   input: number
   output: number
   total: number
+}
+
+/**
+ * One page a searched answer leaned on.
+ *
+ * Kept with the message rather than shown and dropped. A claim checked against
+ * the web is only as good as where the check came from, and a reader who opens
+ * the thread again next week is owed the same links they had at the time.
+ */
+export interface TutorSource {
+  url: string
+  title?: string
 }
 
 /** One turn of the conversation. */
@@ -87,6 +112,8 @@ export interface TutorMessage {
   reasoning?: string
   /** What this exchange cost. Only on the tutor's side, and only if reported. */
   usage?: TutorUsage
+  /** Where a searched answer looked. Absent when no search ran. */
+  sources?: TutorSource[]
   /**
    * The model that actually wrote this. Absent means unknown — either the
    * reader's own words, or a message stored before the app recorded it.
@@ -168,6 +195,15 @@ export interface AskTutorRequest {
    */
   effort?: Effort
   /**
+   * Whether to search the web for this one question.
+   *
+   * The reader's own choice, made with the globe in the composer, and it is
+   * about *this* question only — a search costs money, so it is never left
+   * switched on behind their back. Two task modules ask for search on their
+   * own, and the relay honours either.
+   */
+  search?: boolean
+  /**
    * Which models to try, strongest-first after the reader's own pick. Built by
    * `chainFrom`. Left out, the relay falls back to its own list.
    *
@@ -185,6 +221,8 @@ export interface AskTutorReply {
   reasoning?: string
   /** What the exchange cost, when OpenRouter reported it. */
   usage?: TutorUsage
+  /** The pages a web search fed in, when one ran. */
+  sources?: TutorSource[]
   /**
    * True when `text` is our own canned line rather than a model's words.
    *
@@ -214,7 +252,11 @@ export interface AskTutorReply {
  * where every other server bit of this app sits (`api/`). Overridable for a
  * dev box pointing at a deployed relay.
  */
-const TUTOR_URL: string =
+/**
+ * Where the relay lives. Exported because the memory layer posts to the same
+ * endpoint with a different task module — see `tutor/digest.ts`.
+ */
+export const TUTOR_URL: string =
   (import.meta.env.VITE_TUTOR_URL as string | undefined) ?? '/api/tutor'
 
 /**
@@ -262,6 +304,25 @@ function usageOf(value: unknown): TutorUsage | undefined {
 }
 
 /**
+ * The pages behind a searched answer, kept only if each has a real address.
+ *
+ * A citation with no `url` is nothing a reader can follow, and printing its
+ * title alone would look like a source while being none.
+ */
+function sourcesOf(value: unknown): TutorSource[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((entry) => entry as { url?: unknown; title?: unknown })
+    .filter((entry) => typeof entry?.url === 'string' && entry.url.length > 0)
+    .map((entry) => ({
+      url: entry.url as string,
+      ...(typeof entry.title === 'string' && entry.title.length > 0
+        ? { title: entry.title }
+        : {}),
+    }))
+}
+
+/**
  * One question to the tutor. Resolves to the reply; never rejects — the lamp
  * always gets something it can print.
  */
@@ -284,6 +345,7 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
         history: request.history.map(({ role, text, isProbe }) => ({ role, text, isProbe })),
         userMessage: request.userMessage,
         ...(request.effort ? { effort: request.effort } : {}),
+        ...(request.search ? { search: true } : {}),
         ...(request.models && request.models.length > 0 ? { models: request.models } : {}),
       }),
     })
@@ -295,6 +357,7 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
       model?: unknown
       reasoning?: unknown
       usage?: unknown
+      sources?: unknown
       probe?: unknown
       probeModel?: unknown
     }
@@ -314,6 +377,7 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
         ? { reasoning: data.reasoning }
         : {}),
       ...(usageOf(data.usage) ? { usage: usageOf(data.usage)! } : {}),
+      ...(sourcesOf(data.sources).length > 0 ? { sources: sourcesOf(data.sources) } : {}),
     }
   } catch {
     // `fetch` rejects with a bare "Failed to fetch" for every network-level

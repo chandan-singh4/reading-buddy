@@ -3,9 +3,14 @@
 // The effort preference: what it defaults to, what it accepts, and what it
 // does when storage is not there.
 //
-// The default is the one worth pinning down. It is `high` on purpose — every
+// The default is the one worth pinning down. It is `max` on purpose — every
 // model offered is free, so the usual reason to ration thinking is absent —
 // and it is the kind of value a later change lowers by accident.
+//
+// The list is worth pinning down too, and for a sharper reason. It was three
+// words for a while because they were written from memory of another vendor's
+// API. OpenRouter takes seven, and `max` — the one the reader wanted — was the
+// one missing. So the list is asserted whole, against the documented set.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -24,12 +29,20 @@ beforeEach(() => {
 
 describe('the effort setting', () => {
   it('thinks as hard as it can, by default', () => {
-    expect(DEFAULT_EFFORT).toBe('high')
-    expect(storedEffort()).toBe('high')
+    expect(DEFAULT_EFFORT).toBe('max')
+    expect(storedEffort()).toBe('max')
   })
 
-  it('offers the three levels least-first', () => {
-    expect([...EFFORTS]).toEqual(['low', 'medium', 'high'])
+  it('offers all seven documented levels, least-first', () => {
+    expect([...EFFORTS]).toEqual([
+      'none',
+      'minimal',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
+    ])
   })
 
   it('remembers what the reader chose', () => {
@@ -42,9 +55,10 @@ describe('the effort setting', () => {
     expect(storedEffort()).toBe(DEFAULT_EFFORT)
   })
 
-  it('accepts only the three words', () => {
-    expect(isEffort('high')).toBe(true)
-    expect(isEffort('max')).toBe(false)
+  it('accepts every documented word and nothing else', () => {
+    for (const level of EFFORTS) expect(isEffort(level)).toBe(true)
+    expect(isEffort('maximum')).toBe(false)
+    expect(isEffort('none ')).toBe(false)
     expect(isEffort(undefined)).toBe(false)
   })
 
@@ -63,5 +77,8 @@ describe('the effort setting', () => {
 
   it('writes the level as a word the composer can show', () => {
     expect(effortLabel('medium')).toBe('Medium')
+    expect(effortLabel('max')).toBe('Max')
+    // Not "Xhigh", which reads as a typo in a one-word button.
+    expect(effortLabel('xhigh')).toBe('XHigh')
   })
 })

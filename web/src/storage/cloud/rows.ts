@@ -54,6 +54,7 @@ import type {
   StoredQuote,
   StoredSection,
 } from '../db.ts'
+import { isBookGenre } from '../../reader/genre.ts'
 
 // --- Row shapes --------------------------------------------------------------
 
@@ -94,6 +95,8 @@ export interface BookRow {
   thickness_mm: number | null
   genre: string | null
   genre_overridden: boolean | null
+  /** What the reader said the book is, for the tutor. Null means "guess it". */
+  tutor_genre: string | null
   average_rating: number | null
   ratings_count: number | null
   metadata_source: string | null
@@ -256,6 +259,9 @@ export function bookFromRow(row: BookRow): BookMeta {
   if (row.thickness_mm !== null) meta.thicknessMm = row.thickness_mm
   if (row.genre !== null) meta.genre = row.genre
   if (row.genre_overridden !== null) meta.genreOverridden = row.genre_overridden
+  // Read loosely. The column is new, so a row written by an older build has no
+  // value here at all, and an unknown word is a guess we would rather redo.
+  if (isBookGenre(row.tutor_genre)) meta.tutorGenre = row.tutor_genre
   // `numeric` comes back from PostgREST as a JSON number, but a string is legal
   // in the wire format and one would poison every comparison downstream.
   if (row.average_rating !== null) meta.averageRating = Number(row.average_rating)
@@ -311,6 +317,7 @@ export function bookToRow(meta: BookMeta): BookRow {
     thickness_mm: orNull(meta.thicknessMm),
     genre: orNull(meta.genre),
     genre_overridden: orNull(meta.genreOverridden),
+    tutor_genre: orNull(meta.tutorGenre),
     average_rating: orNull(meta.averageRating),
     ratings_count: orNull(meta.ratingsCount),
     metadata_source: orNull(meta.metadataSource),

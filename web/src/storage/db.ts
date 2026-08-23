@@ -295,6 +295,63 @@ export interface StoredTutorThread {
   updatedAt: string
 }
 
+/**
+ * What one chapter left behind — a recap of the material, and an index of what
+ * the reader got stuck on in it.
+ *
+ * Keyed `[bookId+chapterId]`, so one row per chapter and a direct lookup, the
+ * same shape as every other per-book table here. `chapterId` is the chapter's
+ * path (`ch02`) rather than its number, because the path is already the address
+ * everywhere else in this app.
+ *
+ * Two fields that look alike and are not. `contentRecap` is built from the book
+ * and changes only when the book does. `conversationDigest` is built from the
+ * reader's tutor threads and changes every time they ask something new, which
+ * is why `coversNConversations` sits beside it: it is the whole staleness test.
+ * Rebuild when the chapter has gained threads since, and never otherwise — a
+ * digest is a paid call, and rebuilding one that nothing changed is money for
+ * the same words back.
+ *
+ * Device-local, like `tutor` and `notes`, and for the reason written at the top
+ * of `storage/notes.ts`: the cloud backend has no table for it yet.
+ */
+export interface StoredDigest {
+  bookId: BookId
+  /** The chapter's path — `ch02`. */
+  chapterId: string
+  /**
+   * The map step's output, one entry per digested block, in reading order.
+   *
+   * Kept rather than thrown away after stitching, and this is the field that
+   * makes a long chapter affordable. Reading further digests only the one new
+   * block and stitches the stored ones again; without it, every boundary would
+   * digest the whole chapter from the beginning. See `tutor/digest.ts`.
+   */
+  blocks: string[]
+  /** The stitched recap of the chapter — what the reader is actually shown. */
+  contentRecap: string
+  /** One line per confusion, `problem → resolution`. Empty when there were none. */
+  conversationDigest: string
+  /**
+   * How many tutor threads in this chapter the digest above accounts for.
+   *
+   * The count, not the ids, because the only question ever asked of it is "have
+   * there been more since?" — and a count answers that in an integer compare.
+   */
+  coversNConversations: number
+  /**
+   * The last section number the recap reaches.
+   *
+   * The recap may be built while the reader is still inside the chapter, so it
+   * deliberately stops short of where they are — see `tutor/digest.ts`. This
+   * says where it stops, so the screen can say "up to here" honestly rather
+   * than implying the whole chapter is covered.
+   */
+  coversThroughSection: number
+  /** ISO 8601 — when the recap was last built. */
+  generatedAt: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -316,6 +373,7 @@ export type ReadingBuddyDB = Dexie & {
   bookmarks: Table<StoredBookmark, [BookId, string]>
   notes: Table<StoredNote, [BookId, string]>
   tutor: Table<StoredTutorThread, [BookId, string]>
+  digests: Table<StoredDigest, [BookId, string]>
 }
 
 /**
@@ -456,6 +514,18 @@ function defineSchema(db: Dexie): void {
   // any value written in now would be a guess presented as a fact. They draw
   // with no label. See `StudyLamp`.
   db.version(13).stores({})
+
+  // v14 — what a chapter left behind (stage D). The same key shape as `tutor`
+  // and `notes`, for the same two reasons: `[bookId+chapterId]` is the exact
+  // address, and the loose `bookId` is what lets `deleteBook` drop a book's
+  // digests without listing them first.
+  //
+  // No migration and nothing to backfill. A chapter with no row here has no
+  // digest yet, which is true of every chapter in every book today. The rows
+  // fill in as the reader reads.
+  db.version(14).stores({
+    digests: '[bookId+chapterId], bookId',
+  })
 }
 
 export function createDb(name: string = DB_NAME): ReadingBuddyDB {

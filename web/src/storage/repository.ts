@@ -11,6 +11,7 @@
 import type {
   Anchor,
   BookId,
+  BookGenre,
   BookMeta,
   ChapterIndex,
   Manifest,
@@ -245,6 +246,19 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
 
       if (rewritten.length > 0) await database.books.bulkPut(rewritten)
       return rewritten.length
+    },
+
+    /**
+     * What kind of book this is, for the tutor's chip row.
+     *
+     * Stored only when the reader says it. `reader/genre.ts` guesses when this
+     * is absent, so clearing it is a real choice — it means "go back to the
+     * guess", not "no genre".
+     */
+    async setTutorGenre(id: BookId, genre: BookGenre | undefined): Promise<void> {
+      const book = await database.books.get(id)
+      if (!book) return
+      await database.books.put({ ...book, tutorGenre: genre })
     },
 
     async setNotes(id: BookId, notes: string | undefined): Promise<void> {
@@ -721,6 +735,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.bookmarks,
           database.notes,
           database.tutor,
+          database.digests,
         ],
         async () => {
           for (const bookId of bookIds) {
@@ -734,6 +749,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
             await database.bookmarks.where('bookId').equals(bookId).delete()
             await database.notes.where('bookId').equals(bookId).delete()
             await database.tutor.where('bookId').equals(bookId).delete()
+            await database.digests.where('bookId').equals(bookId).delete()
             await database.books.delete(bookId)
           }
         },
@@ -761,6 +777,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           database.bookmarks,
           database.notes,
           database.tutor,
+          database.digests,
         ],
         async () => {
           await database.sections.where('bookId').equals(bookId).delete()
@@ -773,6 +790,7 @@ export function createRepository(database: ReadingBuddyDB = defaultDb) {
           await database.bookmarks.where('bookId').equals(bookId).delete()
           await database.notes.where('bookId').equals(bookId).delete()
           await database.tutor.where('bookId').equals(bookId).delete()
+          await database.digests.where('bookId').equals(bookId).delete()
           await database.books.delete(bookId)
         },
       )

@@ -88,6 +88,7 @@ import {
   useFigureImages,
   writeFocusMode,
   StudyLamp,
+  genreOf,
   TutorMarks,
   elide,
   passageKindOf,
@@ -104,6 +105,7 @@ import {
   type Touch,
   wordAt,
 } from '../reader/index.ts'
+import { refreshInBackground } from '../tutor/refresh.ts'
 import { catchUpOnOpen } from '../app/bookCatchUp.ts'
 import { knownBook, noteReading } from '../app/shelvesAhead.ts'
 import {
@@ -2050,6 +2052,34 @@ export default function Reader() {
   }, [page])
 
   /**
+   * Leave a recap behind.
+   *
+   * Two quiet moments, exactly as the plan asks: crossing into another section,
+   * and closing the book. Never mid-page, and never at chapter end only — a
+   * 70,000-word chapter is many sittings, and waiting for its end would mean
+   * never.
+   *
+   * It does nothing at all unless the reader switched recaps on, it builds at
+   * most one chapter per run, and it never reports a failure. This is work
+   * nobody asked for at this moment, so it must not interrupt the page. See
+   * `tutor/refresh.ts`.
+   */
+  const placeNow = useRef({ chapter: here.chapter, section: here.section })
+  placeNow.current = { chapter: here.chapter, section: here.section }
+
+  useEffect(() => {
+    if (!id || !restored) return
+    refreshInBackground(id, { chapter: here.chapter, section: here.section })
+  }, [id, restored, here.chapter, here.section])
+
+  useEffect(() => {
+    if (!id) return
+    // The book closing. Read from a ref rather than the dependency array, so
+    // this fires once on the way out instead of on every section change.
+    return () => refreshInBackground(id, placeNow.current)
+  }, [id])
+
+  /**
    * Write down where reading got to.
    *
    * Debounced by the cleanup: each new paragraph cancels the pending write, so
@@ -3974,6 +4004,7 @@ export default function Reader() {
               key={lamp.key}
               passage={lamp.passage}
               context={lampContext}
+              genre={frame.status === 'ready' ? genreOf(frame.book) : undefined}
               saved={lamp.saved}
               onSave={keepThread}
               onClose={() => setLamp(null)}

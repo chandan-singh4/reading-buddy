@@ -8,6 +8,7 @@ export type {
   Anchor,
   AnchorParts,
   BlockKind,
+  BookGenre,
   BookId,
   BookMeta,
   BookType,

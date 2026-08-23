@@ -9,6 +9,7 @@ import { RouteTransition, useViewLocation } from './app/routeTransition.tsx'
 import { UpdatePrompt } from './app/UpdatePrompt.tsx'
 import BookInfo from './pages/BookInfo.tsx'
 import Home from './pages/Home.tsx'
+import LastTime from './pages/LastTime.tsx'
 import Library from './pages/Library.tsx'
 import Reader from './pages/Reader.tsx'
 import Settings from './pages/Settings.tsx'
@@ -36,6 +37,7 @@ export function AppRoutes() {
       </Route>
       <Route path="book/:bookId" element={<Reader />} />
       <Route path="book/:bookId/info" element={<BookInfo />} />
+      <Route path="book/:bookId/last-time" element={<LastTime />} />
       <Route path="*" element={<Home />} />
     </Routes>
   )

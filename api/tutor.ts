@@ -115,6 +115,17 @@ const TIMEOUT_MS = 60_000
 /** Ceilings, not targets. The prompts ask for short answers; these stop runaways. */
 const MAX_TOKENS = 1200
 const MAX_EXCERPT = 8000
+/**
+ * The cap on material sent to be digested, in characters.
+ *
+ * A separate number from `MAX_EXCERPT` because it is a separate job. An
+ * excerpt is a passage a reader selected with their thumb, and 8,000
+ * characters is already generous for that. A digest block is up to 4,000 words
+ * of the book, which is roughly 24,000 characters, so the passage cap would
+ * silently cut a third of every block and the recap would end mid-chapter
+ * without saying so.
+ */
+const MAX_MATERIAL = 30000
 const MAX_MESSAGE = 4000
 const MAX_HISTORY = 40
 /**
@@ -124,6 +135,14 @@ const MAX_HISTORY = 40
 const MAX_NEIGHBOUR = 800
 /** Title, author, chapter, section — a heading, not a paragraph. */
 const MAX_FIELD = 200
+/**
+ * How many searched pages are handed back.
+ *
+ * The plugin is asked for this many results and the answer lists at most this
+ * many. Five is OpenRouter's own default, and it is already more citations than
+ * a paragraph of explanation can carry.
+ */
+const MAX_SOURCES = 5
 
 /* ------------------------------------------------------------------ prompts */
 
@@ -158,6 +177,25 @@ WHAT YOU WORK FROM
 WHEN THE READER TRIES
 Teaching for understanding means you care whether your explanation landed — not just whether you delivered it. When the reader tries to explain something back or answers your question, respond to the attempt: name what they got right, gently fix what's off, and never wave a wrong answer through with "exactly!" A kind, real correction is worth more than praise.`
 
+/**
+ * The base prompt for the digest jobs, in place of `BASE_PROMPT`.
+ *
+ * The tutor's own base prompt forbids the exact thing a digest does: "You never
+ * summarize ahead or hand over a book's content so the reader can skip it."
+ * That rule is right for a reader mid-page and wrong for a reader coming back a
+ * month later to material they have already read. Sending both prompts would
+ * hand the model two orders and let it pick.
+ *
+ * Not from the prompts file — that file has the four digest tasks but no base
+ * for them. This is ours, and it is kept short so the task module below it does
+ * the real work.
+ */
+const RECORDER_PROMPT = `You are the memory of a personal reading app. The reader has already read the material you are given. Your job is to write it down faithfully so they can get it back later without rereading it.
+
+- Work only from the material you are given. Never add, never infer past it, and never mention anything from later in the book.
+- Never address the reader, never explain, never editorialise. Write the record itself.
+- Fidelity beats brevity. A vague summary is a failure here; the specifics are the whole point.`
+
 /** The explain-back check, prompt file §10. Its own turn, never bolted on. */
 const PROBE_PROMPT = `The reader just received an explanation. Now gently check that it landed — not with a test, but the way a friend would. Ask them to put the key idea in their own words, or to apply it to one small new case. Pick the single most important thing they should walk away understanding and build your check around that. One warm, low-pressure question — easy to answer if they've got it, revealing if they haven't. Never ask "did that make sense?" — that isn't a check.`
 
@@ -167,20 +205,28 @@ interface Module {
   /** Whether a gentle check follows the answer as a second turn. */
   probe: boolean
   /**
-   * Whether this job needs grounding in what is known now. Stage C turns this
-   * on for "Still true?" and "Historical context"; nothing sets it yet, and
-   * `plugins` below is already wired for the day something does.
+   * Whether this job needs grounding in what is known now. "Still true?" and
+   * "Historical context" ask for it. The reader can also ask for it on any
+   * question with the globe in the composer, and either one is enough.
    */
   search?: boolean
+  /**
+   * Whether the text sent is material to digest rather than a passage the
+   * reader selected. It changes three things: the base prompt, the wrapper
+   * around the text, and how much text is allowed through.
+   */
+  material?: boolean
 }
 
 /**
  * The task modules, keyed by the intent the client sends.
  *
- * The four here are the genre-neutral ones — they suit any book. The
- * genre-conditional four (still-true, historical, happening, interpret) are
- * Stage C, and they need a genre on the book before the lamp can know which to
- * offer.
+ * The first four are genre-neutral — they suit any book, and the lamp always
+ * offers them. The last four are genre-conditional: the book carries a genre
+ * from its import, and `web/src/reader/genre.ts` decides which of the four that
+ * genre earns. This file offers all eight regardless, because the relay is not
+ * the place to enforce a taste judgment — a reader on an old client asking for
+ * "interpret" on a thriller gets an answer rather than an error.
  *
  * Note which ones carry a probe. "Discuss" already ends on a question, and
  * "Define" is a lookup, not a lesson — checking that a definition "landed"
@@ -211,6 +257,73 @@ Keep the whole thing to something they can read in under a minute.`,
     probe: false,
     prompt: `The reader selected a word or short phrase. Explain what it means right here, in this passage — not its full dictionary range, but the sense it carries in this context. If the word is doing something special here (a technical use, an older meaning, irony), point that out. Two or three sentences. Don't explain the whole passage; just the term.`,
   },
+  stilltrue: {
+    probe: true,
+    search: true,
+    prompt: `This passage makes a factual claim. Help the reader see whether it still holds up today.
+- First, name the specific claim or claims worth checking.
+- If a claim is the kind that could have changed since the book was written — science, statistics, "recent" anything, current events — use web search to check it against what's known now.
+- If it's timeless or clearly dated to its era, answer from your own knowledge. Don't search when there's nothing to update.
+Tell the reader plainly: still true, outdated, or disputed — and what the current understanding is. Note where your check came from.`,
+  },
+  historical: {
+    probe: true,
+    search: true,
+    prompt: `Situate this passage in its time and place. What was going on when it was written, or when it's set, that a reader today would miss? Give the context that makes the passage land differently — the assumptions, events, or conditions the original readers took for granted. A short paragraph. Only search if you need a specific date or fact you're unsure of.`,
+  },
+  happening: {
+    probe: true,
+    prompt: `The reader is disoriented in the story and selected this passage. Orient them: who's present, what just happened, and what this moment is doing in the scene — using only what they've read up to this point.
+Do NOT reveal anything that happens after this passage. If a name or reference is confusing, clear it up. Keep it to just enough for them to find their footing and read on.`,
+  },
+  interpret: {
+    probe: true,
+    prompt: `This passage rewards close reading. Open it up: what is it really saying beneath the surface, and how is it saying it — imagery, structure, the moves it makes? Offer your reading as one way in, not the final word; texts like this hold more than one meaning, and the reader's own reading matters. Stay grounded in the actual words on the page rather than floating off into abstraction. Then invite them to sit with it.`,
+  },
+
+  /*
+   * The four memory jobs, prompt file §§11–14. None of them talks to the
+   * reader, so none of them carries a probe, and all four set `material` — see
+   * `RECORDER_PROMPT` for why they must not get the tutor's base prompt.
+   *
+   * `recap` and `rollup` are a map and a reduce over one chapter. `confusions`
+   * is the terse one, and deliberately: it is an index of what the reader got
+   * stuck on, not prose. `welcome` is the only one fed digests rather than
+   * book text, which is what makes it cheap.
+   */
+  recap: {
+    probe: false,
+    material: true,
+    prompt: `You're digesting one block of a book so the reader can remember it later without rereading it. This is a faithful record for their own memory — capture what they'd want back.
+- Preserve the actual content: the specific ideas, events, names, facts, and turns of argument, in the order they appear. A faithful record, not a vague gloss.
+- Length follows content. Roughly 150–250 words for a full 3–4K-word block; scale down for a shorter section. Don't pad, and don't compress away substance.
+- Plain, clear prose. No "in this section" framing, no editorializing — just the material itself, densely and accurately.
+This may be stitched together with other block-digests later, so keep it self-contained and in order.`,
+  },
+
+  rollup: {
+    probe: false,
+    material: true,
+    prompt: `You're given several block-digests from one chapter, in order. Stitch them into a single continuous chapter recap.
+- Keep the specifics. This is the reduce step: your job is to JOIN, not to shrink. Preserve the names, events, facts, and the thread of the chapter.
+- Make it read as one coherent piece, not a list of fragments. Smooth the seams; cut only true repetition across blocks.
+- Length follows the chapter. Roughly 800–1,200 words for a long chapter, proportionally less for a shorter one. Long is fine when the chapter was long — fidelity matters more than brevity.
+Write it so that reading it brings the whole chapter back.`,
+  },
+
+  confusions: {
+    probe: false,
+    material: true,
+    prompt: `List the reader's confusions from these passage conversations and how each was resolved. One line per distinct question, in this shape:
+what they were stuck on → what cleared it up
+Terse and scannable — this is an index, not prose. Skip small talk; capture only real points of confusion and their resolution.`,
+  },
+
+  welcome: {
+    probe: false,
+    material: true,
+    prompt: `The reader is coming back to this book after time away. Using the chapter digests provided, write a short, warm welcome-back that puts them back in the seat: where they are in the book, the main thread they're in the middle of, and just enough of what's happened to pick up without rereading. A few sentences to a short paragraph. This is orientation, not a full recap — the detailed digests are one tap away if they want more. Don't reveal anything past their current position.`,
+  },
 }
 
 /* -------------------------------------------------------------------- wire */
@@ -237,10 +350,17 @@ interface Body {
   /** Stage B: the reader's pick, put at the head of the fallback chain. */
   model?: unknown
   /**
-   * How hard the model should think: `low`, `medium` or `high`. Anything else,
-   * including nothing at all, means `high`.
+   * How hard the model should think: `none`, `minimal`, `low`, `medium`,
+   * `high`, `xhigh` or `max`. Anything else, including nothing at all, means
+   * `max`.
    */
   effort?: unknown
+  /**
+   * Whether to search the web for this one question. The reader turns the globe
+   * on in the composer. A task module may ask for search on its own, and either
+   * one is enough.
+   */
+  search?: unknown
   /**
    * The whole chain the client wants tried, in order. It knows the roster and
    * which models on it are strongest; this file only knows a list it was
@@ -417,11 +537,14 @@ function frame(value: unknown): string {
 }
 
 function assemble(body: Body, module: Module | undefined): Turn[] {
-  const excerpt = text(body.excerpt, MAX_EXCERPT)
+  // A digest job carries a block of the book, which is several times longer
+  // than any passage a thumb can select.
+  const digesting = module?.material === true
+  const excerpt = text(body.excerpt, digesting ? MAX_MATERIAL : MAX_EXCERPT)
   const asked = text(body.userMessage, MAX_MESSAGE)
   const where = frame(body.context)
 
-  const turns: Turn[] = [{ role: 'system', content: BASE_PROMPT }]
+  const turns: Turn[] = [{ role: 'system', content: digesting ? RECORDER_PROMPT : BASE_PROMPT }]
   if (module) turns.push({ role: 'system', content: module.prompt })
   turns.push(...priorTurns(body.history))
 
@@ -429,9 +552,14 @@ function assemble(body: Body, module: Module | undefined): Turn[] {
   // is the thing being asked about. The anchor id is deliberately not sent:
   // `[ch02-s03-p013]` means nothing to a model, and a line it cannot read is a
   // line that teaches it the rest may be noise too.
-  const passage = excerpt
-    ? `THE PASSAGE THE READER SELECTED — explain this one:\n\n"""\n${excerpt}\n"""\n\n`
-    : ''
+  //
+  // The label changes for a digest, because the usual sentence is a lie there:
+  // nobody selected four thousand words with their thumb, and "explain this
+  // one" is the opposite of the job.
+  const label = digesting
+    ? 'THE MATERIAL TO RECORD'
+    : 'THE PASSAGE THE READER SELECTED — explain this one'
+  const passage = excerpt ? `${label}:\n\n"""\n${excerpt}\n"""\n\n` : ''
 
   turns.push({ role: 'user', content: `${where}${passage}${asked}` })
   return turns
@@ -452,6 +580,14 @@ interface Completion {
   reasoning?: string
   /** What the exchange cost, in tokens. Absent when OpenRouter reports none. */
   usage?: Usage
+  /** The pages the web search fed in, when it ran. */
+  sources?: Source[]
+}
+
+/** One page the search found, as OpenRouter reports it. */
+export interface Source {
+  url: string
+  title?: string
 }
 
 export interface Usage {
@@ -477,13 +613,24 @@ class Upstream extends Error {
 /**
  * How hard the model should think, as OpenRouter words it.
  *
- * The API takes `low`, `medium` or `high` and translates each into whatever the
- * provider underneath calls it. There is no level above `high`, so `high` is
- * what "as much as it will give" means here.
+ * The seven values are the ones the API accepts — see
+ * https://openrouter.ai/docs/use-cases/reasoning-tokens. Each is a share of the
+ * model's token budget: `max` and `xhigh` about 95%, `high` about 80%, `medium`
+ * about 50%, `low` about 20%, `minimal` about 10%, and `none` turns thinking
+ * off. A provider that does not know a level maps it to the nearest one it has,
+ * so every value here is safe to send to every model.
  */
-type Effort = 'low' | 'medium' | 'high'
+type Effort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
-const EFFORTS = new Set<Effort>(['low', 'medium', 'high'])
+const EFFORTS = new Set<Effort>([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+])
 
 /**
  * The default, and why it is the top one.
@@ -494,11 +641,39 @@ const EFFORTS = new Set<Effort>(['low', 'medium', 'high'])
  * thinks first. A paid model is the reader's own money, which is why the client
  * can send something else.
  */
-const DEFAULT_EFFORT: Effort = 'high'
+const DEFAULT_EFFORT: Effort = 'max'
 
 function effortOf(value: unknown): Effort {
   const said = text(value, 12).trim().toLowerCase()
   return EFFORTS.has(said as Effort) ? (said as Effort) : DEFAULT_EFFORT
+}
+
+/**
+ * The pages behind a searched answer.
+ *
+ * OpenRouter returns them on the message as `annotations`, each one a
+ * `url_citation` — see https://openrouter.ai/docs/features/web-search. They are
+ * passed on so the lamp can print where the check came from, which the
+ * "Still true?" module promises the reader in so many words.
+ *
+ * The `content` field of each citation is dropped. It is the scraped page body,
+ * it can be long, and it is already in front of the model — repeating it into
+ * the reader's stored thread would cost far more than it gives.
+ */
+function sourcesOf(value: unknown): Source[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const found: Source[] = []
+  for (const entry of value) {
+    const cite = (entry as { url_citation?: { url?: unknown; title?: unknown } })?.url_citation
+    const url = text(cite?.url, MAX_FIELD).trim()
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    const title = text(cite?.title, MAX_FIELD).trim()
+    found.push({ url, ...(title ? { title } : {}) })
+    if (found.length >= MAX_SOURCES) break
+  }
+  return found
 }
 
 async function complete(
@@ -537,12 +712,14 @@ async function complete(
         usage: { include: true },
         // OpenRouter runs the search itself and feeds the results in. The
         // model still decides whether the results are worth using.
-        ...(search ? { plugins: [{ id: 'web' }] } : {}),
+        ...(search ? { plugins: [{ id: 'web', max_results: MAX_SOURCES }] } : {}),
       }),
     })
 
     const payload = (await response.json().catch(() => null)) as {
-      choices?: { message?: { content?: unknown; reasoning?: unknown } }[]
+      choices?: {
+        message?: { content?: unknown; reasoning?: unknown; annotations?: unknown }
+      }[]
       model?: unknown
       usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown }
       error?: { message?: unknown; code?: unknown }
@@ -580,6 +757,7 @@ async function complete(
 
     const thought = payload?.choices?.[0]?.message?.reasoning
     const spent = payload?.usage
+    const cited = search ? sourcesOf(payload?.choices?.[0]?.message?.annotations) : []
 
     return {
       text: answer.trim(),
@@ -588,6 +766,7 @@ async function complete(
         ? { reasoning: thought.trim().slice(0, MAX_REASONING) }
         : {}),
       ...(spent ? { usage: counted(spent) } : {}),
+      ...(cited.length > 0 ? { sources: cited } : {}),
     }
   } finally {
     clearTimeout(timer)
@@ -650,9 +829,21 @@ export default async function handler(request: Request): Promise<Response> {
 
   const turns = assemble(body, module)
 
+  /*
+   * Whether this question goes to the web.
+   *
+   * Two sources, and either one is enough. The task module asks for it — "Still
+   * true?" cannot do its job without it. Or the reader turned the globe on in
+   * the composer, which is a choice about one question and is not remembered.
+   *
+   * A search costs money on every engine, so it never happens by default, and
+   * never twice: the probe below is always asked with search off.
+   */
+  const wants = module?.search === true || body.search === true
+
   let answer: Completion
   try {
-    answer = await complete(turns, models, key, module?.search === true, effortOf(body.effort))
+    answer = await complete(turns, models, key, wants, effortOf(body.effort))
   } catch (error) {
     // The upstream status is carried out, not flattened to 502. A busy free
     // model and a misconfigured relay both used to arrive as the same sentence,
@@ -690,6 +881,7 @@ export default async function handler(request: Request): Promise<Response> {
       text: answer.text,
       model: answer.model,
       ...(answer.reasoning ? { reasoning: answer.reasoning } : {}),
+      ...(answer.sources ? { sources: answer.sources } : {}),
       // The probe's own tokens are counted in: the reader paid for both, and a
       // number that leaves half the exchange out is worse than none.
       ...(answer.usage || probe?.usage
