@@ -657,20 +657,16 @@
     var(--color-surface);
 }
 
-/* What kind of book, for the tutor. A row of small pressable labels — a
-   `<select>` would hide four of the five behind a tap. */
+/* The sentence under a section heading that says what the section is for.
+   Named for the row of book-kind chips it was written for; that row is gone,
+   and the style outlived it. */
 .genreNote {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
 
-.genreRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
+/* One small pressable label. */
 .genrePick {
   padding: 6px 12px;
   border: 1px solid var(--color-border);
@@ -682,13 +678,7 @@
   cursor: pointer;
 }
 
-.genreOn {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-bg);
-}
-
-/* The way in to the return screen. Shaped like a genre pick because it is the
+/* The way in to the return screen. Shaped like the pick above because it is the
    same kind of thing to a thumb — one small pressable label — but it is a link,
    so it needs the two properties an anchor does not inherit from a button. */
 .returnLink {

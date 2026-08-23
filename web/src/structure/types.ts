@@ -272,17 +272,6 @@ export interface BookMeta {
    */
   genreOverridden?: boolean
   /**
-   * What kind of book it is **for the tutor's chip row** — a different question
-   * from `genre` above, which is the catalogue's coarse label and belongs to
-   * Google.
-   *
-   * Present only when the reader has said so. Absent means "work it out from
-   * the record", which `reader/genre.ts` does from `subjects`, `genre` and
-   * `type`. So there is no migration and no question at import: an old book
-   * reads exactly as it did, and a wrong guess is one tap from being fixed.
-   */
-  tutorGenre?: BookGenre
-  /**
    * The public verdict. **Meaningless without `ratingsCount` beside it**, which
    * is why nothing displays one without the other: every rating in this library
    * rests on one or two votes.

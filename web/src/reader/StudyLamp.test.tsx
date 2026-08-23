@@ -307,23 +307,27 @@ describe('the message actions', () => {
     ).toBe('false')
   })
 
-  it('offers a novel the story chip and never the fact-checking one', async () => {
-    lamp([], { genre: 'fiction' })
-    expect(await screen.findByRole('button', { name: /What’s happening here/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Still true/ })).toBeNull()
-  })
-
-  it('offers a science book the fact-checking chip and never the story one', async () => {
-    lamp([], { genre: 'nonfiction' })
-    expect(await screen.findByRole('button', { name: /Still true/ })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /What’s happening here/ })).toBeNull()
-  })
-
-  it('gives a book of unknown kind the four that suit anything', async () => {
+  /**
+   * Every book is offered every chip.
+   *
+   * The lamp used to show four and work the last three out from the kind of
+   * book. That needed a column in the database, a row of controls on the book's
+   * page, and a guess — for a cost the reader never actually paid: an unsuited
+   * chip is one they simply do not tap.
+   */
+  it('offers all seven chips, whatever the book is', async () => {
     lamp([])
-    expect(await screen.findByRole('button', { name: 'Explain simply' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Still true/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Interpret this/ })).toBeNull()
+    for (const chip of [
+      'Explain simply',
+      'Explain to a friend',
+      'Discuss & ask questions',
+      'Define a term',
+      'What’s happening here?',
+      'Still true?',
+      'Interpret this',
+    ]) {
+      expect(await screen.findByRole('button', { name: chip })).toBeTruthy()
+    }
   })
 
   it('prints where a searched answer looked', async () => {

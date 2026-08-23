@@ -24,6 +24,12 @@ Get that loop working before building any breadth.
   request now has a 20 second deadline, and the page always says why it failed.
   **The deadline answers a hang, not a refusal.** If the button now names a
   reason, that reason is the next thing to fix.
+- **A 503 no longer automatically means "no Google Books key"** (2026-08-23).
+  The client read the status number alone, but the host answers 503 too — a
+  paused or cold deployment — and it does it with an HTML page rather than with
+  our JSON. The client now reads the body: our own function's 503 still names
+  the key, and anything else says the host did not answer. **A reader saw the
+  old message with the key correctly set.**
 - **Stages C and D of the tutor engine are built** (2026-08-22). Search, the
   globe switch, the genre chips, and the whole digest and recap pipeline. A
   live call proved search: five sources and a claim dated April 2026. A live
@@ -32,8 +38,12 @@ Get that loop working before building any breadth.
   reader switches them on**, on the "Last time on…" screen, because each one is
   a paid call that starts while the reader reads. See `docs/active-task.md` for
   the two other deviations from the plan.
-- **One step needs the reader's hands** (2026-08-22). Run
-  `supabase/migrations/0008_tutor_genre.sql` in the Supabase SQL editor.
+- **The book-kind feature is withdrawn** (2026-08-23). Migration `0008` is
+  deleted and **must not be run**. The Study Lamp now offers all seven chips to
+  every book. The "What kind of book" row is gone from the book's page, and the
+  `tutorGenre` column and `reader/genre.ts` are gone with it. Guessing the kind
+  cost a database column, a row of controls and a guess, to save the reader
+  from three chips they can simply not tap.
 - **The tutor is built and the key is live, but no answer has been seen**
   (2026-08-22). `api/tutor.ts` holds the OpenRouter key and the whole prompt
   library. `api/models.ts` fetches the free tool-capable roster.

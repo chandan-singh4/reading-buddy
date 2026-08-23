@@ -48,8 +48,20 @@ async function reasonFrom(response: Response | Error): Promise<string> {
   throw new Error('expected the lookup to fail')
 }
 
+/** A reply from something that is not our endpoint — the host's error page. */
 function status(code: number): Response {
-  return new Response('{}', { status: code })
+  return new Response('<!doctype html><title>Error</title>', {
+    status: code,
+    headers: { 'content-type': 'text/html' },
+  })
+}
+
+/** A reply from our own endpoint, which always says what it objected to. */
+function ours(code: number, error: string): Response {
+  return new Response(JSON.stringify({ error }), {
+    status: code,
+    headers: { 'content-type': 'application/json' },
+  })
 }
 
 describe('what a failed lookup says', () => {
@@ -71,7 +83,26 @@ describe('what a failed lookup says', () => {
   })
 
   it('names a missing key as a missing key', async () => {
-    expect(await reasonFrom(status(503))).toBe('the lookup service has no Google Books key')
+    const said = await reasonFrom(ours(503, 'Google Books is not configured on the server.'))
+    expect(said).toBe('the lookup service has no Google Books key')
+  })
+
+  /**
+   * The one that sent a reader to the wrong settings page.
+   *
+   * A 503 was read as "no key" from the number alone. But the host answers 503
+   * too — a paused deployment, a function that would not start — and it does it
+   * with an HTML page, not with our JSON. Told they had no key, a reader checks
+   * a key that was correct all along.
+   */
+  it('does not blame the key for a 503 our endpoint never sent', async () => {
+    const said = await reasonFrom(status(503))
+    expect(said).toContain('that’s the host')
+    expect(said).not.toContain('has no Google Books key')
+  })
+
+  it('repeats what our own endpoint objected to, when it is something new', async () => {
+    expect(await reasonFrom(ours(400, 'Expected a JSON body.'))).toBe('expected a JSON body')
   })
 
   it('blames Google for Google’s own errors', async () => {

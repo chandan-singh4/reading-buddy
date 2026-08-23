@@ -88,7 +88,6 @@ import {
   useFigureImages,
   writeFocusMode,
   StudyLamp,
-  genreOf,
   TutorMarks,
   elide,
   passageKindOf,
@@ -4004,7 +4003,6 @@ export default function Reader() {
               key={lamp.key}
               passage={lamp.passage}
               context={lampContext}
-              genre={frame.status === 'ready' ? genreOf(frame.book) : undefined}
               saved={lamp.saved}
               onSave={keepThread}
               onClose={() => setLamp(null)}

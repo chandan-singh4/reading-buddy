@@ -56,7 +56,6 @@ function bareRow(overrides: Partial<BookRow> = {}): BookRow {
     thickness_mm: null,
     genre: null,
     genre_overridden: null,
-    tutor_genre: null,
     average_rating: null,
     ratings_count: null,
     metadata_source: null,

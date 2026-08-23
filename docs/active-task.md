@@ -547,6 +547,39 @@ not depend on somebody else's promise settling.
 Google answer. If the button now reports a reason, that reason is the next
 thing to fix.
 
+## Withdrawn — the book-kind guess (2026-08-23)
+
+The Study Lamp offered four chips and worked out up to two more from the kind
+of book. The kind came from a guess over `subjects`, `genre` and `type`, and
+the reader could correct it on the book's page.
+
+**All of it is gone.** Every book now gets all seven chips. Deleted:
+`web/src/reader/genre.ts` and its test, the `tutorGenre` field, the
+`tutor_genre` column mapping in both repositories, the "What kind of book" row
+in `BookInfo.tsx`, and migration `0008_tutor_genre.sql`. **Do not run 0008.**
+
+The reason is the trade. The feature cost a database column, a manual SQL step,
+a row of controls on a screen, and a guess that could be wrong. It bought the
+reader freedom from three chips that do not suit the book — and an unsuited
+chip costs nothing, because nobody taps it. The chips are a scrolling column,
+not a row, so seven is not crowded.
+
+## A 503 is not proof of a missing key (2026-08-23)
+
+`web/src/catalogue/google.ts` read the status number alone, so every 503 said
+"the lookup service has no Google Books key". The host answers 503 as well, for
+a deployment that is paused, cold, or over a limit — and it answers with an
+HTML page, not with our JSON.
+
+The client now reads the body. A 503 that carries our own function's JSON still
+names the key. A 503 that does not says the host never answered, which also
+proves the request never reached the function — so no setting on the function
+can be the cause. Any other unexpected status now repeats the server's own
+sentence rather than a number.
+
+**This was reported, not imagined.** A reader saw "no Google Books key" with the
+key correctly set in Production and the project redeployed.
+
 ## Carried forward — how to work on the reading page
 
 Fourteen lessons earlier threads paid for. They are unchanged and still apply.

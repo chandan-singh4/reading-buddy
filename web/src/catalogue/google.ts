@@ -87,7 +87,7 @@ async function post(body: unknown): Promise<Response> {
     throw new CloudError('you’re offline')
   }
 
-  if (!response.ok) throw new CloudError(reasonFor(response.status))
+  if (!response.ok) throw new CloudError(await reasonFor(response))
   return response
 }
 
@@ -100,8 +100,10 @@ async function post(body: unknown): Promise<Response> {
  * to press the button again, wait a day, sign in, or tell someone the server is
  * misconfigured — and those are four different answers.
  */
-function reasonFor(status: number): string {
-  switch (status) {
+async function reasonFor(response: Response): Promise<string> {
+  const ours = await ourError(response)
+
+  switch (response.status) {
     case 401:
       return 'you’re signed out'
     case 403:
@@ -115,9 +117,42 @@ function reasonFor(status: number): string {
       // is talking to a server that was never given the lookup function.
       return 'this copy of the app has no lookup service'
     case 503:
-      return 'the lookup service has no Google Books key'
+      // The distinction this whole function exists for. Our own function
+      // answers 503 with a JSON body when the key is missing. The host answers
+      // 503 with an HTML page when the deployment is paused, cold, or over its
+      // limit — and reading that as "no key" sends the reader to a settings
+      // screen that was already correct. Said differently on purpose.
+      return ours
+        ? 'the lookup service has no Google Books key'
+        : 'the lookup service didn’t answer — that’s the host, not Google or the key'
     default:
-      return status >= 500 ? 'Google Books is having trouble' : `something went wrong (${status})`
+      // The server's sentence, made to finish "couldn't ask Google Books — …".
+      // Only the first letter is lowered: lowering the whole thing turns JSON
+      // into json and Google into google.
+      if (ours) return ours.charAt(0).toLowerCase() + ours.slice(1).replace(/\.$/, '')
+      return response.status >= 500
+        ? 'Google Books is having trouble'
+        : `something went wrong (${response.status})`
+  }
+}
+
+/**
+ * The message our own endpoint sent, if this reply came from our own endpoint.
+ *
+ * `undefined` means the reply came from something else — the host's error page,
+ * a proxy, a captive portal. That is worth knowing on its own: it says the
+ * request never reached the function, so nothing about the function's settings
+ * can be the cause.
+ */
+async function ourError(response: Response): Promise<string | undefined> {
+  if (!response.headers.get('content-type')?.includes('application/json')) return undefined
+  try {
+    const body = (await response.clone().json()) as { error?: unknown }
+    return typeof body.error === 'string' && body.error.trim().length > 0
+      ? body.error.trim()
+      : undefined
+  } catch {
+    return undefined
   }
 }
 

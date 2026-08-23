@@ -11,7 +11,6 @@ import { isOutOfDate, reparseBooks } from '../import/index.ts'
 import { repository, type StoredQuote } from '../storage/index.ts'
 import type { ReadingPosition } from '../storage/db.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
-import { GENRE_LABELS, GENRES, genreOf, type BookGenre } from '../reader/index.ts'
 import styles from './BookInfo.module.css'
 
 type LoadState =
@@ -285,21 +284,6 @@ export default function BookInfo() {
     }
   }
 
-  /**
-   * Correct the tutor's idea of what kind of book this is.
-   *
-   * Tapping the chosen kind again clears it, which puts the book back on the
-   * guess rather than on nothing. That is why the row shows the guess as
-   * selected even before the reader has ever touched it — there is no
-   * "unset" state to draw, only "we worked it out" and "you said so".
-   */
-  async function chooseGenre(genre: BookGenre) {
-    if (state.status !== 'ready') return
-    const next = state.book.tutorGenre === genre ? undefined : genre
-    setState({ ...state, book: { ...state.book, tutorGenre: next } })
-    await repository.setTutorGenre(id, next)
-  }
-
   async function saveNotes(notes: string) {
     if (state.status !== 'ready') return
     setState({ ...state, book: { ...state.book, notes: notes || undefined } })
@@ -528,35 +512,6 @@ export default function BookInfo() {
             Couldn’t ask Google Books — {catalogue.message}. Nothing about the book was changed.
           </p>
         )}
-      </section>
-
-      {/*
-        * What the tutor offers to do with a passage.
-        *
-        * Here rather than at import: a dropped folder brings in thirty books at
-        * once, and thirty questions in a row is a toll gate, not a welcome. The
-        * app guesses from the book's own record and this is where a wrong guess
-        * is fixed — one tap, on the screen the reader already opens to correct
-        * a title.
-        */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionHeading}>What kind of book</h2>
-        <p className={styles.genreNote}>
-          It decides what the tutor offers when you ask about a passage.
-        </p>
-        <div className={styles.genreRow}>
-          {GENRES.map((genre) => (
-            <button
-              key={genre}
-              type="button"
-              className={`${styles.genrePick} ${genreOf(book) === genre ? styles.genreOn : ''}`}
-              aria-pressed={genreOf(book) === genre}
-              onClick={() => void chooseGenre(genre)}
-            >
-              {GENRE_LABELS[genre]}
-            </button>
-          ))}
-        </div>
       </section>
 
       {/*

@@ -56,15 +56,6 @@ export {
   storedEffort,
 } from './effort.ts'
 export type { Effort } from './effort.ts'
-export {
-  GENRE_INTENTS,
-  GENRE_LABELS,
-  GENRES,
-  genreOf,
-  isBookGenre,
-  intentsFor,
-} from './genre.ts'
-export type { BookGenre } from './genre.ts'
 export { dictationSupported, joinSaid, useDictation } from './dictation.ts'
 export { ThreadMenu } from './ThreadMenu.tsx'
 export type { ThreadMenuProps } from './ThreadMenu.tsx'

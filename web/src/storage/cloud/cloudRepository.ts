@@ -51,7 +51,6 @@
 
 import type {
   Anchor,
-  BookGenre,
   BookId,
   BookMeta,
   ChapterIndex,
@@ -406,26 +405,6 @@ export function createCloudRepository(options: CloudRepositoryOptions = {}): Rep
         filled += count ?? 0
       }
       return filled
-    },
-
-    /**
-     * The reader's own answer to "what kind of book is this".
-     *
-     * Best-effort on purpose. The column arrived in migration `0008`, and the
-     * SQL editor and the deploy are two manual steps in either order — so a
-     * library whose database is one migration behind must not throw an error at
-     * a reader who tapped a chip. Losing the choice puts the book back on the
-     * app's own guess, which is where it already was.
-     */
-    async setTutorGenre(id: BookId, genre: BookGenre | undefined): Promise<void> {
-      try {
-        unwrap(
-          await db().from('books').update({ tutor_genre: genre ?? null }).eq('id', id),
-          'save the kind of book',
-        )
-      } catch {
-        /* see above */
-      }
     },
 
     async setNotes(id: BookId, notes: string | undefined): Promise<void> {

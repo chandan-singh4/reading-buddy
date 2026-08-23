@@ -76,7 +76,6 @@ import {
   storedEffort,
   type Effort,
 } from './effort.ts'
-import { intentsFor, type BookGenre } from './genre.ts'
 import { useDictation } from './dictation.ts'
 import styles from './StudyLamp.module.css'
 
@@ -84,11 +83,6 @@ export interface StudyLampProps {
   passage: PassageAnchor
   /** Where the passage sits in the book. Sent with every question. */
   context?: PassageContext
-  /**
-   * What kind of book this is. It decides which extra chips the reader gets.
-   * Left out, they get the four that suit any book.
-   */
-  genre?: BookGenre
   /** The saved conversation, when the lamp is reopening one. */
   saved?: TutorMessage[]
   /** Every completed exchange, whole. The Reader persists it. */
@@ -97,14 +91,30 @@ export interface StudyLampProps {
 }
 
 /**
- * The chips every book gets, in the order they are offered.
+ * The chips, in the order they are offered.
  *
- * Explaining comes first because it is why the reader stopped reading. The two
- * explainers sit together, then the two that do something else with the
- * passage. `genre.ts` adds at most two more after these, chosen by the kind of
- * book it is.
+ * Every book gets all of them. An earlier design showed four and worked the
+ * last three out from the kind of book — "What's happening here?" only on a
+ * novel, "Still true?" only on a textbook. It was the wrong trade: guessing the
+ * kind needed a column in the database and a row of controls on the book's own
+ * page, and it was still a guess. A chip that does not suit the passage costs
+ * the reader nothing; they simply do not tap it.
+ *
+ * Explaining comes first, because it is why the reader stopped reading. The
+ * two explainers sit together, then the two that do something else with the
+ * passage, then the three that suit a particular kind of book.
+ *
+ * The list is a scrolling column, not a row, so length is cheap here.
  */
-const INTENTS: TutorIntent[] = ['simply', 'friend', 'discuss', 'define']
+const INTENTS: TutorIntent[] = [
+  'simply',
+  'friend',
+  'discuss',
+  'define',
+  'happening',
+  'stilltrue',
+  'interpret',
+]
 
 /**
  * A microphone, drawn rather than typed. The 🎤 emoji is a different size, a
@@ -189,7 +199,6 @@ function totalUsage(messages: readonly TutorMessage[]): TutorUsage | undefined {
 export function StudyLamp({
   passage,
   context,
-  genre,
   saved,
   onSave,
   onClose,
@@ -538,7 +547,7 @@ export function StudyLamp({
       <div ref={flow} className={styles.flow} aria-live="polite">
         {fresh && (
           <div className={styles.options}>
-            {intentsFor(genre ?? 'general', INTENTS).map((chip) => (
+            {INTENTS.map((chip) => (
               <button
                 key={chip}
                 type="button"
