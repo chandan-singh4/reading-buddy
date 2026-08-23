@@ -208,7 +208,13 @@ function chain(): Step[] {
   return (configured.length > 0 ? configured : DEFAULT_MODELS).slice(0, MAX_CHAIN)
 }
 
-/** How long an answer may take before we stop waiting. Free models are slow. */
+/*
+ * How long a silence may last before we stop waiting. Free models are slow.
+ *
+ * This is an idle deadline, not a total one — see `deadline`. It starts again
+ * on every delta, so a long answer is never cut off for being long, and a
+ * provider that accepts the request and then goes quiet is still given up on.
+ */
 const TIMEOUT_MS = 60_000
 
 /*
@@ -616,6 +622,12 @@ interface Body {
    * configured with. So when the client sends one, it wins.
    */
   models?: unknown
+  /**
+   * Whether to send the answer as it is written rather than when it is done.
+   * Asked for, never assumed — a client cached by an old service worker has to
+   * keep getting the reply it was written against.
+   */
+  stream?: unknown
 }
 
 /**
@@ -844,11 +856,7 @@ export interface Usage {
   total: number
 }
 
-/**
- * One call to OpenRouter. Throws with a readable reason; never returns a
- * half-answer.
- */
-/** A failure that came from OpenRouter, carrying the status it reported. */
+/** A failure that came from a provider, carrying the status it reported. */
 class Upstream extends Error {
   constructor(
     message: string,
@@ -924,155 +932,268 @@ function sourcesOf(value: unknown): Source[] {
   return found
 }
 
-async function complete(
+/**
+ * One rung, opened but not yet read.
+ *
+ * Every call upstream is a streaming call now, including the ones whose answer
+ * is assembled and returned whole. That is one code path rather than two, and
+ * it costs nothing: a stream nobody watches is only a slower way to receive the
+ * same bytes.
+ *
+ * The split between opening and reading is what keeps failover invisible. A
+ * model that refuses does it with an HTTP status **before** a single stream
+ * byte — measured, not assumed: a bad slug refused in 281ms and a busy model in
+ * 1.5s, both with the whole body behind them. So `walk` can try rung after rung
+ * here, and only once one of them answers does anything reach the reader.
+ * Nothing has to be un-sent, and the reader never learns a rung was skipped.
+ */
+async function open(
   turns: Turn[],
   step: Step,
   key: string,
   search: boolean,
   effort: Effort,
   ceiling: number,
-): Promise<Completion> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  signal: AbortSignal,
+): Promise<Response> {
   const via = step.source
 
-  try {
-    const response = await fetch(CHAT[via], {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        authorization: `Bearer ${key}`,
-        'content-type': 'application/json',
-        // OpenRouter attributes usage by these two. Neither is a secret, and
-        // the other two providers ignore them.
-        ...(via === 'openrouter'
-          ? {
-              'http-referer': process.env.TUTOR_REFERER ?? 'https://reading-buddy.app',
-              'x-title': 'Reading Buddy',
-            }
-          : {}),
-      },
-      body: JSON.stringify({
-        // One model, not a list. The `models` array was OpenRouter's own
-        // failover and it can only route OpenRouter slugs — the chain across
-        // three providers is walked by `walk` below instead.
-        model: step.id,
-        messages: turns,
-        max_tokens: ceiling,
-        // Warmth is the point, but a wandering tutor is worse than a plain
-        // one — this is the middle of the range, not the top.
-        temperature: 0.7,
-        /*
-         * Ask for the working-out.
-         *
-         * Three providers, two spellings of the same idea. OpenRouter takes an
-         * object; Groq and Gemini both take the bare word, on a shorter ladder
-         * — see `cappedEffort`, which is also what stops Gemini thinking its
-         * whole token budget away and answering with an empty string.
-         *
-         * A model with no reasoning channel ignores whichever it is sent, which
-         * is why this goes to every model rather than being guessed at from the
-         * slug: no roster says which models think out loud.
-         */
-        ...(via === 'openrouter' ? { reasoning: { effort, exclude: false } } : {}),
-        ...(via === 'groq' || via === 'gemini'
-          ? { reasoning_effort: cappedEffort(effort) }
-          : {}),
-        // Some providers report usage only when it is asked for. Gemini and
-        // Groq report it regardless.
-        ...(via === 'openrouter' ? { usage: { include: true } } : {}),
-        // OpenRouter runs the search itself and feeds the results in. The
-        // model still decides whether the results are worth using.
-        ...(search && canSearch(via) ? { plugins: [{ id: 'web', max_results: MAX_SOURCES }] } : {}),
-      }),
-    })
-
-    const body = (await response.json().catch(() => null)) as unknown
-
-    /*
-     * The answer, whatever shape the provider wrapped it in.
-     *
-     * OpenRouter and Groq answer with an object. Gemini's compatibility layer
-     * wraps a *failure* in a one-element array — `[{ error: { ... } }]` — while
-     * answering a success as a plain object. Reading only the object shape
-     * turns every Gemini refusal into "the model returned an empty answer",
-     * which is both wrong and unactionable: the real reason, quota or bad slug,
-     * is sitting in the array we did not look inside.
-     */
-    const payload = (Array.isArray(body) ? body[0] : body) as {
-      choices?: {
-        message?: { content?: unknown; reasoning?: unknown; annotations?: unknown }
-      }[]
-      model?: unknown
-      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown }
-      error?: { message?: unknown; code?: unknown }
-    } | null
-
-    // A rate-limited provider comes back as HTTP 200 with an error envelope
-    // and no `choices` at all. Without this it reads as an empty answer, which
-    // sends the reader a "try again" for a problem retrying will not fix.
-    if (payload?.error) {
-      const reason = typeof payload.error.message === 'string' ? payload.error.message : 'refused'
-      throw new Upstream(
-        `${via} answered ${reason}`,
-        typeof payload.error.code === 'number' ? payload.error.code : 502,
-      )
-    }
-
-    if (!response.ok) {
-      const reason = typeof payload?.error?.message === 'string' ? payload.error.message : ''
-      throw new Upstream(
-        `${via} answered ${response.status}${reason ? `: ${reason}` : ''}`,
-        // OpenRouter reports a provider rate-limit as a 200-shaped envelope
-        // with `error.code`, and a real HTTP status otherwise. Prefer whichever
-        // one is actually there — the reader gets a different sentence for a
-        // busy model than for a broken relay.
-        typeof payload?.error?.code === 'number' ? payload.error.code : response.status,
-      )
-    }
-
-    const answer = payload?.choices?.[0]?.message?.content
-    if (typeof answer !== 'string' || answer.trim().length === 0) {
-      // An empty completion is a failure wearing a 200. Saying so is better
-      // than handing the reader a blank bubble.
-      throw new Error('the model returned an empty answer')
-    }
-
-    const thought = payload?.choices?.[0]?.message?.reasoning
-    const spent = payload?.usage
-    const cited = search ? sourcesOf(payload?.choices?.[0]?.message?.annotations) : []
-
-    return {
-      text: answer.trim(),
-      model: typeof payload?.model === 'string' ? payload.model : step.id,
-      ...(typeof thought === 'string' && thought.trim().length > 0
-        ? { reasoning: thought.trim().slice(0, MAX_REASONING) }
+  const response = await fetch(CHAT[via], {
+    method: 'POST',
+    signal,
+    headers: {
+      authorization: `Bearer ${key}`,
+      'content-type': 'application/json',
+      // OpenRouter attributes usage by these two. Neither is a secret, and
+      // the other two providers ignore them.
+      ...(via === 'openrouter'
+        ? {
+            'http-referer': process.env.TUTOR_REFERER ?? 'https://reading-buddy.app',
+            'x-title': 'Reading Buddy',
+          }
         : {}),
-      ...(spent ? { usage: counted(spent) } : {}),
-      ...(cited.length > 0 ? { sources: cited } : {}),
+    },
+    body: JSON.stringify({
+      // One model, not a list. The `models` array was OpenRouter's own
+      // failover and it can only route OpenRouter slugs — the chain across
+      // three providers is walked by `walk` below instead.
+      model: step.id,
+      messages: turns,
+      stream: true,
+      max_tokens: ceiling,
+      // Warmth is the point, but a wandering tutor is worse than a plain
+      // one — this is the middle of the range, not the top.
+      temperature: 0.7,
+      /*
+       * Ask for the working-out.
+       *
+       * Three providers, two spellings of the same idea. OpenRouter takes an
+       * object; Groq and Gemini both take the bare word, on a shorter ladder
+       * — see `cappedEffort`, which is also what stops Gemini thinking its
+       * whole token budget away and answering with an empty string.
+       *
+       * A model with no reasoning channel ignores whichever it is sent, which
+       * is why this goes to every model rather than being guessed at from the
+       * slug: no roster says which models think out loud.
+       */
+      ...(via === 'openrouter' ? { reasoning: { effort, exclude: false } } : {}),
+      ...(via === 'groq' || via === 'gemini' ? { reasoning_effort: cappedEffort(effort) } : {}),
+      // The counts ride in the last packet, and only for a caller who asked.
+      // OpenRouter wants its own spelling; all three take the standard one.
+      ...(via === 'openrouter' ? { usage: { include: true } } : {}),
+      stream_options: { include_usage: true },
+      // OpenRouter runs the search itself and feeds the results in. The
+      // model still decides whether the results are worth using.
+      ...(search && canSearch(via) ? { plugins: [{ id: 'web', max_results: MAX_SOURCES }] } : {}),
+    }),
+  })
+
+  if (response.ok) return response
+
+  /*
+   * A refusal, which is never a stream.
+   *
+   * Gemini's compatibility layer wraps a failure in a one-element array —
+   * `[{ error: { ... } }]` — while answering a success as a plain object.
+   * Reading only the object shape turned every Gemini refusal into "the model
+   * returned an empty answer", which is both wrong and unactionable: the real
+   * reason, quota or a bad slug, was sitting in the array we did not look
+   * inside.
+   */
+  const body = (await response.json().catch(() => null)) as unknown
+  const failure = (Array.isArray(body) ? body[0] : body) as {
+    error?: { message?: unknown; code?: unknown }
+  } | null
+
+  const reason = typeof failure?.error?.message === 'string' ? failure.error.message : ''
+  throw new Upstream(
+    `${via} answered ${response.status}${reason ? `: ${reason}` : ''}`,
+    // OpenRouter reports a provider rate-limit as a 200-shaped envelope with
+    // `error.code`, and a real HTTP status otherwise. Prefer whichever one is
+    // actually there — the reader gets a different sentence for a busy model
+    // than for a broken relay.
+    typeof failure?.error?.code === 'number' ? failure.error.code : response.status,
+  )
+}
+
+/** One delta off the wire, as the relay passes it on. */
+type Piece =
+  | { t: 'think'; d: string }
+  | { t: 'text'; d: string }
+  | { t: 'sources'; v: Source[] }
+  | { t: 'usage'; v: Usage }
+
+/**
+ * Read an opened rung to the end, assembling the answer as it goes.
+ *
+ * `onPiece` is how one reading serves both callers. A streaming request hands
+ * one in and every delta goes out to the reader as it lands; a plain request
+ * hands none, and only the assembled `Completion` at the end matters. Neither
+ * path parses the stream twice, and neither can drift from the other.
+ *
+ * The format is server-sent events: lines beginning `data:`, one JSON packet
+ * each, closing on a literal `[DONE]`. A packet that will not parse is skipped
+ * rather than thrown on — a half-received line at the edge of a network read is
+ * ordinary, and the leftover is carried into the next read.
+ */
+async function drain(
+  response: Response,
+  step: Step,
+  search: boolean,
+  touch: () => void,
+  onPiece?: (piece: Piece) => void,
+): Promise<Completion> {
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('the model returned an empty answer')
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let text = ''
+  let thought = ''
+  let model = step.id
+  let usage: Usage | undefined
+  const cited: Source[] = []
+  const seen = new Set<string>()
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    // Something arrived, so the silence clock starts again.
+    touch()
+    buffer += decoder.decode(value, { stream: true })
+
+    const lines = buffer.split('\n')
+    // The last piece may be half a line. It waits for the next read.
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue
+      const raw = line.slice(5).trim()
+      if (raw === '' || raw === '[DONE]') continue
+
+      let packet: {
+        model?: unknown
+        usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown }
+        error?: { message?: unknown; code?: unknown }
+        choices?: { delta?: { content?: unknown; reasoning?: unknown; annotations?: unknown } }[]
+      } | null
+      try {
+        packet = JSON.parse(raw) as typeof packet
+      } catch {
+        continue
+      }
+
+      // A provider may put a refusal inside the stream rather than in the
+      // status. The reader may already be watching by now, so this ends the
+      // answer rather than quietly truncating it.
+      if (packet?.error) {
+        const said = typeof packet.error.message === 'string' ? packet.error.message : 'refused'
+        throw new Upstream(
+          `${step.source} answered ${said}`,
+          typeof packet.error.code === 'number' ? packet.error.code : 502,
+        )
+      }
+
+      if (typeof packet?.model === 'string') model = packet.model
+      if (packet?.usage) usage = counted(packet.usage)
+
+      const delta = packet?.choices?.[0]?.delta
+      if (typeof delta?.reasoning === 'string' && delta.reasoning.length > 0) {
+        thought += delta.reasoning
+        onPiece?.({ t: 'think', d: delta.reasoning })
+      }
+      if (typeof delta?.content === 'string' && delta.content.length > 0) {
+        text += delta.content
+        onPiece?.({ t: 'text', d: delta.content })
+      }
+      if (search && delta?.annotations) {
+        // Citations arrive early — in the first packet, measured — and they
+        // arrive once. The set guards against a provider repeating them.
+        const fresh = sourcesOf(delta.annotations).filter((one) => !seen.has(one.url))
+        for (const one of fresh) {
+          seen.add(one.url)
+          cited.push(one)
+        }
+        if (fresh.length > 0) onPiece?.({ t: 'sources', v: cited.slice(0, MAX_SOURCES) })
+      }
     }
-  } finally {
-    clearTimeout(timer)
+  }
+
+  if (text.trim().length === 0) {
+    // An empty completion is a failure wearing a 200. Saying so is better
+    // than handing the reader a blank bubble.
+    throw new Error('the model returned an empty answer')
+  }
+
+  if (usage) onPiece?.({ t: 'usage', v: usage })
+
+  return {
+    text: text.trim(),
+    model,
+    ...(thought.trim().length > 0 ? { reasoning: thought.trim().slice(0, MAX_REASONING) } : {}),
+    ...(usage ? { usage } : {}),
+    ...(cited.length > 0 ? { sources: cited.slice(0, MAX_SOURCES) } : {}),
   }
 }
 
 /**
- * Walk the chain until something answers.
+ * A deadline that starts again every time something arrives.
  *
- * ## Why this loop exists, when the last version was proud of not having one
+ * A fixed deadline is wrong for a stream. It has to be long enough for the
+ * slowest whole answer, which makes it useless against the failure it exists
+ * for — a provider that accepts the request and then stops sending. An idle
+ * deadline asks the question that actually matters: has anything arrived
+ * lately? A long answer resets it on every delta and runs as long as it needs;
+ * a stalled one trips it while the reader is still watching a live cursor.
+ */
+function deadline(ms: number): { signal: AbortSignal; touch: () => void; done: () => void } {
+  const controller = new AbortController()
+  let timer = setTimeout(() => controller.abort(), ms)
+  return {
+    signal: controller.signal,
+    touch: () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => controller.abort(), ms)
+    },
+    done: () => clearTimeout(timer),
+  }
+}
+
+/**
+ * Walk the chain until one rung answers, and hand back its open stream.
  *
- * The file used to say, at some length, that failover was OpenRouter's job and
- * that a hand-rolled retry loop would be a mistake. That was right while every
- * model was an OpenRouter model. It stopped being right the moment the roster
- * spanned three providers: OpenRouter's `models` array can only route slugs
- * OpenRouter serves, so a chain containing a Groq or a Gemini model cannot be
- * handed to it at all. Somebody has to walk it, and there is no longer anyone
- * else.
+ * ## Why the chain is walked here and not by OpenRouter
  *
- * The old warning still applies to the *inside* of a rung, and is respected:
- * there is no retrying of a model that has just failed. Each rung is tried once
- * and the chain moves on. So a run of failures costs one round trip each rather
- * than doubling into two slow failures apiece.
+ * OpenRouter takes a `models` array and fails over inside it, which is where
+ * this used to live. It can only route its own slugs, and the chain now spans
+ * three providers with three keys and three base URLs, so the walking is ours.
+ *
+ * ## One try each
+ *
+ * A model that refuses is usually busy, and a busy model is busy for longer
+ * than a retry waits. So there is no retrying of a model that has just failed.
+ * Each rung is tried once and the chain moves on. A run of failures costs one
+ * round trip each rather than doubling into two slow failures apiece.
  *
  * ## What a failure costs, and why it is not reported
  *
@@ -1091,7 +1212,8 @@ async function walk(
   search: boolean,
   effort: Effort,
   ceiling: number,
-): Promise<{ answer: Completion; step: Step }> {
+  signal: AbortSignal,
+): Promise<{ response: Response; step: Step }> {
   let last: unknown
 
   for (const step of steps) {
@@ -1099,7 +1221,7 @@ async function walk(
     if (!key) continue
 
     try {
-      return { answer: await complete(turns, step, key, search, effort, ceiling), step }
+      return { response: await open(turns, step, key, search, effort, ceiling, signal), step }
     } catch (error) {
       last = error
     }
@@ -1203,41 +1325,128 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   const effort = effortOf(body.effort)
+  const ceiling = module?.material ? MAX_MATERIAL_TOKENS : MAX_TOKENS
 
-  let answer: Completion
+  /*
+   * Whether the reader watches this answer being written.
+   *
+   * The panel asks for a stream; the memory layer does not. A digest is written
+   * to a record nobody is looking at, so streaming it would buy nothing and
+   * cost the caller a parser.
+   *
+   * It is asked for rather than assumed for one more reason: an older client
+   * cached by a service worker is a real thing in this app — one has already
+   * cost a day of chasing a key that was set correctly all along. A client that
+   * does not ask still gets exactly the reply it was written against.
+   */
+  const live = body.stream === true
+
+  const clock = deadline(TIMEOUT_MS)
+
+  let opened: Response
   let served: Step
   try {
-    const walked = await walk(
-      turns,
-      models,
-      wants,
-      effort,
-      module?.material ? MAX_MATERIAL_TOKENS : MAX_TOKENS,
-    )
-    answer = walked.answer
+    const walked = await walk(turns, models, wants, effort, ceiling, clock.signal)
+    opened = walked.response
     served = walked.step
   } catch (error) {
-    // The upstream status is carried out, not flattened to 502. A busy free
-    // model and a misconfigured relay both used to arrive as the same sentence,
-    // which made a two-minute wait look identical to a broken deploy.
-    const reason = error instanceof Error ? error.message : 'the tutor could not be reached'
-    const status = error instanceof Upstream && error.status === 429 ? 429 : 502
-    return json({ error: reason }, status, origin)
+    clock.done()
+    return json({ error: reasonFrom(error) }, statusFrom(error), origin)
   }
 
-  return json(
-    {
-      text: answer.text,
-      model: answer.model,
-      // Which provider served it. The bubble label needs it to tell two rows
-      // apart that share a name — Gemma 4 31B sits on both Gemini and
-      // OpenRouter, and they are different rungs of the chain.
-      source: served.source,
-      ...(answer.reasoning ? { reasoning: answer.reasoning } : {}),
-      ...(answer.sources ? { sources: answer.sources } : {}),
-      ...(answer.usage ? { usage: answer.usage } : {}),
+  if (!live) {
+    try {
+      const answer = await drain(opened, served, wants, clock.touch)
+      return json(replyOf(answer, served), 200, origin)
+    } catch (error) {
+      return json({ error: reasonFrom(error) }, statusFrom(error), origin)
+    } finally {
+      clock.done()
+    }
+  }
+
+  /*
+   * The streaming reply: one JSON object per line.
+   *
+   * Not server-sent events, though that is what we receive. `EventSource` is
+   * the only thing SSE buys and it cannot POST, so this request could never use
+   * it — the body has to be read by hand either way. A line of JSON is less to
+   * parse and less to get wrong.
+   *
+   * `open` goes first and carries the model that actually answered, so the
+   * bubble can be labelled before a single word arrives. Everything after it is
+   * a delta, and `done` closes.
+   *
+   * A failure part-way through is a line like any other. By this point the
+   * status has been sent and cannot be changed, so an error that arrives after
+   * the first byte has to travel inside the stream. The reader keeps whatever
+   * words already landed, which is better than losing a half-written answer to
+   * a provider that gave up near the end.
+   */
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (line: unknown) =>
+        controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`))
+
+      send({ t: 'open', model: served.id, source: served.source })
+      try {
+        const answer = await drain(opened, served, wants, clock.touch, send)
+        // The assembled answer closes the stream. The client has every delta
+        // already, so this is the tidy copy — trimmed, capped, and the same
+        // object a client that never asked to stream would have received.
+        send({ t: 'done', reply: replyOf(answer, served) })
+      } catch (error) {
+        send({ t: 'error', message: reasonFrom(error), status: statusFrom(error) })
+      } finally {
+        clock.done()
+        controller.close()
+      }
     },
-    200,
-    origin,
-  )
+    cancel() {
+      // The reader closed the panel or turned the page. Stop paying for words
+      // nobody will read.
+      clock.done()
+      void opened.body?.cancel()
+    },
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'content-type': 'application/x-ndjson; charset=utf-8',
+      // Proxies that buffer would undo the whole point of this.
+      'cache-control': 'no-cache, no-transform',
+      ...corsHeaders(origin),
+    },
+  })
+}
+
+/** The reply body, identical whether it was streamed or handed over whole. */
+function replyOf(answer: Completion, served: Step) {
+  return {
+    text: answer.text,
+    model: answer.model,
+    // Which provider served it. The bubble label needs it to tell two rows
+    // apart that share a name — Gemma 4 31B sits on both Gemini and
+    // OpenRouter, and they are different rungs of the chain.
+    source: served.source,
+    ...(answer.reasoning ? { reasoning: answer.reasoning } : {}),
+    ...(answer.sources ? { sources: answer.sources } : {}),
+    ...(answer.usage ? { usage: answer.usage } : {}),
+  }
+}
+
+/** The provider's own words, never flattened to "something went wrong". */
+function reasonFrom(error: unknown): string {
+  return error instanceof Error ? error.message : 'the tutor could not be reached'
+}
+
+/*
+ * The upstream status is carried out, not flattened to 502. A busy free model
+ * and a misconfigured relay both used to arrive as the same sentence, which
+ * made a two-minute wait look identical to a broken deploy.
+ */
+function statusFrom(error: unknown): number {
+  return error instanceof Upstream && error.status === 429 ? 429 : 502
 }

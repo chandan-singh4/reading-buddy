@@ -11,7 +11,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { Markdown } from './markdown.tsx'
+import { Markdown, whileWriting } from './markdown.tsx'
 
 afterEach(cleanup)
 
@@ -234,6 +234,80 @@ describe('a table, stacked', () => {
     const { container } = render(<Markdown text={`Here it is:
 | a | one |`} />)
     expect(container.querySelector('p')?.textContent).toBe('Here it is:')
+  })
+})
+
+describe('markdown that is still being typed', () => {
+  // A streamed answer is parsed after every delta. Half of a bold phrase is
+  // `**Plain-language meanin` — an opening mark with no partner yet — and drawn
+  // as it stands the reader watches the asterisks sit there and then vanish.
+
+  it('closes a bold mark that has not been closed yet', () => {
+    const out = draw(whileWriting('The **mind talks'))
+    expect(out.querySelector('strong')?.textContent).toBe('mind talks')
+    expect(out.textContent).not.toContain('*')
+  })
+
+  it('leaves a finished bold mark exactly as it was', () => {
+    // The point of closing rather than hiding: when the model's own closing
+    // mark lands, nothing on screen changes.
+    expect(whileWriting('The **mind** talks')).toBe('The **mind** talks')
+  })
+
+  it('drops a mark that is still arriving', () => {
+    // `*` on its way to becoming `**`. There is nothing to close yet. The
+    // space before it stays, or the next word would jump left and back.
+    expect(whileWriting('The **mind** talks *')).toBe('The **mind** talks ')
+  })
+
+  it('closes an unfinished code span', () => {
+    const out = draw(whileWriting('Call `useMemo'))
+    expect(out.querySelector('code')?.textContent).toBe('useMemo')
+  })
+
+  it('closes an open code fence, so the rest is not swallowed', () => {
+    const out = draw(whileWriting('Here:\n```\nconst a = 1'))
+    expect(out.querySelector('pre code')?.textContent).toBe('const a = 1')
+  })
+
+  it('does not pair asterisks inside a code block', () => {
+    // Inside a fence they are characters, not marks. Closing the fence is the
+    // whole job.
+    expect(whileWriting('```\na ** b')).toBe('```\na ** b\n```')
+  })
+
+  it('holds a table back until it can be drawn as a table', () => {
+    // The header row lands a whole second before the divider under it. Drawn
+    // as it stands, the reader watches a line of raw pipes and then sees it
+    // become a table.
+    const out = draw(whileWriting(['Here it is:', '| Cosmic element | Body part |'].join('\n')))
+    expect(out.textContent).not.toContain('|')
+    expect(out.textContent).toContain('Here it is:')
+  })
+
+  it('draws the rows once the divider has arrived', () => {
+    const table = ['| Element | Part |', '| --- | --- |', '| Mount Meru | Spine |'].join('\n')
+    const out = draw(whileWriting(table))
+    expect(out.textContent).toContain('Mount Meru')
+    expect(out.textContent).not.toContain('|')
+  })
+
+  it('waits for a row to finish before drawing it', () => {
+    // Half a row would draw with its last cell missing and then jump.
+    const table = ['| Element | Part |', '| --- | --- |', '| Mount Meru | The spinal'].join('\n')
+    const out = draw(whileWriting(table))
+    expect(out.textContent).not.toContain('Mount Meru')
+  })
+
+  it('leaves a table alone in the middle of an answer', () => {
+    // Only the block at the very end is still arriving. One already followed
+    // by prose is finished.
+    const table = ['| Element | Part |', '| --- | --- |', '| Meru | Spine |', '', 'And so on.'].join('\n')
+    expect(whileWriting(table)).toBe(table)
+  })
+
+  it('leaves ordinary prose untouched', () => {
+    expect(whileWriting('Nothing to close here.')).toBe('Nothing to close here.')
   })
 })
 

@@ -3,15 +3,31 @@
 > What is in here: the one task in flight, and the exact files to open for it.
 > Read it at startup, before anything else.
 
-## Start here — 2026-08-23
+## Start here — 2026-08-23 (streaming thread)
 
-**Nothing is mid-edit.** The build is green: 1739 tests across 100 files. The
-last commit is `e7c1b23` and `main` is pushed.
+**Nothing is mid-edit.** The build is green: 1795 tests across 100 files.
 
-**One thing waits on the reader.** They must tap "Refresh from Google Books" on
-the phone and report what happens. The server is proved good, so the button
-should now work. If it fails, the new code names the real cause. Ask for the
-exact words before you change any code.
+### What this thread did
+
+1. **Copied the new prompts in.** `api/tutor.ts` now holds the text of
+   `design-inspiration/reading-buddy-prompts.md` word for word. The explain-back
+   probe is gone as a separate ask; the base prompt now carries rule #10.
+2. **Raised the token ceilings.** `MAX_TOKENS` 1200 → 3000, and
+   `MAX_MATERIAL_TOKENS` → 8000. Reasoning tokens share that budget, which is
+   why long answers were cut off in the middle.
+3. **Stacked the tables.** A markdown table no longer draws as raw pipes on a
+   phone. It draws as a list of pairs: the row's first cell in bold, the other
+   cells indented under it and labelled by the header.
+4. **Made the answer stream.** The relay writes NDJSON (one JSON object per
+   line) when the client asks for it. `askTutor` takes an `onProgress` watcher.
+   The Study Lamp draws the answer as it is written.
+5. **Fixed where the thread sits.** While the answer arrives, the newest words
+   stay in view. When it finishes, the view jumps to the answer's **first
+   line**, so a long answer is not left scrolled to its end.
+
+Verified in a real browser at 375px, not only in tests: the words appear
+progressively, no half-typed marks or raw table pipes flash, and on completion
+the answer's first line lands exactly at the top of the thread.
 
 ### The next task — WP-25, something that writes a note
 

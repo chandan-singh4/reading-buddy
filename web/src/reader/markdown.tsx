@@ -162,6 +162,64 @@ export function inlineMarkdown(text: string, keyFrom = 0): ReactNode[] {
   return out
 }
 
+/**
+ * Markdown that is still being typed, made safe to draw.
+ *
+ * A streamed answer is parsed after every delta, and for most of a bold phrase
+ * the text reads `**Plain-language meanin` — an opening mark whose partner has
+ * not arrived. Drawn as it stands, the reader watches two asterisks sit there
+ * through a whole phrase and then vanish. Every emphasis in the answer flashes
+ * its own punctuation on the way past.
+ *
+ * So the marks are closed rather than shown. An unfinished `**` is closed here,
+ * the phrase draws bold from its first letter, and when the model's own closing
+ * mark lands nothing changes on screen. The reader never sees the scaffolding.
+ *
+ * Closing beats hiding: hiding the opening mark would draw the words plain and
+ * then re-draw them bold, which is the same flash wearing different clothes.
+ *
+ * Two things are handled beyond that. A trailing run of mark characters is the
+ * front half of a mark still arriving — `*`, about to become `**` — and is
+ * dropped, because there is nothing yet to close. And an unclosed code fence is
+ * closed, since without it the rest of the answer draws as code.
+ *
+ * This is for text in flight only. A finished answer is drawn as it came.
+ */
+export function whileWriting(text: string): string {
+  // A run of mark characters at the very end is a mark mid-flight, not a mark.
+  let out = text.replace(/[*_~`$]+$/, '')
+
+  // A table cannot be recognised until the divider under its header lands, so
+  // for a second the reader watches `| Cosmic element | Symbolic body part |`
+  // sit there as literal pipes and then turn into a table. Hold the unfinished
+  // block back instead: the table appears when it can be drawn as one. A
+  // half-arrived row of a table that *is* recognisable is held back too, so a
+  // row never draws with its last cell missing and then jumps.
+  const lines = out.split('\n')
+  let from = lines.length
+  while (from > 0 && /^\s{0,3}\|/.test(lines[from - 1]!)) from--
+  if (from < lines.length) {
+    const block = lines.slice(from)
+    const whole = block.some((line) => /^\s{0,3}\|[\s:|-]+\|\s*$/.test(line))
+      ? block.slice(0, /\|\s*$/.test(block[block.length - 1]!) ? block.length : -1)
+      : []
+    out = [...lines.slice(0, from), ...whole].join('\n')
+  }
+
+  // An open fence swallows everything after it, so it is closed first — and
+  // nothing inside a code block wants its asterisks paired.
+  const fences = out.match(/^\s{0,3}(```|~~~)/gm)
+  if (fences && fences.length % 2 === 1) return `${out}\n${fences[0]!.trim()}`
+
+  // Longest mark first: `**` has to be counted before the `*` inside it.
+  for (const mark of ['**', '~~', '`']) {
+    const found = out.split(mark).length - 1
+    if (found % 2 === 1) out += mark
+  }
+
+  return out
+}
+
 const HEADING = /^(#{1,6})\s+(.*)$/
 const BULLET = /^\s{0,3}[-*+]\s+(.*)$/
 const NUMBERED = /^\s{0,3}(\d{1,3})[.)]\s+(.*)$/

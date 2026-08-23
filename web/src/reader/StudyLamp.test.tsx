@@ -140,11 +140,58 @@ function relay(...answers: Response[]) {
 }
 
 const refused = () => new Response(JSON.stringify({ error: 'all busy' }), { status: 502 })
-const answered = () =>
-  new Response(
-    JSON.stringify({ text: 'Jung meant the unconscious.', model: 'google/gemma-4-31b-it:free' }),
-    { status: 200 },
-  )
+
+/** The relay's streaming reply: one JSON object per line. */
+function streamed(lines: unknown[]): Response {
+  return new Response(lines.map((line) => `${JSON.stringify(line)}
+`).join(''), {
+    status: 200,
+    headers: { 'content-type': 'application/x-ndjson' },
+  })
+}
+
+/**
+ * An answer, written one word at a time.
+ *
+ * Split into pieces on purpose. The panel now assembles the words itself, so a
+ * stub that hands over the whole answer at once would test a path the app no
+ * longer takes.
+ */
+const answered = (
+  text = 'Jung meant the unconscious.',
+  model = 'google/gemma-4-31b-it:free',
+) =>
+  streamed([
+    { t: 'open', model, source: 'openrouter' },
+    ...text.split(' ').map((word, at) => ({ t: 'text', d: at === 0 ? word : ` ${word}` })),
+    { t: 'done', reply: { text, model, source: 'openrouter' } },
+  ])
+
+/**
+ * A reply the test writes into, one line at a time.
+ *
+ * `streamed` hands everything over at once, which is fine for checking what
+ * the panel ends up with and useless for checking what it draws *during*. This
+ * one stays open until the test closes it, so the half-written state can be
+ * looked at.
+ */
+function held() {
+  let push!: (line: unknown) => void
+  let close!: () => void
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const encoder = new TextEncoder()
+      push = (line) => controller.enqueue(encoder.encode(`${JSON.stringify(line)}
+`))
+      close = () => controller.close()
+    },
+  })
+  const response = new Response(body, {
+    status: 200,
+    headers: { 'content-type': 'application/x-ndjson' },
+  })
+  return { response, push, close }
+}
 
 async function ask(label = 'Explain simply') {
   fireEvent.click(await screen.findByRole('button', { name: label }))
@@ -189,6 +236,95 @@ describe('a failure the reader can see', () => {
     await screen.findByText(/no model would answer/i)
     await waitFor(() => expect(saved.length).toBe(1))
     expect(saved[0]!.map((m) => m.role)).toEqual(['you'])
+  })
+})
+
+describe('an answer arriving', () => {
+  it('draws the words before the answer is finished', async () => {
+    /*
+     * The stub hands over every line at once, so this cannot time the arrival.
+     * What it can hold is the part that matters: the panel builds the answer
+     * out of the pieces rather than waiting for one finished body. A panel
+     * that ignored the deltas and read only the `done` line would pass every
+     * other test in this file and fail this one.
+     */
+    relay(
+      streamed([
+        { t: 'open', model: 'google/gemma-4-31b-it:free', source: 'openrouter' },
+        { t: 'text', d: 'Jung meant ' },
+        { t: 'text', d: 'the unconscious.' },
+        // No `done` line: the stream stopped early. The words still stand.
+      ]),
+    )
+    lamp([])
+    await ask()
+
+    await screen.findByText('Jung meant the unconscious.')
+  })
+
+  it('reads a finished answer from its first line, not its last', async () => {
+    /*
+     * The reader's own request. A long answer used to end with the view at the
+     * bottom of it, so every single time they had to scroll back by hand to
+     * start reading.
+     *
+     * jsdom has no layout, so the scroll cannot be measured — every element is
+     * zero high. What is checked instead is the hook the effect scrolls to: the
+     * finished answer carries `data-answer`, and without it the effect has
+     * nothing to find and silently falls back to the bottom.
+     */
+    relay(answered('A long explanation of the unconscious.'))
+    lamp([])
+    await ask()
+
+    const answer = await screen.findByText('A long explanation of the unconscious.')
+    expect(answer.closest('[data-answer]')).not.toBeNull()
+  })
+
+  it('shows the thinking while there are no words yet', async () => {
+    // A reasoning model can run for ten seconds before it writes anything, and
+    // ten seconds of pulsing dots reads as a hang.
+    const stream = held()
+    relay(stream.response)
+    lamp([])
+    await ask()
+
+    stream.push({ t: 'open', model: 'google/gemma-4-31b-it:free', source: 'openrouter' })
+    stream.push({ t: 'think', d: 'First I should work out what Jung meant.' })
+
+    await screen.findByText(/what Jung meant/)
+    stream.close()
+  })
+
+  it('puts the thinking away as soon as the first word lands', async () => {
+    const stream = held()
+    relay(stream.response)
+    lamp([])
+    await ask()
+
+    stream.push({ t: 'think', d: 'First I should work out what Jung meant.' })
+    await screen.findByText(/what Jung meant/)
+
+    stream.push({ t: 'text', d: 'Jung meant the unconscious.' })
+    await screen.findByText('Jung meant the unconscious.')
+    expect(screen.queryByText(/what Jung meant/)).toBeNull()
+    stream.close()
+  })
+
+  it('does not offer to copy an answer that is still arriving', async () => {
+    // There is nothing finished to copy or ask again yet. The reader's own
+    // question keeps its actions, so this counts rather than asserting none.
+    const stream = held()
+    relay(stream.response)
+    lamp([])
+    await ask()
+
+    stream.push({ t: 'text', d: 'Half an answer' })
+    await screen.findByText('Half an answer')
+
+    // One copy button, and it belongs to the question above.
+    expect(screen.getAllByRole('button', { name: /copy/i })).toHaveLength(1)
+    stream.close()
   })
 })
 

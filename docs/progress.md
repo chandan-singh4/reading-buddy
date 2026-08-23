@@ -15,6 +15,23 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **The answer now streams, and it opens at its first line** (2026-08-23). The
+  relay writes one JSON object per line while the model writes, so the reader
+  watches the answer arrive instead of watching dots. Half-typed bold marks and
+  a table's raw pipes are held back, so nothing flashes on the way past. When
+  the answer finishes, the thread jumps to its **first line** — a long answer
+  used to leave the reader at the bottom of something they had not read.
+  Failover stays invisible: a provider refuses with an HTTP status before it
+  sends any bytes, so the relay can still walk down its list unseen.
+- **The prompts are the reader's own text now** (2026-08-23). `api/tutor.ts`
+  carries `design-inspiration/reading-buddy-prompts.md` word for word. The
+  explain-back probe no longer runs as a second ask; the base prompt carries the
+  rule. **Answers were also being cut off** — `MAX_TOKENS` was 1200 and
+  reasoning tokens share that budget. It is 3000 now, and the material ceiling
+  is 8000.
+- **Tables read on a phone** (2026-08-23). A markdown table draws as a list of
+  pairs: the row's first cell in bold, the rest indented under it and labelled
+  by the header. Three columns no longer collapse into one unreadable line.
 - **Four changes to the tutor panel and the book page** (2026-08-23). The
   conversation panel now reads markdown, so bold, lists and formulas draw as
   themselves and old answers redraw formatted. Each exchange shows its own

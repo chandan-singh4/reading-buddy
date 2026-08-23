@@ -304,3 +304,116 @@ describe('what the relay is told about the passage', () => {
     expect('context' in sent).toBe(false)
   })
 })
+
+describe('watching the answer being written', () => {
+  /*
+   * The relay answers in lines of JSON when the caller hands in a watcher.
+   * What is guarded here is that the two halves cannot drift: the pieces the
+   * watcher sees must add up to the reply the promise resolves to, and a
+   * caller that hands in no watcher must still get the plain single reply the
+   * memory layer was written against.
+   */
+
+  function streamed(lines: unknown[]): Response {
+    return new Response(lines.map((line) => `${JSON.stringify(line)}\n`).join(''), {
+      status: 200,
+      headers: { 'content-type': 'application/x-ndjson' },
+    })
+  }
+
+  const written = [
+    { t: 'open', model: 'a/one', source: 'groq' },
+    { t: 'think', d: 'Working it out.' },
+    { t: 'text', d: 'Jung meant ' },
+    { t: 'text', d: 'the unconscious.' },
+    { t: 'usage', v: { input: 10, output: 5, total: 15 } },
+    {
+      t: 'done',
+      reply: {
+        text: 'Jung meant the unconscious.',
+        model: 'a/one',
+        source: 'groq',
+        usage: { input: 10, output: 5, total: 15 },
+      },
+    },
+  ]
+
+  it('reports the answer growing, one piece at a time', async () => {
+    answering(streamed(written))
+    const seen: string[] = []
+
+    await askTutor(request, (progress) => seen.push(progress.text))
+
+    // Each report is the whole answer so far, never the newest scrap — a
+    // caller keeping its own running total is a second copy of the truth.
+    expect(seen).toContain('Jung meant ')
+    expect(seen).toContain('Jung meant the unconscious.')
+  })
+
+  it('names the model before a single word arrives', async () => {
+    // The bubble is labelled from the first report, so the name does not
+    // appear late and shift the text under the reader.
+    answering(streamed(written))
+    const first: string[] = []
+
+    await askTutor(request, (progress) => {
+      if (progress.model) first.push(`${progress.model}:${progress.text}`)
+    })
+
+    expect(first[0]).toBe('a/one:')
+  })
+
+  it('resolves to the same reply the pieces added up to', async () => {
+    answering(streamed(written))
+    let last = ''
+
+    const reply = await askTutor(request, (progress) => {
+      last = progress.text
+    })
+
+    expect(reply.text).toBe(last)
+    expect(reply.usage?.total).toBe(15)
+  })
+
+  it('asks for a stream only when someone is watching', async () => {
+    const fetch = answering(streamed(written))
+    await askTutor(request, () => {})
+    expect(JSON.parse(String(fetch.mock.calls[0]![1]!.body)).stream).toBe(true)
+
+    // The memory layer writes digests nobody is looking at. It must keep the
+    // single-reply path it was built against.
+    answering(relay({ text: 'A digest.', model: 'a' }))
+    const plain = await askTutor(request)
+    expect(plain.text).toBe('A digest.')
+  })
+
+  it('keeps the words when the stream stops before it finished', async () => {
+    // A half-written answer the reader watched appear is worth more than a
+    // canned line replacing it. Losing it would look like the app throwing
+    // work away in front of them.
+    answering(streamed(written.slice(0, 4)))
+
+    const reply = await askTutor(request, () => {})
+
+    expect(reply.text).toBe('Jung meant the unconscious.')
+    expect(reply.failed).toBeUndefined()
+  })
+
+  it('says so plainly when the stream carried a failure and no words', async () => {
+    answering(streamed([{ t: 'open', model: 'a/one' }, { t: 'error', message: 'busy', status: 429 }]))
+
+    const reply = await askTutor(request, () => {})
+
+    expect(reply.failed).toBe(true)
+    expect(reply.text).toMatch(/busy/i)
+  })
+
+  it('ignores a kind it does not know', async () => {
+    // A relay that learns to say something new must not break an old client.
+    answering(streamed([{ t: 'weather', v: 'sunny' }, ...written]))
+
+    const reply = await askTutor(request, () => {})
+
+    expect(reply.text).toBe('Jung meant the unconscious.')
+  })
+})

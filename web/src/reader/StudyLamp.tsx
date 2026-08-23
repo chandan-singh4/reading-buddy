@@ -68,12 +68,13 @@ import {
   type PassageAnchor,
   type TutorIntent,
   type TutorMessage,
+  type TutorProgress,
   type TutorUsage,
 } from './tutor.ts'
 import type { PassageContext } from './context.ts'
 import { ModelSheet } from './ModelSheet.tsx'
 import { EffortSheet } from './EffortSheet.tsx'
-import { Markdown } from './markdown.tsx'
+import { Markdown, whileWriting } from './markdown.tsx'
 import {
   DEFAULT_EFFORT,
   effortLabel,
@@ -262,6 +263,15 @@ export function StudyLamp({
   const [searching, setSearching] = useState(false)
   /** The last attempt's failure, if it failed. One at a time, never stored. */
   const [failure, setFailure] = useState<string | undefined>(undefined)
+  /*
+   * The answer being written, before it becomes a message.
+   *
+   * Kept out of `messages` on purpose. A half-written answer must not be
+   * saved, must not be re-asked, and must not offer a copy button for words
+   * that are still arriving — and every one of those follows for free from it
+   * not being in the thread yet.
+   */
+  const [live, setLive] = useState<TutorProgress | undefined>(undefined)
   /** Which message just went to the clipboard, so the button can say so. */
   const [copied, setCopied] = useState<number | undefined>(undefined)
   /** Which chip started it — sent along with every later message. */
@@ -269,6 +279,9 @@ export function StudyLamp({
 
   const overlay = useRef<HTMLDivElement | null>(null)
   const flow = useRef<HTMLDivElement | null>(null)
+  /* The answer to reveal from its first line once it is finished. See the
+     layout effect below for why this is a ref and not state. */
+  const reveal = useRef<number | undefined>(undefined)
   const input = useRef<HTMLInputElement | null>(null)
   /* What is in the box right now, for the recogniser — which starts once and
      must not be rebuilt every keystroke to see it. */
@@ -342,12 +355,44 @@ export function StudyLamp({
     [onClose],
   )
 
-  /* The newest words, always in view. Layout effect so the reader never sees
-     the scroll happen. */
+  /*
+   * Where the thread sits after something changes.
+   *
+   * Two rules, and the second is the interesting one.
+   *
+   * While an answer is arriving, the newest words stay in view. That is the
+   * ordinary chat behaviour and it is what makes a stream feel live.
+   *
+   * When the answer finishes, the view jumps to **its first line** instead.
+   * Following the words leaves the reader at the end of something they have
+   * not read, and a long answer then has to be scrolled back by hand every
+   * single time. The scroll is clamped by the browser, so a short answer that
+   * cannot reach the top simply stays where it was — the jump only happens
+   * when there is something to jump over.
+   *
+   * A layout effect, so the reader never sees the scroll happen — only the
+   * result. A ref rather than state because this must fire once, on the render
+   * that added the answer, and clear itself; as state it would re-scroll on
+   * every later render and pin the reader in place.
+   */
   useLayoutEffect(() => {
     const node = flow.current
-    if (node) node.scrollTop = node.scrollHeight
-  }, [messages, pending])
+    if (!node) return
+
+    const ts = reveal.current
+    if (ts !== undefined) {
+      reveal.current = undefined
+      const answer = node.querySelector(`[data-answer="${ts}"]`)
+      if (answer) {
+        // Measured rather than read off `offsetTop`, which is relative to
+        // whichever ancestor happens to be positioned.
+        node.scrollTop += answer.getBoundingClientRect().top - node.getBoundingClientRect().top
+        return
+      }
+    }
+
+    node.scrollTop = node.scrollHeight
+  }, [messages, pending, live])
 
   /*
    * Speaking instead of typing.
@@ -386,6 +431,7 @@ export function StudyLamp({
       setMessages([...history, yours])
       setDraft('')
       setFailure(undefined)
+      setLive(undefined)
       setPending(true)
       // The globe is spent on this question. See the state above.
       setSearching(false)
@@ -403,7 +449,12 @@ export function StudyLamp({
         ...(columns.length > 0 ? { models: stepsFrom(columns, pick) } : {}),
         effort,
         ...(searching ? { search: true } : {}),
-      }).then((reply) => {
+      },
+        // Every delta, as it lands. `setLive` alone draws the answer growing;
+        // nothing is saved and nothing joins the thread until it is finished.
+        setLive,
+      ).then((reply) => {
+        setLive(undefined)
         if (reply.failed) {
           // The question stays — the reader can see what went unanswered and
           // retry it. The failure itself goes beside the thread, not into it.
@@ -429,6 +480,9 @@ export function StudyLamp({
           ts: Date.now(),
         }
         const whole = [...history, yours, answer]
+        // Read this one from its first line, not from wherever the writing
+        // ended up. The layout effect above does it and clears itself.
+        reveal.current = answer.ts
         setMessages(whole)
         setPending(false)
         // The first exchange pins the passage on its own: the thread has
@@ -595,7 +649,7 @@ export function StudyLamp({
               </div>
             </div>
           ) : (
-            <div key={message.ts}>
+            <div key={message.ts} data-answer={message.ts}>
               {/* Only when the message itself recorded a model. Threads saved
                   before stage B have none, and a caption naming today's model
                   over yesterday's words would be a plain lie. */}
@@ -707,7 +761,29 @@ export function StudyLamp({
           </p>
         )}
 
-        {pending && (
+        {/* The answer as it is written. The same furniture as a finished
+            one — byline, folded thinking, markdown — and none of the actions,
+            because there is nothing yet to copy or ask again. */}
+        {live && (live.text || live.reasoning) && (
+          <div>
+            {live.model && (
+              <p className={styles.byline}>
+                {models.find((row) => row.id === live.model)?.name ?? modelLabel(live.model)}
+              </p>
+            )}
+            {/* Only until the words start. A model may think for ten seconds
+                before it writes anything, and watching the thinking arrive is
+                the difference between a slow answer and a frozen app. */}
+            {!live.text && live.reasoning && (
+              <p className={styles.thinkingAloud}>{live.reasoning.slice(-160)}</p>
+            )}
+            {live.text && (
+              <Markdown className={styles.slip} text={whileWriting(live.text)} />
+            )}
+          </div>
+        )}
+
+        {pending && !live?.text && !live?.reasoning && (
           <div className={styles.slip} aria-label="Claude is thinking">
             <span className={styles.thinking} aria-hidden="true">
               <i />

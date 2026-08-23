@@ -321,10 +321,36 @@ function sourcesOf(value: unknown): TutorSource[] {
 }
 
 /**
- * One question to the tutor. Resolves to the reply; never rejects — the lamp
- * always gets something it can print.
+ * What has arrived so far, handed over as the answer is written.
+ *
+ * `text` and `reasoning` are the whole of each so far, not the newest scrap.
+ * The caller draws what it is given, and a caller that has to keep its own
+ * running total is a caller with a second copy of the truth to get wrong.
  */
-export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply> {
+export interface TutorProgress {
+  text: string
+  reasoning?: string
+  model?: string
+  sources?: TutorSource[]
+}
+
+/**
+ * Ask the tutor, and watch the answer being written when a watcher is given.
+ *
+ * `onProgress` is the whole of the streaming switch. Hand one in and the relay
+ * is asked to stream; leave it out and the exchange is exactly what it was —
+ * one request, one JSON reply. That is what keeps the memory layer, which
+ * writes digests nobody is watching, on the path it was built against.
+ *
+ * Either way the promise resolves to the same finished `AskTutorReply`. A
+ * caller that streams still gets the tidy copy at the end, so nothing
+ * downstream — saving the thread, counting the tokens, labelling the bubble —
+ * has to know which path it came by.
+ */
+export async function askTutor(
+  request: AskTutorRequest,
+  onProgress?: (progress: TutorProgress) => void,
+): Promise<AskTutorReply> {
   try {
     const token = await accessToken()
     const response = await fetch(TUTOR_URL, {
@@ -345,35 +371,146 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
         ...(request.effort ? { effort: request.effort } : {}),
         ...(request.search ? { search: true } : {}),
         ...(request.models && request.models.length > 0 ? { models: request.models } : {}),
+        ...(onProgress ? { stream: true } : {}),
       }),
     })
     if (!response.ok) return cannedReply(reasonFor(response.status))
 
-    const data = (await response.json()) as {
-      text?: unknown
-      isProbe?: unknown
-      model?: unknown
-      reasoning?: unknown
-      usage?: unknown
-      sources?: unknown
-    }
-    if (typeof data.text !== 'string' || data.text.length === 0) {
-      return cannedReply(reasonFor(0))
-    }
+    if (onProgress && response.body) return await follow(response.body, onProgress)
 
-    return {
-      text: data.text,
-      ...(data.isProbe === true ? { isProbe: true } : {}),
-      ...(typeof data.model === 'string' ? { model: data.model } : {}),
-      ...(typeof data.reasoning === 'string' && data.reasoning.length > 0
-        ? { reasoning: data.reasoning }
-        : {}),
-      ...(usageOf(data.usage) ? { usage: usageOf(data.usage)! } : {}),
-      ...(sourcesOf(data.sources).length > 0 ? { sources: sourcesOf(data.sources) } : {}),
-    }
+    const data = (await response.json()) as Wire
+    return replyOf(data) ?? cannedReply(reasonFor(0))
   } catch {
     // `fetch` rejects with a bare "Failed to fetch" for every network-level
     // problem, which on a phone means one thing far more often than not.
     return cannedReply('You’re offline, so the tutor can’t answer yet. Your question stays here — ask again when you have a signal.')
   }
+}
+
+/** The reply as the relay words it, whether streamed or handed over whole. */
+interface Wire {
+  text?: unknown
+  isProbe?: unknown
+  model?: unknown
+  reasoning?: unknown
+  usage?: unknown
+  sources?: unknown
+}
+
+/** One reply, read out of whatever the relay sent. Undefined if it said nothing. */
+function replyOf(data: Wire): AskTutorReply | undefined {
+  if (typeof data.text !== 'string' || data.text.length === 0) return undefined
+  return {
+    text: data.text,
+    ...(data.isProbe === true ? { isProbe: true } : {}),
+    ...(typeof data.model === 'string' ? { model: data.model } : {}),
+    ...(typeof data.reasoning === 'string' && data.reasoning.length > 0
+      ? { reasoning: data.reasoning }
+      : {}),
+    ...(usageOf(data.usage) ? { usage: usageOf(data.usage)! } : {}),
+    ...(sourcesOf(data.sources).length > 0 ? { sources: sourcesOf(data.sources) } : {}),
+  }
+}
+
+/**
+ * Read the relay's stream to the end, reporting as it goes.
+ *
+ * One JSON object per line. The kinds are `open` (the model that answered),
+ * `think` and `text` (deltas), `sources`, `usage`, `error`, and `done` (the
+ * finished reply). An unknown kind is ignored rather than treated as a fault,
+ * so a relay that learns to say something new does not break an old client.
+ *
+ * A line may arrive split across two network reads, so the tail of the buffer
+ * is held back until a newline finishes it.
+ */
+async function follow(
+  body: ReadableStream<Uint8Array>,
+  onProgress: (progress: TutorProgress) => void,
+): Promise<AskTutorReply> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let text = ''
+  let reasoning = ''
+  let model: string | undefined
+  let sources: TutorSource[] | undefined
+  let finished: AskTutorReply | undefined
+  let failure: string | undefined
+
+  const say = () =>
+    onProgress({
+      text,
+      ...(reasoning ? { reasoning } : {}),
+      ...(model ? { model } : {}),
+      ...(sources ? { sources } : {}),
+    })
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let piece: { t?: unknown; d?: unknown; v?: unknown; model?: unknown; reply?: unknown; message?: unknown; status?: unknown }
+      try {
+        piece = JSON.parse(line)
+      } catch {
+        continue
+      }
+
+      switch (piece.t) {
+        case 'open':
+          if (typeof piece.model === 'string') model = piece.model
+          say()
+          break
+        case 'think':
+          if (typeof piece.d === 'string') reasoning += piece.d
+          say()
+          break
+        case 'text':
+          if (typeof piece.d === 'string') text += piece.d
+          say()
+          break
+        case 'sources': {
+          const found = sourcesOf(piece.v)
+          if (found.length > 0) sources = found
+          say()
+          break
+        }
+        case 'done':
+          finished = replyOf((piece.reply ?? {}) as Wire)
+          break
+        case 'error':
+          failure = typeof piece.status === 'number' ? reasonFor(piece.status) : reasonFor(0)
+          break
+        default:
+          break
+      }
+    }
+  }
+
+  if (finished) return finished
+
+  /*
+   * The stream ended without a finished reply.
+   *
+   * If words had already arrived, they are kept: a half-written answer the
+   * reader watched appear is worth more than a canned line replacing it, and
+   * throwing it away would look like the app losing work in front of them. The
+   * counts and the tidy trim are what is lost, which nobody will miss.
+   */
+  if (text.trim().length > 0) {
+    return {
+      text: text.trim(),
+      ...(reasoning.trim() ? { reasoning: reasoning.trim() } : {}),
+      ...(model ? { model } : {}),
+      ...(sources ? { sources } : {}),
+    }
+  }
+
+  return cannedReply(failure ?? reasonFor(0))
 }

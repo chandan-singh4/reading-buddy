@@ -756,3 +756,24 @@
   text-decoration: none;
   border-bottom: 1px solid rgba(147, 197, 253, 0.3);
 }
+
+/*
+ * The model thinking out loud, while it is still only thinking.
+ *
+ * A reasoning model can run for ten seconds before it writes a word, and three
+ * pulsing dots for ten seconds reads as a hang. This shows the tail of the
+ * working-out instead — deliberately the tail, and deliberately faint: it is
+ * proof of life, not something to read. It is replaced by the answer the
+ * moment the first real word lands.
+ */
+.thinkingAloud {
+  margin: 0 24px 6px 2px;
+  padding: 8px 12px;
+  border-left: 2px solid #3d3320;
+  color: #6f6552;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  opacity: 0.85;
+}
