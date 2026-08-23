@@ -132,6 +132,64 @@ describe('formulas', () => {
   })
 })
 
+describe('a table, stacked', () => {
+  // A model reaches for a table whenever the answer has a shape. On a phone a
+  // grid is unreadable, so each row is drawn as a small stacked entry. These
+  // tests hold the two ends of that: no pipes survive, and no cell is lost.
+
+  it('keeps every cell and drops every pipe', () => {
+    const out = draw('| **Meru** | The spine. | Body mirrors cosmos. |')
+    expect(out.textContent).toBe('MeruThe spine.Body mirrors cosmos.')
+    expect(out.textContent).not.toContain('|')
+  })
+
+  it('leads on the first cell, so a row reads as an entry with a heading', () => {
+    const out = draw('| **Meru** | The spine. |')
+    expect(out.querySelector('[class*="lead"]')?.textContent).toBe('Meru')
+  })
+
+  it('keeps the emphasis the model put inside a cell', () => {
+    const out = draw('| **Meru** | the *spine* |')
+    expect(out.querySelector('strong')?.textContent).toBe('Meru')
+    expect(out.querySelector('em')?.textContent).toBe('spine')
+  })
+
+  it('draws one entry per row', () => {
+    const out = draw(`| a | one |
+| b | two |
+| c | three |`)
+    // `_row_` and not `_rows_`: the outer stack must not be counted as an entry.
+    expect(out.querySelectorAll('[class*="_row_"]').length).toBe(3)
+  })
+
+  it('drops the divider under a header rather than drawing it', () => {
+    const out = draw(`| Term | Meaning |
+| --- | --- |
+| Meru | The spine. |`)
+    expect(out.textContent).not.toContain('---')
+    expect(out.querySelectorAll('[class*="_row_"]').length).toBe(2)
+  })
+
+  it('takes rows with no header row at all', () => {
+    // What the models actually send: pipe rows and no `|---|` line. By the
+    // specification that is not a table, and printed raw it is a wall of pipes.
+    const out = draw(`| a | one |
+| b | two |`)
+    expect(out.querySelectorAll('[class*="_row_"]').length).toBe(2)
+  })
+
+  it('leaves a lone pipe inside a sentence alone', () => {
+    const out = draw('the pipe | character is not a table')
+    expect(out.textContent).toBe('the pipe | character is not a table')
+  })
+
+  it('ends the paragraph above it', () => {
+    const { container } = render(<Markdown text={`Here it is:
+| a | one |`} />)
+    expect(container.querySelector('p')?.textContent).toBe('Here it is:')
+  })
+})
+
 describe('what it refuses', () => {
   it('renders HTML in an answer as text, never as markup', () => {
     const out = draw('careful: <script>alert(1)</script> and <b>not bold</b>')

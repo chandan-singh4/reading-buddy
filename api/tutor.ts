@@ -211,8 +211,20 @@ function chain(): Step[] {
 /** How long an answer may take before we stop waiting. Free models are slow. */
 const TIMEOUT_MS = 60_000
 
-/** Ceilings, not targets. The prompts ask for short answers; these stop runaways. */
-const MAX_TOKENS = 1200
+/*
+ * Ceilings, not targets. The prompts set the real length; these stop runaways.
+ *
+ * Two numbers, because the two jobs are not the same size. An answer in the
+ * panel is a few paragraphs. A chapter roll-up is asked for 800-1,200 words,
+ * which is past 1,600 tokens before the model has thought about anything.
+ *
+ * Both leave room for the thinking as well as the answer. Reasoning tokens are
+ * counted against this same budget by every provider here, so a ceiling set to
+ * the length of the wanted answer is a ceiling that truncates it — which is
+ * exactly what a single 1,200 did: answers stopped mid-word at the cap.
+ */
+const MAX_TOKENS = 3000
+const MAX_MATERIAL_TOKENS = 8000
 const MAX_EXCERPT = 8000
 /**
  * The cap on material sent to be digested, in characters.
@@ -918,6 +930,7 @@ async function complete(
   key: string,
   search: boolean,
   effort: Effort,
+  ceiling: number,
 ): Promise<Completion> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
@@ -945,7 +958,7 @@ async function complete(
         // three providers is walked by `walk` below instead.
         model: step.id,
         messages: turns,
-        max_tokens: MAX_TOKENS,
+        max_tokens: ceiling,
         // Warmth is the point, but a wandering tutor is worse than a plain
         // one — this is the middle of the range, not the top.
         temperature: 0.7,
@@ -1077,6 +1090,7 @@ async function walk(
   steps: Step[],
   search: boolean,
   effort: Effort,
+  ceiling: number,
 ): Promise<{ answer: Completion; step: Step }> {
   let last: unknown
 
@@ -1085,7 +1099,7 @@ async function walk(
     if (!key) continue
 
     try {
-      return { answer: await complete(turns, step, key, search, effort), step }
+      return { answer: await complete(turns, step, key, search, effort, ceiling), step }
     } catch (error) {
       last = error
     }
@@ -1193,7 +1207,13 @@ export default async function handler(request: Request): Promise<Response> {
   let answer: Completion
   let served: Step
   try {
-    const walked = await walk(turns, models, wants, effort)
+    const walked = await walk(
+      turns,
+      models,
+      wants,
+      effort,
+      module?.material ? MAX_MATERIAL_TOKENS : MAX_TOKENS,
+    )
     answer = walked.answer
     served = walked.step
   } catch (error) {

@@ -19,8 +19,24 @@
  * ## What it renders
  *
  * Headings, paragraphs, bullet and numbered lists, blockquotes, fenced code,
- * horizontal rules, and — inside all of those — bold, italic, bold-italic,
- * strikethrough, inline code, and links.
+ * horizontal rules, tables, and — inside all of those — bold, italic,
+ * bold-italic, strikethrough, inline code, and links.
+ *
+ * ## Tables, which are not drawn as tables
+ *
+ * Models reach for a table whenever an answer has a shape — quote, meaning,
+ * why it matters. In a column 110 pixels wide that is unreadable, and a table
+ * that scrolls sideways inside a chat bubble is worse: the reader has to drag
+ * each row into view to finish a sentence.
+ *
+ * So each row is stacked instead. The first cell leads, in the emphasis the
+ * model gave it, and the rest follow underneath as ordinary lines. A hairline
+ * separates one row from the next. It reads as what it is — a short entry with
+ * a heading — and it never needs a sideways drag.
+ *
+ * Rows are taken as they come, header row or not. A model that opens a table
+ * with `|---|---|` and one that just starts writing pipe-separated rows both
+ * meant the same thing, and only the first is a table by the specification.
  *
  * ## Formulas
  *
@@ -146,6 +162,10 @@ const NUMBERED = /^\s{0,3}(\d{1,3})[.)]\s+(.*)$/
 const QUOTE = /^\s{0,3}>\s?(.*)$/
 const RULE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/
 const FENCE = /^\s{0,3}(```|~~~)(.*)$/
+/** A pipe-separated row. Both fences are required, so a lone `|` is prose. */
+const ROW = /^\s{0,3}\|(.*)\|\s*$/
+/** The `|---|:--:|` line under a header. Structure, never content. */
+const DIVIDER = /^\s{0,3}\|[\s:|-]+\|\s*$/
 const MATH_FENCE = /^\s{0,3}\$\$\s*$/
 
 /**
@@ -247,6 +267,41 @@ export function Markdown({ text, className }: { text: string; className?: string
       continue
     }
 
+    if (ROW.test(line)) {
+      const rows: string[][] = []
+      while (at < lines.length && ROW.test(lines[at] ?? '')) {
+        const here = lines[at] ?? ''
+        at += 1
+        // The divider carries no words. It is dropped rather than drawn.
+        if (DIVIDER.test(here)) continue
+        rows.push(
+          (ROW.exec(here)?.[1] ?? '')
+            .split('|')
+            .map((cell) => cell.trim())
+            .filter((cell) => cell.length > 0),
+        )
+      }
+      out.push(
+        <div key={next()} className={styles.rows}>
+          {rows
+            .filter((cells) => cells.length > 0)
+            .map((cells, index) => (
+              <div key={index} className={styles.row}>
+                {cells.map((cell, cellAt) => (
+                  <p
+                    key={cellAt}
+                    className={cellAt === 0 ? styles.lead : styles.paragraph}
+                  >
+                    {inlineMarkdown(cell)}
+                  </p>
+                ))}
+              </div>
+            ))}
+        </div>,
+      )
+      continue
+    }
+
     if (BULLET.test(line) || NUMBERED.test(line)) {
       const numbered = NUMBERED.test(line)
       const items: string[] = []
@@ -286,7 +341,8 @@ export function Markdown({ text, className }: { text: string; className?: string
         QUOTE.test(here) ||
         RULE.test(here) ||
         FENCE.test(here) ||
-        MATH_FENCE.test(here)
+        MATH_FENCE.test(here) ||
+        ROW.test(here)
       ) {
         break
       }

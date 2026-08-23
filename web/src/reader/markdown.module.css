@@ -115,3 +115,35 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* A table, stacked. See the note at the top of markdown.tsx for why a table on
+   a phone is drawn as a run of small entries rather than as a grid. */
+.rows {
+  margin: 0 0 0.7em;
+}
+
+.row {
+  padding: 0.55em 0 0.6em;
+  border-top: 1px solid rgba(195, 154, 94, 0.22);
+}
+
+.row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.row:last-child {
+  padding-bottom: 0;
+}
+
+/* The first cell. Whatever emphasis the model gave it survives; this only
+   makes it read as the entry's own heading. */
+.lead {
+  margin: 0 0 0.3em;
+  color: #f0e4c6;
+  line-height: 1.5;
+}
+
+.row .paragraph:last-child {
+  margin-bottom: 0;
+}
