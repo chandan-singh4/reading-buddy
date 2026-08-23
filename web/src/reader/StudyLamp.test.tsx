@@ -18,10 +18,13 @@ vi.mock('./models.ts', async () => {
   const real = await vi.importActual<typeof import('./models.ts')>('./models.ts')
   return {
     ...real,
+    /* Two providers, because one column would not exercise the thing the grid
+       exists for: the fallback going sideways rather than down. */
     loadModels: () =>
       Promise.resolve([
-        { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super', description: '', contextLength: 131_072 },
-        { id: 'google/gemma-4-31b-it:free', name: 'Gemma 4 31B', description: '', contextLength: 131_072 },
+        { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', description: '', contextLength: 1_048_576, source: 'gemini' },
+        { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super', description: '', contextLength: 131_072, source: 'openrouter' },
+        { id: 'google/gemma-4-31b-it:free', name: 'Gemma 4 31B', description: '', contextLength: 131_072, source: 'openrouter' },
       ]),
   }
 })
@@ -90,19 +93,31 @@ describe('the study lamp', () => {
     const picker = await screen.findByLabelText(/Which model answers/)
     // The preferred model, since nothing has been chosen before. It is on the
     // closed control, so the reader can read it without opening anything.
-    await waitFor(() => expect(picker.textContent).toContain('Nemotron 3 Super'))
-    expect(PREFERRED_MODEL).toBe('nvidia/nemotron-3-super-120b-a12b:free')
+    await waitFor(() => expect(picker.textContent).toContain('Gemini 3.7 Flash'))
+    expect(PREFERRED_MODEL).toBe('gemini-3.7-flash')
 
     fireEvent.click(picker)
     const sheet = await screen.findByRole('dialog', { name: 'Which model answers' })
-    const rows = [...sheet.querySelectorAll('button')].map((row) => row.textContent)
-    expect(rows).toEqual(['Nemotron 3 Super', 'Gemma 4 31B', 'Cancel'])
+
+    // One column per provider, in the order the chain walks them.
+    const heads = [...sheet.querySelectorAll('[class*="head"]')].map((head) => head.textContent)
+    expect(heads).toEqual(['Google', 'OpenRouter'])
+
+    // Every model is offered, and ranked inside its own column.
+    const rows = [...sheet.querySelectorAll('[class*="_row"]')].map(
+      (row) => row.getAttribute('aria-label'),
+    )
+    expect(rows).toEqual(['Gemini 3.7 Flash', 'Nemotron 3 Super', 'Gemma 4 31B'])
   })
 
   it('takes a choice from the sheet and closes it', async () => {
     lamp([])
     fireEvent.click(await screen.findByLabelText(/Which model answers/))
-    fireEvent.click(await screen.findByRole('button', { name: 'Gemma 4 31B' }))
+    // A press and a release, not a click: the grid reads a tap off the pointer
+    // so it can tell one from the long press that starts a drag.
+    const row = await screen.findByRole('button', { name: 'Gemma 4 31B' })
+    fireEvent.pointerDown(row)
+    fireEvent.pointerUp(window)
 
     expect(screen.queryByRole('dialog', { name: 'Which model answers' })).toBeNull()
     await waitFor(() =>

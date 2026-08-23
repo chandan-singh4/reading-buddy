@@ -14,24 +14,32 @@
  * *intent*, a short enum, and this file decides what that means. That is the
  * difference between a relay and an open proxy to a paid API.
  *
- * ## OpenRouter, not Anthropic directly
+ * ## Three providers, one request shape
  *
  * `api/README.md` used to promise an `ANTHROPIC_API_KEY` here. The build brief
- * changed that: everything goes through OpenRouter's OpenAI-compatible
- * endpoint, because that is what makes the model a *setting* rather than an
- * integration. Free models, and Claude, are the same code and a different
- * slug. Switching costs one line in an environment variable.
+ * changed that: everything goes through an OpenAI-compatible endpoint, because
+ * that is what makes the model a *setting* rather than an integration. Free
+ * models, and Claude, are the same code and a different slug.
  *
- * ## Failover is OpenRouter's job, not ours
+ * There are now three such endpoints — OpenRouter, Groq, and Gemini through its
+ * compatibility layer. They differ in four small ways, each handled in
+ * `complete` and commented there: the URL, the key, how they spell "think
+ * harder", and whether they can search the web. Everything else about the
+ * request is identical, which is the only reason a third provider was
+ * affordable at all.
  *
- * We send a `models` array rather than a single `model`, and OpenRouter walks
- * it when one is rate-limited or down. There is deliberately no retry loop in
- * this file. A hand-rolled one would double every real outage into two slow
- * failures, and it would have to know which status codes are worth retrying —
- * which is exactly the knowledge OpenRouter already has and we do not.
+ * ## Failover is ours now, and that is a reversal
  *
- * The free roster churns weekly, so the chain is an environment variable. A
- * delisted model is a dashboard edit, not a deploy.
+ * This file used to send a `models` array and let OpenRouter walk it, and said
+ * at length that a hand-rolled retry loop would be a mistake. That was right
+ * while every model was an OpenRouter model, and it stopped being right when
+ * the roster grew a Groq and a Gemini column: OpenRouter cannot route a slug it
+ * does not serve. `walk` does it instead, and the note above it explains what
+ * survives of the old warning.
+ *
+ * The free roster churns weekly, so the chain is still an environment variable
+ * when the client sends none. A delisted model is a dashboard edit, not a
+ * deploy — but note that `TUTOR_MODELS` entries now carry a source.
  *
  * ## The response reports which model really answered
  *
@@ -43,7 +51,76 @@
 
 export const config = { runtime: 'edge' }
 
-const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions'
+/**
+ * Which provider a step goes to, and where.
+ *
+ * All three speak the OpenAI chat-completions shape — Gemini through its
+ * compatibility layer — so one request body serves all of them and only the URL
+ * and the key change. The per-provider differences are small and are handled in
+ * `complete`, each one commented where it happens.
+ */
+type Provider = 'gemini' | 'openrouter' | 'groq'
+
+const CHAT: Record<Provider, string> = {
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+  groq: 'https://api.groq.com/openai/v1/chat/completions',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+}
+
+/** One rung of the fallback chain: which model, and whose. */
+interface Step {
+  id: string
+  source: Provider
+}
+
+function keyFor(source: Provider): string | undefined {
+  const named = {
+    openrouter: process.env.OPENROUTER_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    gemini: process.env.GEMINI_API_KEY,
+  }[source]
+  return named?.trim() || undefined
+}
+
+/**
+ * Only OpenRouter can search the web in the shape we send.
+ *
+ * Groq and Gemini both have search of their own, but each wants a different
+ * request — Groq through its `compound` models, Gemini through a `google_search`
+ * tool. Neither is the `plugins: [{ id: 'web' }]` this relay sends. Rather than
+ * pretend, a searching question puts the OpenRouter steps first and the plugin
+ * only rides on those. A step that cannot search does not silently answer as if
+ * it had; it answers with no sources, and the reader sees no sources.
+ */
+function canSearch(source: Provider): boolean {
+  return source === 'openrouter'
+}
+
+/**
+ * Our seven effort levels, squeezed into the four that Groq and Gemini take.
+ *
+ * OpenRouter takes the whole ladder this app offers. Groq and Gemini both take
+ * `none`, `low`, `medium` and `high`, and both answer `400` to anything else.
+ * That was measured against the live APIs, one value at a time: `minimal`,
+ * `xhigh` and `max` are all rejected. Since `max` is this app's *default*
+ * effort, sending it straight through would have failed every Groq and Gemini
+ * rung for every reader who never touched the setting.
+ *
+ * The three levels above `high` collapse onto `high` because that is the
+ * ceiling on both. Nothing is lost that either was ever going to give.
+ *
+ * Sending this to Gemini is worth more than obedience to the reader's setting.
+ * Gemini 3.7 Flash spent 344 tokens thinking before it wrote a word, and with a
+ * smaller budget it returns `finish_reason: length` and an empty string — the
+ * thinking ate the whole allowance. An empty bubble is not an answer, and it is
+ * the exact failure that cost GLM its place as the default model.
+ */
+function cappedEffort(effort: Effort): string {
+  if (effort === 'none') return 'none'
+  if (effort === 'minimal' || effort === 'low') return 'low'
+  if (effort === 'medium') return 'medium'
+  return 'high'
+}
 
 /**
  * The fallback chain, when the reader's own pick has not been put at its head.
@@ -75,22 +152,27 @@ const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions'
  * instruction-tuned, and tool-capable. Coding and classifier models are
  * deliberately absent.
  */
-const DEFAULT_MODELS = [
-  'nvidia/nemotron-3-super-120b-a12b:free',
-  'google/gemma-4-31b-it:free',
-  'z-ai/glm-5.2:free',
+const DEFAULT_MODELS: Step[] = [
+  { id: 'gemini-3.7-flash', source: 'gemini' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free', source: 'openrouter' },
+  { id: 'openai/gpt-oss-120b', source: 'groq' },
 ]
 
 /**
- * OpenRouter rejects a `models` array longer than this.
+ * How many rungs the chain may have.
  *
- * Found the hard way: a four-entry chain returns `400 'models' array must have
- * 3 items or fewer` for *every* request, and the reader sees the generic "could
- * not be reached" line no matter which model they pick. The cap is enforced
- * here rather than trusted to whoever edits `TUTOR_MODELS`, because getting it
- * wrong takes the tutor down completely and looks exactly like an outage.
+ * This used to be three, and the three was not ours: OpenRouter rejects a
+ * `models` array longer than that with `400 'models' array must have 3 items or
+ * fewer`, and a fourth entry took the tutor down for every question.
+ *
+ * That limit no longer applies, because the array no longer exists. This file
+ * walks the chain itself, one provider at a time, so the ceiling is now about
+ * patience rather than about OpenRouter's parser: every rung that refuses costs
+ * a round trip before the next is tried. Six is two full passes over three
+ * providers, which is far enough to survive one provider being down without
+ * making a genuine outage take a minute to admit.
  */
-const MAX_CHAIN = 3
+const MAX_CHAIN = 6
 /**
  * The most working-out that is passed on.
  *
@@ -101,11 +183,28 @@ const MAX_CHAIN = 3
  */
 const MAX_REASONING = 20_000
 
-function chain(): string[] {
+/**
+ * The chain to walk when the client sends none.
+ *
+ * `TUTOR_MODELS` entries are written `source:model-id` — `groq:openai/gpt-oss-120b`.
+ * The source has to be stated because a bare slug no longer says who serves it,
+ * and guessing from the shape of the string would break the first time a
+ * provider changed its naming. An entry with no source, or an unknown one, is
+ * dropped rather than sent somewhere arbitrary.
+ */
+function chain(): Step[] {
   const configured = (process.env.TUTOR_MODELS ?? '')
     .split(',')
-    .map((slug) => slug.trim())
+    .map((entry) => entry.trim())
     .filter(Boolean)
+    .map((entry) => {
+      const cut = entry.indexOf(':')
+      const source = entry.slice(0, cut) as Provider
+      const id = entry.slice(cut + 1).trim()
+      return cut > 0 && id && source in CHAT ? { id, source } : undefined
+    })
+    .filter((step): step is Step => step !== undefined)
+
   return (configured.length > 0 ? configured : DEFAULT_MODELS).slice(0, MAX_CHAIN)
 }
 
@@ -395,19 +494,27 @@ function counted(usage: {
 }
 
 /**
- * A list of model slugs from the request, made safe.
+ * The chain from the request, made safe.
  *
- * Trusted for *order* and nothing else: a slug that is not on OpenRouter comes
- * back as an error from OpenRouter, which is already handled, and a slug is
- * never interpolated into a prompt. Length and count are still capped, because
- * this endpoint is reachable by anything that can sign in.
+ * Trusted for *order* and nothing else. A model id that the provider does not
+ * have comes back as an error from that provider, which is already handled, and
+ * an id is never interpolated into a prompt. The `source` is checked against
+ * the three we know, because that one *is* trusted — it picks which key gets
+ * spent. Length and count are capped, because this endpoint is reachable by
+ * anything that can sign in.
  */
-function slugs(value: unknown): string[] {
+function steps(value: unknown): Step[] {
   if (!Array.isArray(value)) return []
   return value
-    .filter((entry): entry is string => typeof entry === 'string')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
+    .map((entry) => {
+      const said = entry as { id?: unknown; source?: unknown } | null
+      const id = text(said?.id, 120).trim()
+      const source = said?.source
+      return id && typeof source === 'string' && source in CHAT
+        ? { id, source: source as Provider }
+        : undefined
+    })
+    .filter((step): step is Step => step !== undefined)
     .slice(0, MAX_CHAIN)
 }
 
@@ -678,45 +785,79 @@ function sourcesOf(value: unknown): Source[] {
 
 async function complete(
   turns: Turn[],
-  models: string[],
+  step: Step,
   key: string,
   search: boolean,
   effort: Effort,
 ): Promise<Completion> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const via = step.source
 
   try {
-    const response = await fetch(OPENROUTER, {
+    const response = await fetch(CHAT[via], {
       method: 'POST',
       signal: controller.signal,
       headers: {
         authorization: `Bearer ${key}`,
         'content-type': 'application/json',
-        // OpenRouter attributes usage by these two. Neither is a secret.
-        'http-referer': process.env.TUTOR_REFERER ?? 'https://reading-buddy.app',
-        'x-title': 'Reading Buddy',
+        // OpenRouter attributes usage by these two. Neither is a secret, and
+        // the other two providers ignore them.
+        ...(via === 'openrouter'
+          ? {
+              'http-referer': process.env.TUTOR_REFERER ?? 'https://reading-buddy.app',
+              'x-title': 'Reading Buddy',
+            }
+          : {}),
       },
       body: JSON.stringify({
-        models,
+        // One model, not a list. The `models` array was OpenRouter's own
+        // failover and it can only route OpenRouter slugs — the chain across
+        // three providers is walked by `walk` below instead.
+        model: step.id,
         messages: turns,
         max_tokens: MAX_TOKENS,
         // Warmth is the point, but a wandering tutor is worse than a plain
-        // one — this is the middle of OpenRouter's range, not the top.
+        // one — this is the middle of the range, not the top.
         temperature: 0.7,
-        // Ask for the working-out. A model with no reasoning channel ignores
-        // this, which is why it is sent to every model rather than guessed at
-        // from the slug — the roster gives no way to tell them apart.
-        reasoning: { effort, exclude: false },
-        // Some providers report usage only when it is asked for.
-        usage: { include: true },
+        /*
+         * Ask for the working-out.
+         *
+         * Three providers, two spellings of the same idea. OpenRouter takes an
+         * object; Groq and Gemini both take the bare word, on a shorter ladder
+         * — see `cappedEffort`, which is also what stops Gemini thinking its
+         * whole token budget away and answering with an empty string.
+         *
+         * A model with no reasoning channel ignores whichever it is sent, which
+         * is why this goes to every model rather than being guessed at from the
+         * slug: no roster says which models think out loud.
+         */
+        ...(via === 'openrouter' ? { reasoning: { effort, exclude: false } } : {}),
+        ...(via === 'groq' || via === 'gemini'
+          ? { reasoning_effort: cappedEffort(effort) }
+          : {}),
+        // Some providers report usage only when it is asked for. Gemini and
+        // Groq report it regardless.
+        ...(via === 'openrouter' ? { usage: { include: true } } : {}),
         // OpenRouter runs the search itself and feeds the results in. The
         // model still decides whether the results are worth using.
-        ...(search ? { plugins: [{ id: 'web', max_results: MAX_SOURCES }] } : {}),
+        ...(search && canSearch(via) ? { plugins: [{ id: 'web', max_results: MAX_SOURCES }] } : {}),
       }),
     })
 
-    const payload = (await response.json().catch(() => null)) as {
+    const body = (await response.json().catch(() => null)) as unknown
+
+    /*
+     * The answer, whatever shape the provider wrapped it in.
+     *
+     * OpenRouter and Groq answer with an object. Gemini's compatibility layer
+     * wraps a *failure* in a one-element array — `[{ error: { ... } }]` — while
+     * answering a success as a plain object. Reading only the object shape
+     * turns every Gemini refusal into "the model returned an empty answer",
+     * which is both wrong and unactionable: the real reason, quota or bad slug,
+     * is sitting in the array we did not look inside.
+     */
+    const payload = (Array.isArray(body) ? body[0] : body) as {
       choices?: {
         message?: { content?: unknown; reasoning?: unknown; annotations?: unknown }
       }[]
@@ -731,7 +872,7 @@ async function complete(
     if (payload?.error) {
       const reason = typeof payload.error.message === 'string' ? payload.error.message : 'refused'
       throw new Upstream(
-        `OpenRouter answered ${reason}`,
+        `${via} answered ${reason}`,
         typeof payload.error.code === 'number' ? payload.error.code : 502,
       )
     }
@@ -739,7 +880,7 @@ async function complete(
     if (!response.ok) {
       const reason = typeof payload?.error?.message === 'string' ? payload.error.message : ''
       throw new Upstream(
-        `OpenRouter answered ${response.status}${reason ? `: ${reason}` : ''}`,
+        `${via} answered ${response.status}${reason ? `: ${reason}` : ''}`,
         // OpenRouter reports a provider rate-limit as a 200-shaped envelope
         // with `error.code`, and a real HTTP status otherwise. Prefer whichever
         // one is actually there — the reader gets a different sentence for a
@@ -761,7 +902,7 @@ async function complete(
 
     return {
       text: answer.trim(),
-      model: typeof payload?.model === 'string' ? payload.model : models[0],
+      model: typeof payload?.model === 'string' ? payload.model : step.id,
       ...(typeof thought === 'string' && thought.trim().length > 0
         ? { reasoning: thought.trim().slice(0, MAX_REASONING) }
         : {}),
@@ -771,6 +912,61 @@ async function complete(
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * Walk the chain until something answers.
+ *
+ * ## Why this loop exists, when the last version was proud of not having one
+ *
+ * The file used to say, at some length, that failover was OpenRouter's job and
+ * that a hand-rolled retry loop would be a mistake. That was right while every
+ * model was an OpenRouter model. It stopped being right the moment the roster
+ * spanned three providers: OpenRouter's `models` array can only route slugs
+ * OpenRouter serves, so a chain containing a Groq or a Gemini model cannot be
+ * handed to it at all. Somebody has to walk it, and there is no longer anyone
+ * else.
+ *
+ * The old warning still applies to the *inside* of a rung, and is respected:
+ * there is no retrying of a model that has just failed. Each rung is tried once
+ * and the chain moves on. So a run of failures costs one round trip each rather
+ * than doubling into two slow failures apiece.
+ *
+ * ## What a failure costs, and why it is not reported
+ *
+ * The reader is told which model wrote the words in their bubble, and nothing
+ * about the rungs above it. That is deliberate: the ordering in the picker
+ * already says what the chain was, so a reader who sees Groq's name knows
+ * exactly which models declined on the way. Naming them again in the answer
+ * would be noise about machinery rather than about the book.
+ *
+ * A rung with no key is skipped in silence. That is the normal state of a
+ * deployment holding two keys out of three, not a fault worth a message.
+ */
+async function walk(
+  turns: Turn[],
+  steps: Step[],
+  search: boolean,
+  effort: Effort,
+): Promise<{ answer: Completion; step: Step }> {
+  let last: unknown
+
+  for (const step of steps) {
+    const key = keyFor(step.source)
+    if (!key) continue
+
+    try {
+      return { answer: await complete(turns, step, key, search, effort), step }
+    } catch (error) {
+      last = error
+    }
+  }
+
+  // Every rung refused, so the reader gets the last provider's own words rather
+  // than a flattened "could not be reached". A 429 from the final attempt still
+  // reads as a 429 to the handler, which says something different about a busy
+  // model than about a broken relay.
+  throw last ?? new Error('no model on the chain could be reached')
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -783,8 +979,10 @@ export default async function handler(request: Request): Promise<Response> {
     return json({ error: 'POST only' }, 405, origin)
   }
 
-  const key = process.env.OPENROUTER_API_KEY?.trim()
-  if (!key) return json({ error: 'the tutor relay has no API key' }, 500, origin)
+  // Any one key is enough to run. A deployment holding only a Gemini key is a
+  // smaller tutor, not a broken one.
+  const anyKey = (['gemini', 'openrouter', 'groq'] as const).some((source) => keyFor(source))
+  if (!anyKey) return json({ error: 'the tutor relay has no API key' }, 500, origin)
 
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? ''
   if (!token || !(await signedIn(token))) {
@@ -818,13 +1016,17 @@ export default async function handler(request: Request): Promise<Response> {
    * Everything after is the same as before — the pick leads, duplicates go, and
    * the array is cut to three, because OpenRouter 400s a longer one.
    */
-  const asked = slugs(body.models)
-  const models = asked.length > 0 ? asked : chain()
+  const asked = steps(body.models)
+  let models = asked.length > 0 ? asked : chain()
   const picked = text(body.model, 120).trim()
   if (picked) {
-    const rest = models.filter((slug) => slug !== picked)
-    models.length = 0
-    models.push(picked, ...rest.slice(0, MAX_CHAIN - 1))
+    const rest = models.filter((step) => step.id !== picked)
+    // The pick's own source comes from the chain when the chain names it, and
+    // falls back to the head of the chain when it does not. A pick with no
+    // source would otherwise have to be guessed at, and guessing spends the
+    // wrong key.
+    const home = models.find((step) => step.id === picked)?.source ?? models[0]?.source
+    if (home) models = [{ id: picked, source: home }, ...rest].slice(0, MAX_CHAIN)
   }
 
   const turns = assemble(body, module)
@@ -841,9 +1043,31 @@ export default async function handler(request: Request): Promise<Response> {
    */
   const wants = module?.search === true || body.search === true
 
+  /*
+   * A searching question tries the searchers first.
+   *
+   * Only OpenRouter runs the web plugin we send, so a chain that happens to
+   * start at Gemini would answer a "Still true?" without ever going to the web,
+   * and the answer would look exactly like one that had. Reordering costs the
+   * reader nothing — every rung still gets its turn — and it keeps the promise
+   * the task module made. Stable, so the reader's own ranking survives inside
+   * each half.
+   */
+  if (wants) {
+    models = [
+      ...models.filter((step) => canSearch(step.source)),
+      ...models.filter((step) => !canSearch(step.source)),
+    ]
+  }
+
+  const effort = effortOf(body.effort)
+
   let answer: Completion
+  let served: Step
   try {
-    answer = await complete(turns, models, key, wants, effortOf(body.effort))
+    const walked = await walk(turns, models, wants, effort)
+    answer = walked.answer
+    served = walked.step
   } catch (error) {
     // The upstream status is carried out, not flattened to 502. A busy free
     // model and a misconfigured relay both used to arrive as the same sentence,
@@ -865,8 +1089,11 @@ export default async function handler(request: Request): Promise<Response> {
           { role: 'system', content: PROBE_PROMPT },
           { role: 'user', content: 'Now check that it landed.' },
         ],
-        models,
-        key,
+        // The rung that answered, not the head of the chain. The probe is a
+        // follow-up to what this model just said, so asking a different one
+        // would have it check a stranger's explanation.
+        served,
+        keyFor(served.source)!,
         false,
         // The probe is one short question, not a problem to be reasoned about.
         'low',
@@ -880,6 +1107,10 @@ export default async function handler(request: Request): Promise<Response> {
     {
       text: answer.text,
       model: answer.model,
+      // Which provider served it. The bubble label needs it to tell two rows
+      // apart that share a name — Gemma 4 31B sits on both Gemini and
+      // OpenRouter, and they are different rungs of the chain.
+      source: served.source,
       ...(answer.reasoning ? { reasoning: answer.reasoning } : {}),
       ...(answer.sources ? { sources: answer.sources } : {}),
       // The probe's own tokens are counted in: the reader paid for both, and a

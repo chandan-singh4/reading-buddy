@@ -43,11 +43,20 @@ export interface SheetRow {
 
 export interface SheetProps {
   title: string
-  rows: readonly SheetRow[]
+  rows?: readonly SheetRow[]
   /** The current choice, ticked. Absent means none is. */
   pick?: string
-  onPick: (id: string) => void
+  onPick?: (id: string) => void
   onClose: () => void
+  /**
+   * A body of its own, instead of the row list.
+   *
+   * The effort sheet is a list of choices and uses `rows`. The model picker
+   * stopped being a list when it became a grid — but it still wants this
+   * sheet's scrim, its escape key, its dark furniture and its Cancel button.
+   * Those are the parts worth sharing; the list was never the point.
+   */
+  children?: React.ReactNode
 }
 
 /** iOS's tick. Drawn, not typed — a ✓ glyph is a different weight in every font. */
@@ -68,7 +77,7 @@ function Tick() {
   )
 }
 
-export function Sheet({ title, rows, pick, onPick, onClose }: SheetProps) {
+export function Sheet({ title, rows, pick, onPick, onClose, children }: SheetProps) {
   const chosen = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
@@ -95,8 +104,10 @@ export function Sheet({ title, rows, pick, onPick, onClose }: SheetProps) {
         <span className={styles.grab} aria-hidden="true" />
         <p className={styles.title}>{title}</p>
 
+        {children}
+
         <div className={styles.list}>
-          {rows.map((row) => {
+          {(rows ?? []).map((row) => {
             const here = row.id === pick
             return (
               <button
@@ -105,7 +116,7 @@ export function Sheet({ title, rows, pick, onPick, onClose }: SheetProps) {
                 type="button"
                 className={styles.row}
                 aria-pressed={here}
-                onClick={() => onPick(row.id)}
+                onClick={() => onPick?.(row.id)}
               >
                 <span className={styles.name}>
                   <span className={styles.said}>

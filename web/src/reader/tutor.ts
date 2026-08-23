@@ -204,14 +204,18 @@ export interface AskTutorRequest {
    */
   search?: boolean
   /**
-   * Which models to try, strongest-first after the reader's own pick. Built by
-   * `chainFrom`. Left out, the relay falls back to its own list.
+   * Which models to try, in order, after the reader's own pick. Built by
+   * `stepsFrom`. Left out, the relay falls back to its own list.
    *
    * A chain rather than one slug because a free model refusing is the normal
    * case, not the exception — and when it happens, *which* model catches the
    * question is the difference between a good answer and a poor one.
+   *
+   * Each rung carries its provider as well as its id. The relay needs it to
+   * choose a URL and a key, and an id alone no longer says who serves it —
+   * Gemma 4 31B is on both Gemini and OpenRouter and they are different rungs.
    */
-  models?: string[]
+  models?: { id: string; source: string }[]
 }
 
 export interface AskTutorReply {

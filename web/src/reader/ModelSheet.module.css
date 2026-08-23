@@ -1,0 +1,12 @@
+/* One line under the sheet's title, saying what the grid means. Quieter than
+   the title above it and the models below it — it is there to be found once and
+   then ignored. */
+.hint {
+  margin: 0;
+  padding: 0.5rem 1rem 0;
+  color: rgb(235 235 245 / 45%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  text-align: center;
+}

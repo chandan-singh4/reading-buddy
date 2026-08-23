@@ -50,7 +50,10 @@ describe('when the relay answers', () => {
   it('carries the model that really produced the text, not the one asked for', async () => {
     answering(relay({ text: 'Here is the idea.', model: 'meta-llama/llama-3.3-70b-instruct:free' }))
 
-    const reply = await askTutor({ ...request, models: ['z-ai/glm-4.6:free'] })
+    const reply = await askTutor({
+      ...request,
+      models: [{ id: 'z-ai/glm-4.6:free', source: 'openrouter' }],
+    })
 
     // The reader picked GLM and a different model served it. The label has to
     // say so — that is the entire reason the field exists.
@@ -75,10 +78,19 @@ describe('when the relay answers', () => {
   it('sends the whole chain, not just the pick, so the fallback is chosen too', async () => {
     const fetch = answering(relay({ text: 'ok', model: 'a' }))
 
-    await askTutor({ ...request, models: ['z-ai/glm-4.6:free', 'big', 'next'] })
+    const chain = [
+      { id: 'z-ai/glm-4.6:free', source: 'openrouter' },
+      { id: 'gemini-3.7-flash', source: 'gemini' },
+      { id: 'openai/gpt-oss-120b', source: 'groq' },
+    ]
+    await askTutor({ ...request, models: chain })
 
-    const sent = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as { models?: string[] }
-    expect(sent.models).toEqual(['z-ai/glm-4.6:free', 'big', 'next'])
+    // Each rung carries its provider. The relay picks a URL and a key from it,
+    // and an id alone no longer says who serves the model.
+    const sent = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)) as {
+      models?: { id: string; source: string }[]
+    }
+    expect(sent.models).toEqual(chain)
   })
 
   it('leaves the chain out when it is empty, so the relay uses its own list', async () => {

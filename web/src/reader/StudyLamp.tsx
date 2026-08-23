@@ -41,6 +41,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -48,12 +49,16 @@ import {
 import { createPortal } from 'react-dom'
 
 import {
-  chainFrom,
+  arrange,
+  arrangementOf,
   chosenFrom,
   loadModels,
+  rememberArrangement,
   rememberPick,
+  stepsFrom,
+  storedArrangement,
   storedPick,
-  type TutorModel,
+  type Column,
 } from './models.ts'
 import {
   askTutor,
@@ -218,8 +223,16 @@ export function StudyLamp({
    * exactly the stage-A behaviour — the relay chooses. So the picker is an
    * addition to the lamp, never a gate on it.
    */
-  const [models, setModels] = useState<TutorModel[]>([])
+  /*
+   * The roster is held as columns rather than as a flat list, because the
+   * columns are the reader's arrangement and the arrangement is the chain. A
+   * flat list would have to be re-grouped on every render and every drag.
+   */
+  const [columns, setColumns] = useState<Column[]>([])
   const [pick, setPick] = useState<string | undefined>(undefined)
+
+  /** Every model, for the times a flat list is what is wanted — a name lookup. */
+  const models = useMemo(() => columns.flatMap((column) => column.models), [columns])
   /**
    * Which sheet is up, if either. A layer above the lamp, not in it.
    *
@@ -291,8 +304,9 @@ export function StudyLamp({
     void loadModels()
       .then((rows) => {
         if (!live) return
-        setModels(rows)
-        setPick(chosenFrom(rows, storedPick()))
+        const laid = arrange(rows, storedArrangement())
+        setColumns(laid)
+        setPick(chosenFrom(laid, storedPick()))
       })
       .catch(() => {
         /* no roster, no picker */
@@ -386,7 +400,7 @@ export function StudyLamp({
         // The whole chain, not just the pick. If the reader's choice will not
         // answer, the next thing tried should be the strongest model on the
         // roster — not whatever fixed list the server happens to carry.
-        ...(models.length > 0 ? { models: chainFrom(models, pick) } : {}),
+        ...(columns.length > 0 ? { models: stepsFrom(columns, pick) } : {}),
         effort,
         ...(searching ? { search: true } : {}),
       }).then((reply) => {
@@ -438,7 +452,7 @@ export function StudyLamp({
         onSave(whole)
       })
     },
-    [messages, passage, context, pending, models, pick, effort, searching, onSave],
+    [messages, passage, context, pending, columns, pick, effort, searching, onSave],
   )
 
   /* The nearest question at or above a message. Retrying an answer means
@@ -730,7 +744,7 @@ export function StudyLamp({
             together. The microphone belongs to the message bar instead: it is
             about how the question is typed, not about how it is answered. */}
         <div className={styles.pickers}>
-          {models.length > 0 && (
+          {columns.length > 0 && (
             <>
           <button
             type="button"
@@ -819,12 +833,20 @@ export function StudyLamp({
 
       {sheet === 'model' && (
         <ModelSheet
-          models={models}
+          columns={columns}
           pick={pick}
           onPick={(id) => {
             setPick(id)
             rememberPick(id)
             setSheet(null)
+          }}
+          onArrange={(next) => {
+            // Saved as it is dragged, not on closing. The sheet can be
+            // dismissed by the scrim, by Escape and by the back gesture, and
+            // an arrangement lost to one of those would look like the drag
+            // never took.
+            setColumns(next)
+            rememberArrangement(arrangementOf(next))
           }}
           onClose={() => setSheet(null)}
         />
