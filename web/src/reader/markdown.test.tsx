@@ -145,7 +145,7 @@ describe('a table, stacked', () => {
 
   it('leads on the first cell, so a row reads as an entry with a heading', () => {
     const out = draw('| **Meru** | The spine. |')
-    expect(out.querySelector('[class*="lead"]')?.textContent).toBe('Meru')
+    expect(out.querySelector('dt[class*="lead"]')?.textContent).toBe('Meru')
   })
 
   it('keeps the emphasis the model put inside a cell', () => {
@@ -167,6 +167,53 @@ describe('a table, stacked', () => {
 | --- | --- |
 | Meru | The spine. |`)
     expect(out.textContent).not.toContain('---')
+  })
+
+  it('lifts the header out of the entries and says it once', () => {
+    // The fault this fixes: the header row was drawn as though it were data,
+    // so "Cosmic element" and "Symbolic body part" read as an entry of their
+    // own and nothing said the rows below were pairs.
+    const out = draw(`| Cosmic element | Symbolic body part |
+| --- | --- |
+| Mount Meru | The spinal cord |
+| Four continents | Our limbs |`)
+    expect(out.querySelector('[class*="caption"]')?.textContent).toBe(
+      'Cosmic element · Symbolic body part',
+    )
+    expect(out.querySelectorAll('[class*="_row_"]').length).toBe(2)
+  })
+
+  it('pairs the term with its value, so the belonging is visible', () => {
+    const out = draw(`| Term | Meaning |
+| --- | --- |
+| Meru | The spine. |`)
+    expect(out.querySelector('dt')?.textContent).toBe('Meru')
+    expect(out.querySelector('dd')?.textContent).toBe('The spine.')
+  })
+
+  it('labels each value past two columns, where the order stops being obvious', () => {
+    const out = draw(`| Term | Meaning | Why |
+| --- | --- | --- |
+| Meru | The spine. | We mirror it. |`)
+    const labels = [...out.querySelectorAll('[class*="label"]')].map((n) => n.textContent)
+    expect(labels).toEqual(['Meaning', 'Why'])
+    // And then no caption: it would repeat the labels word for word.
+    expect(out.querySelector('[class*="caption"]')).toBeNull()
+  })
+
+  it('does not label a two-column table, where it would only be clutter', () => {
+    const out = draw(`| Term | Meaning |
+| --- | --- |
+| Meru | The spine. |`)
+    expect(out.querySelector('[class*="label"]')).toBeNull()
+  })
+
+  it('treats a table with no divider as having no header', () => {
+    // Without the divider there is nothing to say the first row is a header,
+    // so it stays an entry rather than being silently eaten as a caption.
+    const out = draw(`| a | one |
+| b | two |`)
+    expect(out.querySelector('[class*="caption"]')).toBeNull()
     expect(out.querySelectorAll('[class*="_row_"]').length).toBe(2)
   })
 

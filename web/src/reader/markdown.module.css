@@ -117,13 +117,26 @@
 }
 
 /* A table, stacked. See the note at the top of markdown.tsx for why a table on
-   a phone is drawn as a run of small entries rather than as a grid. */
+   a phone is drawn as a run of term-and-value entries rather than as a grid. */
 .rows {
   margin: 0 0 0.7em;
 }
 
+/* The header row, said once for the whole stack. */
+.caption {
+  margin: 0 0 0.55em;
+  color: #b6a479;
+  font-size: 0.82em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pairs {
+  margin: 0;
+}
+
 .row {
-  padding: 0.55em 0 0.6em;
+  padding: 0.5em 0 0.55em;
   border-top: 1px solid rgba(195, 154, 94, 0.22);
 }
 
@@ -136,14 +149,35 @@
   padding-bottom: 0;
 }
 
-/* The first cell. Whatever emphasis the model gave it survives; this only
-   makes it read as the entry's own heading. */
+/* The term. Bold on its own account: the model bolds the first cell about half
+   the time, and an entry whose heading looks like its body is not an entry. */
 .lead {
-  margin: 0 0 0.3em;
-  color: #f0e4c6;
+  margin: 0 0 0.2em;
+  color: #f4e9cd;
+  font-weight: 700;
   line-height: 1.5;
 }
 
-.row .paragraph:last-child {
+/* The indent is the whole point — it is what says this belongs to the term
+   above it, which is the job the column did before the table was stacked. */
+.value {
+  margin: 0 0 0.25em;
+  padding-left: 0.9em;
+  border-left: 1px solid rgba(195, 154, 94, 0.28);
+  color: #e3d7b6;
+  line-height: 1.55;
+}
+
+.value:last-child {
   margin-bottom: 0;
+}
+
+/* Which column this value came from. Only drawn past two columns — see the
+   note in markdown.tsx. */
+.label {
+  display: block;
+  color: #a4936c;
+  font-size: 0.78em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }

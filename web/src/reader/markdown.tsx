@@ -29,14 +29,20 @@
  * that scrolls sideways inside a chat bubble is worse: the reader has to drag
  * each row into view to finish a sentence.
  *
- * So each row is stacked instead. The first cell leads, in the emphasis the
- * model gave it, and the rest follow underneath as ordinary lines. A hairline
- * separates one row from the next. It reads as what it is — a short entry with
- * a heading — and it never needs a sideways drag.
+ * So each row is stacked instead, as a `dl`: the first cell is the term, in
+ * bold, and the rest are its values, indented underneath. The indent is the
+ * part that does the work — it is what says "these belong to that", which a
+ * grid says with a column and a flat stack does not say at all.
  *
- * Rows are taken as they come, header row or not. A model that opens a table
- * with `|---|---|` and one that just starts writing pipe-separated rows both
- * meant the same thing, and only the first is a table by the specification.
+ * A header row is not an entry. It becomes a caption above the whole stack —
+ * "Cosmic element · Symbolic body part" — so the reader learns once what the
+ * pairs are pairs *of*. Past two columns the header also labels each value in
+ * place, because by then the reader cannot hold the column order in their head.
+ *
+ * Rows are taken with or without a `|---|` divider. A model that opens a table
+ * with one and a model that just starts writing pipe rows meant the same thing,
+ * and only the first is a table by the specification. The divider is also the
+ * only way to know a header row is a header, so a table without one has none.
  *
  * ## Formulas
  *
@@ -268,35 +274,54 @@ export function Markdown({ text, className }: { text: string; className?: string
     }
 
     if (ROW.test(line)) {
+      const cellsOf = (row: string): string[] =>
+        (ROW.exec(row)?.[1] ?? '')
+          .split('|')
+          .map((cell) => cell.trim())
+          .filter((cell) => cell.length > 0)
+
       const rows: string[][] = []
+      let head: string[] | undefined
       while (at < lines.length && ROW.test(lines[at] ?? '')) {
         const here = lines[at] ?? ''
         at += 1
-        // The divider carries no words. It is dropped rather than drawn.
-        if (DIVIDER.test(here)) continue
-        rows.push(
-          (ROW.exec(here)?.[1] ?? '')
-            .split('|')
-            .map((cell) => cell.trim())
-            .filter((cell) => cell.length > 0),
-        )
+        // The divider carries no words. What it does carry is the news that
+        // the row above it was a header, which is the only way to tell one.
+        if (DIVIDER.test(here)) {
+          if (rows.length === 1) head = rows.shift()
+          continue
+        }
+        rows.push(cellsOf(here))
       }
+
+      const entries = rows.filter((cells) => cells.length > 0)
+      // Labels earn their space only past two columns. At two, the pair is
+      // "Mount Meru" and what Mount Meru is, and saying so twice is clutter.
+      const labelled = head !== undefined && entries.some((cells) => cells.length > 2)
+
       out.push(
         <div key={next()} className={styles.rows}>
-          {rows
-            .filter((cells) => cells.length > 0)
-            .map((cells, index) => (
+          {/* Either the caption or the labels, never both — they say the
+              same words, and saying them twice is the clutter the labels
+              were meant to avoid. */}
+          {head && head.length > 0 && !labelled && (
+            <p className={styles.caption}>{head.join(' · ')}</p>
+          )}
+          <dl className={styles.pairs}>
+            {entries.map((cells, index) => (
               <div key={index} className={styles.row}>
-                {cells.map((cell, cellAt) => (
-                  <p
-                    key={cellAt}
-                    className={cellAt === 0 ? styles.lead : styles.paragraph}
-                  >
+                <dt className={styles.lead}>{inlineMarkdown(cells[0] ?? '')}</dt>
+                {cells.slice(1).map((cell, cellAt) => (
+                  <dd key={cellAt} className={styles.value}>
+                    {labelled && head?.[cellAt + 1] && (
+                      <span className={styles.label}>{head[cellAt + 1]}</span>
+                    )}
                     {inlineMarkdown(cell)}
-                  </p>
+                  </dd>
                 ))}
               </div>
             ))}
+          </dl>
         </div>,
       )
       continue
