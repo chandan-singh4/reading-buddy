@@ -3,6 +3,30 @@
 > What is in here: the one task in flight, and the exact files to open for it.
 > Read it at startup, before anything else.
 
+## Start here — 2026-08-23
+
+**Nothing is mid-edit.** The build is green: 1739 tests across 100 files. The
+last commit is `e7c1b23` and `main` is pushed.
+
+**One thing waits on the reader.** They must tap "Refresh from Google Books" on
+the phone and report what happens. The server is proved good, so the button
+should now work. If it fails, the new code names the real cause. Ask for the
+exact words before you change any code.
+
+### The next task — WP-25, something that writes a note
+
+The Notes tab reads a table that nothing fills. This is written out further
+down this file. **One question is still open: device-local or cloud.**
+Device-local is the smaller step. Ask the reader before you start.
+
+Files in scope for WP-25:
+
+- `web/src/pages/Reader.tsx` — the Notes tab and `noteRows`.
+- `web/src/storage/notes.ts` — the store that nothing writes to.
+- `web/src/storage/db.ts` — the note row's shape.
+
+Add any other path to this list with a one-line reason. Do not grep the tree.
+
 ## Task — the AI tutor engine, stage A of four
 
 The reader gave a build brief and a prompt library on 2026-08-22:

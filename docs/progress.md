@@ -30,6 +30,17 @@ Get that loop working before building any breadth.
   our JSON. The client now reads the body: our own function's 503 still names
   the key, and anything else says the host did not answer. **A reader saw the
   old message with the key correctly set.**
+  **Solved on 2026-08-23. The cause was a stale service worker, not the key.**
+  A live probe of `https://reading-buddy-web-nu.vercel.app` settled it. An
+  unauthenticated `POST /api/books/google` answered `401 Not signed in.`, and
+  the key check in `api/books/google.ts` runs *before* the sign-in check. So
+  the request got past the key check and `GOOGLE_BOOKS_KEY` is set. The nine
+  served JavaScript files all carry the new strings. The reader's phone was
+  running an older cached build. Two full restarts of the app fixed it.
+  **Two lessons for a later thread.** First, `reading-buddy-web.vercel.app` is
+  a dead alias with no API functions at all — the live host is the `-nu` one.
+  Second, an unauthenticated probe is a clean test for a missing key, because
+  the two checks are in that order.
 - **Stages C and D of the tutor engine are built** (2026-08-22). Search, the
   globe switch, the genre chips, and the whole digest and recap pipeline. A
   live call proved search: five sources and a claim dated April 2026. A live
@@ -176,6 +187,13 @@ Get that loop working before building any breadth.
 
 ### Recently done
 
+- **A publisher's field name no longer shows as a subject tag** (2026-08-23,
+  `e7c1b23`). A book listed `review_metadata` as its only subject. An EPUB's
+  `dc:subject` is copied out of the file verbatim by `parse/epub.ts`, and
+  nothing judged it. `subjectTags` in `pages/BookInfo.tsx` now drops a tag that
+  has no space *and* contains an underscore. The rule is narrow on purpose:
+  `Self-Help` and `Philosophy` keep their place. It runs at display time, so
+  the stored record stays a true copy of the file.
 - **Study Lamp round two — the reader's first-use feedback** (2026-08-21).
   Four fixes off one report:
   - **A slip per sentence.** `TutorMarks.tsx` places each thread's slip at the

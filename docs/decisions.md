@@ -1268,3 +1268,10 @@ sign-in screen.
   the lamp and delete to the thread store. One list, one order, two shapes. — 2026-08-21
 - **A slip is anchored to its passage's last inked line.** Not to the paragraph
   corner — two threads in one paragraph must wear two visible slips. — 2026-08-21
+- **A file's `dc:subject` is stored verbatim and filtered at display time.** A
+  publisher's tooling leaves field names such as `review_metadata` in the
+  metadata; the record must stay a true copy of the file, so the rule lives in
+  `subjectTags`, where one line can undo it. — 2026-08-23
+- **The live host is `reading-buddy-web-nu.vercel.app`.** The shorter
+  `reading-buddy-web.vercel.app` is a dead alias with no API functions. Probe
+  the `-nu` host. — 2026-08-23
