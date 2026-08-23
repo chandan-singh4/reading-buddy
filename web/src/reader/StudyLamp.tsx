@@ -428,22 +428,7 @@ export function StudyLamp({
           ...(reply.sources ? { sources: reply.sources } : {}),
           ts: Date.now(),
         }
-        // The check that the explanation landed is a *second* bubble, not a
-        // paragraph tacked onto the first. It is a different kind of thing —
-        // the tutor asking rather than telling — and the room already draws
-        // those differently.
-        const check: TutorMessage[] = reply.probe
-          ? [
-              {
-                role: 'claude',
-                text: reply.probe,
-                isProbe: true,
-                ...(reply.probeModel ? { model: reply.probeModel } : {}),
-                ts: Date.now() + 1,
-              },
-            ]
-          : []
-        const whole = [...history, yours, answer, ...check]
+        const whole = [...history, yours, answer]
         setMessages(whole)
         setPending(false)
         // The first exchange pins the passage on its own: the thread has
@@ -456,7 +441,8 @@ export function StudyLamp({
   )
 
   /* The nearest question at or above a message. Retrying an answer means
-     asking its question again, and an answer may be followed by a probe. */
+     asking its question again. Threads saved before the explain-back check
+     moved into the answer still hold a probe bubble after one. */
   const questionAt = useCallback(
     (index: number): number => {
       for (let at = index; at >= 0; at -= 1) if (messages[at]?.role === 'you') return at

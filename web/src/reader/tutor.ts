@@ -47,9 +47,9 @@ export interface PassageAnchor {
  *
  * These name **task modules in the relay's prompt library**, not labels. The
  * earlier set (`explain`, `quiz`) was invented before the prompt file existed
- * and matched nothing in it; `quiz` in particular is now the explain-back
- * probe, which fires on its own after an explanation rather than as a chip the
- * reader has to remember to press.
+ * and matched nothing in it; `quiz` in particular is gone — the base prompt now
+ * asks for an understanding check when the answer taught something worth
+ * checking, so it is part of the answer rather than a chip.
  *
  * The first four suit any book and the lamp always offers them. The last four
  * are genre-conditional: `genre.ts` decides which of them a book has earned,
@@ -243,12 +243,6 @@ export interface AskTutorReply {
    * differ, which is exactly when the label matters.
    */
   model?: string
-  /**
-   * The gentle check that the explanation landed, when the task module carries
-   * one. A whole second turn, drawn as its own bubble with `isProbe`.
-   */
-  probe?: string
-  probeModel?: string
 }
 
 /**
@@ -362,8 +356,6 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
       reasoning?: unknown
       usage?: unknown
       sources?: unknown
-      probe?: unknown
-      probeModel?: unknown
     }
     if (typeof data.text !== 'string' || data.text.length === 0) {
       return cannedReply(reasonFor(0))
@@ -373,10 +365,6 @@ export async function askTutor(request: AskTutorRequest): Promise<AskTutorReply>
       text: data.text,
       ...(data.isProbe === true ? { isProbe: true } : {}),
       ...(typeof data.model === 'string' ? { model: data.model } : {}),
-      ...(typeof data.probe === 'string' && data.probe.length > 0
-        ? { probe: data.probe }
-        : {}),
-      ...(typeof data.probeModel === 'string' ? { probeModel: data.probeModel } : {}),
       ...(typeof data.reasoning === 'string' && data.reasoning.length > 0
         ? { reasoning: data.reasoning }
         : {}),

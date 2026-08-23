@@ -10,8 +10,8 @@
  * has none — and these tests are what stop a later refactor from adding a
  * cheerful placeholder in the middle.
  *
- * The success half checks the two fields the UI cannot get anywhere else: the
- * model that really answered, and the explain-back probe as its own turn.
+ * The success half checks the one field the UI cannot get anywhere else: the
+ * model that really answered.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -59,20 +59,6 @@ describe('when the relay answers', () => {
     // say so — that is the entire reason the field exists.
     expect(reply.text).toBe('Here is the idea.')
     expect(reply.model).toBe('meta-llama/llama-3.3-70b-instruct:free')
-  })
-
-  it('carries the explain-back probe as a separate turn', async () => {
-    answering(relay({ text: 'Here is the idea.', model: 'a', probe: 'Can you put that in your own words?' }))
-
-    const reply = await askTutor(request)
-
-    expect(reply.probe).toBe('Can you put that in your own words?')
-  })
-
-  it('leaves the probe out when the relay sent none', async () => {
-    answering(relay({ text: 'A definition.', model: 'a' }))
-
-    expect((await askTutor({ ...request, intent: 'define' })).probe).toBeUndefined()
   })
 
   it('sends the whole chain, not just the pick, so the fallback is chosen too', async () => {
@@ -227,7 +213,6 @@ describe('when the relay does not answer', () => {
     const reply = await askTutor(request)
 
     expect(reply.model).toBeUndefined()
-    expect(reply.probe).toBeUndefined()
   })
 
   it('never puts the passage s own words into the failure', async () => {
