@@ -5,7 +5,11 @@
 
 ## Start here — 2026-08-24 (the answer that waits for you)
 
-**Nothing is mid-edit.** The build is green: 1812 tests across 101 files.
+**Nothing is mid-edit.** The build is green: 1809 tests across 100 files.
+
+**The tutor is named Veda.** The reader uses many models, so the assistant is
+not called Claude any more. The stored note author stays `claude` — every note
+already written carries it. Only the label changed.
 
 ### What this thread did
 

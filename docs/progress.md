@@ -15,6 +15,38 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **The tutor is called Veda now** (2026-08-24). The reader uses many models,
+  so naming the assistant after one of them was wrong. "Ask Veda" on the
+  selection menu, "✦ Veda" on a note, "Veda" as the Notes chip. **The stored
+  value stays `claude`.** It is the author of every note already written, and
+  renaming it would orphan them. The label is what the reader reads.
+- **Five things the reader found on the phone** (2026-08-24).
+  1. A selected paragraph now scrolls. It faded out at 122px and the only offer
+     was to pin it away, so the last lines could not be read. The fade means
+     something now: on while there is more below, off at the end.
+  2. The notes paper scrolls with the words. A background painted on a
+     scrolling box is pinned to the box, not to the content, so the rules stood
+     still while the ink slid over them. The sheet is two elements now: `.sheet`
+     is the window and holds no paper, `.page` is the paper and is as tall as
+     the notes on it.
+  3. The red margin line runs the whole page. It was drawn on the window, so it
+     stopped at the fold. It is on `.page` now.
+  4. A tutor answer in Notes draws as markdown. The lamp always drew it; this
+     list showed the `**` and the `##` themselves. The slip had to stop being a
+     `<button>` — a button may not contain a heading or a list — so it is a div
+     with the button role and the two keys.
+  5. Every colour in `markdown.module.css` is a `--md-*` token with the lamp's
+     own value as its fallback. The Notes tab draws the same answer on white
+     paper and only re-names five inks.
+- **An ask that died while the reader was away is made again by itself**
+  (2026-08-24). Closing the panel was already safe; minimising the app was not.
+  Android freezes a backgrounded tab when memory is short, and a frozen tab's
+  connection dies with it. No web page can stop that. What it can do is notice:
+  `errand.ts` watches `visibilitychange`, and a failure that lands after the
+  reader went away is retried once on their return instead of being shown as a
+  Retry button under a question they already asked. A second failure is real and
+  is reported as itself. **If Android discards the tab outright, the module goes
+  with it and nothing survives** — that limit is real and is written in the file.
 - **An answer now outlives the panel that asked for it** (2026-08-24). The
   reader asked a question, watched the model start thinking, went to another app
   or closed the panel — and came back to the question, unanswered. The ask lives

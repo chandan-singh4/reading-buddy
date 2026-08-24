@@ -24,9 +24,13 @@
  * operating system. A phone that is short of memory may freeze or discard a
  * backgrounded tab, and when that happens the connection goes with it — no web
  * page can prevent that, and any claim otherwise would be a lie told with a
- * progress bar. What is guaranteed is narrower and still worth having: as long
- * as the tab is alive, closing the panel, opening another book or looking at
- * something else does not cost the reader their answer.
+ * progress bar.
+ *
+ * What is guaranteed is narrower and still worth having. As long as the tab is
+ * alive, closing the panel, opening another book or looking at something else
+ * does not cost the reader their answer. And when the tab *was* frozen, the ask
+ * is made again by itself on the reader's return — they wait, but they are
+ * never asked to press Retry on a question they have already asked.
  */
 
 import {
@@ -129,22 +133,64 @@ export function askOnErrand(
 
   errands.set(key, { progress: { text: '' } })
 
-  void askTutor(request, (progress) => {
-    if (!mine()) return
-    errands.set(key, { progress })
-    tell(key)
-  }).then((reply) => {
-    if (!mine()) return
-    /*
-     * Saved first, told second. If a watcher throws — and a watcher is React
-     * code, so one day it will — the answer is already on disk. The other way
-     * round, a render error would cost the reader the answer, which is the
-     * failure this whole file exists to prevent.
-     */
-    const result = settle(reply)
-    errands.set(key, { progress: errands.get(key)?.progress ?? { text: '' }, result })
-    tell(key)
-  })
+  /*
+   * Whether the reader left the app while this was in the air.
+   *
+   * A phone that is short of memory freezes a backgrounded tab, and a frozen
+   * tab's connection dies with it. Nothing in a web page can prevent that. What
+   * a page *can* do is notice: an ask that failed while the reader was away
+   * almost certainly failed *because* they were away, not because the model
+   * refused. So it is asked again the moment they are back, rather than left as
+   * a Retry button under the question they already asked.
+   *
+   * Once only. A second failure is a real one and is reported as itself.
+   */
+  const watchAway = typeof document !== 'undefined'
+  let wentAway = watchAway && document.visibilityState === 'hidden'
+  const noteAway = () => {
+    if (document.visibilityState === 'hidden') wentAway = true
+  }
+  if (watchAway) document.addEventListener('visibilitychange', noteAway)
+
+  const done = () => {
+    if (watchAway) document.removeEventListener('visibilitychange', noteAway)
+  }
+
+  const run = (again: boolean) => {
+    void askTutor(request, (progress) => {
+      if (!mine()) return
+      errands.set(key, { progress })
+      tell(key)
+    }).then((reply) => {
+      if (!mine()) {
+        done()
+        return
+      }
+
+      if (reply.failed && wentAway && !again) {
+        // Back from the freeze. Start over quietly: the reader's question is
+        // still on screen and the answer simply resumes arriving under it.
+        wentAway = false
+        errands.set(key, { progress: { text: '' } })
+        tell(key)
+        run(true)
+        return
+      }
+
+      done()
+      /*
+       * Saved first, told second. If a watcher throws — and a watcher is React
+       * code, so one day it will — the answer is already on disk. The other way
+       * round, a render error would cost the reader the answer, which is the
+       * failure this whole file exists to prevent.
+       */
+      const result = settle(reply)
+      errands.set(key, { progress: errands.get(key)?.progress ?? { text: '' }, result })
+      tell(key)
+    })
+  }
+
+  run(false)
 }
 
 /** The errand for this passage, live or landed. */

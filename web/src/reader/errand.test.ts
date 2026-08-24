@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * An answer must survive the reader walking away.
  *
@@ -216,6 +217,7 @@ describe('an errand', () => {
       saved = reply.text
       return { messages: [{ role: 'claude', text: reply.text, ts: 1 }] }
     })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
     watchErrand('p1', (errand) => {
       if (errand.result) throw new Error('a render blew up')
     })
@@ -250,5 +252,82 @@ describe('an errand', () => {
     await new Promise((go) => setTimeout(go, 10))
 
     expect(heard).toBe('It means the self.')
+  })
+})
+
+describe('an errand interrupted by the reader leaving', () => {
+  /*
+   * A frozen tab loses its connection, and the ask comes back as a failure that
+   * has nothing to do with the model. The reader should not have to press Retry
+   * on a question they already asked.
+   */
+  function away(state: 'hidden' | 'visible') {
+    Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }
+
+  afterEach(() => away('visible'))
+
+  it('asks again by itself when the ask died while the reader was away', async () => {
+    const first = relay()
+    const second = relay()
+    const settled: string[] = []
+    askOnErrand('p1', asked, (reply) => {
+      settled.push(reply.text)
+      return { messages: [{ role: 'claude', text: reply.text, ts: 1 }] }
+    })
+
+    away('hidden')
+    // The connection dies with the frozen tab.
+    first.push({ t: 'error', message: 'the connection was lost', status: 502 })
+    first.close()
+    await new Promise((go) => setTimeout(go, 20))
+
+    // Nothing has been settled: the failure is being retried, not reported.
+    expect(settled).toHaveLength(0)
+
+    away('visible')
+    second.push(answer)
+    second.close()
+    await landed('p1')
+
+    expect(settled).toEqual(['It means the self.'])
+  })
+
+  it('reports a second failure rather than asking for ever', async () => {
+    const first = relay()
+    const second = relay()
+    let settled = ''
+    askOnErrand('p1', asked, (reply) => {
+      settled = reply.text
+      return { messages: [], failure: reply.text }
+    })
+
+    away('hidden')
+    first.push({ t: 'error', message: 'lost', status: 502 })
+    first.close()
+    await new Promise((go) => setTimeout(go, 20))
+    second.push({ t: 'error', message: 'lost again', status: 502 })
+    second.close()
+    await landed('p1')
+
+    expect(settled).toMatch(/No model would answer/i)
+  })
+
+  it('leaves a plain failure alone when the reader never went away', async () => {
+    // A model that refuses while the reader is watching is a real answer to
+    // report, not a connection to retry.
+    const wire = relay()
+    let settled = ''
+    askOnErrand('p1', asked, (reply) => {
+      settled = reply.text
+      return { messages: [], failure: reply.text }
+    })
+
+    wire.push({ t: 'error', message: 'refused', status: 502 })
+    wire.close()
+    await landed('p1')
+
+    expect(settled).toMatch(/No model would answer/i)
   })
 })

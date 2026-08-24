@@ -36,10 +36,37 @@ describe('the notes tab', () => {
     expect(screen.getByText(/No notes yet/)).toBeTruthy()
   })
 
-  it('marks Claude’s notes as Claude’s, and never the reader’s', () => {
+  it("draws the tutor's answer as markdown, not as its marks", () => {
+    /*
+     * The reader's report: the Notes tab showed `**bold**` and `##` as
+     * themselves. The lamp has always drawn the marks; this list was the one
+     * place the same answer arrived raw.
+     */
+    const written = note('2', 'claude')
+    written.text = '## The core teaching\n\nYou are **already** free.'
+    draw([written])
+
+    expect(screen.getByText('The core teaching')).toBeTruthy()
+    expect(screen.getByText('already').tagName).toBe('STRONG')
+    expect(screen.queryByText(/\*\*/)).toBeNull()
+  })
+
+  it('still opens the thread when the answer is markdown', () => {
+    // The slip stopped being a `<button>` when it began holding headings and
+    // lists, which a button may not contain. It must still act like one.
+    const written = note('2', 'claude')
+    written.text = '**Bold** and plain.'
+    written.threadId = 'thread-2'
+    const { onOpenThread } = draw([written])
+
+    fireEvent.click(screen.getByRole('button', { name: /Bold and plain/ }))
+    expect(onOpenThread).toHaveBeenCalledWith('thread-2')
+  })
+
+  it('marks Veda’s notes as Veda’s, and never the reader’s', () => {
     draw()
 
-    expect(screen.getAllByText('✦ Claude')).toHaveLength(1)
+    expect(screen.getAllByText('✦ Veda')).toHaveLength(1)
     expect(screen.getByText('Claude says 2')).toBeTruthy()
     expect(screen.getByText('My thought 1')).toBeTruthy()
   })
@@ -55,7 +82,7 @@ describe('the notes tab', () => {
   it('narrows to one author', () => {
     draw()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Claude' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Veda' }))
     expect(screen.queryByText('My thought 1')).toBeNull()
     expect(screen.getByText('Claude says 2')).toBeTruthy()
 

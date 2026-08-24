@@ -44,7 +44,7 @@ export type NoteFilter = 'all' | 'you' | 'claude' | 'chapter'
 export const NOTE_FILTERS: { value: NoteFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'you', label: 'Quotes' },
-  { value: 'claude', label: 'Claude' },
+  { value: 'claude', label: 'Veda' },
   { value: 'chapter', label: 'By chapter' },
 ]
 

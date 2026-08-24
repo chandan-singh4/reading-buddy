@@ -68,22 +68,45 @@
 /* --- The sheet ------------------------------------------------------------ */
 
 /*
+ * The sheet is two elements, and it has to be.
+ *
+ * A background painted on a scrolling box does not scroll with what is inside
+ * it — the browser pins it to the box, not to the content — so the rules and
+ * the margin line stayed still while the words slid over them. It read as words
+ * floating above the paper rather than written on it.
+ *
+ * So `.sheet` is the window and holds no paper at all; `.page` is the paper and
+ * is as tall as the notes on it. Both move together because they are one thing
+ * now. The margin line is drawn on `.page` for the same reason: pinned to the
+ * window it stopped at the fold, which is why it ran out as soon as the reader
+ * scrolled.
+ */
+.sheet {
+  flex: 1;
+  overflow-y: auto;
+  background: #fbf7ee;
+}
+
+/*
  * The rules are a repeating gradient rather than drawn elements, so a note of
  * any length sits on them without anything having to count lines. 32px is the
  * line height the handwriting is set to; the two must stay equal or the ink
  * drifts off the rule down the page.
  */
-.sheet {
+.page {
   position: relative;
-  flex: 1;
-  overflow-y: auto;
+  /* A short page is still a page. Without this the rules would stop under the
+     last note and leave bare paper below it. */
+  min-height: 100%;
   padding: 16px 18px 20px 46px;
-  background:
-    repeating-linear-gradient(to bottom, transparent 0 31px, rgb(120 140 190 / 22%) 31px 32px),
-    #fbf7ee;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 31px,
+    rgb(120 140 190 / 22%) 31px 32px
+  );
 }
 
-.sheet::before {
+.page::before {
   content: '';
   position: absolute;
   top: 0;
@@ -226,7 +249,25 @@
   text-transform: uppercase;
 }
 
+/*
+ * The answer, in markdown, printed rather than lit.
+ *
+ * `markdown.module.css` is written for the lamp — warm ink on a dark page — and
+ * every colour in it reads a `--md-*` token first. The same answer on white
+ * paper needs those five inks re-named and nothing else. Without this the
+ * headings and the table rules would be pale gold on near-white, which is a
+ * heading you cannot read.
+ */
 .txt {
+  --md-strong: var(--ink);
+  --md-quiet: var(--ink-soft);
+  --md-faint: var(--ink-faint);
+  --md-mark: var(--claude);
+  --md-link: var(--pen);
+  --md-code: var(--ink);
+  --md-edge: rgb(122 92 192 / 28%);
+  --md-wash: rgb(122 92 192 / 8%);
+
   display: block;
   color: var(--ink);
   font-family: var(--font-ui);

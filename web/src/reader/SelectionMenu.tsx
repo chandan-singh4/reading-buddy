@@ -731,7 +731,7 @@ export function SelectionMenu({
           onClick={() => act({ kind: 'ask' })}
         >
           <Icon path={ICONS.spark} filled />
-          <span>Ask Claude</span>
+          <span>Ask Veda</span>
         </button>
       </div>
       </div>

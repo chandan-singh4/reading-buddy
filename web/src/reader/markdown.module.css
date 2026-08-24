@@ -1,6 +1,10 @@
 /*
  * The formatting inside a tutor answer.
  *
+ * Every colour here is a `var(--md-*)` with the lamp's own value as its
+ * fallback, so this file needs no change to be read anywhere else. The Notes
+ * tab draws the same answers on white paper and only has to name five inks.
+ *
  * Everything here sits inside the slip, so nothing sets a colour or a face of
  * its own unless it means to differ from the surrounding words. The spacing is
  * tight on purpose: this is a chat bubble on a phone, and document-sized gaps
@@ -22,7 +26,7 @@
 .heading {
   margin: 0.9em 0 0.35em;
   font-weight: 600;
-  color: #f3e6c8;
+  color: var(--md-strong, #f3e6c8);
 }
 
 .heading:first-child {
@@ -43,14 +47,14 @@
 }
 
 .item::marker {
-  color: #c39a5e;
+  color: var(--md-mark, #c39a5e);
 }
 
 .quote {
   margin: 0 0 0.7em;
   padding-left: 0.8em;
-  border-left: 2px solid rgba(195, 154, 94, 0.45);
-  color: #ddd0b0;
+  border-left: 2px solid var(--md-edge, rgba(195, 154, 94, 0.45));
+  color: var(--md-quiet, #ddd0b0);
   font-style: italic;
   white-space: pre-wrap;
 }
@@ -62,7 +66,7 @@
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   /* Monospace runs large next to Garamond; this brings the two back level. */
   font-size: 0.88em;
-  color: #e8d9b4;
+  color: var(--md-quiet, #e8d9b4);
 }
 
 .block {
@@ -76,7 +80,7 @@
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.86em;
   line-height: 1.5;
-  color: #e8d9b4;
+  color: var(--md-quiet, #e8d9b4);
 }
 
 .block code {
@@ -88,18 +92,18 @@
   padding: 0.05em 0.3em;
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.9em;
-  color: #f0dcae;
+  color: var(--md-code, #f0dcae);
 }
 
 .display {
   margin: 0.5em 0 0.75em;
   padding: 10px 12px;
   border-radius: 6px;
-  background: rgba(195, 154, 94, 0.08);
+  background: var(--md-wash, rgba(195, 154, 94, 0.08));
   overflow-x: auto;
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.9em;
-  color: #f0dcae;
+  color: var(--md-code, #f0dcae);
   text-align: center;
   white-space: pre-wrap;
 }
@@ -107,11 +111,11 @@
 .rule {
   margin: 0.9em 0;
   border: 0;
-  border-top: 1px solid rgba(195, 154, 94, 0.25);
+  border-top: 1px solid var(--md-edge, rgba(195, 154, 94, 0.25));
 }
 
 .link {
-  color: #d9b475;
+  color: var(--md-link, #d9b475);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -125,7 +129,7 @@
 /* The header row, said once for the whole stack. */
 .caption {
   margin: 0 0 0.55em;
-  color: #b6a479;
+  color: var(--md-faint, #b6a479);
   font-size: 0.82em;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -137,7 +141,7 @@
 
 .row {
   padding: 0.5em 0 0.55em;
-  border-top: 1px solid rgba(195, 154, 94, 0.22);
+  border-top: 1px solid var(--md-edge, rgba(195, 154, 94, 0.22));
 }
 
 .row:first-child {
@@ -153,7 +157,7 @@
    the time, and an entry whose heading looks like its body is not an entry. */
 .lead {
   margin: 0 0 0.2em;
-  color: #f4e9cd;
+  color: var(--md-strong, #f4e9cd);
   font-weight: 700;
   line-height: 1.5;
 }
@@ -163,8 +167,8 @@
 .value {
   margin: 0 0 0.25em;
   padding-left: 0.9em;
-  border-left: 1px solid rgba(195, 154, 94, 0.28);
-  color: #e3d7b6;
+  border-left: 1px solid var(--md-edge, rgba(195, 154, 94, 0.28));
+  color: var(--md-quiet, #e3d7b6);
   line-height: 1.55;
 }
 
@@ -176,7 +180,7 @@
    note in markdown.tsx. */
 .label {
   display: block;
-  color: #a4936c;
+  color: var(--md-faint, #a4936c);
   font-size: 0.78em;
   letter-spacing: 0.03em;
   text-transform: uppercase;

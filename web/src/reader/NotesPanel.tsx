@@ -14,6 +14,7 @@
 
 import { useRef, useState } from 'react'
 
+import { Markdown } from './markdown.tsx'
 import { groupByChapter, NOTE_FILTERS, notesUnder, type NoteFilter } from './notes.ts'
 import type { NoteAuthor } from '../storage/index.ts'
 import type { Anchor } from '../structure/index.ts'
@@ -67,10 +68,28 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
   if (note.author === 'claude') {
     return (
       <li className={styles.note}>
-        <button type="button" className={styles.slip} onClick={onJump}>
-          <span className={styles.who}>✦ Claude</span>
-          <span className={styles.txt}>{note.text}</span>
-        </button>
+        {/*
+          A div wearing a button's clothes, and it has to be one. The answer is
+          markdown now, so this holds headings, lists and stacked tables — and
+          a `<button>` may not contain any of them. The role and the two keys
+          give back everything the element gave up.
+        */}
+        <div
+          role="button"
+          tabIndex={0}
+          className={styles.slip}
+          onClick={onJump}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            onJump()
+          }}
+        >
+          <span className={styles.who}>✦ Veda</span>
+          {/* The tutor writes `**like this**`. The lamp has always drawn it;
+              the Notes tab showed the marks themselves until now. */}
+          <Markdown className={styles.txt} text={note.text} />
+        </div>
         <span className={styles.tagRow}>
           <span className={styles.tag}>{whereItIs(note)}</span>
         </span>
@@ -155,37 +174,39 @@ export function NotesPanel({ notes, onJumpToNote, onOpenThread }: NotesPanelProp
       </div>
 
       <div className={styles.sheet}>
-        {shown.length === 0 ? (
-          <p className={styles.empty}>
-            {notes.length === 0
-              ? 'No notes yet. Ask the tutor about a passage, or write your own — they all land here, filed by chapter.'
-              : 'No notes of that kind in this book yet.'}
-          </p>
-        ) : filter === 'chapter' ? (
-          /*
-            "By chapter" groups; it does not hide. Every note the reader has is
-            still on the page, gathered under the chapter it belongs to — which
-            is the only reading of the words that is any use.
-          */
-          groupByChapter(shown).map((group) => (
-            <section key={group.chapter}>
-              <h3 className={styles.divider}>
-                {group.notes[0]?.chapterTitle ?? 'Elsewhere'}
-              </h3>
-              <ul className={styles.group}>
-                {group.notes.map((note) => (
-                  <Note key={note.id} note={note} onJump={() => visit(note)} />
-                ))}
-              </ul>
-            </section>
-          ))
-        ) : (
-          <ul className={styles.list}>
-            {shown.map((note) => (
-              <Note key={note.id} note={note} onJump={() => visit(note)} />
-            ))}
-          </ul>
-        )}
+        <div className={styles.page}>
+          {shown.length === 0 ? (
+            <p className={styles.empty}>
+              {notes.length === 0
+                ? 'No notes yet. Ask the tutor about a passage, or write your own — they all land here, filed by chapter.'
+                : 'No notes of that kind in this book yet.'}
+            </p>
+          ) : filter === 'chapter' ? (
+            /*
+              "By chapter" groups; it does not hide. Every note the reader has is
+              still on the page, gathered under the chapter it belongs to — which
+              is the only reading of the words that is any use.
+            */
+            groupByChapter(shown).map((group) => (
+              <section key={group.chapter}>
+                <h3 className={styles.divider}>
+                  {group.notes[0]?.chapterTitle ?? 'Elsewhere'}
+                </h3>
+                <ul className={styles.group}>
+                  {group.notes.map((note) => (
+                    <Note key={note.id} note={note} onJump={() => visit(note)} />
+                  ))}
+                </ul>
+              </section>
+            ))
+          ) : (
+            <ul className={styles.list}>
+              {shown.map((note) => (
+                <Note key={note.id} note={note} onJump={() => visit(note)} />
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   )

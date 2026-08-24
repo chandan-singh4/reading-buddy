@@ -206,6 +206,24 @@ export function StudyLamp({
   // A reopened thread starts pinned — the reader came back for the
   // conversation, and the passage is one tap away.
   const [collapsed, setCollapsed] = useState((saved?.length ?? 0) > 0)
+
+  /*
+   * Whether the passage box has more below the fold.
+   *
+   * The box scrolls, so the fade at its foot has to mean something: on while
+   * there is more to read, off at the end. A fade that never lifts reads as a
+   * cut-off paragraph, which is exactly the complaint it was meant to answer.
+   */
+  const quote = useRef<HTMLQuoteElement>(null)
+  const [more, setMore] = useState(false)
+  const measureQuote = useCallback(() => {
+    const box = quote.current
+    if (!box) return
+    // A pixel of slack: sub-pixel line heights mean the sum rarely lands exactly
+    // on `scrollHeight`, and without it the fade stays on at the bottom.
+    setMore(box.scrollTop + box.clientHeight < box.scrollHeight - 2)
+  }, [])
+  useLayoutEffect(measureQuote, [measureQuote, passage.excerpt, collapsed])
   const [pending, setPending] = useState(false)
   const [draft, setDraft] = useState('')
   /*
@@ -619,7 +637,7 @@ export function StudyLamp({
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
-      aria-label="Ask Claude about this passage"
+      aria-label="Ask Veda about this passage"
       onKeyDown={onKeyDown}
     >
       <div className={`${styles.glow} ${collapsed ? styles.glowDim : ''}`} aria-hidden="true" />
@@ -650,7 +668,13 @@ export function StudyLamp({
             {passage.kind === 'sentence' ? (
               <blockquote className={styles.passageSentence}>“{passage.excerpt}”</blockquote>
             ) : (
-              <blockquote className={styles.passageParagraph}>{passage.excerpt}</blockquote>
+              <blockquote
+                ref={quote}
+                className={`${styles.passageParagraph} ${more ? styles.passageMore : ''}`}
+                onScroll={measureQuote}
+              >
+                {passage.excerpt}
+              </blockquote>
             )}
             <button
               type="button"
@@ -853,7 +877,7 @@ export function StudyLamp({
         )}
 
         {pending && !live?.text && !live?.reasoning && (
-          <div className={styles.slip} aria-label="Claude is thinking">
+          <div className={styles.slip} aria-label="Veda is thinking">
             <span className={styles.thinking} aria-hidden="true">
               <i />
               <i />

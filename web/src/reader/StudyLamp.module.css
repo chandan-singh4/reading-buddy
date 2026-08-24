@@ -109,8 +109,16 @@
   animation: rise 400ms ease both;
 }
 
-/* A paragraph: fading into shadow, never cut. The mask is the design — a long
-   passage visibly continues below the light rather than ending. */
+/*
+ * A paragraph: fading into shadow, never cut — and readable to the end.
+ *
+ * The fade is the design: a long passage visibly continues below the light
+ * rather than stopping. It was also the whole story, which was the fault. The
+ * reader selected a paragraph, could not reach its last lines, and the only
+ * thing offered was to pin it away. So the box scrolls now, and the fade tells
+ * the truth about it: `.passageMore` is on while there is more below, and off
+ * at the bottom, where a fade would only dim the last line for no reason.
+ */
 .passageParagraph {
   margin: 0;
   padding: 6px 2px 0;
@@ -120,11 +128,22 @@
   line-height: 1.55;
   color: #f2e6c9;
   text-align: left;
-  max-height: 122px;
-  overflow: hidden;
+  max-height: 148px;
+  overflow-y: auto;
+  /* The panel is a dialog over the page. Without this, a flick that runs past
+     the last line scrolls the book underneath instead. */
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  animation: rise 400ms ease both;
+}
+
+.passageParagraph::-webkit-scrollbar {
+  display: none;
+}
+
+.passageMore {
   -webkit-mask-image: linear-gradient(to bottom, #000 34%, transparent 96%);
   mask-image: linear-gradient(to bottom, #000 34%, transparent 96%);
-  animation: rise 400ms ease both;
 }
 
 .pin {
