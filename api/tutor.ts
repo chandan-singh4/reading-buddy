@@ -1394,15 +1394,61 @@ export default async function handler(request: Request): Promise<Response> {
       const send = (line: unknown) =>
         controller.enqueue(encoder.encode(`${JSON.stringify(line)}\n`))
 
-      send({ t: 'open', model: served.id, source: served.source })
+      /*
+       * Keep walking the chain when a rung fails after it has opened.
+       *
+       * The reader's report: the model thinks for ten or fifteen seconds and
+       * then the answer turns into "no model would answer". A rung can accept
+       * a request and still fail late — most often by spending its whole token
+       * budget on reasoning and returning an empty string, which `drain` quite
+       * rightly refuses to serve as an answer. Failover used to stop the moment
+       * a rung opened, so that late failure ended the ask on the first rung
+       * instead of moving to the second.
+       *
+       * The one thing that must not be failed over is an answer the reader has
+       * already begun reading. Words on screen cannot be un-sent, so `wrote`
+       * bars the retry as soon as the first one goes out. Thinking is not
+       * words: it is working-out, the client replaces it when a new rung opens,
+       * and nobody reads a paragraph of it as the answer.
+       */
+      let rung = served
+      let response = opened
+      let rest = models.slice(models.indexOf(served) + 1)
+      let wrote = false
+      const relay = (piece: Piece) => {
+        if (piece.t === 'text') wrote = true
+        send(piece)
+      }
+
       try {
-        const answer = await drain(opened, served, wants, clock.touch, send)
-        // The assembled answer closes the stream. The client has every delta
-        // already, so this is the tidy copy — trimmed, capped, and the same
-        // object a client that never asked to stream would have received.
-        send({ t: 'done', reply: replyOf(answer, served) })
-      } catch (error) {
-        send({ t: 'error', message: reasonFrom(error), status: statusFrom(error) })
+        for (;;) {
+          send({ t: 'open', model: rung.id, source: rung.source })
+          try {
+            const answer = await drain(response, rung, wants, clock.touch, relay)
+            // The assembled answer closes the stream. The client has every
+            // delta already, so this is the tidy copy — trimmed, capped, and
+            // the same object a client that never asked to stream would have
+            // received.
+            send({ t: 'done', reply: replyOf(answer, rung) })
+            break
+          } catch (error) {
+            if (wrote || rest.length === 0) {
+              send({ t: 'error', message: reasonFrom(error), status: statusFrom(error) })
+              break
+            }
+            try {
+              const walked = await walk(turns, rest, wants, effort, ceiling, clock.signal)
+              rung = walked.step
+              response = walked.response
+              rest = rest.slice(rest.indexOf(rung) + 1)
+            } catch (fell) {
+              // Nothing below it would open either. The last rung's own words
+              // beat the one that opened and then died.
+              send({ t: 'error', message: reasonFrom(fell), status: statusFrom(fell) })
+              break
+            }
+          }
+        }
       } finally {
         clock.done()
         controller.close()

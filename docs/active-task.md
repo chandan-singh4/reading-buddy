@@ -3,31 +3,61 @@
 > What is in here: the one task in flight, and the exact files to open for it.
 > Read it at startup, before anything else.
 
-## Start here — 2026-08-23 (streaming thread)
+## Start here — 2026-08-24 (the answer that waits for you)
 
-**Nothing is mid-edit.** The build is green: 1795 tests across 100 files.
+**Nothing is mid-edit.** The build is green: 1812 tests across 101 files.
 
 ### What this thread did
 
-1. **Copied the new prompts in.** `api/tutor.ts` now holds the text of
-   `design-inspiration/reading-buddy-prompts.md` word for word. The explain-back
-   probe is gone as a separate ask; the base prompt now carries rule #10.
-2. **Raised the token ceilings.** `MAX_TOKENS` 1200 → 3000, and
-   `MAX_MATERIAL_TOKENS` → 8000. Reasoning tokens share that budget, which is
-   why long answers were cut off in the middle.
-3. **Stacked the tables.** A markdown table no longer draws as raw pipes on a
-   phone. It draws as a list of pairs: the row's first cell in bold, the other
-   cells indented under it and labelled by the header.
-4. **Made the answer stream.** The relay writes NDJSON (one JSON object per
-   line) when the client asks for it. `askTutor` takes an `onProgress` watcher.
-   The Study Lamp draws the answer as it is written.
-5. **Fixed where the thread sits.** While the answer arrives, the newest words
-   stay in view. When it finishes, the view jumps to the answer's **first
-   line**, so a long answer is not left scrolled to its end.
+1. **Raised the answer ceiling.** `MAX_TOKENS` 3000 → 8000. Reasoning tokens
+   share this budget, so 3000 was shaping answers, not catching runaways.
+2. **Removed the delete button from Notes.** A note now goes only from the
+   reader page. No `×` sits next to the text you can lose with one tap.
+3. **Grew the question box.** It expands down to 160px instead of scrolling
+   sideways. You can see the whole question while you edit it.
+4. **Removed the in-app microphone.** Two tries did not fix the write-back on
+   Android. The reader chose to remove it and use the keyboard microphone.
+   `dictation.ts` is gone.
+5. **Left the selection menu native.** The reader's decision. Replacing it means
+   suppressing the browser's own menu, and that costs more than it gives.
+6. **Fixed the tap that fell through.** A model row and the sheet scrim now
+   close on `click`, not `pointerdown`. **The rule: never close a sheet on
+   `pointerdown`.** The browser hit-tests the follow-up `click` against whatever
+   is under the finger by then, so the tap runs the button behind the sheet.
+7. **Showed the model buttons at once.** The last roster is kept in
+   `localStorage` and drawn while the fresh one loads.
+8. **Kept the answer when the panel closes.** See below — this is the big one.
+9. **Stopped a late failure ending the ask.** See below.
 
-Verified in a real browser at 375px, not only in tests: the words appear
-progressively, no half-typed marks or raw table pipes flash, and on completion
-the answer's first line lands exactly at the top of the thread.
+### The answer now outlives the panel
+
+The reader's report: ask a question, watch the model think, flick to another app
+or close the panel, come back — and the question sits there unanswered.
+
+The ask now lives in `web/src/reader/errand.ts`, a module. A module survives
+every unmount and re-render. The panel is one possible *watcher* of an errand,
+not its owner, and nothing about finishing an answer needs anyone watching. The
+errand saves the finished thread **first** and tells watchers **second**, so a
+render error cannot cost the reader the answer.
+
+`Reader.tsx` also had a second cause: `keepThread` gave up when the panel was
+closed. It now keeps the passage in a `saving` ref, so a save works with the
+panel gone.
+
+**What it does not promise.** A phone short of memory may freeze or discard a
+backgrounded tab. No web page can stop that. What is true: as long as the tab is
+alive, closing the panel or opening another book does not cost the answer.
+
+### A rung that fails late now hands off
+
+The reader's report: the model thinks for 10–15 seconds, then the answer turns
+into "no model would answer". A rung can accept a request and fail late — most
+often by spending its whole token budget on reasoning and returning an empty
+string. Failover used to stop the moment a rung opened.
+
+`api/tutor.ts` now keeps walking the chain after a late failure, unless the
+reader has already begun reading words. Thinking is not words: the client clears
+it when a new rung opens.
 
 ### The next task — WP-25, something that writes a note
 

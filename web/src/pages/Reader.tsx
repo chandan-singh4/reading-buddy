@@ -3001,6 +3001,22 @@ export default function Reader() {
   lampRef.current = lamp
 
   /*
+   * Which conversation a saved answer belongs to — kept after the lamp closes.
+   *
+   * An answer can land long after the reader has shut the panel, walked out of
+   * the book, or put the phone in their pocket. The ask is not tied to the
+   * panel any more (see `reader/errand.ts`), so the *saving* must not be tied
+   * to it either. This used to read `lampRef` and give up when it was empty,
+   * which is precisely how a finished answer got thrown away: the reader came
+   * back and had to ask the question again.
+   *
+   * Written when a lamp opens, and updated when a first save turns the
+   * conversation into a real thread. Never cleared on close.
+   */
+  const saving = useRef<{ passage: PassageAnchor; threadId: string | null } | null>(null)
+  if (lamp) saving.current = { passage: lamp.passage, threadId: lamp.threadId }
+
+  /*
    * What the tutor is told about *where* the passage is.
    *
    * Built from the book, the manifest and the section on screen — title,
@@ -3036,7 +3052,10 @@ export default function Reader() {
    */
   const keepThread = useCallback(
     async (messages: TutorMessage[]) => {
-      const open = lampRef.current
+      // Deliberately not `lampRef`. See `saving` above: the panel may be long
+      // closed by the time the answer arrives, and the answer is still the
+      // reader's.
+      const open = saving.current
       if (!id || !open) return
       if (open.threadId) {
         void tutorStore.setMessages(id, open.threadId, messages)
@@ -3051,6 +3070,9 @@ export default function Reader() {
         return
       }
       const row = await tutorStore.addThread(id, open.passage, messages)
+      // The next save is an update to this thread, not a second one, whether or
+      // not the panel is still open to be told.
+      saving.current = { passage: open.passage, threadId: row.id }
       setThreads((rows) => [...rows, row])
       setLamp((current) => (current ? { ...current, threadId: row.id, saved: messages } : current))
     },

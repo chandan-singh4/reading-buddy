@@ -56,7 +56,6 @@ export {
   storedEffort,
 } from './effort.ts'
 export type { Effort } from './effort.ts'
-export { dictationSupported, joinSaid, useDictation } from './dictation.ts'
 export { ThreadMenu } from './ThreadMenu.tsx'
 export type { ThreadMenuProps } from './ThreadMenu.tsx'
 export { TutorMarks } from './TutorMarks.tsx'

@@ -465,6 +465,13 @@ async function follow(
       switch (piece.t) {
         case 'open':
           if (typeof piece.model === 'string') model = piece.model
+          /*
+           * A second `open` means the relay moved to the next model after this
+           * one failed late. The working-out belongs to the rung that gave up,
+           * so it goes with it — leaving it on screen would show one model's
+           * thinking under another model's name.
+           */
+          reasoning = ''
           say()
           break
         case 'think':

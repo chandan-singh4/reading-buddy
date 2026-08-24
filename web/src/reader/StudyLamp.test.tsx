@@ -10,6 +10,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { forgetAllErrands } from './errand.ts'
 import { PREFERRED_MODEL } from './models.ts'
 import { StudyLamp } from './StudyLamp.tsx'
 import type { PassageAnchor, TutorMessage } from './tutor.ts'
@@ -235,7 +236,12 @@ async function ask(label = 'Explain simply') {
   fireEvent.click(await screen.findByRole('button', { name: label }))
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  // Errands live in a module, on purpose — they have to survive a panel going
+  // away. That also means one test's ask would otherwise turn up in the next.
+  forgetAllErrands()
+})
 
 describe('the question box', () => {
   /*

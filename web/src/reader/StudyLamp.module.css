@@ -610,48 +610,11 @@
   transform: translateY(-1px);
 }
 
-/* Ask out loud.
- *
- * Left of the box rather than right, so it never trades places with Send — the
- * two do different things and a control that moves is a control that gets
- * pressed by mistake. Drawn only where the browser has the API. */
-.mic {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: #7a6d52;
-  cursor: pointer;
-}
-
+/* The glyph inside the globe. Kept at this name because the globe is the only
+   thing that draws one now — the microphone that shared it is gone. */
 .micGlyph {
   width: 19px;
   height: 19px;
-}
-
-/* Listening. The room does not have a red light, so it uses its own lamp
-   colour and a slow pulse — the same signal, in the same palette. */
-.hearing {
-  background: rgba(195, 154, 94, 0.16);
-  color: #e6c98d;
-  animation: hearing 1.6s ease-in-out infinite;
-}
-
-@keyframes hearing {
-  50% {
-    background: rgba(195, 154, 94, 0.32);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hearing {
-    animation: none;
-  }
 }
 
 /*
@@ -727,7 +690,6 @@
 .anchorBar:focus-visible,
 .option:focus-visible,
 .send:focus-visible,
-.mic:focus-visible,
 .picker:focus-visible,
 .action:focus-visible,
 .failureRetry:focus-visible,

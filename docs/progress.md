@@ -15,6 +15,23 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **An answer now outlives the panel that asked for it** (2026-08-24). The
+  reader asked a question, watched the model start thinking, went to another app
+  or closed the panel — and came back to the question, unanswered. The ask lives
+  in `web/src/reader/errand.ts` now, a module, which no unmount can touch. The
+  panel *watches* an errand rather than owning it, and nothing about finishing
+  an answer needs anyone watching. The errand **saves first and tells watchers
+  second**, so a render error cannot cost the answer. A second cause sat in
+  `Reader.tsx`: `keepThread` gave up when the panel was closed. It keeps the
+  passage in a ref now. **The limit, stated plainly:** a phone short of memory
+  may still freeze or discard a backgrounded tab, and no web page can stop that.
+- **A model that fails late no longer ends the ask** (2026-08-24). The reader
+  saw the model think for 10–15 seconds and then say no model would answer. A
+  rung can accept the request and fail late — usually by spending its whole
+  token budget on reasoning and returning an empty string. Failover used to stop
+  the moment a rung opened. `api/tutor.ts` keeps walking the chain after a late
+  failure, unless words have already reached the reader. Thinking is not words:
+  the client clears it when a new rung opens.
 - **The question box repeated every sentence, and the cause was not the
   microphone** (2026-08-24). A screenshot from the phone settled it: the reader
   is on **Android**, and the box filled with the same sentence again and again,
@@ -28,9 +45,10 @@ Get that loop working before building any breadth.
   **The rule: never make a text field in this app a controlled React field.**
   An earlier fix aimed at Safari's re-delivery missed this entirely — the wrong
   platform was assumed from the symptom.
-- **The app's own microphone is idempotent now too.** Each chunk is written into
-  its own slot rather than added to a running total, so a chunk the phone sends
-  twice cannot be typed twice, whatever `resultIndex` reports.
+- **The in-app microphone is removed** (2026-08-24). Two fixes did not stop the
+  write-back, and the reader decided: "Let's just remove it. I'll use the
+  keyboard microphone." `dictation.ts` and its button are gone. The keyboard's
+  own microphone works, because it feeds the field the same way typing does.
 - **Four fixes from a real afternoon of reading** (2026-08-24).
   1. The answer ceiling is 8,000 tokens, up from 3,000. Real answers were going
      over it and more were sitting just under, which is a ceiling shaping the
@@ -42,9 +60,7 @@ Get that loop working before building any breadth.
      then scrolls. It used to be a one-line input that scrolled sideways, so a
      word in the middle of a long question could not be reached. Enter sends,
      Shift+Enter makes a line.
-  4. The in-app microphone typed every word twice. It added up the whole result
-     list, and Safari re-delivers chunks it has already settled. It reads from
-     `event.resultIndex` now and keeps the settled words itself.
+  4. The in-app microphone typed every word twice, and is now removed.
 - **The text selection menu stays the platform's.** The reader asked for the
   cut/copy/paste popup in the question box to be drawn in the app's own style.
   That bar is drawn by Android outside the page and cannot be restyled. It

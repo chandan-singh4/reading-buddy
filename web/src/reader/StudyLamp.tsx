@@ -62,7 +62,6 @@ import {
   type Column,
 } from './models.ts'
 import {
-  askTutor,
   elide,
   INTENT_LABELS,
   modelLabel,
@@ -75,6 +74,13 @@ import {
 import type { PassageContext } from './context.ts'
 import { ModelSheet } from './ModelSheet.tsx'
 import { EffortSheet } from './EffortSheet.tsx'
+import {
+  askOnErrand,
+  errandAt,
+  forgetErrand,
+  watchErrand,
+  type Errand,
+} from './errand.ts'
 import { Markdown, whileWriting } from './markdown.tsx'
 import {
   DEFAULT_EFFORT,
@@ -83,7 +89,6 @@ import {
   storedEffort,
   type Effort,
 } from './effort.ts'
-import { useDictation } from './dictation.ts'
 import styles from './StudyLamp.module.css'
 
 export interface StudyLampProps {
@@ -124,29 +129,7 @@ const INTENTS: TutorIntent[] = [
 ]
 
 /**
- * A microphone, drawn rather than typed. The 🎤 emoji is a different size, a
- * different colour and a different century in every font that has it.
- */
-function MicGlyph() {
-  return (
-    <svg
-      className={styles.micGlyph}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="9" y="2.5" width="6" height="11" rx="3" />
-      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
-    </svg>
-  )
-}
-
-/**
- * A globe. Drawn for the same reason the microphone is: 🌐 is a different size
+ * A globe, drawn rather than typed. 🌐 is a different size, a different colour
  * and a different century in every font that has it.
  */
 function GlobeGlyph() {
@@ -302,10 +285,6 @@ export function StudyLamp({
      layout effect below for why this is a ref and not state. */
   const reveal = useRef<number | undefined>(undefined)
   const input = useRef<HTMLTextAreaElement | null>(null)
-  /* What is in the box right now, for the recogniser — which starts once and
-     must not be rebuilt every keystroke to see it. */
-  const draftRef = useRef('')
-  draftRef.current = draft
   /*
    * ## Why the question box is not a controlled field
    *
@@ -324,11 +303,44 @@ export function StudyLamp({
    * So the element owns its text and `draft` follows it, rather than the other
    * way round. `draft` is still what the send button and the recogniser read;
    * it is simply never written back to the box. Everything that needs to *set*
-   * the text — sending, editing, dictation — goes through `setBox` below, which
+   * the text — sending and editing — goes through `setBox` below, which
    * writes both.
    */
 
+  /* One errand per passage. See `errand.ts`. */
+  const errandKey = passage.anchor
+
   const fresh = messages.length === 0
+
+  /*
+   * Catch up with the ask, however long the reader was away.
+   *
+   * Runs on mount as well as on change, so a panel reopened while an answer is
+   * being written shows the words still arriving, and one reopened after it
+   * landed shows the answer rather than the question sitting on its own.
+   */
+  useEffect(() => {
+    const collect = (errand: Errand) => {
+      if (!errand.result) {
+        setPending(true)
+        setLive(errand.progress)
+        return
+      }
+      setLive(undefined)
+      setPending(false)
+      setMessages(errand.result.messages)
+      setFailure(errand.result.failure)
+      if (errand.result.messages.length > 0) setCollapsed(true)
+      if (errand.result.reveal !== undefined) reveal.current = errand.result.reveal
+      // Collected. A panel opening later reads it from the saved thread, like
+      // any other finished conversation.
+      forgetErrand(errandKey)
+    }
+
+    const waiting = errandAt(errandKey)
+    if (waiting) collect(waiting)
+    return watchErrand(errandKey, collect)
+  }, [errandKey])
 
   /*
    * Focus management, the modal contract: focus moves in, Tab cycles inside,
@@ -459,7 +471,7 @@ export function StudyLamp({
    * The element is not controlled — see the long note by `draft` — so the app
    * has to write to it as well as to the state. Every path that sets the
    * question rather than reading it comes through here: sending clears it,
-   * Edit refills it, dictation writes into it.
+   * Edit refills it.
    */
   const setBox = useCallback(
     (text: string) => {
@@ -473,23 +485,6 @@ export function StudyLamp({
 
   useLayoutEffect(grow, [draft, grow])
 
-  /*
-   * Speaking instead of typing.
-   *
-   * The words land in the same box the reader would have typed into, so a
-   * dictated question can be corrected by hand before it is sent — which is
-   * most of them, because a recogniser hears "Nietzsche" as "Nietzsche" about
-   * half the time.
-   */
-  const dictation = useDictation({
-    baseText: () => draftRef.current,
-    onText: setBox,
-  })
-  /* `send` must be able to end a run without listing the whole dictation in
-     its dependencies — it is rebuilt on every keystroke otherwise. */
-  const stopSaying = useRef(dictation.stop)
-  stopSaying.current = dictation.stop
-
   const send = useCallback(
     /**
      * `base` replaces the thread this question is asked against. A retry passes
@@ -501,8 +496,6 @@ export function StudyLamp({
       if (pending) return
       const asked = text.trim()
       if (!asked) return
-      // A question that has gone must not keep collecting words behind it.
-      stopSaying.current()
       if (chip) intent.current = chip
 
       const yours: TutorMessage = { role: 'you', text: asked, ts: Date.now() }
@@ -515,7 +508,17 @@ export function StudyLamp({
       // The globe is spent on this question. See the state above.
       setSearching(false)
 
-      void askTutor({
+      /*
+       * Sent on an errand, not from here.
+       *
+       * Everything below the `askOnErrand` call runs whether or not this panel
+       * is still on screen. The reader can close the room, leave the book or
+       * put the phone away; the answer still arrives and is still saved. See
+       * `errand.ts` for why that could not be done from inside the component.
+       */
+      askOnErrand(
+        errandKey,
+        {
         anchor: passage,
         ...(context ? { context } : {}),
         mode: history.length === 0 ? 'fresh' : 'reopen',
@@ -527,48 +530,35 @@ export function StudyLamp({
         // roster — not whatever fixed list the server happens to carry.
         ...(columns.length > 0 ? { models: stepsFrom(columns, pick) } : {}),
         effort,
-        ...(searching ? { search: true } : {}),
-      },
-        // Every delta, as it lands. `setLive` alone draws the answer growing;
-        // nothing is saved and nothing joins the thread until it is finished.
-        setLive,
-      ).then((reply) => {
-        setLive(undefined)
-        if (reply.failed) {
-          // The question stays — the reader can see what went unanswered and
-          // retry it. The failure itself goes beside the thread, not into it.
-          const kept = [...history, yours]
-          setMessages(kept)
-          setFailure(reply.text)
-          setPending(false)
-          if (history.length === 0) setCollapsed(true)
-          onSave(kept)
-          return
-        }
-        // `reply.model` is what answered, not what was asked for. On a failover
-        // the two differ, and the label has to name the one that wrote the
-        // words. A canned failure line carries no model and so draws no name.
-        const answer: TutorMessage = {
-          role: 'claude',
-          text: reply.text,
-          ...(reply.isProbe ? { isProbe: true } : {}),
-          ...(reply.model ? { model: reply.model } : {}),
-          ...(reply.reasoning ? { reasoning: reply.reasoning } : {}),
-          ...(reply.usage ? { usage: reply.usage } : {}),
-          ...(reply.sources ? { sources: reply.sources } : {}),
-          ts: Date.now(),
-        }
-        const whole = [...history, yours, answer]
-        // Read this one from its first line, not from wherever the writing
-        // ended up. The layout effect above does it and clears itself.
-        reveal.current = answer.ts
-        setMessages(whole)
-        setPending(false)
-        // The first exchange pins the passage on its own: the thread has
-        // begun, and the thread needs the room.
-        if (history.length === 0) setCollapsed(true)
-        onSave(whole)
-      })
+          ...(searching ? { search: true } : {}),
+        },
+        (reply) => {
+          if (reply.failed) {
+            // The question stays — the reader can see what went unanswered and
+            // retry it. The failure itself goes beside the thread, not into it.
+            const kept = [...history, yours]
+            onSave(kept)
+            return { messages: kept, failure: reply.text }
+          }
+          // `reply.model` is what answered, not what was asked for. On a
+          // failover the two differ, and the label has to name the one that
+          // wrote the words. A canned failure line carries no model and so
+          // draws no name.
+          const answer: TutorMessage = {
+            role: 'claude',
+            text: reply.text,
+            ...(reply.isProbe ? { isProbe: true } : {}),
+            ...(reply.model ? { model: reply.model } : {}),
+            ...(reply.reasoning ? { reasoning: reply.reasoning } : {}),
+            ...(reply.usage ? { usage: reply.usage } : {}),
+            ...(reply.sources ? { sources: reply.sources } : {}),
+            ts: Date.now(),
+          }
+          const whole = [...history, yours, answer]
+          onSave(whole)
+          return { messages: whole, reveal: answer.ts }
+        },
+      )
     },
     [messages, passage, context, pending, columns, pick, effort, searching, onSave],
   )
@@ -933,17 +923,6 @@ export function StudyLamp({
             <GlobeGlyph />
           </button>
         </div>
-        {dictation.supported && (
-          <button
-            type="button"
-            className={`${styles.mic} ${dictation.listening ? styles.hearing : ''}`}
-            aria-label={dictation.listening ? 'Stop dictating' : 'Ask out loud'}
-            aria-pressed={dictation.listening}
-            onClick={dictation.toggle}
-          >
-            <MicGlyph />
-          </button>
-        )}
         {/*
           A textarea, not an input, and it grows.
 
@@ -965,7 +944,7 @@ export function StudyLamp({
              the Android keyboard's composing buffer and the question doubles. */
           defaultValue=""
 
-          placeholder={dictation.listening ? 'Listening…' : 'Ask into the quiet…'}
+          placeholder="Ask into the quiet…"
           aria-label="Ask about this passage"
           /* `draft` follows the element, and is never written back to it. It
              is read by the send button, by `send`, and by the recogniser. */
