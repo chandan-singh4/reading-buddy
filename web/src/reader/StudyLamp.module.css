@@ -457,7 +457,10 @@
   flex: 0 0 auto;
   z-index: 1;
   display: flex;
-  align-items: center;
+  /* The send button and the microphone stay with the *last* line of a question
+     that has grown to several. Centred, they would drift up the side of the box
+     and end up beside the middle of the text. */
+  align-items: flex-end;
   flex-wrap: wrap;
   gap: 9px;
   margin: 0;
@@ -651,15 +654,38 @@
   }
 }
 
+/*
+ * The question box, which grows with the question.
+ *
+ * A one-line input scrolled sideways, so correcting a word in the middle of a
+ * long question meant dragging the text back and forth to find it. This takes
+ * as many lines as it needs; `StudyLamp.tsx` sets the height from the content
+ * and stops at `MAX_COMPOSER_PX`, after which `overflow-y` takes over.
+ */
 .input {
   flex: 1;
+  /* `min-width: 0` or a long unbroken word makes the flex item wider than the
+     row and pushes the send button off the edge. */
+  min-width: 0;
   min-height: 2.5rem;
+  /* The height is set in JS; this is the cap it stops at, repeated here so the
+     box can never run past it even for the frame before the effect runs. */
+  max-height: 160px;
   border: 0;
   background: transparent;
   color: #ece0c4;
   font-family: 'EB Garamond', Georgia, serif;
   font-size: 17px;
+  /* Set, not inherited: the JS measures `scrollHeight` against it, and a
+     textarea's default of `normal` differs from the line the rest of the panel
+     is set in. */
+  line-height: 1.45;
   outline: none;
+  /* A textarea comes with a drag handle and a scrollbar. The height is the
+     app's business here, and the reader has no reason to fight it. */
+  resize: none;
+  overflow-y: auto;
+  padding: 0.45rem 0;
 }
 
 .input::placeholder {

@@ -21,21 +21,11 @@ function note(id: string, author: 'you' | 'claude', chapter = 1): NoteRow {
 
 const NOTES = [note('1', 'you'), note('2', 'claude'), note('3', 'you', 2)]
 
-function draw(
-  notes: NoteRow[] = NOTES,
-  onJumpToNote = vi.fn(),
-  onDeleteNote = vi.fn(),
-  onOpenThread = vi.fn(),
-) {
+function draw(notes: NoteRow[] = NOTES, onJumpToNote = vi.fn(), onOpenThread = vi.fn()) {
   render(
-    <NotesPanel
-      notes={notes}
-      onJumpToNote={onJumpToNote}
-      onDeleteNote={onDeleteNote}
-      onOpenThread={onOpenThread}
-    />,
+    <NotesPanel notes={notes} onJumpToNote={onJumpToNote} onOpenThread={onOpenThread} />,
   )
-  return { onJumpToNote, onDeleteNote, onOpenThread }
+  return { onJumpToNote, onOpenThread }
 }
 
 afterEach(cleanup)
@@ -104,13 +94,17 @@ describe('the notes tab', () => {
     expect(onJumpToNote).toHaveBeenCalledWith('[ch01-s01-p001]')
   })
 
-  it('deletes the note whose cross was pressed', () => {
-    const { onDeleteNote } = draw()
+  it('offers no way to delete from this list', () => {
+    /*
+     * The reader asked for the crosses to go. Each one sat a thumb's width from
+     * the note it belonged to, and pressing one took a highlight or a whole
+     * conversation with no warning and no way back. Deleting is still offered
+     * where the reader is already looking at the thing itself — a highlight
+     * from its menu on the page, a conversation from the menu inside it.
+     */
+    draw()
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Delete this note' })[0]!)
-
-    expect(onDeleteNote).toHaveBeenCalledTimes(1)
-    expect(onDeleteNote.mock.calls[0]![0].id).toBe('1')
+    expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull()
   })
 
   it('reopens a tutor thread instead of jumping', () => {
@@ -123,12 +117,11 @@ describe('the notes tab', () => {
     expect(onJumpToNote).not.toHaveBeenCalled()
   })
 
-  it('names a thread row’s delete after the conversation it takes', () => {
+  it('offers no way to delete a conversation from this list either', () => {
+    // The row a slip of the thumb cost the most: a whole conversation.
     const thread = { ...note('4', 'claude'), threadId: 'thread-4' }
-    const { onDeleteNote } = draw([thread])
+    draw([thread])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete this conversation' }))
-
-    expect(onDeleteNote.mock.calls[0]![0].threadId).toBe('thread-4')
+    expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull()
   })
 })

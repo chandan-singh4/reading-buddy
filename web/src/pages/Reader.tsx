@@ -3200,23 +3200,6 @@ export default function Reader() {
     [id],
   )
 
-  /**
-   * Delete from the notes panel. A tutor row is a whole conversation: the
-   * thread goes, and with it the ink and the slip on the page.
-   */
-  const dropNoteRow = useCallback(
-    (note: NoteRow) => {
-      if (!id) return
-      if (note.threadId) {
-        void tutorStore.deleteThread(id, note.threadId)
-        setThreads((rows) => rows.filter((row) => row.id !== note.threadId))
-        return
-      }
-      dropNote(note.id)
-    },
-    [id, dropNote],
-  )
-
   /** Delete from the page. The row goes, and with it the ink and the slip. */
   const dropThread = useCallback(
     (thread: StoredTutorThread) => {
@@ -3543,7 +3526,6 @@ export default function Reader() {
             onDeleteBookmark={deleteBookmark}
             notes={noteRows}
             onJumpToNote={jumpToAnchor}
-            onDeleteNote={dropNoteRow}
             onOpenThread={openThreadById}
             searchOpen={searchOpen}
             query={query}

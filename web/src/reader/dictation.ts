@@ -25,6 +25,18 @@
  * So a dictation run remembers what was in the box when it started, and every
  * event rewrites *everything after that point*. The reader sees words appear
  * and then tidy themselves, which is what dictation looks like everywhere else.
+ *
+ * ## Why the finished words are kept by hand
+ *
+ * The obvious reading of the API is that `event.results` is the whole
+ * transcript, so adding every chunk up gives you what was said. On a phone it
+ * does not: Safari re-delivers chunks it has already finished, so adding them
+ * all up types the same words a second time. That is the doubling the reader
+ * hit, and it made the button useless.
+ *
+ * `event.resultIndex` is the fix and is what it is for — it says where the new
+ * chunks start in that list. So the finished words are appended once, as they
+ * are finished, and only the unfinished tail is redrawn on every event.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -42,8 +54,15 @@ interface Recogniser {
   onend: (() => void) | null
 }
 
+interface SpeechResult extends ArrayLike<{ transcript: string }> {
+  /** True once the recogniser has stopped revising this chunk. */
+  isFinal: boolean
+}
+
 interface SpeechEvent {
-  results: ArrayLike<ArrayLike<{ transcript: string }>>
+  results: ArrayLike<SpeechResult>
+  /** Where in `results` this event's new chunks begin. */
+  resultIndex: number
 }
 
 type RecogniserClass = new () => Recogniser
@@ -72,18 +91,25 @@ export function dictationSupported(): boolean {
 }
 
 /**
- * Everything heard so far, in one string.
+ * What this event adds: the chunks it settled, and the tail still being revised.
  *
- * The API hands back a growing list of chunks, each with its own alternatives.
- * Only the first alternative of each chunk is used — the others are the
+ * Read from `resultIndex` rather than from zero. Everything before it is
+ * already accounted for, and on Safari it is also re-delivered — reading from
+ * zero is what typed every word twice.
+ *
+ * Only the first alternative of each chunk is used. The others are the
  * recogniser's second guesses, and showing them would be noise.
  */
-export function transcriptOf(event: SpeechEvent): string {
-  let said = ''
-  for (let index = 0; index < event.results.length; index++) {
-    said += event.results[index]?.[0]?.transcript ?? ''
+export function heardIn(event: SpeechEvent): { settled: string; pending: string } {
+  let settled = ''
+  let pending = ''
+  for (let index = event.resultIndex; index < event.results.length; index++) {
+    const chunk = event.results[index]
+    const words = chunk?.[0]?.transcript ?? ''
+    if (chunk?.isFinal) settled += words
+    else pending += words
   }
-  return said.trim()
+  return { settled, pending }
 }
 
 /**
@@ -119,6 +145,9 @@ export function useDictation(options: {
   const [listening, setListening] = useState(false)
   const machine = useRef<Recogniser | null>(null)
   const base = useRef('')
+  /* The words this run has finished with. Built up chunk by chunk, because the
+     recogniser cannot be trusted to hand back the whole transcript. */
+  const settled = useRef('')
   // Held in a ref so the recogniser's callbacks always call today's function,
   // not the one that existed when the run started.
   const latest = useRef(options)
@@ -151,8 +180,13 @@ export function useDictation(options: {
     machinery.lang = document.documentElement.lang || navigator.language || 'en-US'
 
     base.current = latest.current.baseText()
+    settled.current = ''
     machinery.onresult = (event) => {
-      latest.current.onText(joinSaid(base.current, transcriptOf(event)))
+      const { settled: done, pending } = heardIn(event)
+      settled.current += done
+      // The finished words, then the guess at the tail. The guess is replaced
+      // on the next event; the finished words never are.
+      latest.current.onText(joinSaid(base.current, `${settled.current}${pending}`))
     }
     machinery.onerror = () => {
       // Refused permission, no microphone, or silence timed out. All three end

@@ -15,6 +15,25 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **Four fixes from a real afternoon of reading** (2026-08-24).
+  1. The answer ceiling is 8,000 tokens, up from 3,000. Real answers were going
+     over it and more were sitting just under, which is a ceiling shaping the
+     answer instead of catching a runaway.
+  2. The × is gone from every row in Notes. It sat a thumb's width from the note
+     and took a highlight or a whole conversation with no warning. Deleting is
+     still offered where the reader is looking at the thing itself.
+  3. The question box is a textarea that grows to the question, up to 160px,
+     then scrolls. It used to be a one-line input that scrolled sideways, so a
+     word in the middle of a long question could not be reached. Enter sends,
+     Shift+Enter makes a line.
+  4. The in-app microphone typed every word twice. It added up the whole result
+     list, and Safari re-delivers chunks it has already settled. It reads from
+     `event.resultIndex` now and keeps the settled words itself.
+- **One thing we will not do: replace the text selection menu.** The reader
+  asked for the copy/paste popup in the question box to match the app. That menu
+  is drawn by iOS itself, outside the page, and a web app cannot restyle it.
+  Replacing it means suppressing it and rebuilding copy, paste, select-all,
+  dictation, autocorrect and the drag handles by hand — worse in every case.
 - **Two faults in the tutor's controls, both reported by the reader**
   (2026-08-24). First, the model and effort controls were missing for the first
   three or four seconds of a new conversation: the roster is fetched behind a

@@ -126,8 +126,6 @@ export interface ChromeProps {
   notes: readonly NoteRow[]
   /** Go to the paragraph a note is about. */
   onJumpToNote: (anchor: Anchor) => void
-  /** Take a note off the page — or a whole tutor thread, where the row is one. */
-  onDeleteNote: (note: NoteRow) => void
   /** Reopen a tutor conversation under the lamp. */
   onOpenThread: (threadId: string) => void
 
@@ -193,7 +191,6 @@ export function Chrome({
   onDeleteBookmark,
   notes,
   onJumpToNote,
-  onDeleteNote,
   onOpenThread,
   searchOpen,
   query,
@@ -664,7 +661,6 @@ export function Chrome({
             <NotesPanel
               notes={notes}
               onJumpToNote={onJumpToNote}
-              onDeleteNote={onDeleteNote}
               onOpenThread={onOpenThread}
             />
           )}

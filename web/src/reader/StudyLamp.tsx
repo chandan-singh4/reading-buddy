@@ -203,6 +203,15 @@ function totalUsage(messages: readonly TutorMessage[]): TutorUsage | undefined {
   return any ? sum : undefined
 }
 
+/*
+ * How tall the question box may grow, in pixels.
+ *
+ * A third of a short phone's screen. Past that the box scrolls instead — a
+ * composer that keeps growing ends up hiding the conversation it is part of,
+ * and on a phone with the keyboard up there is not much room to give away.
+ */
+const MAX_COMPOSER_PX = 160
+
 export function StudyLamp({
   passage,
   context,
@@ -292,7 +301,7 @@ export function StudyLamp({
   /* The answer to reveal from its first line once it is finished. See the
      layout effect below for why this is a ref and not state. */
   const reveal = useRef<number | undefined>(undefined)
-  const input = useRef<HTMLInputElement | null>(null)
+  const input = useRef<HTMLTextAreaElement | null>(null)
   /* What is in the box right now, for the recogniser — which starts once and
      must not be rebuilt every keystroke to see it. */
   const draftRef = useRef('')
@@ -403,6 +412,25 @@ export function StudyLamp({
 
     node.scrollTop = node.scrollHeight
   }, [messages, pending, live])
+
+  /*
+   * The composer, grown to fit the question.
+   *
+   * Height is reset to nothing first and then read back off `scrollHeight`.
+   * Without the reset the box could only ever get taller: `scrollHeight` never
+   * reports less than the height already set, so deleting a line would leave
+   * the gap behind.
+   *
+   * A layout effect, so the box is the right size in the frame the character
+   * lands in. In a plain effect the reader would see one frame of the old
+   * height on every keystroke that wraps.
+   */
+  useLayoutEffect(() => {
+    const box = input.current
+    if (!box) return
+    box.style.height = 'auto'
+    box.style.height = `${Math.min(box.scrollHeight, MAX_COMPOSER_PX)}px`
+  }, [draft])
 
   /*
    * Speaking instead of typing.
@@ -875,13 +903,38 @@ export function StudyLamp({
             <MicGlyph />
           </button>
         )}
-        <input
+        {/*
+          A textarea, not an input, and it grows.
+
+          A one-line input scrolls sideways, so a question longer than the bar
+          could only be corrected by dragging the text back and forth to find
+          the word. The box now takes as many lines as the question needs — up
+          to a third of the screen, after which it scrolls, because a composer
+          that eats the conversation is its own problem.
+
+          `rows={1}` is the floor. The height is set from `scrollHeight` in the
+          layout effect below, which is the only way to measure text that has
+          not been laid out yet.
+        */}
+        <textarea
           ref={input}
           className={styles.input}
+          rows={1}
           value={draft}
           placeholder={dictation.listening ? 'Listening…' : 'Ask into the quiet…'}
           aria-label="Ask about this passage"
           onChange={(event) => setDraft(event.target.value)}
+          /* Enter sends, as it did when this was an input. Shift+Enter is the
+             new line — the same bargain every chat box on a keyboard makes.
+             On a phone the key is "return" and inserts a line, which is what a
+             thumb typing a long question wants. */
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || event.shiftKey) return
+            // Mid-word in an IME. The key is finishing a character, not sending.
+            if (event.nativeEvent.isComposing) return
+            event.preventDefault()
+            if (!pending && draft.trim().length > 0) send(draft)
+          }}
         />
         <button
           type="submit"

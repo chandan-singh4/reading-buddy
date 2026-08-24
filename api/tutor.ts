@@ -228,8 +228,13 @@ const TIMEOUT_MS = 60_000
  * counted against this same budget by every provider here, so a ceiling set to
  * the length of the wanted answer is a ceiling that truncates it — which is
  * exactly what a single 1,200 did: answers stopped mid-word at the cap.
+ *
+ * 3,000 was still too tight. Reading with the app for an afternoon found real
+ * answers over it and more sitting just under, which is the shape of a ceiling
+ * that is shaping the answer rather than catching a runaway. 8,000 is past
+ * anything one exchange should need, so the prompts decide the length again.
  */
-const MAX_TOKENS = 3000
+const MAX_TOKENS = 8000
 const MAX_MATERIAL_TOKENS = 8000
 const MAX_EXCERPT = 8000
 /**

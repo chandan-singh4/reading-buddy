@@ -44,8 +44,6 @@ export interface NotesPanelProps {
   notes: readonly NoteRow[]
   /** Go to the paragraph a note is about. */
   onJumpToNote: (anchor: Anchor) => void
-  /** Take a note off the page — or a whole tutor thread, where the row is one. */
-  onDeleteNote: (note: NoteRow) => void
   /** Reopen a tutor conversation under the lamp. */
   onOpenThread?: (threadId: string) => void
 }
@@ -55,29 +53,17 @@ function whereItIs(note: NoteRow): string {
   return note.page === null ? note.chapterTitle : `${note.chapterTitle} · p.${note.page}`
 }
 
-/** One note, in the hand of whoever wrote it. */
-function Note({
-  note,
-  onJump,
-  onDelete,
-}: {
-  note: NoteRow
-  onJump: () => void
-  onDelete: () => void
-}) {
-  const bin = (
-    <button
-      type="button"
-      className={styles.bin}
-      aria-label={
-        note.threadId ? 'Delete this conversation' : 'Delete this note'
-      }
-      onClick={onDelete}
-    >
-      ×
-    </button>
-  )
-
+/*
+ * One note, in the hand of whoever wrote it.
+ *
+ * **Nothing here deletes.** There used to be a small × on every row, and it sat
+ * a thumb's width from the row itself — one slip and a conversation was gone
+ * with no warning and no way back. Deleting is still offered, but only where
+ * the reader is already looking at the thing itself: a highlight comes off from
+ * its own menu on the page, and a conversation from the menu inside it. This
+ * list is for finding your way back to them.
+ */
+function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
   if (note.author === 'claude') {
     return (
       <li className={styles.note}>
@@ -87,7 +73,6 @@ function Note({
         </button>
         <span className={styles.tagRow}>
           <span className={styles.tag}>{whereItIs(note)}</span>
-          {bin}
         </span>
       </li>
     )
@@ -97,7 +82,6 @@ function Note({
     <li className={styles.note}>
       <span className={styles.tagRow}>
         <span className={styles.tag}>{whereItIs(note)}</span>
-        {bin}
       </span>
       {/* The colour the reader chose, carried through to the list. It is the
           only thing telling two highlights apart at a glance, and readers give
@@ -114,7 +98,7 @@ function Note({
   )
 }
 
-export function NotesPanel({ notes, onJumpToNote, onDeleteNote, onOpenThread }: NotesPanelProps) {
+export function NotesPanel({ notes, onJumpToNote, onOpenThread }: NotesPanelProps) {
   const [filter, setFilter] = useState<NoteFilter>('all')
   const chips = useRef<(HTMLButtonElement | null)[]>([])
 
@@ -190,12 +174,7 @@ export function NotesPanel({ notes, onJumpToNote, onDeleteNote, onOpenThread }: 
               </h3>
               <ul className={styles.group}>
                 {group.notes.map((note) => (
-                  <Note
-                    key={note.id}
-                    note={note}
-                    onJump={() => visit(note)}
-                    onDelete={() => onDeleteNote(note)}
-                  />
+                  <Note key={note.id} note={note} onJump={() => visit(note)} />
                 ))}
               </ul>
             </section>
@@ -203,12 +182,7 @@ export function NotesPanel({ notes, onJumpToNote, onDeleteNote, onOpenThread }: 
         ) : (
           <ul className={styles.list}>
             {shown.map((note) => (
-              <Note
-                key={note.id}
-                note={note}
-                onJump={() => visit(note)}
-                onDelete={() => onDeleteNote(note)}
-              />
+              <Note key={note.id} note={note} onJump={() => visit(note)} />
             ))}
           </ul>
         )}

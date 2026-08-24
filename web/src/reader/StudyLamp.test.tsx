@@ -237,6 +237,64 @@ async function ask(label = 'Explain simply') {
 
 afterEach(() => vi.unstubAllGlobals())
 
+describe('the question box', () => {
+  /*
+   * It used to be a one-line `<input>`. A question longer than the bar scrolled
+   * sideways, so correcting a word in the middle meant dragging the text back
+   * and forth to find it. It is a textarea that grows now — which means Enter
+   * has to be given back its job by hand, because a textarea's Enter makes a
+   * line rather than submitting the form.
+   */
+
+  it('takes more than one line', async () => {
+    lamp([])
+    const box = await screen.findByLabelText('Ask about this passage')
+    expect(box.tagName).toBe('TEXTAREA')
+  })
+
+  it('sends on Enter', async () => {
+    relay(answered('The mind talks in pictures.'))
+    lamp([])
+    const box = await screen.findByLabelText('Ask about this passage')
+    fireEvent.change(box, { target: { value: 'What does this mean?' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+
+    expect(await screen.findByText('What does this mean?')).toBeTruthy()
+  })
+
+  it('makes a new line on Shift+Enter, and sends nothing', async () => {
+    relay(answered('Never asked.'))
+    lamp([])
+    const box = await screen.findByLabelText('Ask about this passage')
+    fireEvent.change(box, { target: { value: 'First line' } })
+    fireEvent.keyDown(box, { key: 'Enter', shiftKey: true })
+
+    // Still in the box, not in the thread.
+    expect((box as HTMLTextAreaElement).value).toBe('First line')
+    expect(screen.queryByText('Never asked.')).toBeNull()
+  })
+
+  it('sends nothing on Enter when the box is empty', async () => {
+    lamp([])
+    const box = await screen.findByLabelText('Ask about this passage')
+    fireEvent.keyDown(box, { key: 'Enter' })
+
+    expect(screen.queryByText(/Claude is thinking/)).toBeNull()
+  })
+
+  it('lets an IME finish a character without sending', async () => {
+    // Mid-word in a Japanese or Chinese keyboard, Enter picks the candidate.
+    // Sending there would cut the question off at half a word.
+    relay(answered('Never asked.'))
+    lamp([])
+    const box = await screen.findByLabelText('Ask about this passage')
+    fireEvent.change(box, { target: { value: 'なに' } })
+    fireEvent.keyDown(box, { key: 'Enter', isComposing: true })
+
+    expect((box as HTMLTextAreaElement).value).toBe('なに')
+  })
+})
+
 describe('a failure the reader can see', () => {
   it('does not stack when the tutor keeps refusing', async () => {
     relay(refused())

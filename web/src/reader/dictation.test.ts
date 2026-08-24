@@ -13,7 +13,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 
-import { dictationSupported, joinSaid, transcriptOf, useDictation } from './dictation.ts'
+import { dictationSupported, heardIn, joinSaid, useDictation } from './dictation.ts'
 
 interface Fake {
   started: number
@@ -57,8 +57,22 @@ function fakeRecogniser() {
 }
 
 /** What the API hands back: chunks, each with alternatives. */
-function heard(...chunks: string[]) {
-  return { results: chunks.map((transcript) => [{ transcript }]) }
+/*
+ * One `onresult` event.
+ *
+ * A chunk written as `'the words'` is still being revised; one written as
+ * `['the words']` is finished and will not be sent again. `from` is the
+ * recogniser's `resultIndex` — where this event's new chunks start.
+ */
+function heard(chunks: (string | string[])[], from = 0) {
+  return {
+    resultIndex: from,
+    results: chunks.map((chunk) => {
+      const final = Array.isArray(chunk)
+      const said = final ? chunk[0]! : chunk
+      return Object.assign([{ transcript: said }], { isFinal: final })
+    }),
+  }
 }
 
 afterEach(() => {
@@ -80,14 +94,32 @@ describe('joinSaid', () => {
   })
 })
 
-describe('transcriptOf', () => {
-  it('joins every chunk, not only the newest', () => {
-    expect(transcriptOf(heard('what does ', 'this word mean'))).toBe('what does this word mean')
+describe('heardIn', () => {
+  it('separates the settled words from the guess at the tail', () => {
+    const event = heard([['what does '], 'this word mean'])
+    expect(heardIn(event)).toEqual({ settled: 'what does ', pending: 'this word mean' })
+  })
+
+  it('reads only from where this event begins', () => {
+    /*
+     * The reader's bug: every word typed twice.
+     *
+     * Safari re-delivers chunks it has already finished, so a reader that adds
+     * up the whole list types those words again. `resultIndex` says where the
+     * new ones start, and everything before it is already in the box.
+     */
+    const event = heard([['what does '], ['Nietzsche '], 'mean'], 2)
+    expect(heardIn(event)).toEqual({ settled: '', pending: 'mean' })
   })
 
   it('takes the first alternative and ignores the rest', () => {
-    const event = { results: [[{ transcript: 'Nietzsche' }, { transcript: 'niche' }]] }
-    expect(transcriptOf(event)).toBe('Nietzsche')
+    const event = {
+      resultIndex: 0,
+      results: [
+        Object.assign([{ transcript: 'Nietzsche' }, { transcript: 'niche' }], { isFinal: true }),
+      ],
+    }
+    expect(heardIn(event).settled).toBe('Nietzsche')
   })
 })
 
@@ -135,12 +167,52 @@ describe('useDictation', () => {
     const { view, onText } = lamp('So ')
 
     act(() => view.result.current.toggle())
-    act(() => last?.onresult?.(heard('what does niche')))
-    act(() => last?.onresult?.(heard('what does Nietzsche mean')))
+    act(() => last?.onresult?.(heard(['what does niche'])))
+    act(() => last?.onresult?.(heard(['what does Nietzsche mean'])))
 
     expect(onText.mock.calls.map((call) => call[0])).toEqual([
       'So what does niche',
       'So what does Nietzsche mean',
+    ])
+  })
+
+  it('does not type a word twice when the phone sends it twice', () => {
+    /*
+     * The reader's own report, and the reason they went back to the keyboard's
+     * microphone: every word appeared twice.
+     *
+     * Safari settles a chunk, then keeps handing it back at the front of the
+     * list on later events. Adding the list up types it again. What is drawn
+     * here is one settled chunk, then a second event that re-delivers it and
+     * adds a new one.
+     */
+    fakeRecogniser()
+    const { view, onText } = lamp('')
+
+    act(() => view.result.current.toggle())
+    act(() => last?.onresult?.(heard([['what does ']])))
+    // Chunk 0 again, plus chunk 1. `resultIndex` says only chunk 1 is new.
+    act(() => last?.onresult?.(heard([['what does '], ['Nietzsche mean']], 1)))
+
+    expect(onText.mock.calls.map((call) => call[0])).toEqual([
+      'what does',
+      'what does Nietzsche mean',
+    ])
+  })
+
+  it('keeps the words it already settled when the tail is revised', () => {
+    // The other half of the same rule: a settled chunk must survive every later
+    // event, and only the unfinished tail may be redrawn.
+    fakeRecogniser()
+    const { view, onText } = lamp('')
+
+    act(() => view.result.current.toggle())
+    act(() => last?.onresult?.(heard([['what does '], 'niche'])))
+    act(() => last?.onresult?.(heard([['what does '], 'Nietzsche mean'], 1)))
+
+    expect(onText.mock.calls.map((call) => call[0])).toEqual([
+      'what does niche',
+      'what does Nietzsche mean',
     ])
   })
 
