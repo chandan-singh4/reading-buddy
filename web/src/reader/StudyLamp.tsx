@@ -306,6 +306,27 @@ export function StudyLamp({
      must not be rebuilt every keystroke to see it. */
   const draftRef = useRef('')
   draftRef.current = draft
+  /*
+   * ## Why the question box is not a controlled field
+   *
+   * Android's keyboard does not type finished text. It holds a *composing
+   * region* — the underlined words it is still deciding about, which is how
+   * voice typing, autocorrect and glide typing all work — and it replaces that
+   * region as it makes up its mind.
+   *
+   * A controlled React field fights this. React writes `value` back onto the
+   * element after every change — and it insists: even a handler that changes no
+   * state has the old value restored. Writing to an element that has a live
+   * composing region makes the keyboard commit its buffer again, so the box
+   * fills with the same sentence over and over, each copy longer than the last.
+   * That is what the reader photographed, and why they went back to typing.
+   *
+   * So the element owns its text and `draft` follows it, rather than the other
+   * way round. `draft` is still what the send button and the recogniser read;
+   * it is simply never written back to the box. Everything that needs to *set*
+   * the text — sending, editing, dictation — goes through `setBox` below, which
+   * writes both.
+   */
 
   const fresh = messages.length === 0
 
@@ -425,12 +446,32 @@ export function StudyLamp({
    * lands in. In a plain effect the reader would see one frame of the old
    * height on every keystroke that wraps.
    */
-  useLayoutEffect(() => {
+  const grow = useCallback(() => {
     const box = input.current
     if (!box) return
     box.style.height = 'auto'
     box.style.height = `${Math.min(box.scrollHeight, MAX_COMPOSER_PX)}px`
-  }, [draft])
+  }, [])
+
+  /*
+   * Put words in the box, from the app's side.
+   *
+   * The element is not controlled — see the long note by `draft` — so the app
+   * has to write to it as well as to the state. Every path that sets the
+   * question rather than reading it comes through here: sending clears it,
+   * Edit refills it, dictation writes into it.
+   */
+  const setBox = useCallback(
+    (text: string) => {
+      const box = input.current
+      if (box) box.value = text
+      setDraft(text)
+      grow()
+    },
+    [grow],
+  )
+
+  useLayoutEffect(grow, [draft, grow])
 
   /*
    * Speaking instead of typing.
@@ -442,7 +483,7 @@ export function StudyLamp({
    */
   const dictation = useDictation({
     baseText: () => draftRef.current,
-    onText: setDraft,
+    onText: setBox,
   })
   /* `send` must be able to end a run without listing the whole dictation in
      its dependencies — it is rebuilt on every keystroke otherwise. */
@@ -467,7 +508,7 @@ export function StudyLamp({
       const yours: TutorMessage = { role: 'you', text: asked, ts: Date.now() }
       const history = base ?? messages
       setMessages([...history, yours])
-      setDraft('')
+      setBox('')
       setFailure(undefined)
       setLive(undefined)
       setPending(true)
@@ -559,7 +600,7 @@ export function StudyLamp({
     (index: number) => {
       setMessages(messages.slice(0, index))
       setFailure(undefined)
-      setDraft(messages[index]?.text ?? '')
+      setBox(messages[index]?.text ?? '')
       input.current?.focus()
     },
     [messages],
@@ -920,10 +961,18 @@ export function StudyLamp({
           ref={input}
           className={styles.input}
           rows={1}
-          value={draft}
+          /* Not `value`. See the note by `draft`: a controlled field re-commits
+             the Android keyboard's composing buffer and the question doubles. */
+          defaultValue=""
+
           placeholder={dictation.listening ? 'Listening…' : 'Ask into the quiet…'}
           aria-label="Ask about this passage"
-          onChange={(event) => setDraft(event.target.value)}
+          /* `draft` follows the element, and is never written back to it. It
+             is read by the send button, by `send`, and by the recogniser. */
+          onChange={(event) => {
+            setDraft(event.target.value)
+            grow()
+          }}
           /* Enter sends, as it did when this was an input. Shift+Enter is the
              new line — the same bargain every chat box on a keyboard makes.
              On a phone the key is "return" and inserts a line, which is what a
@@ -933,7 +982,10 @@ export function StudyLamp({
             // Mid-word in an IME. The key is finishing a character, not sending.
             if (event.nativeEvent.isComposing) return
             event.preventDefault()
-            if (!pending && draft.trim().length > 0) send(draft)
+            // The element, not `draft`: a word still being composed has not
+            // reached React yet, and sending would cut it off.
+            const said = event.currentTarget.value
+            if (!pending && said.trim().length > 0) send(said)
           }}
         />
         <button

@@ -15,6 +15,22 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **The question box repeated every sentence, and the cause was not the
+  microphone** (2026-08-24). A screenshot from the phone settled it: the reader
+  is on **Android**, and the box filled with the same sentence again and again,
+  each copy longer than the last. Android's keyboard does not type finished
+  text — it holds a *composing region* for the words it is still deciding
+  about, which is how voice typing, autocorrect and glide typing all work. A
+  controlled React field writes `value` back after every change, and writing to
+  an element with a live composing region makes the keyboard commit its buffer
+  again. **The question box is uncontrolled now**: the element owns its text and
+  `draft` follows it. Everything that sets the text goes through `setBox`.
+  **The rule: never make a text field in this app a controlled React field.**
+  An earlier fix aimed at Safari's re-delivery missed this entirely — the wrong
+  platform was assumed from the symptom.
+- **The app's own microphone is idempotent now too.** Each chunk is written into
+  its own slot rather than added to a running total, so a chunk the phone sends
+  twice cannot be typed twice, whatever `resultIndex` reports.
 - **Four fixes from a real afternoon of reading** (2026-08-24).
   1. The answer ceiling is 8,000 tokens, up from 3,000. Real answers were going
      over it and more were sitting just under, which is a ceiling shaping the
@@ -29,11 +45,13 @@ Get that loop working before building any breadth.
   4. The in-app microphone typed every word twice. It added up the whole result
      list, and Safari re-delivers chunks it has already settled. It reads from
      `event.resultIndex` now and keeps the settled words itself.
-- **One thing we will not do: replace the text selection menu.** The reader
-  asked for the copy/paste popup in the question box to match the app. That menu
-  is drawn by iOS itself, outside the page, and a web app cannot restyle it.
-  Replacing it means suppressing it and rebuilding copy, paste, select-all,
-  dictation, autocorrect and the drag handles by hand — worse in every case.
+- **The text selection menu stays the platform's.** The reader asked for the
+  cut/copy/paste popup in the question box to be drawn in the app's own style.
+  That bar is drawn by Android outside the page and cannot be restyled. It
+  *can* be suppressed and replaced with our own, but Paste then needs a
+  clipboard permission prompt, the drag handles stay Android's either way, and
+  the whole thing breaks when Chrome changes. Not worth it for a menu that
+  works. Revisit only if the reader asks again.
 - **Two faults in the tutor's controls, both reported by the reader**
   (2026-08-24). First, the model and effort controls were missing for the first
   three or four seconds of a new conversation: the roster is fetched behind a

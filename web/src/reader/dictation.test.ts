@@ -13,7 +13,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 
-import { dictationSupported, heardIn, joinSaid, useDictation } from './dictation.ts'
+import { dictationSupported, heardIn, joinSaid, saidSoFar, useDictation } from './dictation.ts'
 
 interface Fake {
   started: number
@@ -95,21 +95,25 @@ describe('joinSaid', () => {
 })
 
 describe('heardIn', () => {
-  it('separates the settled words from the guess at the tail', () => {
+  it('puts every chunk in its own slot', () => {
     const event = heard([['what does '], 'this word mean'])
-    expect(heardIn(event)).toEqual({ settled: 'what does ', pending: 'this word mean' })
+    expect(saidSoFar(heardIn(event))).toBe('what does this word mean')
   })
 
-  it('reads only from where this event begins', () => {
+  it('puts a chunk delivered twice back in the same slot', () => {
     /*
-     * The reader's bug: every word typed twice.
+     * The reader's bug: every sentence typed again, and again.
      *
-     * Safari re-delivers chunks it has already finished, so a reader that adds
-     * up the whole list types those words again. `resultIndex` says where the
-     * new ones start, and everything before it is already in the box.
+     * A phone re-delivers chunks it has already settled. Added to a running
+     * total they are typed a second time; written into the slot they came
+     * from, the second write changes nothing. This is the property the whole
+     * file is built on, so it is checked directly.
      */
-    const event = heard([['what does '], ['Nietzsche '], 'mean'], 2)
-    expect(heardIn(event)).toEqual({ settled: '', pending: 'mean' })
+    const once = heardIn(heard([['what does '], 'Nietzsche']))
+    const again = heardIn(heard([['what does '], ['Nietzsche '], 'mean'], 1))
+    for (const [slot, words] of again) once.set(slot, words)
+
+    expect(saidSoFar(once)).toBe('what does Nietzsche mean')
   })
 
   it('takes the first alternative and ignores the rest', () => {
@@ -119,7 +123,7 @@ describe('heardIn', () => {
         Object.assign([{ transcript: 'Nietzsche' }, { transcript: 'niche' }], { isFinal: true }),
       ],
     }
-    expect(heardIn(event).settled).toBe('Nietzsche')
+    expect(saidSoFar(heardIn(event))).toBe('Nietzsche')
   })
 })
 
@@ -191,7 +195,7 @@ describe('useDictation', () => {
 
     act(() => view.result.current.toggle())
     act(() => last?.onresult?.(heard([['what does ']])))
-    // Chunk 0 again, plus chunk 1. `resultIndex` says only chunk 1 is new.
+    // Chunk 0 delivered a second time, plus a new chunk 1.
     act(() => last?.onresult?.(heard([['what does '], ['Nietzsche mean']], 1)))
 
     expect(onText.mock.calls.map((call) => call[0])).toEqual([
@@ -209,9 +213,12 @@ describe('useDictation', () => {
     act(() => view.result.current.toggle())
     act(() => last?.onresult?.(heard([['what does '], 'niche'])))
     act(() => last?.onresult?.(heard([['what does '], 'Nietzsche mean'], 1)))
+    // And once more with `resultIndex` back at zero, which some phones do.
+    act(() => last?.onresult?.(heard([['what does '], 'Nietzsche mean'], 0)))
 
     expect(onText.mock.calls.map((call) => call[0])).toEqual([
       'what does niche',
+      'what does Nietzsche mean',
       'what does Nietzsche mean',
     ])
   })

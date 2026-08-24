@@ -34,9 +34,11 @@
  * all up types the same words a second time. That is the doubling the reader
  * hit, and it made the button useless.
  *
- * `event.resultIndex` is the fix and is what it is for — it says where the new
- * chunks start in that list. So the finished words are appended once, as they
- * are finished, and only the unfinished tail is redrawn on every event.
+ * The rule that survives every browser: **write each chunk into its own slot,
+ * never add it on the end.** A chunk carries the position it belongs at, so a
+ * chunk delivered twice lands in the same slot twice and the second write
+ * changes nothing. Adding to a running total is what turns a re-delivery into
+ * a repeat, and no amount of trusting `resultIndex` is needed to avoid it.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -100,16 +102,25 @@ export function dictationSupported(): boolean {
  * Only the first alternative of each chunk is used. The others are the
  * recogniser's second guesses, and showing them would be noise.
  */
-export function heardIn(event: SpeechEvent): { settled: string; pending: string } {
-  let settled = ''
-  let pending = ''
-  for (let index = event.resultIndex; index < event.results.length; index++) {
+export function heardIn(event: SpeechEvent): Map<number, string> {
+  const chunks = new Map<number, string>()
+  for (let index = 0; index < event.results.length; index++) {
     const chunk = event.results[index]
-    const words = chunk?.[0]?.transcript ?? ''
-    if (chunk?.isFinal) settled += words
-    else pending += words
+    // `resultIndex` says where this event's new chunks begin. Everything before
+    // it is repeated from last time, and writing it into the same slot again
+    // is harmless — which is the point of keying by slot.
+    if (index < event.resultIndex && !chunk) continue
+    chunks.set(index, chunk?.[0]?.transcript ?? '')
   }
-  return { settled, pending }
+  return chunks
+}
+
+/** The slots, in order, as one line of text. */
+export function saidSoFar(chunks: ReadonlyMap<number, string>): string {
+  return [...chunks.keys()]
+    .sort((one, two) => one - two)
+    .map((slot) => chunks.get(slot) ?? '')
+    .join('')
 }
 
 /**
@@ -145,9 +156,9 @@ export function useDictation(options: {
   const [listening, setListening] = useState(false)
   const machine = useRef<Recogniser | null>(null)
   const base = useRef('')
-  /* The words this run has finished with. Built up chunk by chunk, because the
-     recogniser cannot be trusted to hand back the whole transcript. */
-  const settled = useRef('')
+  /* Every chunk this run has heard, in its own slot. A slot is written, never
+     added to, so a chunk the phone sends twice cannot be typed twice. */
+  const heard = useRef(new Map<number, string>())
   // Held in a ref so the recogniser's callbacks always call today's function,
   // not the one that existed when the run started.
   const latest = useRef(options)
@@ -180,13 +191,13 @@ export function useDictation(options: {
     machinery.lang = document.documentElement.lang || navigator.language || 'en-US'
 
     base.current = latest.current.baseText()
-    settled.current = ''
+    heard.current = new Map()
     machinery.onresult = (event) => {
-      const { settled: done, pending } = heardIn(event)
-      settled.current += done
-      // The finished words, then the guess at the tail. The guess is replaced
-      // on the next event; the finished words never are.
-      latest.current.onText(joinSaid(base.current, `${settled.current}${pending}`))
+      for (const [slot, words] of heardIn(event)) heard.current.set(slot, words)
+      // Everything after the base is rebuilt from the slots every time, so the
+      // box always says what has been heard — never what has been heard plus
+      // what was heard before.
+      latest.current.onText(joinSaid(base.current, saidSoFar(heard.current)))
     }
     machinery.onerror = () => {
       // Refused permission, no microphone, or silence timed out. All three end

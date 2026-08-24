@@ -274,6 +274,50 @@ describe('the question box', () => {
     expect(screen.queryByText('Never asked.')).toBeNull()
   })
 
+  it('does not echo the phone keyboard while it composes a word', async () => {
+    /*
+     * The reader's bug, in a screenshot: the box filling with the same sentence
+     * over and over, each copy longer than the last.
+     *
+     * Android's keyboard does not type finished text. It holds a composing
+     * region — the underlined words it is still deciding about, which is how
+     * voice typing, autocorrect and glide typing all work — and it replaces
+     * that region as it makes up its mind. A *controlled* React field writes
+     * `value` back onto the element after every change, and writing to an
+     * element with a live composing region makes the keyboard commit its
+     * buffer again. That is the echo.
+     *
+     * What is held here is the property that stops it: the element's own text
+     * survives a re-render. React must never put anything back into this box.
+     */
+    lamp([])
+    const box = (await screen.findByLabelText('Ask about this passage')) as HTMLTextAreaElement
+
+    fireEvent.compositionStart(box)
+    fireEvent.change(box, { target: { value: 'I don’t think this issue' } })
+    fireEvent.compositionEnd(box)
+
+    // A re-render from somewhere else entirely. A controlled field would take
+    // this moment to write its own idea of the value over the keyboard's.
+    fireEvent.click(screen.getByLabelText(/Search the web/i))
+
+    expect(box.value).toBe('I don’t think this issue')
+  })
+
+  it('clears the box after the question is sent', async () => {
+    // The box owns its text now, so clearing it is the app's job rather than
+    // something a re-render does for free. A question left behind after
+    // sending would be asked twice.
+    relay(answered('An answer.'))
+    lamp([])
+    const box = (await screen.findByLabelText('Ask about this passage')) as HTMLTextAreaElement
+    fireEvent.change(box, { target: { value: 'What does this mean?' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+
+    await screen.findByText('An answer.')
+    expect(box.value).toBe('')
+  })
+
   it('sends nothing on Enter when the box is empty', async () => {
     lamp([])
     const box = await screen.findByLabelText('Ask about this passage')
