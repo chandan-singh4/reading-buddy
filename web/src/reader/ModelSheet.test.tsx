@@ -15,7 +15,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 import { ModelSheet } from './ModelSheet.tsx'
 import { arrange, type Column, type TutorModel } from './models.ts'
@@ -58,6 +58,13 @@ function sheet(over: Partial<Parameters<typeof ModelSheet>[0]> = {}) {
   return { onPick, onClose, onArrange }
 }
 
+/** A finger on a row: press, release, and the click the browser then sends. */
+function tap(node: HTMLElement) {
+  fireEvent.pointerDown(node)
+  fireEvent.pointerUp(window)
+  fireEvent.click(node)
+}
+
 /** A row, found by the short name the grid draws rather than the full one. */
 function row(name: string) {
   return screen.getByRole('button', { name: new RegExp(`\\b${name}\\b`) })
@@ -81,9 +88,51 @@ describe('the model sheet', () => {
 
   it('reports the model that was tapped', () => {
     const { onPick } = sheet()
+    tap(row('Two'))
+    expect(onPick).toHaveBeenCalledWith('a/two:free')
+  })
+
+  it('chooses on the click, so nothing behind the sheet is pressed', () => {
+    /*
+     * The reader's bug, and it cost them a question every time.
+     *
+     * Choosing on `pointerup` closed the sheet, and the sheet was gone by the
+     * time the browser dispatched the `click` that always follows. The browser
+     * hit-tests that click against whatever is under the finger *now* — one of
+     * the task chips behind the sheet — so picking a model also asked a
+     * question nobody typed.
+     *
+     * What this holds is that nothing is decided before the click: a press and
+     * a release on their own must change nothing.
+     */
+    const { onPick } = sheet()
     fireEvent.pointerDown(row('Two'))
     fireEvent.pointerUp(window)
+    expect(onPick).not.toHaveBeenCalled()
+
+    fireEvent.click(row('Two'))
     expect(onPick).toHaveBeenCalledWith('a/two:free')
+  })
+
+  it('does not choose the model that was only moved', () => {
+    // A drag ends with a click of its own. That one is a rearrangement, and
+    // must not also change which model answers.
+    vi.useFakeTimers()
+    try {
+      const { onPick } = sheet()
+      const two = row('Two')
+      // jsdom has no pointer capture, and the lift asks for it.
+      two.setPointerCapture = () => {}
+      fireEvent.pointerDown(two, { clientX: 0, clientY: 0 })
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      fireEvent.pointerUp(window)
+      fireEvent.click(two)
+      expect(onPick).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not report a tap that turned into a scroll', () => {
@@ -166,7 +215,11 @@ describe('the model sheet', () => {
   it('closes on a tap outside it', () => {
     const { onClose } = sheet()
     const scrim = document.querySelector('[class*="scrim"]') as HTMLElement
+    // On the click, for the same reason the rows are: a scrim removed on
+    // `pointerdown` lets the click through to the page behind it.
     fireEvent.pointerDown(scrim)
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.click(scrim)
     expect(onClose).toHaveBeenCalled()
   })
 

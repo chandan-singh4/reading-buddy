@@ -110,14 +110,52 @@ describe('the study lamp', () => {
     expect(rows).toEqual(['Gemini 3.7 Flash', 'Nemotron 3 Super', 'Gemma 4 31B'])
   })
 
+  it('offers the controls before the roster has arrived', async () => {
+    /*
+     * The reader's report: for the first three or four seconds of a new
+     * conversation, the model and the effort controls are not on screen. The
+     * roster is fetched behind a sign-in, and the picker was drawn only once
+     * it landed — so the lamp opened without its controls and they appeared
+     * later, moving everything under the reader's thumb.
+     *
+     * The roster the reader saw last time is now on the first paint. Held here
+     * with a fetch that never answers, which is the worst version of the wait.
+     */
+    localStorage.setItem(
+      'reading-buddy:tutor-roster',
+      JSON.stringify([
+        {
+          id: 'google/gemma-4-31b-it:free',
+          name: 'Gemma 4 31B',
+          description: '',
+          contextLength: 131_072,
+          source: 'openrouter',
+        },
+      ]),
+    )
+    const models = await import('./models.ts')
+    const slow = vi.spyOn(models, 'loadModels').mockReturnValue(new Promise(() => {}))
+    try {
+      lamp([])
+      // No `findBy`: the point is that it is already there, not that it turns
+      // up eventually.
+      expect(screen.getByLabelText(/Which model answers/).textContent).toContain('Gemma 4 31B')
+      expect(screen.getByLabelText(/How hard it thinks/)).toBeTruthy()
+    } finally {
+      slow.mockRestore()
+      localStorage.clear()
+    }
+  })
+
   it('takes a choice from the sheet and closes it', async () => {
     lamp([])
     fireEvent.click(await screen.findByLabelText(/Which model answers/))
-    // A press and a release, not a click: the grid reads a tap off the pointer
-    // so it can tell one from the long press that starts a drag.
+    // The whole finger gesture. The click is the part that chooses — see the
+    // model sheet's own tests for why it cannot be the release.
     const row = await screen.findByRole('button', { name: 'Gemma 4 31B' })
     fireEvent.pointerDown(row)
     fireEvent.pointerUp(window)
+    fireEvent.click(row)
 
     expect(screen.queryByRole('dialog', { name: 'Which model answers' })).toBeNull()
     await waitFor(() =>

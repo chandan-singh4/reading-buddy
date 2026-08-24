@@ -98,6 +98,14 @@ export function ModelGrid({ columns, pick, onPick, onArrange }: ModelGridProps) 
   const grid = useRef<HTMLDivElement | null>(null)
   const lists = useRef(new Map<Provider, HTMLDivElement>())
   const chosen = useRef<HTMLButtonElement | null>(null)
+  /*
+   * Whether the press that just ended was a drag.
+   *
+   * A drag ends with a `click` like any other press does, and that click must
+   * not also choose the model the reader was only moving. Read and cleared by
+   * the row's `onClick` below, which is the next thing to run.
+   */
+  const dragged = useRef(false)
 
   /*
    * Focus opens on the current choice, which is where a platform picker puts
@@ -189,15 +197,25 @@ export function ModelGrid({ columns, pick, onPick, onArrange }: ModelGridProps) 
    * The timer is the whole mechanism. It is cleared by a move beyond `SLOP`
    * (the reader is scrolling), and by letting go (the reader is tapping). Only
    * if it survives both does anything lift.
+   *
+   * A tap is **not** acted on here. Choosing a model closes the sheet, and a
+   * sheet closed on `pointerup` is gone by the time the browser dispatches the
+   * `click` that follows — so the browser hit-tests that click against the
+   * page now under the finger and presses whatever chip was behind the sheet.
+   * The reader picked a model and the tutor answered a question they never
+   * asked. The `click` handler on the row does the choosing instead: it runs
+   * while the sheet is still on screen and is aimed at the row itself.
    */
   const press = useCallback(
-    (event: React.PointerEvent, becomes: NonNullable<Lift>, tap?: () => void) => {
+    (event: React.PointerEvent, becomes: NonNullable<Lift>) => {
       const start = { x: event.clientX, y: event.clientY }
       const target = event.currentTarget as HTMLElement
       let held = false
+      dragged.current = false
 
       const timer = window.setTimeout(() => {
         held = true
+        dragged.current = true
         target.setPointerCapture(event.pointerId)
         setLift(becomes)
         // The phone's own confirmation that something is now in the air. Silent
@@ -209,20 +227,19 @@ export function ModelGrid({ columns, pick, onPick, onArrange }: ModelGridProps) 
         Math.abs(moved.clientX - start.x) > SLOP || Math.abs(moved.clientY - start.y) > SLOP
 
       const watch = (moved: PointerEvent) => {
-        if (!held && strayed(moved)) stop(false)
+        if (!held && strayed(moved)) stop()
       }
 
-      const stop = (tapped: boolean) => {
+      const stop = () => {
         clearTimeout(timer)
         window.removeEventListener('pointermove', watch)
         window.removeEventListener('pointerup', up)
         window.removeEventListener('pointercancel', cancel)
         if (held) setLift(null)
-        else if (tapped) tap?.()
       }
 
-      const up = () => stop(true)
-      const cancel = () => stop(false)
+      const up = () => stop()
+      const cancel = () => stop()
 
       window.addEventListener('pointermove', watch)
       window.addEventListener('pointerup', up)
@@ -295,15 +312,18 @@ export function ModelGrid({ columns, pick, onPick, onArrange }: ModelGridProps) 
                     row.busy ? ', busy' : ''
                   }`}
                   onPointerDown={(event) =>
-                    press(event, { kind: 'row', source: column.source, id: row.id }, () =>
-                      onPick(row.id),
-                    )
+                    press(event, { kind: 'row', source: column.source, id: row.id })
                   }
-                  /* A press that never lifted is a tap, and `press` reports it.
-                     This is for the keyboard and for anything driving the page
-                     without a pointer, where no press happened at all. */
-                  onClick={(event) => {
-                    if (event.detail === 0) onPick(row.id)
+                  /* Every way of choosing lands here — finger, mouse, Enter,
+                     Space. See `press` for why the finger is not served on
+                     `pointerup` instead. A drag ends with a click too, and that
+                     one is a move, not a choice. */
+                  onClick={() => {
+                    if (dragged.current) {
+                      dragged.current = false
+                      return
+                    }
+                    onPick(row.id)
                   }}
                   onKeyDown={(event) => {
                     if (event.key === 'ArrowUp' && event.altKey) {

@@ -17,6 +17,7 @@ import {
   chosenFrom,
   fitForReading,
   forgetModels,
+  lastRoster,
   loadModels,
   offerable,
   PREFERRED_MODEL,
@@ -221,6 +222,60 @@ describe('loadModels', () => {
     vi.stubGlobal('fetch', fetch)
     await expect(loadModels()).rejects.toThrow()
     expect((await loadModels()).length).toBe(1)
+  })
+})
+
+describe('the roster kept between launches', () => {
+  /*
+   * The reader's report: for the first three or four seconds of a new
+   * conversation the model and effort controls are simply not there. The
+   * roster is fetched behind a sign-in, and the picker was drawn only once it
+   * landed — so the lamp opened without its controls and they appeared later,
+   * moving everything under the reader's thumb.
+   */
+
+  // This file runs without a browser, so storage is a Map behind the same two
+  // methods the code calls.
+  let store: Map<string, string>
+
+  beforeEach(() => {
+    forgetModels()
+    vi.unstubAllGlobals()
+    store = new Map()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('remembers the roster it fetched', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(new Response(JSON.stringify({ models: [model()] }), { status: 200 })),
+      ),
+    )
+    await loadModels()
+    expect(lastRoster().map((row) => row.id)).toEqual(['vendor/general-1:free'])
+  })
+
+  it('reports nothing on a first ever run', () => {
+    // No roster, no picker — which is the behaviour the lamp already had.
+    expect(lastRoster()).toEqual([])
+  })
+
+  it('reports nothing rather than throwing on damaged storage', () => {
+    store.set('reading-buddy:tutor-roster', 'not json at all')
+    expect(lastRoster()).toEqual([])
+  })
+
+  it('drops a remembered row that is not a model', () => {
+    store.set('reading-buddy:tutor-roster', JSON.stringify([{ name: 'no id' }, null, 7]))
+    expect(lastRoster()).toEqual([])
   })
 })
 

@@ -52,6 +52,7 @@ import {
   arrange,
   arrangementOf,
   chosenFrom,
+  lastRoster,
   loadModels,
   rememberArrangement,
   rememberPick,
@@ -229,8 +230,17 @@ export function StudyLamp({
    * columns are the reader's arrangement and the arrangement is the chain. A
    * flat list would have to be re-grouped on every render and every drag.
    */
-  const [columns, setColumns] = useState<Column[]>([])
-  const [pick, setPick] = useState<string | undefined>(undefined)
+  /*
+   * Seeded from the roster the reader saw last time, so the model and effort
+   * controls are on screen at the first paint rather than three seconds in.
+   * Empty on a first ever run, which is the old behaviour: no roster, no
+   * picker. The live roster below replaces this the moment it arrives.
+   */
+  const remembered = useMemo(() => arrange(lastRoster(), storedArrangement()), [])
+  const [columns, setColumns] = useState<Column[]>(remembered)
+  const [pick, setPick] = useState<string | undefined>(() =>
+    remembered.length > 0 ? chosenFrom(remembered, storedPick()) : undefined,
+  )
 
   /** Every model, for the times a flat list is what is wanted — a name lookup. */
   const models = useMemo(() => columns.flatMap((column) => column.models), [columns])

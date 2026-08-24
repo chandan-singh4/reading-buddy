@@ -99,7 +99,12 @@ export function Sheet({ title, rows, pick, onPick, onClose, children }: SheetPro
 
   return createPortal(
     <>
-      <div className={styles.scrim} onPointerDown={onClose} aria-hidden="true" />
+      {/* Closes on the click, not on the press. A scrim taken away on
+          `pointerdown` is gone before the browser dispatches the `click` that
+          follows, so the browser hit-tests that click against the page now
+          under the finger and presses whatever was behind the sheet. Dismissing
+          the picker would run one of the reader's task chips. */}
+      <div className={styles.scrim} onClick={onClose} aria-hidden="true" />
       <div className={styles.sheet} role="dialog" aria-label={title}>
         <span className={styles.grab} aria-hidden="true" />
         <p className={styles.title}>{title}</p>

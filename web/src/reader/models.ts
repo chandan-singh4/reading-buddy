@@ -97,6 +97,7 @@ export const PREFERRED_MODEL = 'gemini-3.7-flash'
 
 const PICK_KEY = 'reading-buddy:tutor-model'
 const ORDER_KEY = 'reading-buddy:tutor-order'
+const ROSTER_KEY = 'reading-buddy:tutor-roster'
 
 /**
  * Words that mark a model as built for one job that is not this one.
@@ -459,11 +460,50 @@ export function arrangementOf(columns: readonly Column[]): Arrangement {
 }
 
 /**
+ * The roster the reader saw last time, ready before the network answers.
+ *
+ * The fetch takes three or four seconds behind a sign-in, and for all of that
+ * time the model and effort controls were simply absent — the lamp opened
+ * without them and they appeared later, moving everything under the reader's
+ * thumb. A menu is exactly the kind of thing worth keeping: the reader's own
+ * pick has always been remembered, so remembering what it was picked *from*
+ * costs nothing new.
+ *
+ * Only ever a first draft. The live roster replaces it the moment it lands, so
+ * a model that has since been delisted is offered for a few seconds at most —
+ * and asking for one the relay no longer has walks to the next rung anyway.
+ */
+export function lastRoster(): TutorModel[] {
+  try {
+    const raw = localStorage.getItem(ROSTER_KEY)
+    if (!raw) return []
+    const rows: unknown = JSON.parse(raw)
+    if (!Array.isArray(rows)) return []
+    // Enough of a check to keep hand-edited or half-written storage from
+    // reaching `arrange`. Everything else it needs, it filters for itself.
+    return rows.filter(
+      (row): row is TutorModel =>
+        typeof row === 'object' && row !== null && typeof (row as TutorModel).id === 'string',
+    )
+  } catch {
+    return []
+  }
+}
+
+export function rememberRoster(rows: readonly TutorModel[]): void {
+  try {
+    localStorage.setItem(ROSTER_KEY, JSON.stringify(rows))
+  } catch {
+    /* Private mode, or full. The lamp works without it, one wait longer. */
+  }
+}
+
+/**
  * The roster, fetched once and kept for the session.
  *
  * In memory rather than in the database: it is a menu, not the reader's work,
  * and a stale menu offering a delisted model is worse than one refetch on the
- * next launch.
+ * next launch. `lastRoster` above is what fills the gap while this runs.
  */
 let cached: Promise<TutorModel[]> | undefined
 
@@ -475,7 +515,10 @@ export async function loadModels(): Promise<TutorModel[]> {
     })
     if (!response.ok) throw new Error(`the model list answered ${response.status}`)
     const data = (await response.json()) as { models?: TutorModel[] }
-    return (data.models ?? []).filter(fitForReading)
+    const rows = (data.models ?? []).filter(fitForReading)
+    // Kept for the next launch, so the controls are there from the first paint.
+    rememberRoster(rows)
+    return rows
   })().catch((error: unknown) => {
     // A failed fetch must not poison the cache — the reader may simply have
     // been offline when the lamp first opened, and the next try should work.

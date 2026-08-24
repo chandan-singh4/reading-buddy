@@ -15,6 +15,16 @@ Get that loop working before building any breadth.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green.
+- **Two faults in the tutor's controls, both reported by the reader**
+  (2026-08-24). First, the model and effort controls were missing for the first
+  three or four seconds of a new conversation: the roster is fetched behind a
+  sign-in and the picker waited for it. The roster the reader saw last time is
+  now kept, so the controls are on the first paint and the live roster replaces
+  them when it lands. Second, choosing a model also pressed the task chip
+  behind the sheet. The sheet chose on `pointerup` and was gone before the
+  browser sent the `click` that follows, so the browser aimed that click at
+  whatever was under the finger. Both the rows and the scrim act on the click
+  now. **The rule for any sheet in this app: never close on `pointerdown`.**
 - **The answer now streams, and it opens at its first line** (2026-08-23). The
   relay writes one JSON object per line while the model writes, so the reader
   watches the answer arrive instead of watching dots. Half-typed bold marks and
