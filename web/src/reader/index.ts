@@ -219,3 +219,8 @@ export {
   scrollStrip,
 } from './motion.ts'
 export type { Cancel } from './motion.ts'
+
+export { AloudBar, RATES, nextRate } from './AloudBar.tsx'
+export { useReadAloud } from './useReadAloud.ts'
+export type { AloudControls } from './useReadAloud.ts'
+export type { Utterance } from './readAloud.ts'

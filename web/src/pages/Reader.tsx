@@ -107,6 +107,11 @@ import {
   type WordRow,
   wordAt,
   keepScreenAwake,
+  AloudBar,
+  useReadAloud,
+  rangeOfQuote,
+  type HighlightLike,
+  type Utterance,
 } from '../reader/index.ts'
 import { refreshInBackground } from '../tutor/refresh.ts'
 import { catchUpOnOpen } from '../app/bookCatchUp.ts'
@@ -311,14 +316,25 @@ function columnGapOf(element: HTMLElement): number {
  * page next to the one it is on.
  */
 function columnOf(node: HTMLElement, strip: HTMLElement | null): number {
+  return columnOfRect(node.getBoundingClientRect(), strip)
+}
+
+/**
+ * The same answer for a bare rectangle.
+ *
+ * Read-aloud needs it: a paragraph can run over a column boundary, and the
+ * sentence being spoken is a *range* inside it, not the paragraph element. A
+ * long paragraph would otherwise hold the page still while the voice read on
+ * into the next column.
+ */
+function columnOfRect(box: { left: number }, strip: HTMLElement | null): number {
   const { pageWidth } = measure(strip)
   if (!strip || pageWidth <= 0) return 1
 
   // Both rectangles are drawn at the same scale, so the distance between them
   // is scaled once — and `scrollLeft`, which it is added to, is not scaled at
   // all. Dividing puts the two in the same units.
-  const from =
-    (node.getBoundingClientRect().left - strip.getBoundingClientRect().left) / scaleOf(strip)
+  const from = (box.left - strip.getBoundingClientRect().left) / scaleOf(strip)
   // A half-pixel of slack, so a paragraph sitting exactly on a column edge is
   // read as opening that column rather than as ending the one before it.
   return Math.floor((from + strip.scrollLeft + 0.5) / pageWidth) + 1
@@ -361,6 +377,19 @@ const FLASH_COLOUR = '#ffd54a'
 
 /** The id the flash is painted under. No stored note can hold it. */
 const SEARCH_FLASH_ID = 'search-flash'
+
+/**
+ * The wash under the sentence being read out.
+ *
+ * Softer than the search flash and different from all four highlighter colours,
+ * for the same reason the flash is: this is the app saying "here", not a mark
+ * the reader left. It is on the page for a second or two at a time, so it has
+ * to be findable at a glance and quiet enough to read straight through.
+ */
+const ALOUD_COLOUR = '#9fd3ff'
+
+/** The id that wash is painted under. Like the flash, no note can hold it. */
+const ALOUD_MARK_ID = 'aloud-saying'
 
 /** One array, so "no section yet" is the same value every render — see
     `useFigureImages`, which re-fetches when its input changes identity. */
@@ -2462,6 +2491,56 @@ export default function Reader() {
     return () => window.clearTimeout(timer)
   }, [flash])
 
+  /*
+   * ## Reading the book out loud (WP-16)
+   *
+   * Three parts, and they are separate on purpose. `readAloud.ts` decides what
+   * to say next and knows nothing about a screen. `useReadAloud` owns the
+   * browser's engine and silences it when the reader leaves. This is the part
+   * that only the reading screen can do: turn the page to the sentence being
+   * spoken, mark it, and hand over the next section when this one ends.
+   */
+
+  /** Keep the spoken sentence on the page in front of the reader. */
+  const followAloud = useCallback(
+    (one: Utterance) => {
+      setAnchorHere(one.anchor)
+      // The sentence, not the paragraph it is in: a paragraph can straddle two
+      // columns, and the voice reads on across the boundary.
+      const range = rangeOfQuote(one.anchor, one.text)
+      const box = range?.getBoundingClientRect()
+      const node = document.getElementById(elementIdOf(one.anchor))
+      const column =
+        box && box.width > 0
+          ? columnOfRect(box, strip.current)
+          : node
+            ? columnOf(node, strip.current)
+            : null
+      if (column === null) return
+      // Only when it has actually left the page. Assigning the same page on
+      // every sentence would fight a reader who is looking ahead.
+      if (column !== pageShowing()) showPage(column, true)
+    },
+    [pageShowing, showPage],
+  )
+
+  /** Off the end of this section: go on into the next one, if there is one. */
+  const aloudSectionEnd = useCallback(() => {
+    const target = neighbours.next
+    if (!target) return false
+    landOn.current = 'start'
+    goTo(target)
+    return true
+  }, [neighbours, goTo])
+
+  const aloud = useReadAloud({
+    paragraphs: page.status === 'ready' ? page.section.paragraphs : EMPTY_PARAGRAPHS,
+    voiceName: settings.aloudVoice,
+    rate: settings.aloudRate,
+    onSaying: followAloud,
+    onSectionEnd: aloudSectionEnd,
+  })
+
   const highlights = useMemo(
     () => notes.filter((row) => row.quote && row.colour),
     [notes],
@@ -2474,16 +2553,36 @@ export default function Reader() {
    * and it carries `flash` so the ink pulses. Its id is fixed and unlike any
    * note's, so nothing can mistake it for a row — see `SEARCH_FLASH_ID`.
    */
-  const painted = useMemo(
-    () =>
-      flash
-        ? [
-            ...highlights,
-            { id: SEARCH_FLASH_ID, anchor: flash.anchor, quote: flash.quote, colour: FLASH_COLOUR, flash: true },
-          ]
-        : highlights,
-    [highlights, flash],
-  )
+  const painted = useMemo(() => {
+    // The stored rows themselves when there is nothing to add, and a copy only
+    // when there is. Identity is the whole point: a new array on every render
+    // makes every painter re-measure every mark, on a page that re-renders
+    // whenever the reader's thumb moves.
+    if (!flash && !aloud.saying) return highlights
+
+    const rows: HighlightLike[] = [...highlights]
+    if (flash) {
+      rows.push({
+        id: SEARCH_FLASH_ID,
+        anchor: flash.anchor,
+        quote: flash.quote,
+        colour: FLASH_COLOUR,
+        flash: true,
+      })
+    }
+    // The sentence the voice is on, in the app's own colour. Painted last so it
+    // sits over any highlight already on those words, and it moves with the
+    // voice — one row that changes, never a trail left behind.
+    if (aloud.saying) {
+      rows.push({
+        id: ALOUD_MARK_ID,
+        anchor: aloud.saying.anchor,
+        quote: aloud.saying.text,
+        colour: ALOUD_COLOUR,
+      })
+    }
+    return rows
+  }, [highlights, flash, aloud.saying])
 
   /*
    * ## In-book search (WP-14)
@@ -3529,14 +3628,13 @@ export default function Reader() {
           openSearch()
           break
 
-        case 'speak': {
-          const speech = window.speechSynthesis
-          if (speech) {
-            speech.cancel()
-            speech.speak(new SpeechSynthesisUtterance(at.text))
-          }
+        case 'speak':
+          // Not "say this sentence" any more — "read the book to me, from
+          // here". The selection is where the voice starts, and it goes on
+          // through the section and into the next one until the reader stops
+          // it. See `useReadAloud`.
+          aloud.start(at.anchor)
           break
-        }
 
         case 'ask': {
           // Under the lamp. If these exact words already have a thread, that
@@ -3599,6 +3697,7 @@ export default function Reader() {
       threads,
       unit,
       openThread,
+      aloud,
     ],
   )
 
@@ -3779,6 +3878,7 @@ export default function Reader() {
             onSettingsChange={changeSettings}
             highlighter={highlighter}
             onHighlighterChange={changeHighlighter}
+            voices={aloud.voices}
             bookmarks={bookmarkRows}
             onJumpToBookmark={jumpToAnchor}
             onRenameBookmark={renameBookmark}
@@ -4131,6 +4231,23 @@ export default function Reader() {
           */}
           <PageDecks percent={pages?.percent ?? null} />
           <PageSpine />
+
+          {/*
+            The reading transport, only while the book is being read out. It is
+            fixed to the foot of the screen rather than placed in the page — see
+            `AloudBar.module.css`.
+          */}
+          {aloud.running && (
+            <AloudBar
+              playing={aloud.playing}
+              rate={settings.aloudRate}
+              onPlay={aloud.resume}
+              onPause={aloud.pause}
+              onSkip={aloud.skip}
+              onRate={(aloudRate) => setSettings((was) => ({ ...was, aloudRate }))}
+              onStop={aloud.stop}
+            />
+          )}
 
           {/*
             The selection menu, and the note it can open.

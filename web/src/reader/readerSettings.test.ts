@@ -32,6 +32,8 @@ describe('readReaderSettings', () => {
       spacing: 'relaxed',
       margins: 'wide',
       dim: 0.4,
+      aloudRate: 1.5,
+      aloudVoice: 'Daniel',
     }
     writeReaderSettings(settings)
     expect(readReaderSettings()).toEqual(settings)

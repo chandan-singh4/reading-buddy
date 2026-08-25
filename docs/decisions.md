@@ -1313,3 +1313,21 @@ sign-in screen.
   built; `BookGenre` is declared and unused. The relay offers every module for
   every book on purpose: the relay is not the place to enforce a taste
   judgment. — 2026-08-25
+
+- **The voice reads a sentence at a time, not a section.** One long utterance
+  is simpler, and it fails three ways: nothing can follow it, because progress
+  comes back as a character offset; a pause is not heard until the paragraph
+  ends; and several engines stop part way through a few thousand characters and
+  say nothing. A sentence *is* the place in the book, so `readAloud.ts` cuts a
+  section into sentences and the place in that list is the place on the page.
+  Tables, code and figures are skipped. Headings are read — a listener needs to
+  hear that a new chapter started. — 2026-08-25
+- **`cancel()` fires `onend`.** So "when a sentence ends, say the next" starts
+  the book up again the moment a reader presses stop. Every utterance carries
+  the generation it was made in, and one that ends from an older generation is
+  ignored. Pause, stop, skip and a change of voice all move the generation on.
+  This is the single rule the whole read-aloud module is built around. — 2026-08-25
+- **A pause says its sentence again on resume.** The engine is not trusted to
+  carry on: desktop Chrome has stopped a resumed utterance after a timeout for
+  years. A repeated sentence is a fault a listener forgives. A silent stop is
+  not. — 2026-08-25

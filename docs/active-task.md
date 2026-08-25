@@ -23,7 +23,7 @@ rewriting, and a finished WP-25 sat at the top and was proposed three times.
 
 ## State — 2026-08-25
 
-Nothing is mid-edit. Build green: 1909 tests across 105 files. `main` is pushed.
+Nothing is mid-edit. Build green: 2034 tests across 112 files. `main` is pushed.
 
 The AI tutor works end to end: a reader selects a passage, taps a chip, and a
 live model streams a warm answer into the Study Lamp. The reader picks the
@@ -32,9 +32,21 @@ Merriam-Webster loupe beside the word.
 
 ## Task — none in flight
 
-WP-39 closed on 2026-08-25. WP-16 read-aloud is next, by the reader's choice.
+WP-16 closed on 2026-08-25. Nothing is chosen for next. Run `/plan-task`.
 
 **Files in scope:** none yet.
+
+## Not proved on a device — the reading voice
+
+1. **Ask for read-aloud and leave it running.** It must cross paragraphs and
+   then a section boundary without being touched.
+2. **Watch the mark and the page.** The blue wash must sit on the sentence being
+   said, and the page must turn itself when the voice leaves it.
+3. **The transport.** Pause, resume, back, next, and each speed. A resumed
+   sentence starts again from its beginning — that is on purpose.
+4. **The voice list.** The Aa tab's Mode pane lists the phone's voices. Choose
+   one mid-sentence: the current sentence restarts in the new voice.
+5. **Leave the book while it is reading.** The voice must stop.
 
 ## Not proved on a device — a PDF's figures
 

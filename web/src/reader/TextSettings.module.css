@@ -485,3 +485,26 @@
 .pageLine:last-child {
   width: 62%;
 }
+
+/*
+ * The reading-voice list.
+ *
+ * The platform's own control, dressed to match the panel. Only the frame is
+ * ours — the open list belongs to the phone, and it should.
+ */
+.picker {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.picker:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

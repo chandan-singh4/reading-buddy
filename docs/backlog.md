@@ -179,7 +179,7 @@
 > chapter the book no longer has — otherwise re-importing a book would open it
 > to "That part of the book is missing". Deleting a book takes its place with
 > it, so re-importing the same book never resumes a previous read.
-- [ ] **WP-16 Read-aloud** — phone built-in TTS via Web Speech API · *after 12*
+- [x] **WP-16 Read-aloud** — done 2026-08-25. The phone's own voice reads the book, not one sentence. It starts from the selection, goes on through the section and into the next one, marks the sentence it is on, and turns the page to keep it in view. A transport at the foot of the page holds back, play or pause, next, the speed and stop. The voice is chosen in the Aa tab. Leaving the book stops the voice — it did not before · *after 12*
 - [x] **WP-41 Swipe and gesture fixes** — added 2026-08-02, straight off the first real phone session. The page drifted sideways under a thumb; a back swipe with the contents sheet open threw the reader out of the book onto the shelf; and the sheet filled the screen with nothing to tap to dismiss it · *after 32*
 - [x] **WP-42 Links inside the text** — added 2026-08-02, from the phone session. `<a href>` is discarded by the HTML parser today, so footnote markers, cross-references and the book's own contents page are dead text. Resolve an epub's internal hrefs to anchors and render them as taps. **Note the trap:** restoring the book's internal ToC *page* would renumber every paragraph after it and invalidate saved positions and highlights — so links in prose first, and treat the in-book contents page as a separate decision · *after 12; needs 15's positions to be considered*
 

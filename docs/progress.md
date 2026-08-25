@@ -15,7 +15,13 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  1909 tests across 105 files.
+  2034 tests across 112 files.
+- **A flaky test teardown, not ours to blame on WP-16.** `vitest run` reports one
+  unhandled error from `HandDrawn.tsx` — a coalesced measure fires after jsdom
+  has been torn down and the stored range can no longer be measured. Every test
+  passes. It reproduces on the untouched commit before WP-16, so it is older
+  than this work. It makes `npm test` exit non-zero. Worth a small task of its
+  own.
 - **Define needs its keys wherever it runs.** `MW_COLLEGIATE_KEY` (required) and
   `MW_THESAURUS_KEY` (optional) are set locally and on Vercel. A new machine, or
   a new deploy target, needs them again. Two free and separate registrations at
@@ -25,6 +31,29 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **The book reads itself out loud** (2026-08-25). WP-16 is closed. Build green:
+  2034 tests across 112 files.
+  - Read aloud was one sentence, said once, with no way to stop it. It is now a
+    voice that keeps going: from the selection, through the section, into the
+    next one, until the reader stops it.
+  - **The engine is a plain object, not a hook** — `reader/readAloud.ts`. What
+    plays next, what a pause means and which endings are real are rules worth
+    testing without a renderer. 22 tests drive it through a fake engine.
+  - **The rule the module is built around:** `cancel()` fires `onend`. Every
+    utterance carries its generation, and an ending from an old one is ignored.
+  - The sentence being said is washed in the app's own blue, painted by the same
+    machinery as a highlight, so it survives a page turn for free.
+  - The page follows the voice by the *sentence's* rectangle, not the
+    paragraph's: a long paragraph crosses a column, and the voice crosses with
+    it.
+  - The transport is at the foot of the page: back, play or pause, next, the
+    speed, stop. The voice itself is chosen in the Aa tab, where it is decided
+    once.
+  - **The defect it fixes:** nothing silenced the speech when the reader left
+    the book. The hook's cleanup does.
+  - `aloudRate` and `aloudVoice` joined the reader's settings, so both survive a
+    reload.
 
 - **A PDF's pictures, found without recognising them** (2026-08-25). WP-39 is
   closed. Build green: 2006 tests across 110 files.

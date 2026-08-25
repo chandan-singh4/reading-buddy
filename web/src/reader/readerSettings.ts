@@ -95,6 +95,21 @@ export interface ReaderSettings {
    * dimmed the page last night expects it dim tonight.
    */
   dim: number
+  /**
+   * How fast the book is read out loud, as a multiple of the voice's own pace.
+   *
+   * Kept with the reading settings and not with the transport that changes it,
+   * because a reader who slowed the voice down last night wants it slow tonight.
+   */
+  aloudRate: number
+  /**
+   * The chosen reading voice, by name.
+   *
+   * A name and not an object: the browser rebuilds its voice list on every
+   * load, and the objects in it cannot be stored. Absent means "whatever this
+   * device offers", which is the right answer for a reader who has not chosen.
+   */
+  aloudVoice?: string
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
@@ -115,6 +130,8 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
      ever takes light away from it, and taking light away is the reader's move
      to make. */
   dim: 0,
+  /* The voice's own pace. Every engine is already tuned to be listenable at 1. */
+  aloudRate: 1,
 }
 
 export const TEXT_STEPS = ['0.875rem', '1rem', '1.125rem', '1.3125rem', '1.5rem'] as const
@@ -225,6 +242,13 @@ export function readReaderSettings(): ReaderSettings {
       // build with a wider range should come back as "as dark as we now go"
       // and not as "full brightness, and your setting is gone".
       dim: typeof parsed.dim === 'number' ? clampDim(parsed.dim) : DEFAULT_SETTINGS.dim,
+      // Clamped to the range the engines all accept. A stored 12 is a bug
+      // somewhere else, and reading at twelve times speed is not a setting.
+      aloudRate:
+        typeof parsed.aloudRate === 'number'
+          ? Math.min(3, Math.max(0.5, parsed.aloudRate))
+          : DEFAULT_SETTINGS.aloudRate,
+      ...(typeof parsed.aloudVoice === 'string' ? { aloudVoice: parsed.aloudVoice } : {}),
     }
   } catch {
     return DEFAULT_SETTINGS

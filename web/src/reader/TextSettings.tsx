@@ -98,6 +98,14 @@ export interface TextSettingsProps {
    */
   highlighter?: HighlighterChoice
   onHighlighterChange?: (choice: HighlighterChoice) => void
+  /**
+   * The voices this device offers for reading the book out loud (WP-16).
+   *
+   * Optional, and for the same reason the highlighter is: the list comes from
+   * the browser's speech engine, which a caller without one — a test, a screen
+   * with no book open — has no way to supply. Left out, the row is not drawn.
+   */
+  voices?: readonly SpeechSynthesisVoice[]
 }
 
 export function TextSettings({
@@ -105,6 +113,7 @@ export function TextSettings({
   onSettingsChange,
   highlighter,
   onHighlighterChange,
+  voices,
 }: TextSettingsProps) {
   const [pane, setPane] = useState<Pane>('text')
   const [adjusting, setAdjusting] = useState<Adjusting>(null)
@@ -304,6 +313,46 @@ export function TextSettings({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/*
+            The reading voice.
+
+            A plain `<select>`, and deliberately so. A device can offer forty
+            voices, the names are the system's own — "Microsoft Zira", "Daniel"
+            — and no set of buttons makes that list better. The phone already
+            draws a good picker for a long list, and this is the one control in
+            the panel where the platform's own is the right one.
+
+            Chosen here rather than on the transport bar: it is decided once,
+            and the bar has to stay small enough to use without looking.
+          */}
+          {voices && voices.length > 0 && (
+            <div className={styles.row}>
+              <span className={styles.rowLabel}>Reading voice</span>
+              <select
+                className={styles.picker}
+                value={settings.aloudVoice ?? ''}
+                aria-label="Reading voice"
+                onChange={(event) =>
+                  onSettingsChange(
+                    // An empty choice clears the setting rather than storing an
+                    // empty name: "this device's own voice" is the absence of a
+                    // choice, and it has to survive being chosen again.
+                    event.target.value
+                      ? { aloudVoice: event.target.value }
+                      : { aloudVoice: undefined },
+                  )
+                }
+              >
+                <option value="">This device’s voice</option>
+                {voices.map((voice) => (
+                  <option key={voice.name} value={voice.name}>
+                    {voice.name}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </div>

@@ -1,0 +1,97 @@
+/*
+ * The reading transport, at the foot of the page.
+ *
+ * Fixed to the bottom rather than placed in the page, because the page is a
+ * column in a horizontal strip and anything laid inside it would scroll away on
+ * the first turn. It sits above the page furniture and below the sheets a turn
+ * throws up, so a turn goes over it and not under it.
+ */
+
+.bar {
+  position: fixed;
+  z-index: 12;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Clear of the phone's own home bar, and of the page number under it. */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 2.5rem);
+
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem;
+
+  font-family: var(--font-ui);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
+}
+
+.bar button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+
+  /* The phone's own minimum for a target you press without looking. */
+  min-width: 3rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.4rem;
+
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.bar button:hover {
+  background: var(--color-surface-raised);
+}
+
+.bar button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The one button the thumb goes to by default: filled, and wider than the rest. */
+.play {
+  min-width: 3.5rem;
+  font-size: 1.1rem;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+}
+
+.play:hover {
+  /* Not the raised surface: on a filled button that would wash the icon out. */
+  background: color-mix(in srgb, var(--color-accent) 85%, var(--color-text));
+}
+
+.step {
+  font-size: 0.8rem;
+}
+
+/* Under the arrows, so a first-time reader knows which way they go. */
+.label {
+  font-size: 0.625rem;
+  color: var(--color-text-muted);
+}
+
+.rate {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  color: var(--color-accent);
+  background: var(--color-accent-wash);
+}
+
+.stop {
+  color: var(--color-text-muted);
+}
+
+/* While a page is turning, the transport steps aside with the other furniture. */
+body:has([data-page-sheet]) .bar {
+  visibility: hidden;
+}

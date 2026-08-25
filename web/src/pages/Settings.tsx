@@ -99,7 +99,6 @@ export default function Settings() {
         <div className={styles.card}>
           <ul>
             <li>Appearance — day/night and reading type size (WP-14)</li>
-            <li>Read-aloud voice (WP-16)</li>
             <li>Cost and usage (WP-27)</li>
             <li>An offline copy of the cloud library (WP-58)</li>
           </ul>
