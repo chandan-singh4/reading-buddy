@@ -38,13 +38,22 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     ruled it out.
   - **The speaker never disappears again, for any reason.** It dims, disables
     and says "no recording" to a screen reader.
-  - **A spent MW quota is no longer reported as "no dictionary entry".** MW
-    answers a spent key with **200 and a suggestion list** — the same shape as
-    a word it has never heard of. Measured on 2026-08-25: `fundamental`,
-    `person`, `cat`, `dog` and `water` all came back as suggestion lists on a
-    key that had answered properly an hour earlier. `isOutOfLookups` reads MW
-    echoing the word back as its own first suggestion, which a genuine miss
-    cannot do.
+  - **A malfunctioning MW is no longer reported as "no dictionary entry".** A
+    broken MW and a word MW lacks are the same 200 and the same array of
+    strings. On 2026-08-25 the Collegiate endpoint answered that way for
+    `cat`, `dog`, `water`, `person` and `fundamental` for about half an hour,
+    then recovered on its own. `mwKnowsTheWord` reads MW echoing the word back
+    as its own first suggestion, which a genuine miss cannot do, and the panel
+    says "try again in a moment" instead of naming the word as unknown.
+  - **The first explanation for that was wrong, and is recorded as wrong.** It
+    was called a spent daily quota. The reader's usage report disproved it: 30
+    hits in 30 days. Also ruled out by measurement — swapped keys, an invalid
+    key, a rate limit, response caching, and common words being treated
+    differently. See the note on `mwKnowsTheWord` in `reader/dictionary.ts`.
+  - **No morphology work is needed.** The reader asked for "persons" to fall
+    back to "person". MW does that itself: once the fault cleared, `persons`
+    returned the `person` entry and `unnoticed` returned its own. The report
+    was the fault above.
 
 - **Four fixes off the phone** (2026-08-25). Build green: 1929 tests across 107
   files.

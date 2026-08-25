@@ -163,39 +163,46 @@ export function isNotFound(body: unknown): boolean {
 }
 
 /**
- * Whether a not-found is really the key being out of lookups for the day.
+ * Whether MW has the word and simply did not define it.
  *
  * ## Two very different answers with the same shape
  *
- * MW does not report a spent quota with a status code. It answers **200 with a
- * suggestion list** — the same shape, byte for byte, as a word it has never
- * heard of. The app read every one of those as "no dictionary entry for that
- * word", which is a lie, and it tells it about every word at once.
+ * A word MW has never heard of and a malfunctioning MW look identical from
+ * here: **200, with a JSON array of spelling suggestions.** There is no status
+ * code and no header to tell them apart. Read literally, the second one makes
+ * the app tell the reader "no dictionary entry for that word" — about a word
+ * that is plainly in the dictionary, and about every word at once.
  *
- * Measured 2026-08-25. Early in the session `fundamental` returned a full
- * entry. Later the same key returned suggestion lists for `fundamental`,
- * `person`, `cat`, `dog` and `water` — all of them certainly in the
- * Collegiate, all of them 200, and no rate-limit header on the response.
+ * ## This is measured, and the first explanation for it was wrong
+ *
+ * On 2026-08-25 the Collegiate endpoint returned suggestion lists for `cat`,
+ * `dog`, `water`, `person` and `fundamental` for about half an hour, then
+ * recovered on its own with no change at this end.
+ *
+ * It was called a spent daily quota at first. The reader's usage report
+ * disproved that: 30 hits in 30 days. Also ruled out, each by measurement — a
+ * wrong or swapped key (swapping them answers "Not subscribed"), an invalid
+ * key (that answers in plain text, not JSON), a rate limit (`justice` survived
+ * eight rapid calls unharmed), response caching (a cache-buster and a
+ * `no-cache` header changed nothing), and common words being treated
+ * differently (`house`, `tree` and `book` all worked while `cat` failed).
+ *
+ * What is left is a transient fault at MW. We cannot prevent it. We can refuse
+ * to blame the reader's word for it.
  *
  * ## How to tell them apart
  *
- * MW echoes the word back as its own first suggestion when it knows the word
- * and is simply not giving it to us. A word it genuinely does not have cannot
- * be its own suggestion — "asdfghjkl" comes back with other spellings or with
- * nothing.
+ * MW echoes the word back as its own first suggestion when it knows the word.
+ * A word it genuinely lacks cannot be its own suggestion — "asdfghjkl" comes
+ * back with other spellings, or with nothing.
  *
- * So: the queried word appearing in its own suggestion list means MW has the
- * word. That is the signature of a spent quota, not of a missing entry.
- *
- * **This discriminator is not yet proved against a healthy key.** It was
- * derived while the quota was already spent, so only half of it is measured:
- * the degraded side. The other half — that a real miss does not echo — is
- * MW's documented behaviour and is what the existing suggestion list is built
- * on, but it wants one check on a fresh day. If it is wrong, the cost is a
- * reader told "try later" about a word that genuinely is not in the
- * dictionary, and the panel still offers Veda underneath.
+ * The degraded half of this rule is measured. The other half — that a real
+ * miss does not echo — is MW's documented behaviour, and it is what the
+ * existing suggestion list already relies on. If it is ever wrong, the cost is
+ * a reader told "try again" about a word that truly is absent, and the panel
+ * still offers Veda underneath.
  */
-export function isOutOfLookups(word: string, body: unknown): boolean {
+export function mwKnowsTheWord(word: string, body: unknown): boolean {
   if (!Array.isArray(body)) return false
   const asked = word.trim().toLowerCase()
   return body.some((one) => typeof one === 'string' && one.trim().toLowerCase() === asked)

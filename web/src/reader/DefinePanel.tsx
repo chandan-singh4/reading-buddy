@@ -456,7 +456,7 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
         )}
 
         {found?.state === 'failed' && (
-          <p className={styles.quiet}>The dictionary couldn’t be reached. Try again in a moment.</p>
+          <p className={styles.quiet}>The dictionary didn’t answer. Try again in a moment.</p>
         )}
 
         <div className={styles.foot}>

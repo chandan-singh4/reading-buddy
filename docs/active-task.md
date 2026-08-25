@@ -44,20 +44,12 @@ WP-28. It is the last foundation the tutor is missing.
 Smaller rows that are open and unblocked: WP-16 read-aloud, WP-43 re-scan a
 folder, WP-27 cost visibility, and the cloud path for notes.
 
-## Open question — does MW need help with inflected forms?
+## Closed — MW does not need help with inflected forms
 
 The reader reported that "persons" says there is no dictionary entry, and asked
-for a fall-back to "person". **Do not build this yet.**
-
-MW matches inflected forms itself, so "persons" should return the "person"
-entry on a healthy key. Every probe run on 2026-08-25 was made *after* the
-day's quota was spent, and a spent key answers every word with a suggestion
-list. So there is no evidence yet that morphology is the problem at all — the
-report is fully explained by the quota bug, which is now fixed.
-
-**The test, on a fresh day:** look up "persons" and "unnoticed". If they now
-open, there is nothing to build. If they still say no entry, the fall-back is
-real work and can be planned then.
+for a fall-back to "person". **Nothing to build.** Measured on 2026-08-25 once
+the MW fault cleared: `persons` returns the `person` entry, and `unnoticed`
+returns its own. MW resolves inflected forms itself.
 
 ## Not proved on a phone (2026-08-25)
 

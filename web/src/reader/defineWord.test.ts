@@ -273,19 +273,20 @@ describe('a cached entry from an older parser', () => {
 })
 
 /*
- * MW answers a spent quota with 200 and a suggestion list — the same shape as a
- * word it has never heard of. Read literally, it makes the app tell the reader
- * "no dictionary entry" about every word at once.
+ * A malfunctioning MW and a word MW has never heard of are the same 200 and the
+ * same array of strings. Read literally, the first makes the app tell the
+ * reader "no dictionary entry" about every word at once. Seen live on
+ * 2026-08-25, and gone half an hour later.
  */
-describe('the day’s lookups running out', () => {
-  it('is called busy, not a missing word', async () => {
+describe('MW answering with spellings for a word it plainly has', () => {
+  it('is a failure to retry, not a missing word', async () => {
     online(true)
     // The real reply for "person" on a spent key, trimmed.
     relay({ collegiate: ['person', 'persona', 'Pearson'], thesaurus: [] })
 
     const found = await lookUpWord('person', store().api)
 
-    expect(found.state).toBe('busy')
+    expect(found.state).toBe('failed')
   })
 
   it('still calls a genuine miss a miss', async () => {

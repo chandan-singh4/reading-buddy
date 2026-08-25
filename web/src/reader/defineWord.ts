@@ -25,7 +25,7 @@ import { wordStore, type WordStore } from '../storage/words.ts'
 import {
   etymologyTextOf,
   isNotFound,
-  isOutOfLookups,
+  mwKnowsTheWord,
   normalize,
   suggestionsOf,
   type DefineEntry,
@@ -140,11 +140,12 @@ export async function lookUpWord(selected: string, store: WordStore = wordStore)
   const answered = last.body as { collegiate?: unknown; thesaurus?: unknown } | null
   const collegiate = answered?.collegiate
   if (isNotFound(collegiate)) {
-    /* MW does not use a status code for a spent quota — it answers 200 with a
-     * suggestion list, exactly like a word it has never heard of. Telling the
-     * reader "no dictionary entry" then is a lie, and it tells it about every
-     * word at once. See `isOutOfLookups`. */
-    if (isOutOfLookups(word, collegiate)) return { state: 'busy', word }
+    /* A malfunctioning MW and a word MW has never heard of look identical from
+     * here: 200, with a list of spellings. Saying "no dictionary entry" then is
+     * a lie about a word that is plainly in the dictionary. `busy` is kept for
+     * a real 429; this is a fault that clears on its own, so it is `failed` —
+     * "try again in a moment". See `mwKnowsTheWord`. */
+    if (mwKnowsTheWord(word, collegiate)) return { state: 'failed', word }
     return { state: 'none', word, suggestions: suggestionsOf(collegiate) }
   }
 
@@ -152,7 +153,7 @@ export async function lookUpWord(selected: string, store: WordStore = wordStore)
   const etymology = found.et ? parseEtymology(found.et, word, found.date) : undefined
   const entry = normalize(word, collegiate, answered?.thesaurus, etymology)
   if (!entry) {
-    if (isOutOfLookups(word, collegiate)) return { state: 'busy', word }
+    if (mwKnowsTheWord(word, collegiate)) return { state: 'failed', word }
     return { state: 'none', word, suggestions: suggestionsOf(collegiate) }
   }
 

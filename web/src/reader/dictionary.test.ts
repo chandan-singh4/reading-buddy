@@ -18,7 +18,7 @@ import {
   suggestionsOf,
   syllablesOf,
   synonymsOf,
-  isOutOfLookups,
+  mwKnowsTheWord,
 } from './dictionary.ts'
 
 /** `fundamental`, as MW answers it: an adjective and a noun. */
@@ -338,33 +338,36 @@ describe('one example, one sense', () => {
 })
 
 /*
- * Measured against the live API on 2026-08-25. Early in the session
- * "fundamental" returned a full entry; later the same key returned suggestion
- * lists for "fundamental", "person", "cat", "dog" and "water" — every one of
- * them in the Collegiate, every one a 200, and no rate-limit header anywhere on
- * the response. A spent quota has no status code of its own.
+ * Measured against the live API on 2026-08-25. For about half an hour the
+ * Collegiate endpoint answered 200 with suggestion lists for "cat", "dog",
+ * "water", "person" and "fundamental", then recovered on its own.
+ *
+ * It was first blamed on a spent daily quota. The reader's usage report
+ * disproved that — 30 hits in 30 days — and so did every other theory tried
+ * against it. What matters here is the shape, not the cause: a broken MW and a
+ * word MW lacks are the same 200 and the same array of strings.
  */
-describe('isOutOfLookups', () => {
-  it('reads MW echoing the word back as a spent quota', () => {
-    // The real reply for "person" on a spent key, trimmed.
+describe('mwKnowsTheWord', () => {
+  it('reads MW echoing the word back as MW having the word', () => {
+    // The real reply for "person" during the fault, trimmed.
     const body = ['person', 'persona', 'Pearson', 'persons', 'Persian']
-    expect(isOutOfLookups('person', body)).toBe(true)
+    expect(mwKnowsTheWord('person', body)).toBe(true)
   })
 
   it('is not fooled by case or by stray space', () => {
-    expect(isOutOfLookups('  Person ', ['person'])).toBe(true)
+    expect(mwKnowsTheWord('  Person ', ['person'])).toBe(true)
   })
 
   it('leaves a genuine miss alone', () => {
     // A word MW does not have cannot be its own suggestion.
-    expect(isOutOfLookups('asdfghjkl', ['ashcake', 'askance'])).toBe(false)
+    expect(mwKnowsTheWord('asdfghjkl', ['ashcake', 'askance'])).toBe(false)
   })
 
   it('leaves an empty suggestion list alone', () => {
-    expect(isOutOfLookups('asdfghjkl', [])).toBe(false)
+    expect(mwKnowsTheWord('asdfghjkl', [])).toBe(false)
   })
 
   it('says nothing about a real entry', () => {
-    expect(isOutOfLookups('person', [{ meta: { id: 'person' } }])).toBe(false)
+    expect(mwKnowsTheWord('person', [{ meta: { id: 'person' } }])).toBe(false)
   })
 })
