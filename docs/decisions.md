@@ -1331,3 +1331,10 @@ sign-in screen.
   carry on: desktop Chrome has stopped a resumed utterance after a timeout for
   years. A repeated sentence is a fault a listener forgives. A silent stop is
   not. — 2026-08-25
+- **"Stopped" and "finished" are two different endings.** Both leave the voice
+  quiet with no place in the book, and a single callback for the pair is a real
+  fault, reported from the phone: pressing stop was read as "this section is
+  done", so the app moved to the next chapter and started reading it. Pressing
+  stop again moved on again. `AloudReader` now reports the place through
+  `onPlace` and the end of the plan through `onFinished`, and only `onFinished`
+  turns the page into the next section. — 2026-08-25

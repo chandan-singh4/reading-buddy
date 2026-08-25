@@ -137,15 +137,29 @@ export class AloudReader {
   private readonly make: (text: string) => SpokenLike
   /** Told the place in the plan when it moves, and `null` when it stops. */
   private readonly onPlace: (at: number | null) => void
+  /**
+   * Told when the plan has been *read to the end* — and at no other time.
+   *
+   * Separate from `onPlace(null)`, and that separation is the fix for a real
+   * fault. The two endings look identical from outside: the reading has
+   * finished and there is no place any more. They mean opposite things. One is
+   * "this section is done, go on to the next"; the other is "the reader
+   * pressed stop". While a single callback carried both, pressing stop moved
+   * the reader to the next chapter and started reading it — and pressing stop
+   * again moved them on again, with no way out.
+   */
+  private readonly onFinished: () => void
 
   constructor(
     speech: SpeechLike,
     make: (text: string) => SpokenLike,
     onPlace: (at: number | null) => void = () => {},
+    onFinished: () => void = () => {},
   ) {
     this.speech = speech
     this.make = make
     this.onPlace = onPlace
+    this.onFinished = onFinished
   }
 
   get index(): number {
@@ -193,12 +207,23 @@ export class AloudReader {
     this.say()
   }
 
-  /** Stop, and forget the place. */
+  /**
+   * Stop, and forget the place.
+   *
+   * What a reader asks for. It never reports the plan as finished — see
+   * `onFinished`.
+   */
   stop(): void {
     this.silence()
     this.plan = []
     this.at = 0
     this.onPlace(null)
+  }
+
+  /** The plan was read to its end. Stop, then say so. */
+  private finish(): void {
+    this.stop()
+    this.onFinished()
   }
 
   /** Move by whole sentences, playing or paused. */
@@ -241,7 +266,7 @@ export class AloudReader {
   private say(): void {
     const line = this.plan[this.at]
     if (!line) {
-      this.stop()
+      this.finish()
       return
     }
 
@@ -258,7 +283,7 @@ export class AloudReader {
       if (mine !== this.generation || !this.speaking) return
       this.at += 1
       if (this.at >= this.plan.length) {
-        this.stop()
+        this.finish()
         return
       }
       this.say()

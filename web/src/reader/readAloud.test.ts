@@ -104,6 +104,39 @@ describe('AloudReader', () => {
     expect(reader.playing).toBe(false)
   })
 
+  /*
+   * The reported fault, and the reason the two endings are separate callbacks.
+   *
+   * Stop and "read to the end" both leave the reader silent with no place. They
+   * mean opposite things. While one callback carried both, pressing stop was
+   * read as "this section is finished", so the screen moved to the next chapter
+   * and started reading it — and pressing stop again moved on again.
+   */
+  it('says the plan is finished only when it is read to the end', () => {
+    const fake = fakeSpeech()
+    const done = vi.fn()
+    const reader = new AloudReader(fake.speech, fake.make, () => {}, done)
+
+    reader.start(plan)
+    reader.stop()
+    expect(done).not.toHaveBeenCalled()
+
+    reader.start(plan)
+    fake.finish()
+    fake.finish()
+    fake.finish()
+    expect(done).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not say the plan is finished when a skip runs off an end', () => {
+    const fake = fakeSpeech()
+    const done = vi.fn()
+    const reader = new AloudReader(fake.speech, fake.make, () => {}, done)
+    reader.start(plan)
+    reader.skip(-1)
+    expect(done).not.toHaveBeenCalled()
+  })
+
   it('starts part way in', () => {
     const fake = fakeSpeech()
     new AloudReader(fake.speech, fake.make).start(plan, 2)

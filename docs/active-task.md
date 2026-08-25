@@ -23,7 +23,7 @@ rewriting, and a finished WP-25 sat at the top and was proposed three times.
 
 ## State — 2026-08-25
 
-Nothing is mid-edit. Build green: 2034 tests across 112 files. `main` is pushed.
+Nothing is mid-edit. Build green: 2036 tests across 112 files. `main` is pushed.
 
 The AI tutor works end to end: a reader selects a passage, taps a chip, and a
 live model streams a warm answer into the Study Lamp. The reader picks the
@@ -47,6 +47,8 @@ WP-16 closed on 2026-08-25. Nothing is chosen for next. Run `/plan-task`.
 4. **The voice list.** The Aa tab's Mode pane lists the phone's voices. Choose
    one mid-sentence: the current sentence restarts in the new voice.
 5. **Leave the book while it is reading.** The voice must stop.
+6. **Press stop.** It must stop. It must not move to the next chapter — that
+   was the reported fault, and it is fixed and tested, but prove it by hand.
 
 ## Not proved on a device — a PDF's figures
 

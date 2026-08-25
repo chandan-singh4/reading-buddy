@@ -109,16 +109,24 @@ export function useReadAloud(options: AloudOptions): AloudControls {
       (at) => {
         setPlace(at)
         if (at === null) {
-          // The plan is finished. Either the book goes on into the next
-          // section, or this is where the reading stops.
-          const moved = sectionEnd.current?.() ?? false
-          carryOn.current = moved
-          setPlaying(moved)
-          setRunning(moved)
+          // Quiet, and nothing on the page marked. Whether the book goes on is
+          // the *other* callback's business — see it below.
+          setPlaying(false)
+          setRunning(false)
           return
         }
         const line = planNow.current[at]
         if (line) saying.current?.(line)
+      },
+      () => {
+        // The section was read to its end. This never runs when the reader
+        // presses stop, which is the whole reason it is a separate callback:
+        // stop used to be indistinguishable from "finished", so it carried the
+        // reader into the next chapter instead of ending the reading.
+        const moved = sectionEnd.current?.() ?? false
+        carryOn.current = moved
+        setPlaying(moved)
+        setRunning(moved)
       },
     )
   }
@@ -159,8 +167,10 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   }, [])
 
   const stop = useCallback(() => {
-    carryOn.current = false
     reader.current?.stop()
+    // After the reader, not before it. `stop` reports the place as gone, and a
+    // flag cleared first would be the flag this cleared, set again.
+    carryOn.current = false
     setPlaying(false)
     setRunning(false)
   }, [])
