@@ -15,6 +15,32 @@
 import { db as defaultDb, type ReadingBuddyDB, type StoredDefinition, type StoredWord } from './db.ts'
 import type { Anchor, BookId } from '../structure/index.ts'
 
+/**
+ * The parser behind a cached definition. Raise it whenever a change here or in
+ * `reader/dictionary.ts` would produce a *different* entry from the same MW
+ * JSON — a new field, a fixed URL, a better etymology chain.
+ *
+ * ## Why a cache needs a version at all
+ *
+ * What is cached is the parsed entry, not MW's JSON, and the cache is read
+ * before the network. So a parsing bug does not end when it is fixed: every
+ * device keeps serving the old broken entry for those words, forever, and the
+ * fix appears to work everywhere except where it matters.
+ *
+ * That is not hypothetical. The audio path was wrong until 2026-08-24
+ * (`/audio/pronunciation/mp3/` answers 403; `/audio/prons/en/us/mp3/` answers
+ * 200). The path was fixed, the tests passed, and the reader's phone went on
+ * playing the 403 for every word it had already looked up — reported
+ * 2026-08-25 against "fundamental". Raising this number is what actually
+ * delivers a parser fix to a device.
+ *
+ * Same idea as `PARSER_VERSION`, and for the same reason.
+ *
+ * - 1 — implied, every row written before this constant existed.
+ * - 2 — 2026-08-25. Re-fetch everything, to clear the 403 audio URLs.
+ */
+export const DEFINITION_VERSION = 2
+
 /** Where a saved word was met. Both optional — a word can be saved from anywhere. */
 export interface WordFrom {
   bookId?: BookId
@@ -34,7 +60,12 @@ export function createWordStore(database: ReadingBuddyDB = defaultDb) {
      */
     async cachedDefinition(word: string): Promise<StoredDefinition | undefined> {
       try {
-        return await database.definitions.get(word.trim().toLowerCase())
+        const kept = await database.definitions.get(word.trim().toLowerCase())
+        /* A row from an older parser is a miss, not a hit. See
+         * `DEFINITION_VERSION`. The row is left where it is: the next lookup
+         * overwrites it, and a reader with no signal keeps something to read
+         * rather than nothing. */
+        return kept && kept.v === DEFINITION_VERSION ? kept : undefined
       } catch {
         return undefined
       }
@@ -47,6 +78,7 @@ export function createWordStore(database: ReadingBuddyDB = defaultDb) {
           word: word.trim().toLowerCase(),
           entry,
           fetchedAt: new Date().toISOString(),
+          v: DEFINITION_VERSION,
         })
       } catch {
         /* A full disk is not a reason to refuse to show the word. */

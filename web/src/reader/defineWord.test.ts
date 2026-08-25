@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { lookUpWord, wordFrom } from './defineWord.ts'
-import type { WordStore } from '../storage/words.ts'
+import { DEFINITION_VERSION, type WordStore } from '../storage/words.ts'
 
 vi.mock('../storage/cloud/client.ts', () => ({
   accessToken: () => Promise.resolve('token'),
@@ -43,7 +43,7 @@ function store(seeded: Record<string, unknown> = {}) {
       cachedDefinition: (word: string) =>
         Promise.resolve(
           cache.has(word)
-            ? { word, entry: cache.get(word), fetchedAt: '2026-08-24T00:00:00.000Z' }
+            ? { word, entry: cache.get(word), fetchedAt: '2026-08-24T00:00:00.000Z', v: 2 }
             : undefined,
         ),
       cacheDefinition: (word: string, entry: unknown) => {
@@ -214,5 +214,86 @@ describe('the four ways it fails', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('no route'))))
     online(true)
     expect(await lookUpWord('fundamental', kept.api)).toEqual({ state: 'offline', word: 'fundamental' })
+  })
+})
+
+/*
+ * The 2026-08-25 report: the speaker vanished on "fundamental", every time, on
+ * a device where the URL fix had already shipped.
+ *
+ * The cache holds the *parsed* entry and is read before the network, so a
+ * parsing bug outlives its own fix: the device keeps serving the old broken
+ * entry for every word it had already looked up. `DEFINITION_VERSION` is what
+ * makes a fix reach a device. These two hold that seam open.
+ */
+describe('a cached entry from an older parser', () => {
+  /** A store holding one row written before `DEFINITION_VERSION` existed. */
+  function stale() {
+    return {
+      cachedDefinition: (word: string) => {
+        const kept = {
+          word,
+          entry: { headword: 'fundamental' },
+          fetchedAt: '2026-08-20T00:00:00.000Z',
+          // No `v` at all — every row written before 2026-08-25 looks like this.
+          v: undefined as number | undefined,
+        }
+        return Promise.resolve(kept.v === DEFINITION_VERSION ? kept : undefined)
+      },
+      cacheDefinition: () => Promise.resolve(),
+      saveWord: () => Promise.resolve({ word: '', savedAt: '' }),
+      isSaved: () => Promise.resolve(false),
+      forgetWord: () => Promise.resolve(),
+      savedWords: () => Promise.resolve([]),
+    } as unknown as WordStore
+  }
+
+  it('is a miss, so the word is fetched and parsed again', async () => {
+    online(true)
+    const fetching = relay({ collegiate: COLLEGIATE, thesaurus: [] })
+
+    const found = await lookUpWord('fundamental', stale())
+
+    expect(fetching).toHaveBeenCalled()
+    expect(found.state).toBe('entry')
+    if (found.state === 'entry') expect(found.fromCache).toBe(false)
+  })
+
+  it('is a hit when the version matches, and costs no network', async () => {
+    online(true)
+    const fetching = relay({ collegiate: COLLEGIATE, thesaurus: [] })
+    const kept = store({ fundamental: { headword: 'fundamental', senseGroups: [] } })
+
+    const found = await lookUpWord('fundamental', kept.api)
+
+    expect(fetching).not.toHaveBeenCalled()
+    expect(found.state).toBe('entry')
+    if (found.state === 'entry') expect(found.fromCache).toBe(true)
+  })
+})
+
+/*
+ * MW answers a spent quota with 200 and a suggestion list — the same shape as a
+ * word it has never heard of. Read literally, it makes the app tell the reader
+ * "no dictionary entry" about every word at once.
+ */
+describe('the day’s lookups running out', () => {
+  it('is called busy, not a missing word', async () => {
+    online(true)
+    // The real reply for "person" on a spent key, trimmed.
+    relay({ collegiate: ['person', 'persona', 'Pearson'], thesaurus: [] })
+
+    const found = await lookUpWord('person', store().api)
+
+    expect(found.state).toBe('busy')
+  })
+
+  it('still calls a genuine miss a miss', async () => {
+    online(true)
+    relay({ collegiate: ['ashcake', 'askance'], thesaurus: [] })
+
+    const found = await lookUpWord('asdfghjkl', store().api)
+
+    expect(found.state).toBe('none')
   })
 })

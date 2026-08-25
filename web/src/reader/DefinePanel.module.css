@@ -193,6 +193,20 @@
   transform: scale(0.9);
 }
 
+/*
+ * A recording that will not play. The button stays where it was — see the long
+ * note on `say` in DefinePanel.tsx — and says so by going quiet: dimmed, and
+ * with no press animation, because nothing happens when it is pressed.
+ */
+.sayOff {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.sayOff:active {
+  transform: none;
+}
+
 .say svg {
   width: 14px;
   height: 14px;

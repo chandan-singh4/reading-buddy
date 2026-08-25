@@ -153,7 +153,7 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
   const [saved, setSaved] = useState(false)
   const [asked, setAsked] = useState(() => wordFrom(selected))
   const [place, setPlace] = useState<Loupe | null>(null)
-  /** Set only when the browser says it cannot play this file at all. See `say`. */
+  /** Set when the browser says it cannot play this file. The button stays; it goes quiet. */
   const [mute, setMute] = useState(false)
   /**
    * The one audio element the panel reuses.
@@ -239,19 +239,28 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
    * URL: that word maps to `fundam02`, which answers 200 with 6.6 KB of audio.
    * The element now lives in a ref for as long as the panel does.
    *
-   * **One failure was read as a broken recording**, and the button removed
-   * itself under the reader's finger. A control that vanishes when you press it
-   * reads as the app breaking, which is worse than the silence it was meant to
-   * prevent. Only `NotSupportedError` — the browser saying it cannot play this
-   * file at all — takes the button away now. Everything else (a lost network, a
-   * second tap interrupting the first, an autoplay refusal) leaves it in place
-   * and is worth another tap.
+   * **The button no longer disappears, for any reason.** It used to remove
+   * itself on a failed play, on the argument that a silent speaker is a lie.
+   * The argument was right and the remedy was wrong: a control that vanishes
+   * under the reader's finger reads as the app breaking, which is worse than
+   * the silence it was meant to prevent. It was still wrong when narrowed to
+   * `NotSupportedError` on 2026-08-25 — the reader saw it vanish again the
+   * same day, because that was the error all along.
+   *
+   * So a recording that will not play leaves a speaker that is visibly off:
+   * dimmed, `disabled`, and labelled "no recording" for a screen reader. The
+   * reader can see the difference between "this word has no audio" and "the
+   * app just ate my button", which is the whole of what went wrong here.
    */
   const say = useCallback((url: string) => {
     const player = (sound.current ??= new Audio())
     if (player.src !== url) player.src = url
     player.currentTime = 0
     void player.play().catch((error: unknown) => {
+      /* `NotSupportedError` is the browser saying it has no playable source —
+       * a 404 or a 403 behind the URL. Everything else (a lost network, a
+       * second tap interrupting the first, an autoplay refusal) is worth
+       * another tap and changes nothing on screen. */
       if (error instanceof DOMException && error.name === 'NotSupportedError') setMute(true)
     })
   }, [])
@@ -358,11 +367,16 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
           <>
             {(entry.pronunciation || entry.partsOfSpeech.length > 0) && (
               <div className={styles.pron}>
-                {entry.pronunciation?.audioUrl && !mute && (
+                {entry.pronunciation?.audioUrl && (
                   <button
                     type="button"
-                    className={styles.say}
-                    aria-label={`Pronounce ${entry.headword}`}
+                    className={mute ? `${styles.say} ${styles.sayOff}` : styles.say}
+                    disabled={mute}
+                    aria-label={
+                      mute
+                        ? `No recording for ${entry.headword}`
+                        : `Pronounce ${entry.headword}`
+                    }
                     onClick={() => say(entry.pronunciation!.audioUrl!)}
                   >
                     <SayGlyph />

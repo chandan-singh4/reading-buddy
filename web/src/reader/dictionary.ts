@@ -162,6 +162,45 @@ export function isNotFound(body: unknown): boolean {
   return typeof body[0] === 'string'
 }
 
+/**
+ * Whether a not-found is really the key being out of lookups for the day.
+ *
+ * ## Two very different answers with the same shape
+ *
+ * MW does not report a spent quota with a status code. It answers **200 with a
+ * suggestion list** — the same shape, byte for byte, as a word it has never
+ * heard of. The app read every one of those as "no dictionary entry for that
+ * word", which is a lie, and it tells it about every word at once.
+ *
+ * Measured 2026-08-25. Early in the session `fundamental` returned a full
+ * entry. Later the same key returned suggestion lists for `fundamental`,
+ * `person`, `cat`, `dog` and `water` — all of them certainly in the
+ * Collegiate, all of them 200, and no rate-limit header on the response.
+ *
+ * ## How to tell them apart
+ *
+ * MW echoes the word back as its own first suggestion when it knows the word
+ * and is simply not giving it to us. A word it genuinely does not have cannot
+ * be its own suggestion — "asdfghjkl" comes back with other spellings or with
+ * nothing.
+ *
+ * So: the queried word appearing in its own suggestion list means MW has the
+ * word. That is the signature of a spent quota, not of a missing entry.
+ *
+ * **This discriminator is not yet proved against a healthy key.** It was
+ * derived while the quota was already spent, so only half of it is measured:
+ * the degraded side. The other half — that a real miss does not echo — is
+ * MW's documented behaviour and is what the existing suggestion list is built
+ * on, but it wants one check on a fresh day. If it is wrong, the cost is a
+ * reader told "try later" about a word that genuinely is not in the
+ * dictionary, and the panel still offers Veda underneath.
+ */
+export function isOutOfLookups(word: string, body: unknown): boolean {
+  if (!Array.isArray(body)) return false
+  const asked = word.trim().toLowerCase()
+  return body.some((one) => typeof one === 'string' && one.trim().toLowerCase() === asked)
+}
+
 /** The headword an entry is for, with the homograph number taken off. */
 function headwordOf(entry: CollegiateEntry): string {
   const id = typeof entry.meta?.id === 'string' ? entry.meta.id : ''

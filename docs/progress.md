@@ -26,6 +26,26 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **The speaker, properly this time, and a lie the dictionary was telling**
+  (2026-08-25). Build green: 1938 tests across 107 files.
+  - **Root cause of the vanishing speaker: the cache, not a race.** The word
+    cache keeps the *parsed* entry and is read before the network, and the row
+    had no version. So the audio-path fix of 2026-08-24 never reached any word
+    the reader had already looked up. Measured: the old path answers 403, the
+    new one 200. New `DEFINITION_VERSION` in `storage/words.ts`, now 2. A row
+    from an older parser counts as a miss. The first guess — an unheld `Audio`
+    element being collected — was wrong, and "it fails every time" is what
+    ruled it out.
+  - **The speaker never disappears again, for any reason.** It dims, disables
+    and says "no recording" to a screen reader.
+  - **A spent MW quota is no longer reported as "no dictionary entry".** MW
+    answers a spent key with **200 and a suggestion list** — the same shape as
+    a word it has never heard of. Measured on 2026-08-25: `fundamental`,
+    `person`, `cat`, `dog` and `water` all came back as suggestion lists on a
+    key that had answered properly an hour earlier. `isOutOfLookups` reads MW
+    echoing the word back as its own first suggestion, which a genuine miss
+    cannot do.
+
 - **Four fixes off the phone** (2026-08-25). Build green: 1929 tests across 107
   files.
   - **Home paints once.** The greeting sat outside the load gate and the shelf

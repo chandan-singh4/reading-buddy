@@ -18,6 +18,7 @@ import {
   suggestionsOf,
   syllablesOf,
   synonymsOf,
+  isOutOfLookups,
 } from './dictionary.ts'
 
 /** `fundamental`, as MW answers it: an adjective and a noun. */
@@ -333,5 +334,37 @@ describe('one example, one sense', () => {
       'the same line',
       undefined,
     ])
+  })
+})
+
+/*
+ * Measured against the live API on 2026-08-25. Early in the session
+ * "fundamental" returned a full entry; later the same key returned suggestion
+ * lists for "fundamental", "person", "cat", "dog" and "water" — every one of
+ * them in the Collegiate, every one a 200, and no rate-limit header anywhere on
+ * the response. A spent quota has no status code of its own.
+ */
+describe('isOutOfLookups', () => {
+  it('reads MW echoing the word back as a spent quota', () => {
+    // The real reply for "person" on a spent key, trimmed.
+    const body = ['person', 'persona', 'Pearson', 'persons', 'Persian']
+    expect(isOutOfLookups('person', body)).toBe(true)
+  })
+
+  it('is not fooled by case or by stray space', () => {
+    expect(isOutOfLookups('  Person ', ['person'])).toBe(true)
+  })
+
+  it('leaves a genuine miss alone', () => {
+    // A word MW does not have cannot be its own suggestion.
+    expect(isOutOfLookups('asdfghjkl', ['ashcake', 'askance'])).toBe(false)
+  })
+
+  it('leaves an empty suggestion list alone', () => {
+    expect(isOutOfLookups('asdfghjkl', [])).toBe(false)
+  })
+
+  it('says nothing about a real entry', () => {
+    expect(isOutOfLookups('person', [{ meta: { id: 'person' } }])).toBe(false)
   })
 })

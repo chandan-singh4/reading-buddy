@@ -376,6 +376,13 @@ export interface StoredDefinition {
   entry: unknown
   /** ISO 8601 — when it was looked up, so a stale entry can be refreshed. */
   fetchedAt: string
+  /**
+   * The parser that produced `entry`. Absent on every row written before
+   * 2026-08-25, which is exactly what makes those rows re-fetchable.
+   *
+   * See `DEFINITION_VERSION` in `storage/words.ts` for why this exists.
+   */
+  v?: number
 }
 
 /**
