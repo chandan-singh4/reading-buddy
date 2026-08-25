@@ -39,6 +39,7 @@ export { DefinePanel } from './DefinePanel.tsx'
 export type { DefinePanelProps } from './DefinePanel.tsx'
 
 export { lookUpWord, wordFrom } from './defineWord.ts'
+export { keepScreenAwake } from './wakeLock.ts'
 export type { Lookup } from './defineWord.ts'
 
 export type { DefineEntry, Etymology, EtymologyNode } from './dictionary.ts'

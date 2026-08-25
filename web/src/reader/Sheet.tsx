@@ -27,9 +27,10 @@
  * wrappers that know what a row means.
  */
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { dismisses, offsetFor } from './swipeDown.ts'
 import styles from './Sheet.module.css'
 
 export interface SheetRow {
@@ -80,6 +81,46 @@ function Tick() {
 export function Sheet({ title, rows, pick, onPick, onClose, children }: SheetProps) {
   const chosen = useRef<HTMLButtonElement | null>(null)
 
+  /*
+   * Swipe the sheet down to dismiss it.
+   *
+   * Reported 2026-08-25: the picker opens on the way to every question, and
+   * Cancel was the only way out of it. The handle was drawn from the first day
+   * and did nothing, which is its own small lie — a grab bar is a promise.
+   *
+   * **The gesture is on the handle and the title, not on the whole card.**
+   * `ModelGrid` drags its own columns, and a sheet that also drags would take
+   * that gesture away from it. The narrow strip at the top is where a phone
+   * puts this anyway, and the list below it stays free to scroll.
+   *
+   * `null` means no drag is in progress, which is different from a drag that
+   * has moved nowhere — the first draws no transform at all, the second draws
+   * one of zero and keeps the transition switched off.
+   */
+  const [drag, setDrag] = useState<{ from: number; at: number; dy: number } | null>(null)
+
+  const start = useCallback((event: React.PointerEvent) => {
+    // Secondary buttons and multi-touch are not a dismissal.
+    if (!event.isPrimary) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setDrag({ from: event.clientY, at: performance.now(), dy: 0 })
+  }, [])
+
+  const move = useCallback((event: React.PointerEvent) => {
+    setDrag((was) => (was ? { ...was, dy: event.clientY - was.from } : was))
+  }, [])
+
+  const end = useCallback(
+    (event: React.PointerEvent) => {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+      setDrag((was) => {
+        if (was && dismisses(was.dy, performance.now() - was.at)) onClose()
+        return null
+      })
+    },
+    [onClose],
+  )
+
   useEffect(() => {
     chosen.current?.focus()
   }, [])
@@ -105,9 +146,29 @@ export function Sheet({ title, rows, pick, onPick, onClose, children }: SheetPro
           under the finger and presses whatever was behind the sheet. Dismissing
           the picker would run one of the reader's task chips. */}
       <div className={styles.scrim} onClick={onClose} aria-hidden="true" />
-      <div className={styles.sheet} role="dialog" aria-label={title}>
-        <span className={styles.grab} aria-hidden="true" />
-        <p className={styles.title}>{title}</p>
+      <div
+        className={styles.sheet}
+        role="dialog"
+        aria-label={title}
+        /* No transition while a finger is on it: the sheet must sit under the
+           thumb, not chase it. The transition is what springs it back on a
+           release, so it belongs to every frame except the dragged ones. */
+        style={
+          drag
+            ? { transform: `translateY(${offsetFor(drag.dy)}px)`, transition: 'none' }
+            : undefined
+        }
+      >
+        <div
+          className={styles.handle}
+          onPointerDown={start}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerCancel={end}
+        >
+          <span className={styles.grab} aria-hidden="true" />
+          <p className={styles.title}>{title}</p>
+        </div>
 
         {children}
 

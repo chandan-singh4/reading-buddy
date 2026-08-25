@@ -218,6 +218,29 @@ export default function Home() {
     }
   })
 
+  /*
+   * The whole page waits, or none of it does.
+   *
+   * The greeting used to sit outside this gate while the shelf sat inside it.
+   * On a cold launch the shelf waits for the database read and then up to
+   * COVER_WAIT_MS for the artwork, so the reader got the greeting alone on an
+   * empty page for about a second, and then the books dropped in underneath it.
+   * Reported 2026-08-25: "that delay makes it feel lagging".
+   *
+   * A warm return never showed this, because the shelf memory above seeds the
+   * first frame. So the fault was only ever on the launch — the one moment the
+   * app is being judged for speed.
+   *
+   * Holding the greeting back does not make the wait longer. It makes it one
+   * wait instead of two, and one thing arriving finished reads as faster than
+   * two things arriving in pieces. The splash screen is what fills the moment,
+   * which is what a splash screen is for.
+   *
+   * `failed` still draws the greeting: an error under a bare heading is a page,
+   * and an error alone on white is a crash.
+   */
+  if (state.status === 'loading') return <div className={styles.home} aria-busy="true" />
+
   return (
     <div className={styles.home}>
       <header className={styles.greeting}>
@@ -228,16 +251,6 @@ export default function Home() {
             reader something instead, so it earns its place. */}
         <p className={styles.greetingAsk}>What book are you picking up today?</p>
       </header>
-
-      {/*
-        Nothing at all while loading — deliberately, and not an oversight.
-        "Loading…" is one more thing that appears and is then replaced by
-        something else, and at launch it is on screen for roughly a frame. A
-        word that flickers past under the greeting is indistinguishable from the
-        page reloading; empty space for the same moment is invisible. The
-        `failed` branch below is what the reader sees if it genuinely doesn't
-        arrive.
-      */}
 
       {state.status === 'failed' && (
         <div className={styles.error} role="alert">

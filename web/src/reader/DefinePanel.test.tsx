@@ -301,20 +301,70 @@ describe('the things a reader can do in the panel', () => {
     expect(window.history.length).toBe(before)
   })
 
-  it('takes the speaker away when the recording will not play', async () => {
-    /*
-     * The 2026-08-24 report: "I tap the sound and hear nothing." The URL was
-     * wrong and the failure was swallowed, so the button looked healthy and did
-     * nothing. A silent button is a lie; the respelling still says how the word
-     * sounds.
-     */
-    const play = vi.fn(() => Promise.reject(new Error('no')))
-    vi.stubGlobal('Audio', class { play = play })
+  /*
+   * The 2026-08-24 report was "I tap the sound and hear nothing", and the answer
+   * then was to take the button away on any failure at all. The 2026-08-25
+   * report is what that answer cost: "the button shows up, and when I click it,
+   * it disappears" — on `fundamental`, whose recording is perfectly good.
+   *
+   * So the rule is narrower now. Only the browser saying it cannot play this
+   * file — `NotSupportedError` — removes the button. A refusal that might not
+   * happen twice leaves it alone.
+   */
+  it('keeps the speaker when a play fails but the file is fine', async () => {
+    const play = vi.fn(() => Promise.reject(new DOMException('interrupted', 'AbortError')))
+    vi.stubGlobal('Audio', class { src = ''; currentTime = 0; pause = vi.fn(); play = play })
+    lookUpWord.mockResolvedValue({ state: 'entry', entry: ENTRY, fromCache: false })
+    panel()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Pronounce/ }))
+    await waitFor(() => expect(play).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: /Pronounce/ })).not.toBeNull()
+    vi.unstubAllGlobals()
+  })
+
+  it('takes the speaker away only when the file cannot be played at all', async () => {
+    const play = vi.fn(() => Promise.reject(new DOMException('no', 'NotSupportedError')))
+    vi.stubGlobal('Audio', class { src = ''; currentTime = 0; pause = vi.fn(); play = play })
     lookUpWord.mockResolvedValue({ state: 'entry', entry: ENTRY, fromCache: false })
     panel()
 
     fireEvent.click(await screen.findByRole('button', { name: /Pronounce/ }))
     await waitFor(() => expect(screen.queryByRole('button', { name: /Pronounce/ })).toBeNull())
+    vi.unstubAllGlobals()
+  })
+
+  /*
+   * The bug itself. The old line was `new Audio(url).play()`, which kept no
+   * reference to the element it started. An unreachable media element that is
+   * still loading can be collected, and that rejects the `play()` in flight.
+   * Holding it in a ref is the fix, and reusing one element is how the test can
+   * see that it was held.
+   */
+  it('reuses one audio element rather than dropping each one it makes', async () => {
+    const built: unknown[] = []
+    const play = vi.fn(() => Promise.resolve())
+    vi.stubGlobal(
+      'Audio',
+      class {
+        src = ''
+        currentTime = 0
+        pause = vi.fn()
+        play = play
+        constructor() {
+          built.push(this)
+        }
+      },
+    )
+    lookUpWord.mockResolvedValue({ state: 'entry', entry: ENTRY, fromCache: false })
+    panel()
+
+    const speaker = await screen.findByRole('button', { name: /Pronounce/ })
+    fireEvent.click(speaker)
+    fireEvent.click(speaker)
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(2))
+
+    expect(built).toHaveLength(1)
     vi.unstubAllGlobals()
   })
 

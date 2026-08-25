@@ -153,8 +153,15 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
   const [saved, setSaved] = useState(false)
   const [asked, setAsked] = useState(() => wordFrom(selected))
   const [place, setPlace] = useState<Loupe | null>(null)
-  /** Set when a recording refused to play. See `say`. */
+  /** Set only when the browser says it cannot play this file at all. See `say`. */
   const [mute, setMute] = useState(false)
+  /**
+   * The one audio element the panel reuses.
+   *
+   * It has to outlive the call that starts it — see `say` for why. Created
+   * lazily, because the panel opens far more often than the speaker is tapped.
+   */
+  const sound = useRef<HTMLAudioElement | null>(null)
 
   /*
    * No `useBackDismiss` here, on purpose.
@@ -220,17 +227,41 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
   }, [])
 
   /*
-   * A recording that will not play takes its own button away.
+   * Play the recording. Two bugs lived in the one line this replaces:
    *
-   * There is still no error message: the word is defined either side of it, and
-   * a sentence about audio would be the loudest thing in the panel. But a
-   * speaker that does nothing when tapped is a lie, and the 2026-08-24 report
-   * ("I tap the sound and hear nothing") was exactly that — a wrong URL behind
-   * a button that looked perfectly healthy. Now the button leaves, and the
-   * respelling beside it still says how the word sounds.
+   *   void new Audio(url).play().catch(() => setMute(true))
+   *
+   * **Nothing held the element.** It went unreachable in the same statement
+   * that started it, and a media element that is still loading and has no
+   * reference can be collected — which rejects the `play()` already in flight.
+   * That is timing, so it hit some words and not others, and it always landed
+   * *after* the tap. Reported 2026-08-25 against "fundamental". It was not the
+   * URL: that word maps to `fundam02`, which answers 200 with 6.6 KB of audio.
+   * The element now lives in a ref for as long as the panel does.
+   *
+   * **One failure was read as a broken recording**, and the button removed
+   * itself under the reader's finger. A control that vanishes when you press it
+   * reads as the app breaking, which is worse than the silence it was meant to
+   * prevent. Only `NotSupportedError` — the browser saying it cannot play this
+   * file at all — takes the button away now. Everything else (a lost network, a
+   * second tap interrupting the first, an autoplay refusal) leaves it in place
+   * and is worth another tap.
    */
   const say = useCallback((url: string) => {
-    void new Audio(url).play().catch(() => setMute(true))
+    const player = (sound.current ??= new Audio())
+    if (player.src !== url) player.src = url
+    player.currentTime = 0
+    void player.play().catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === 'NotSupportedError') setMute(true)
+    })
+  }, [])
+
+  /* Stop the recording when the panel goes. Otherwise it plays on to a closed
+   * loupe, and the reader has nothing left to tap to stop it. */
+  useEffect(() => {
+    return () => {
+      sound.current?.pause()
+    }
   }, [])
 
   /*

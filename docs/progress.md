@@ -26,6 +26,24 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **Four fixes off the phone** (2026-08-25). Build green: 1929 tests across 107
+  files.
+  - **Home paints once.** The greeting sat outside the load gate and the shelf
+    inside it, so a cold launch showed the greeting alone for about a second
+    while the covers loaded. Both are behind the gate now.
+  - **The screen stays awake in a book.** New `reader/wakeLock.ts`. The browser
+    drops a wake lock every time the page hides and does not give it back, so
+    the module re-takes it on `visibilitychange` — a one-shot request would have
+    worked until the reader's first interruption and then stopped silently.
+  - **A sheet closes on a swipe down.** In `Sheet`, so every sheet gains it. The
+    gesture is on the handle strip only: `ModelGrid` drags its own columns.
+  - **The speaker stops vanishing.** `new Audio(url).play()` kept no reference to
+    the element, and an unreachable media element that is still loading can be
+    collected, which rejects the `play()` in flight. The panel now holds one
+    element. It also no longer removes the button on any failure — only on
+    `NotSupportedError`. Not the URL: "fundamental" maps to `fundam02`, which
+    answers 200.
+
 - **Define — the dictionary loupe** (2026-08-24, `f79cf19` … `0200625`). A
   reader selects a word, taps **Define**, and a glass panel opens beside it —
   headword, MW respelling, up to three senses, synonym chips, and the origin as

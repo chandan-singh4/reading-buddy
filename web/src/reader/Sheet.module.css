@@ -19,6 +19,9 @@
 }
 
 .sheet {
+  /* Springs back when the finger leaves. Switched off while dragging — see the
+     inline style in `Sheet.tsx`. */
+  transition: transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
   position: fixed;
   z-index: 93;
   right: 0.5rem;
@@ -63,6 +66,24 @@
 /* The grabber. It does not drag — the sheet has a Cancel button and a scrim,
    and a handle that only *looks* draggable is a smaller lie than a sheet with
    no affordance at all reads as a bug. */
+/*
+ * The strip the sheet is dragged by — the handle and the title together.
+ *
+ * `touch-action: none` is what makes the gesture possible at all: without it
+ * the browser claims a vertical drag for scrolling and stops sending pointer
+ * moves partway through. It is on this strip only, so the list below keeps its
+ * own scrolling.
+ */
+.handle {
+  flex: none;
+  touch-action: none;
+  /* A drag is not a text selection. Without this a slow pull highlights the
+     title, and the reader is left with blue text after the sheet springs back. */
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
 .grab {
   width: 2.25rem;
   height: 0.3125rem;

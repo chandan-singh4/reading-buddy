@@ -65,11 +65,20 @@ function renderFrom(entries: string[]) {
   )
 }
 
+/*
+ * Home's greeting is awaited, not read straight off the first render.
+ *
+ * It used to paint before the shelf did. That was the bug reported on
+ * 2026-08-25 — the greeting landed alone and the books dropped in a second
+ * later — so `Home` now holds the whole page back until the shelf is ready and
+ * paints the two together. These tests used the greeting as their "we are on
+ * Home" landmark, which now means waiting for it.
+ */
 describe('app shell', () => {
   it('lands on Home and reports an empty shelf', async () => {
     renderAt('/')
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
     // Resolves only once the repository has actually answered.
     expect(await screen.findByText('No books yet')).toBeDefined()
   })
@@ -130,13 +139,13 @@ describe('app shell', () => {
 
   it('swipes left from Home to the library, and right back again', async () => {
     renderAt('/')
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
 
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
 
     swipe(150)
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
   })
 
   it('does not swipe past the ends', async () => {
@@ -145,7 +154,7 @@ describe('app shell', () => {
     renderAt('/')
 
     swipe(150)
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
   })
 
   it('ignores a swipe that was really a scroll', async () => {
@@ -154,14 +163,14 @@ describe('app shell', () => {
     renderAt('/')
 
     swipe(-150, 300)
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
   })
 
-  it('ignores a movement too short to be a swipe', () => {
+  it('ignores a movement too short to be a swipe', async () => {
     renderAt('/')
 
     swipe(-20)
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
   })
 
   it('still navigates when the browser cancels the gesture', async () => {
@@ -281,7 +290,7 @@ describe('app shell', () => {
   })
 
 
-  it('ignores a drag that starts inside the drawer', () => {
+  it('ignores a drag that starts inside the drawer', async () => {
     // The drawer is a panel over the page, not part of it; dragging across its
     // links must not navigate the page underneath.
     renderAt('/')
@@ -292,7 +301,7 @@ describe('app shell', () => {
     fireEvent.pointerMove(document, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 300 })
     fireEvent.pointerUp(document, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 300 })
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
   })
 
   it('closes the drawer on Escape', () => {
@@ -368,10 +377,10 @@ describe('app shell', () => {
     expect(await screen.findByRole('alert')).toBeDefined()
   })
 
-  it('falls back to Home for an unknown route', () => {
+  it('falls back to Home for an unknown route', async () => {
     renderAt('/nowhere')
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /)
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
   })
 })
 

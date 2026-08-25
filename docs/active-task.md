@@ -30,27 +30,31 @@ live model streams a warm answer into the Study Lamp. The reader picks the
 model. Notes, highlights and saved words are written and listed. Define opens a
 Merriam-Webster loupe beside the word.
 
-## Task — none chosen yet
+## Task — none in flight
 
-`/plan-task` fills this in. See "Proposed next" below.
+The four phone fixes shipped on 2026-08-25. `/plan-task` fills this in next.
 
 **Files in scope:** none yet.
 
 ## Proposed next — WP-09, the import manifest and crossrefs
 
-Four rows wait on this one and cannot start without it: WP-10 (import
-classification), WP-18 (the retrieval assembler), WP-21 (tutor persona), WP-28
-(the books-stay-separate guard). It is the last foundation the tutor is missing.
+Four rows wait on this one and cannot start without it: WP-10, WP-18, WP-21 and
+WP-28. It is the last foundation the tutor is missing.
 
-**Not yet agreed with the reader.** Confirm before planning.
+Smaller rows that are open and unblocked: WP-16 read-aloud, WP-43 re-scan a
+folder, WP-27 cost visibility, and the cloud path for notes.
 
-Other rows that are open and unblocked, if the reader prefers a smaller step:
+## Not proved on a phone (2026-08-25)
 
-- **WP-16 Read-aloud** — phone TTS through the Web Speech API.
-- **WP-43 Re-scan a folder** — "Check folder for new books", name what arrived.
-- **WP-27 Cost / usage visibility** — now unblocked, because WP-19 is done.
-- **The cloud path for notes** — `notes`, `tutor` and `digests` are all
-  device-local, and all three carry the same note explaining why.
+Three of the four fixes were proved by test and by the accessibility tree in a
+desktop browser with an empty shelf. They still want a phone:
+
+1. **The wake lock.** No desktop browser reproduces a phone locking its screen.
+   Open a book, leave it still for longer than the lock timer, and see.
+2. **The swipe on a sheet.** Proved as arithmetic in `swipeDown.test.ts`, not as
+   a thumb on glass. Check the flick as well as the slow pull.
+3. **The speaker.** The cause is timing, so a pass is never proof. "fundamental"
+   is the word that failed.
 
 ## Note on the docs, 2026-08-25
 

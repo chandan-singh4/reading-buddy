@@ -105,6 +105,7 @@ import {
   type Touch,
   type WordRow,
   wordAt,
+  keepScreenAwake,
 } from '../reader/index.ts'
 import { refreshInBackground } from '../tutor/refresh.ts'
 import { catchUpOnOpen } from '../app/bookCatchUp.ts'
@@ -500,6 +501,22 @@ export default function Reader() {
   useEffect(() => {
     setHighlighter(readHighlighter(id))
   }, [id])
+
+  /*
+   * Hold the screen awake for as long as a book is open.
+   *
+   * Reading is the one thing a reader does that produces no taps for minutes,
+   * so the phone's idle timer concludes nobody is there — exactly when somebody
+   * is. Reported 2026-08-25: the light dimmed and the screen locked mid-page.
+   *
+   * This screen is the whole of "in a book", so the lock lives and dies with
+   * it. Leave for the shelf and the phone goes back to its own timer, which is
+   * what the reader asked for: it should lock when they are out of the book.
+   *
+   * No dependencies — this must not be dropped and re-taken on every render.
+   * `keepScreenAwake` handles a missing API and a refused request on its own.
+   */
+  useEffect(() => keepScreenAwake(), [])
 
   const changeHighlighter = useCallback(
     (choice: HighlighterChoice) => {
