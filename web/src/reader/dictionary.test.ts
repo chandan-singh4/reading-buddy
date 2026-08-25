@@ -126,8 +126,19 @@ describe('the small conversions', () => {
 
   it('builds an audio URL from the file name’s own first letter', () => {
     expect(audioUrl('fundam01')).toBe(
-      'https://media.merriam-webster.com/audio/pronunciation/mp3/f/fundam01.mp3',
+      'https://media.merriam-webster.com/audio/prons/en/us/mp3/f/fundam01.mp3',
     )
+  })
+
+  it('uses the path MW actually serves', () => {
+    /*
+     * `/audio/prons/en/us/mp3/`. The other shape in MW's own docs,
+     * `/audio/pronunciation/mp3/`, answers 403 to every request. Found on the
+     * phone 2026-08-24: the speaker drew, the tap played nothing, and the panel
+     * swallowed the failure.
+     */
+    expect(audioUrl('fundam01')).toContain('/audio/prons/en/us/mp3/')
+    expect(audioUrl('fundam01')).not.toContain('/audio/pronunciation/')
   })
 
   it('follows MW’s three special folders', () => {
@@ -258,5 +269,69 @@ describe('finding the etymology to parse', () => {
     )
     expect(found.et).toBeUndefined()
     expect(found.date).toBe('1904')
+  })
+})
+
+describe('one example, one sense', () => {
+  /*
+   * The 2026-08-24 report: a word with three senses showed the same sentence
+   * under all three. `def` is one entry per *part of speech*, not per sense, so
+   * every sense after the first fell back to `def[0]` and read the same `vis`.
+   *
+   * A sentence repeated under three meanings tells the reader the meanings are
+   * interchangeable, which is the one thing a numbered list denies.
+   */
+
+  /** One block of `sseq`, in MW's shape: a sense, and perhaps a sentence. */
+  const block = (text: string, vis?: string) => [
+    [
+      'sense',
+      {
+        dt: vis
+          ? [
+              ['text', `{bc}${text}`],
+              ['vis', [{ t: vis }]],
+            ]
+          : [['text', `{bc}${text}`]],
+      },
+    ],
+  ]
+
+  const verb = (sseq: unknown[], shortdef: string[]) => [
+    { meta: { id: 'run:1' }, hwi: { hw: 'run' }, fl: 'verb', def: [{ sseq }], shortdef },
+  ]
+
+  it('gives each sense its own sentence', () => {
+    const entry = normalize(
+      'run',
+      verb(
+        [
+          block('to go faster than a walk', 'ran to the door'),
+          block('to be a candidate', 'running for mayor'),
+          block('to flow'),
+        ],
+        ['to go faster than a walk', 'to be a candidate', 'to flow'],
+      ),
+      undefined,
+    )!
+
+    expect(entry.senseGroups[0]!.senses.map((sense) => sense.example)).toEqual([
+      'ran to the door',
+      'running for mayor',
+      undefined,
+    ])
+  })
+
+  it('shows no sentence at all rather than the same one twice', () => {
+    const entry = normalize(
+      'run',
+      verb([block('one', 'the same line'), block('two', 'the same line')], ['one', 'two']),
+      undefined,
+    )!
+
+    expect(entry.senseGroups[0]!.senses.map((sense) => sense.example)).toEqual([
+      'the same line',
+      undefined,
+    ])
   })
 })

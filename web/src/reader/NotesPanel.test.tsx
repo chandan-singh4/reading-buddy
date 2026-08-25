@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { NotesPanel, type NoteRow } from './NotesPanel.tsx'
+import { NotesPanel, type NoteRow, type WordRow } from './NotesPanel.tsx'
 import type { Anchor } from '../structure/index.ts'
 
 function note(id: string, author: 'you' | 'claude', chapter = 1): NoteRow {
@@ -152,3 +152,55 @@ describe('the notes tab', () => {
     expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull()
   })
 })
+
+describe('the words tab', () => {
+  /*
+   * The 2026-08-24 question: "Save word saves it — but where do I see them?"
+   * Nowhere, until this tab. A button that keeps something the reader can never
+   * find again is worse than no button.
+   */
+  const WORDS: WordRow[] = [
+    { word: 'fundamental', gloss: 'serving as an original source', savedAt: '2026-08-24T10:00:00.000Z' },
+    { word: 'palimpsest', savedAt: '2026-08-23T10:00:00.000Z' },
+  ]
+
+  function drawWords(words: WordRow[], onDefineWord = vi.fn()) {
+    render(
+      <NotesPanel
+        notes={NOTES}
+        onJumpToNote={vi.fn()}
+        words={words}
+        onDefineWord={onDefineWord}
+      />,
+    )
+    fireEvent.click(screen.getByRole('radio', { name: 'Words' }))
+    return { onDefineWord }
+  }
+
+  it('lists the kept words, with the meaning under each', () => {
+    drawWords(WORDS)
+    expect(screen.getByText('fundamental')).toBeTruthy()
+    expect(screen.getByText('serving as an original source')).toBeTruthy()
+    expect(screen.getByText('palimpsest')).toBeTruthy()
+  })
+
+  it('opens the loupe again on a word the reader taps', () => {
+    const { onDefineWord } = drawWords(WORDS)
+    fireEvent.click(screen.getByText('fundamental'))
+    expect(onDefineWord).toHaveBeenCalledWith('fundamental')
+  })
+
+  it('says how words get here, rather than talking about notes', () => {
+    // The notes list is not empty. Reusing its sentence would tell a reader
+    // with three notes and no words that they have no notes.
+    drawWords([])
+    expect(screen.getByText(/No words kept yet/)).toBeTruthy()
+    expect(screen.queryByText(/No notes/)).toBeNull()
+  })
+
+  it('hides the notes while it is showing words', () => {
+    drawWords(WORDS)
+    expect(screen.queryByText('My thought 1')).toBeNull()
+  })
+})
+

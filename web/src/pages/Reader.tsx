@@ -103,6 +103,7 @@ import {
   type Spine,
   type Strip,
   type Touch,
+  type WordRow,
   wordAt,
 } from '../reader/index.ts'
 import { refreshInBackground } from '../tutor/refresh.ts'
@@ -113,6 +114,7 @@ import {
   noteStore,
   repository,
   tutorStore,
+  wordStore,
   type StoredBookmark,
   type StoredNote,
   type StoredTutorThread,
@@ -2518,6 +2520,29 @@ export default function Reader() {
     rects: { top: number; left: number; width: number; height: number }[]
   } | null>(null)
 
+  /*
+   * The words the reader has kept, for the Notes panel's Words tab.
+   *
+   * Not scoped to this book, and read again whenever the loupe closes: the
+   * usual way a word is saved is from the loupe, so that is the moment the list
+   * behind it goes stale.
+   */
+  const [keptWords, setKeptWords] = useState<readonly WordRow[]>([])
+
+  useEffect(() => {
+    if (defining) return
+    let live = true
+    void wordStore
+      .savedWords()
+      .then((rows) => {
+        if (live) setKeptWords(rows.map(({ word, gloss, savedAt }) => ({ word, gloss, savedAt })))
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [defining])
+
   useEffect(() => {
     if (!unbuilt) return
     const timer = window.setTimeout(() => setUnbuilt(null), 2600)
@@ -3590,6 +3615,13 @@ export default function Reader() {
             notes={noteRows}
             onJumpToNote={jumpToAnchor}
             onOpenThread={openThreadById}
+            words={keptWords}
+            onDefineWord={(word) => {
+              // No rectangles: there is no word on the page to point at, so the
+              // loupe opens in the middle of the screen. `loupe.ts` handles it.
+              closeSheet()
+              setDefining({ word, anchor: anchorHere ?? ('' as Anchor), rects: [] })
+            }}
             searchOpen={searchOpen}
             query={query}
             results={results}

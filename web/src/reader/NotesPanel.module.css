@@ -305,3 +305,41 @@
   padding: 0;
   list-style: none;
 }
+
+/* --- The kept words ------------------------------------------------------- */
+
+/*
+ * A word in the reader's own hand, with the dictionary's gloss under it in the
+ * printed face. The two faces say who wrote which: the word is the reader's
+ * choice, the meaning is Merriam-Webster's.
+ */
+.wordRow {
+  display: block;
+  padding: 2px 0 6px 8px;
+  border-inline-start: 3px solid transparent;
+  color: var(--pen);
+  font-family: Caveat, cursive;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 31px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wordRow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.wordHead {
+  display: block;
+}
+
+.wordGloss {
+  display: block;
+  color: #6b6257;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+}

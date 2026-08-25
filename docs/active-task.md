@@ -69,6 +69,19 @@ Not proved: one live MW answer. No key exists on this machine. The panel was
 checked in a browser at 375px with a fixture, so the design and the theme glass
 are proved; the network path is not.
 
+### Three fixes off the first real use (2026-08-24)
+
+1. **The speaker played nothing.** MW's audio is served from
+   `/audio/prons/en/us/mp3/`, not `/audio/pronunciation/mp3/`. The second
+   shape is in MW's own docs and answers 403 to every request. A recording
+   that will not play now takes its own button away.
+2. **Every sense showed the same example.** `def` is one entry per part of
+   speech, not one per sense. The senses live inside `sseq`. A sentence is
+   now used once; a sense that would repeat it shows none.
+3. **The saved words had nowhere to live.** The Notes panel has a fifth tab,
+   **Words**. It is not book-scoped — a word is learned once. A tap opens the
+   loupe on that word again, in the middle of the screen.
+
 ### The task before this one — WP-25, something that writes a note
 
 The Notes tab reads a table that nothing fills. This is written out further

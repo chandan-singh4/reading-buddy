@@ -36,7 +36,7 @@ import type { ReaderSettings } from './readerSettings.ts'
 import type { HighlighterChoice } from './highlightStyle.ts'
 import { TextSettings } from './TextSettings.tsx'
 import { BookmarksPanel, type BookmarkRow } from './BookmarksPanel.tsx'
-import { NotesPanel, type NoteRow } from './NotesPanel.tsx'
+import { NotesPanel, type NoteRow, type WordRow } from './NotesPanel.tsx'
 import { FocusLamp } from './FocusLamp.tsx'
 import styles from './Chrome.module.css'
 
@@ -128,6 +128,10 @@ export interface ChromeProps {
   onJumpToNote: (anchor: Anchor) => void
   /** Reopen a tutor conversation under the lamp. */
   onOpenThread: (threadId: string) => void
+  /** Every word the reader has kept, newest first. */
+  words?: readonly WordRow[]
+  /** Open the loupe on a kept word. */
+  onDefineWord?: (word: string) => void
 
   /** Whether the search panel is up. */
   searchOpen: boolean
@@ -192,6 +196,8 @@ export function Chrome({
   notes,
   onJumpToNote,
   onOpenThread,
+  words,
+  onDefineWord,
   searchOpen,
   query,
   results,
@@ -662,6 +668,8 @@ export function Chrome({
               notes={notes}
               onJumpToNote={onJumpToNote}
               onOpenThread={onOpenThread}
+              words={words}
+              onDefineWord={onDefineWord}
             />
           )}
         </div>

@@ -27,7 +27,7 @@ export interface NoteLike {
  * that hid four fifths of a reader's notes and called itself "by chapter" would
  * be answering a question nobody asked.
  */
-export type NoteFilter = 'all' | 'you' | 'claude' | 'chapter'
+export type NoteFilter = 'all' | 'you' | 'claude' | 'chapter' | 'words'
 
 /**
  * What each chip calls itself.
@@ -46,6 +46,7 @@ export const NOTE_FILTERS: { value: NoteFilter; label: string }[] = [
   { value: 'you', label: 'Quotes' },
   { value: 'claude', label: 'Veda' },
   { value: 'chapter', label: 'By chapter' },
+  { value: 'words', label: 'Words' },
 ]
 
 /**
@@ -83,6 +84,9 @@ export function notesUnder<T extends NoteLike>(
   filter: NoteFilter,
 ): T[] {
   if (filter === 'all' || filter === 'chapter') return [...notes]
+  // 'words' is not a kind of note. The saved words are a different list from a
+  // different table, and the panel draws them instead of this one.
+  if (filter === 'words') return []
   return notes.filter((note) => note.author === filter)
 }
 

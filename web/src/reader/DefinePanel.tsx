@@ -153,6 +153,8 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
   const [saved, setSaved] = useState(false)
   const [asked, setAsked] = useState(() => wordFrom(selected))
   const [place, setPlace] = useState<Loupe | null>(null)
+  /** Set when a recording refused to play. See `say`. */
+  const [mute, setMute] = useState(false)
 
   /*
    * No `useBackDismiss` here, on purpose.
@@ -175,6 +177,7 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
   useEffect(() => {
     let live = true
     setFound(null)
+    setMute(false)
     void lookUpWord(asked, store).then((answer) => {
       if (live) setFound(answer)
     })
@@ -216,10 +219,18 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
     panel.current?.focus({ preventScroll: true })
   }, [])
 
+  /*
+   * A recording that will not play takes its own button away.
+   *
+   * There is still no error message: the word is defined either side of it, and
+   * a sentence about audio would be the loudest thing in the panel. But a
+   * speaker that does nothing when tapped is a lie, and the 2026-08-24 report
+   * ("I tap the sound and hear nothing") was exactly that — a wrong URL behind
+   * a button that looked perfectly healthy. Now the button leaves, and the
+   * respelling beside it still says how the word sounds.
+   */
   const say = useCallback((url: string) => {
-    // No error branch on purpose. A recording that will not play is not worth a
-    // sentence on the screen — the word is still defined either side of it.
-    void new Audio(url).play().catch(() => {})
+    void new Audio(url).play().catch(() => setMute(true))
   }, [])
 
   const keep = useCallback(() => {
@@ -298,7 +309,7 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
           <>
             {(entry.pronunciation || entry.partsOfSpeech.length > 0) && (
               <div className={styles.pron}>
-                {entry.pronunciation?.audioUrl && (
+                {entry.pronunciation?.audioUrl && !mute && (
                   <button
                     type="button"
                     className={styles.say}

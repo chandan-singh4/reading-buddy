@@ -132,7 +132,11 @@ export function audioUrl(audio: string): string | undefined {
       : /^[0-9\W_]/.test(name)
         ? 'number'
         : name[0]!
-  return `https://media.merriam-webster.com/audio/pronunciation/mp3/${subdir}/${name}.mp3`
+  // `/audio/prons/en/us/mp3/`, not `/audio/pronunciation/mp3/`. The second
+  // shape reads well and answers 403 to every request. Found on the phone
+  // 2026-08-24: the speaker drew, the tap did nothing, and the failure was
+  // swallowed. The test below holds the real path.
+  return `https://media.merriam-webster.com/audio/prons/en/us/mp3/${subdir}/${name}.mp3`
 }
 
 /** "fun*da*men*tal" is how MW writes syllables. A reader wants the dots. */
@@ -213,6 +217,18 @@ function exampleIn(sseq: unknown): string | undefined {
 }
 
 /**
+ * One block of `sseq` per sense, in MW's own order.
+ *
+ * `def` is *not* one entry per sense — it is one entry per part of speech, and
+ * usually there is exactly one. The senses live a level down, inside `sseq`.
+ * Reading `def[index]` therefore missed for every sense after the first.
+ */
+function senseBlocks(entry: CollegiateEntry): unknown[] {
+  const groups = Array.isArray(entry.def) ? entry.def : []
+  return groups.flatMap((group) => (Array.isArray(group?.sseq) ? group.sseq : []))
+}
+
+/**
  * The senses of one entry, in MW's own order.
  *
  * `shortdef` is the baseline because it is the one field MW guarantees is
@@ -220,17 +236,30 @@ function exampleIn(sseq: unknown): string | undefined {
  * matched by position, which is approximate — `sseq` counts sub-senses that
  * `shortdef` folds together. An example under a neighbouring sense of the same
  * word is a small wrong; no examples at all is a duller panel.
+ *
+ * ## One example, one sense
+ *
+ * Reported from the phone 2026-08-24: a word with three senses showed the same
+ * sentence three times. The cause was the fallback to `def[0]` above, which
+ * every sense after the first took. An example repeated under three different
+ * meanings is worse than no example at all — it tells the reader the meanings
+ * are interchangeable, which is the one thing the numbered list denies. So a
+ * sentence is used once, and a sense that would repeat it shows none.
  */
 function sensesOf(entry: CollegiateEntry): DefineSense[] {
   const short = Array.isArray(entry.shortdef) ? entry.shortdef : []
-  const groups = Array.isArray(entry.def) ? entry.def : []
+  const blocks = senseBlocks(entry)
+  const used = new Set<string>()
 
   return short.slice(0, MAX_SENSES).flatMap((text, index) => {
     if (typeof text !== 'string') return []
     const said = clean(text)
     if (!said) return []
-    const example = exampleIn(groups[index]?.sseq ?? groups[0]?.sseq)
-    return [example ? { text: said, example } : { text: said }]
+
+    const example = exampleIn(blocks[index])
+    if (!example || used.has(example)) return [{ text: said }]
+    used.add(example)
+    return [{ text: said, example }]
   })
 }
 

@@ -122,7 +122,7 @@ export type {
 } from './highlightStyle.ts'
 
 export { NotesPanel } from './NotesPanel.tsx'
-export type { NoteRow, NotesPanelProps } from './NotesPanel.tsx'
+export type { NoteRow, NotesPanelProps, WordRow } from './NotesPanel.tsx'
 
 export { groupByChapter, inNoteOrder, NOTE_FILTERS, notesUnder } from './notes.ts'
 export type { NoteFilter, NoteGroup, NoteLike } from './notes.ts'

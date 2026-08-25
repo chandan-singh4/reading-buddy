@@ -33,7 +33,7 @@ const ENTRY: DefineEntry = {
   syllables: 'fun·da·men·tal',
   pronunciation: {
     respelling: 'ˌfən-də-ˈmen-tᵊl',
-    audioUrl: 'https://media.merriam-webster.com/audio/pronunciation/mp3/f/fundam01.mp3',
+    audioUrl: 'https://media.merriam-webster.com/audio/prons/en/us/mp3/f/fundam01.mp3',
   },
   partsOfSpeech: ['adjective', 'noun'],
   senseGroups: [
@@ -278,6 +278,23 @@ describe('the things a reader can do in the panel', () => {
 
     await screen.findByText('a basic principle')
     expect(window.history.length).toBe(before)
+  })
+
+  it('takes the speaker away when the recording will not play', async () => {
+    /*
+     * The 2026-08-24 report: "I tap the sound and hear nothing." The URL was
+     * wrong and the failure was swallowed, so the button looked healthy and did
+     * nothing. A silent button is a lie; the respelling still says how the word
+     * sounds.
+     */
+    const play = vi.fn(() => Promise.reject(new Error('no')))
+    vi.stubGlobal('Audio', class { play = play })
+    lookUpWord.mockResolvedValue({ state: 'entry', entry: ENTRY, fromCache: false })
+    panel()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Pronounce/ }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Pronounce/ })).toBeNull())
+    vi.unstubAllGlobals()
   })
 
   it('closes on the scrim, on the button, and on Escape', async () => {

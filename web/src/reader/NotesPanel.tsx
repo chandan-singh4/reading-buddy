@@ -40,6 +40,14 @@ export interface NoteRow {
   threadId?: string
 }
 
+/** A word the reader kept from the Define panel. */
+export interface WordRow {
+  word: string
+  /** The first sense, as it read on the day it was saved. */
+  gloss?: string
+  savedAt: string
+}
+
 export interface NotesPanelProps {
   /** Every note in this book, already in the book's own order. */
   notes: readonly NoteRow[]
@@ -47,6 +55,11 @@ export interface NotesPanelProps {
   onJumpToNote: (anchor: Anchor) => void
   /** Reopen a tutor conversation under the lamp. */
   onOpenThread?: (threadId: string) => void
+  /** Every word the reader has kept, newest first. Not book-scoped: a word is
+   *  learned once, and the reader who kept it wants it in the next book too. */
+  words?: readonly WordRow[]
+  /** Open the loupe on a kept word. */
+  onDefineWord?: (word: string) => void
 }
 
 /** "Ch. Breathing · p.91" — the small tag above a note. */
@@ -117,7 +130,13 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
   )
 }
 
-export function NotesPanel({ notes, onJumpToNote, onOpenThread }: NotesPanelProps) {
+export function NotesPanel({
+  notes,
+  onJumpToNote,
+  onOpenThread,
+  words = [],
+  onDefineWord,
+}: NotesPanelProps) {
   const [filter, setFilter] = useState<NoteFilter>('all')
   const chips = useRef<(HTMLButtonElement | null)[]>([])
 
@@ -175,7 +194,41 @@ export function NotesPanel({ notes, onJumpToNote, onOpenThread }: NotesPanelProp
 
       <div className={styles.sheet}>
         <div className={styles.page}>
-          {shown.length === 0 ? (
+          {filter === 'words' ? (
+            /*
+              The kept words. A different table from the notes, so this branch
+              comes before the empty check below — "no notes in this book" is
+              the wrong sentence for a reader who has kept no words yet.
+            */
+            words.length === 0 ? (
+              <p className={styles.empty}>
+                No words kept yet. Tap a word, choose Define, then Save word — they gather here,
+                across every book.
+              </p>
+            ) : (
+              <ul className={styles.list}>
+                {words.map((kept) => (
+                  <li key={kept.word}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className={styles.wordRow}
+                      onClick={() => onDefineWord?.(kept.word)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          onDefineWord?.(kept.word)
+                        }
+                      }}
+                    >
+                      <span className={styles.wordHead}>{kept.word}</span>
+                      {kept.gloss && <span className={styles.wordGloss}>{kept.gloss}</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : shown.length === 0 ? (
             <p className={styles.empty}>
               {notes.length === 0
                 ? 'No notes yet. Ask the tutor about a passage, or write your own — they all land here, filed by chapter.'
