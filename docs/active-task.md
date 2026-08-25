@@ -38,12 +38,15 @@ Two search fixes shipped on 2026-08-25. `/plan-task` fills this in next.
 
 ## Not proved on a device — the two search fixes
 
-1. **"Search in book" from the selection menu.** Driving a real text selection
+1. **The page position after a jump.** The toolbar no longer closes as the
+   reader jumps. Check that a result lands squarely on its column, with no text
+   cut off at the right edge.
+2. **"Search in book" from the selection menu.** Driving a real text selection
    in jsdom is not practical, so there is no test for the route in. The one-line
    cause is fixed and the panel itself is well covered. Check it on the phone:
    select a word, tap **Search in book**, and the results must appear with no
    tap on the page first.
-2. **The flash on a search result.** The ink and the pulse have unit tests. What
+3. **The flash on a search result.** The ink and the pulse have unit tests. What
    they cannot show is how it feels: whether 4.5 seconds is right, and whether
    two pulses read as "look here" rather than as a fault.
 

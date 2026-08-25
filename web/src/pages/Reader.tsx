@@ -2566,12 +2566,27 @@ export default function Reader() {
     return searchBook(bookText.current, settledQuery)
   }, [searchOpen, textLoaded, settledQuery])
 
-  /** Going to a result closes the panel — the reader asked to be taken there. */
-  /** Going to a result closes the panel — the reader asked to be taken there. */
+  /**
+   * Going to a result closes the panel — the reader asked to be taken there.
+   *
+   * The toolbar is deliberately left up, and this is not a preference.
+   *
+   * Showing the toolbar does not move the page, it *scales* it — see `.stage`'s
+   * `data-shrunk` rule — and that scale is transitioned. `columnOf` divides the
+   * distance to a paragraph by the scale it reads at that instant, so a jump
+   * begun in the same frame as a toolbar closing measures against a scale that
+   * is halfway to somewhere else, and lands between two columns.
+   *
+   * `settleOn` exists to correct exactly that, and cannot here: it re-corrects
+   * until the layout is still, and judges stillness by `scrollWidth`, which a
+   * transform never changes. It sees a settled page from the first frame.
+   *
+   * Closing the toolbar and jumping in one action is therefore not two harmless
+   * steps. A reader who wants the toolbar gone taps the page, as always.
+   */
   const jumpToHit = useCallback(
     (anchor: Anchor, match: string) => {
       setSearchOpen(false)
-      setChromeShown(false)
       jumpToAnchor(anchor)
       // A fresh object every time, so tapping the same result twice lights it
       // again rather than doing nothing because the state did not change.

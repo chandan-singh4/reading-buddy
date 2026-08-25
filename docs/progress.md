@@ -39,6 +39,13 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     that nothing writes down, drawn by the same renderer — ink drawn any other
     way would have to solve the page turn's copies again. Its colour is
     deliberately not one of the reader's four.
+  - **The jump landed between two columns** (fixed same day). The first version
+    of the above closed the toolbar as it jumped. Showing the toolbar scales the
+    page, and the scale is transitioned; `columnOf` divides by the scale it
+    reads at that instant, so the jump measured against a scale that was still
+    moving. `settleOn` could not correct it, because it judges a settled layout
+    by `scrollWidth`, and a transform never changes `scrollWidth`. The toolbar
+    now stays up during a jump, as it always did.
 
 - **The speaker, properly this time, and a lie the dictionary was telling**
   (2026-08-25). Build green: 1938 tests across 107 files.
