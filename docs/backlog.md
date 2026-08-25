@@ -189,19 +189,26 @@
 - [ ] **WP-43 Re-scan a folder + tell me what's new** — added 2026-08-02. Remember the folder that was imported from, offer "Check folder for new books", skip what's already on the shelf (duplicate detection already does this), and name what arrived: "2 new books: …". On iOS the handle can't be remembered between sessions, so it degrades to re-picking the folder · *after 11*
 
 ### Leg 3 — The Tutor (inline explain + Claude)
-- [~] **WP-17 Selection menu** — Highlight / Copy / Define (local) / Ask · *after 12*
+- [x] **WP-17 Selection menu** — Highlight / Copy / Define (local) / Ask · *after 12*
   — the menu, the four colours, the sentence/paragraph chevrons and the two
   highlight styles are built and phone-tested (2026-08-16, 2026-08-17). It also
   survives a page turn now. **Define shipped 2026-08-24** — a Merriam-Webster
   loupe, not the local dictionary this row first imagined. Left: **Ask**, which
-  waits on WP-19
+  waits on WP-19. **Closed 2026-08-25:** Ask shipped with the Study Lamp, so
+  every item on this row is built.
 - [ ] **WP-18 Retrieval assembler** — manifest + chapter index + one section + learner.md · *after 05,09*
-- [ ] **WP-19 Claude API call shape** — Haiku→Sonnet tier, caching, streaming, retry · *after 18*
-- [~] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19* — the Study Lamp room, saved threads and Notes listing shipped 2026-08-21; streaming waits on WP-19
+- [x] **WP-19 Claude API call shape** — Haiku→Sonnet tier, caching, streaming, retry · *after 18*
+  — **closed 2026-08-25, in a different shape than written.** `api/tutor.ts`
+  holds the key, streams, retries and falls over a named chain. The tier became
+  a reader-facing model picker through OpenRouter, not Haiku→Sonnet. The row was
+  never flipped, so it read `[ ]` while the tutor answered.
+- [x] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19* — the Study Lamp room, saved threads and Notes listing shipped 2026-08-21; streaming shipped 2026-08-23 (`e82c5c7`) on both ends. **Closed 2026-08-25**
 - [~] **WP-39 Ask about a picture** — *the sourcing half shipped 2026-08-02: epub images are extracted at import into an `assets` table and shown on the page. What's left is the tutor half (tap a figure → send it to Claude), plus pdf.js region rendering.* — tap a figure/table/formula → send that image + surrounding text to Claude. Source image from the epub/docx archive where it exists; pdf.js renders the region for PDFs. The escape hatch for everything WP-38 can only describe · *after 19,20,38*
 - [ ] **WP-21 Tutor persona + teaching modes** — subject-driven, 12 modes, dense books only · *after 19,10*
 - [ ] **WP-22 learner.md adaptive model** — understood/struggled/analogies/misconceptions · *after 20*
-- [ ] **WP-23 Chapter recap** — zero-token summary + things learned + cheap quiz · *after 21,22*
+- [~] **WP-23 Chapter recap** — zero-token summary + things learned + cheap quiz · *after 21,22*
+  — the digest pipeline is built: `tutor/digest.ts` and `storage/digests.ts`.
+  The recap screen and the quiz are still to come.
 
 ### Leg 4 — The Archive (library & persistence)
 - [~] **WP-24 Multi-book library** — covers, progress, status grouping · *after 04,11*
@@ -387,11 +394,13 @@
   reader's own simplification, and the reason there is deliberately no
   reading-events log. A part-read book shows an approximation, percent × page
   count · *after 11; step 1 done, step 2 needs no API at all*
-- [~] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
+- [x] **WP-25 Highlights & notes list** — dedicated per-book view · *after 17,03*
   — the **view** is built (2026-08-15): the Notes tab of the browse page, with a
   `notes` table at Dexie v11 behind `storage/notes.ts`. Left to do: something
   that **writes** a note, highlights, and a cloud path (the table is
-  device-local, because `Repository` has no notes)
+  device-local, because `Repository` has no notes). **Closed 2026-08-25:**
+  `Reader.tsx` writes, recolours and deletes notes, and `NoteComposer` is the
+  way in. Only the cloud path is left, and it is now its own row, not this one.
 - [~] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
   — a first half shipped 2026-08-24 with Define: **Save word** keeps a word in a
   `vocabulary` table (Dexie v15), and the Notes panel's **Words** tab lists them
@@ -401,7 +410,9 @@
 - [ ] **WP-28 Books-stay-separate guard** — no cross-book memory/lookups · *after 18,22*
 
 ### Leg 5 — Landfall (deploy, install, backup)
-- [ ] **WP-29 Tiny key backend** — one endpoint holding the API key · *after 19*
+- [x] **WP-29 Tiny key backend** — one endpoint holding the API key · *after 19*
+  — **closed 2026-08-25.** `api/` holds three relays: `tutor.ts`, `define.ts`
+  and `models.ts`. No key reaches the browser.
 - [x] **WP-30 PWA manifest + service worker** — installable, offline caching · *after 04*
 - [x] **WP-31 mkcert HTTPS + phone trust** — local cert, one-time trust, LAN serve · *after 30*
 - [x] **WP-32 Install on iOS + Android** — add-to-home-screen, verify offline · *after 31*

@@ -10,7 +10,11 @@ Capture just enough state that the next session needs zero code-reading to
 resume. Keep every edit terse.
 
 1. **`docs/progress.md`** — update "In flight", move finished items to "Recently
-   done" (keep the last ~5, drop older), refresh "Next up" and any "Blockers".
+   done", refresh "Next up" and any "Blockers". **Keep the last ~5 and delete
+   the rest.** Do not archive them anywhere. Git holds every earlier version of
+   this file, so the record is already kept — `git log -p docs/progress.md`
+   brings back any entry ever written. A second copy in the repo is a file that
+   goes stale and costs tokens.
 2. **`docs/backlog.md`** — flip the status box of any waypoints touched
    (`[ ]` → `[~]` → `[x]`).
 3. **`docs/decisions.md`** — if we settled anything non-obvious this session,
@@ -18,7 +22,8 @@ resume. Keep every edit terse.
    changed.
 4. **`docs/architecture.md`** — update only if the folder layout, book structure,
    or anchor grammar actually changed.
-5. **`docs/active-task.md`** — rewrite it for next session: the next task, its
+5. **`docs/active-task.md`** — **rewrite it, do not append to it.** Replace the
+   whole file for next session: the next task, its
    definition-of-done, and the exact "Files in scope" list. If the current task
    is unfinished, keep it and note what's left.
 6. **`wayfinder_build_board.html`** (repo root, only if it exists) — if any
