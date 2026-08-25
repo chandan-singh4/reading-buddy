@@ -25,15 +25,20 @@ export type {
   StoredFolder,
   StoredNote,
   StoredQuote,
+  StoredDefinition,
   StoredSection,
   StoredSource,
   StoredTutorThread,
+  StoredWord,
 } from './db.ts'
 
 export { createNoteStore, noteStore } from './notes.ts'
 export type { NewNote } from './notes.ts'
 
 export { createTutorStore, findThread, tutorStore } from './tutor.ts'
+
+export { createWordStore, wordStore } from './words.ts'
+export type { WordFrom, WordStore } from './words.ts'
 
 export { COVER_ASSET_PATH, FETCHED_COVER_ASSET_PATH, createRepository } from './repository.ts'
 export type { BookAsset, ParsedBook, Repository } from './repository.ts'

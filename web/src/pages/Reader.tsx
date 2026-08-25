@@ -87,6 +87,7 @@ import {
   useBackDismiss,
   useFigureImages,
   writeFocusMode,
+  DefinePanel,
   StudyLamp,
   TutorMarks,
   elide,
@@ -2504,6 +2505,19 @@ export default function Reader() {
    */
   const [unbuilt, setUnbuilt] = useState<string | null>(null)
 
+  /**
+   * The word under the loupe, and the lines it sits on.
+   *
+   * The rectangles are copied out of the selection rather than being read again
+   * when the panel opens, because opening it drops the selection — by then
+   * there is nothing left on the page to measure.
+   */
+  const [defining, setDefining] = useState<{
+    word: string
+    anchor: Anchor
+    rects: { top: number; left: number; width: number; height: number }[]
+  } | null>(null)
+
   useEffect(() => {
     if (!unbuilt) return
     const timer = window.setTimeout(() => setUnbuilt(null), 2600)
@@ -3342,9 +3356,26 @@ export default function Reader() {
         }
 
         case 'define':
+          /*
+           * Under the loupe. The lines are taken now, while the selection is
+           * still on the page: `dropSelection` runs a few lines below and after
+           * it there is nothing left to measure.
+           */
+          setDefining({
+            word: at.text,
+            anchor: at.anchor,
+            rects: (selected?.rects ?? []).map((line) => ({
+              top: line.top,
+              left: line.left,
+              width: line.width,
+              height: line.height,
+            })),
+          })
+          break
+
         case 'translate':
           // Nothing to open yet — see `unbuilt` above.
-          setUnbuilt(action.kind === 'define' ? 'Define' : 'Translate')
+          setUnbuilt('Translate')
           break
       }
 
@@ -4010,6 +4041,38 @@ export default function Reader() {
               saved={lamp.saved}
               onSave={keepThread}
               onClose={() => setLamp(null)}
+            />
+          )}
+
+          {defining && (
+            <DefinePanel
+              key={`${defining.anchor}:${defining.word}`}
+              selected={defining.word}
+              rects={defining.rects}
+              onClose={() => setDefining(null)}
+              onAsk={(word) => {
+                /*
+                 * Out of the loupe and under the lamp, carrying the word.
+                 *
+                 * The passage is the word itself rather than the sentence it
+                 * came from: the reader asked about *this word*, and handing
+                 * the tutor the whole sentence would answer a question they did
+                 * not ask. A thread about the word already open is resumed, the
+                 * same rule the Ask action follows.
+                 */
+                setDefining(null)
+                const existing = findThread(threads, { anchor: defining.anchor, excerpt: word })
+                if (existing) {
+                  openThread(existing)
+                  return
+                }
+                setLamp({
+                  key: `${defining.anchor}:${Date.now()}`,
+                  passage: { anchor: defining.anchor, excerpt: word, kind: 'sentence' },
+                  threadId: null,
+                  saved: [],
+                })
+              }}
             />
           )}
 

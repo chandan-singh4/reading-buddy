@@ -352,6 +352,54 @@ export interface StoredDigest {
   generatedAt: string
 }
 
+/**
+ * A word the reader looked up, already parsed.
+ *
+ * The *parsed* entry, not MW's JSON. Parsing once and keeping the result is
+ * what makes a second tap on the same word instant and makes it work with no
+ * signal at all — the etymology chain in particular is real work, and it is the
+ * same work every time.
+ *
+ * Keyed by the lowercased word alone, with no book attached. A word is a word
+ * wherever it was met, and looking "fundamental" up in a second book should
+ * find what the reader already read about it rather than spending another of
+ * the day's thousand lookups.
+ *
+ * No expiry. The Collegiate Dictionary does not change under us in a way that
+ * matters to a reader, and a personal shelf will never hold enough words for
+ * the size to be worth a sweep.
+ */
+export interface StoredDefinition {
+  /** The lowercased headword. The primary key. */
+  word: string
+  /** The parsed entry, as `DefineEntry` in `reader/dictionary.ts`. */
+  entry: unknown
+  /** ISO 8601 — when it was looked up, so a stale entry can be refreshed. */
+  fetchedAt: string
+}
+
+/**
+ * A word the reader chose to keep.
+ *
+ * Separate from `definitions` on purpose: the cache is a copy of something MW
+ * said and may be dropped at any time, while this is the reader's own decision
+ * and may not. The word is the key, so saving it twice is saving it once.
+ *
+ * `bookId` and `anchor` record where it was met rather than what it belongs
+ * to — a saved word outlives the book it was found in, so this does not
+ * cascade on delete the way notes and bookmarks do.
+ */
+export interface StoredWord {
+  word: string
+  /** Where the reader was when they saved it. */
+  bookId?: BookId
+  anchor?: Anchor
+  /** The one-line meaning, so a list can be read without a lookup each. */
+  gloss?: string
+  /** ISO 8601. What a vocabulary list sorts on. */
+  savedAt: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -374,6 +422,8 @@ export type ReadingBuddyDB = Dexie & {
   notes: Table<StoredNote, [BookId, string]>
   tutor: Table<StoredTutorThread, [BookId, string]>
   digests: Table<StoredDigest, [BookId, string]>
+  definitions: Table<StoredDefinition, string>
+  vocabulary: Table<StoredWord, string>
 }
 
 /**
@@ -525,6 +575,25 @@ function defineSchema(db: Dexie): void {
   // fill in as the reader reads.
   db.version(14).stores({
     digests: '[bookId+chapterId], bookId',
+  })
+
+  /*
+   * v15 — the dictionary. Two tables, and the split is the point.
+   *
+   * `definitions` is a cache: a copy of what Merriam-Webster said, keyed by the
+   * word so a second tap anywhere in the shelf is free and works offline. It
+   * may be dropped at any time and nothing is lost but a lookup.
+   *
+   * `vocabulary` is the reader's own list and may not be dropped. Same key, so
+   * saving a word twice saves it once, and `savedAt` is indexed because a
+   * vocabulary list is read newest first.
+   *
+   * Neither is keyed by book, and neither cascades when a book is deleted. A
+   * word met in a book is not part of the book.
+   */
+  db.version(15).stores({
+    definitions: 'word',
+    vocabulary: 'word, savedAt',
   })
 }
 

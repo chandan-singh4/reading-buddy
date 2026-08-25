@@ -35,6 +35,14 @@ export type { ChapterHeadingStyle, ChapterNumber } from './chapterHeading.ts'
 
 export { NoteComposer } from './NoteComposer.tsx'
 export type { NoteComposerProps } from './NoteComposer.tsx'
+export { DefinePanel } from './DefinePanel.tsx'
+export type { DefinePanelProps } from './DefinePanel.tsx'
+
+export { lookUpWord, wordFrom } from './defineWord.ts'
+export type { Lookup } from './defineWord.ts'
+
+export type { DefineEntry, Etymology, EtymologyNode } from './dictionary.ts'
+
 export { SelectionMenu } from './SelectionMenu.tsx'
 export type { SelectionAction, SelectionMenuProps } from './SelectionMenu.tsx'
 export { Highlights, canPaintHighlights } from './Highlights.tsx'

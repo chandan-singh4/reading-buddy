@@ -3,9 +3,89 @@
 > What is in here: the one task in flight, and the exact files to open for it.
 > Read it at startup, before anything else.
 
-## Start here — 2026-08-24 (the answer that waits for you)
+## Start here — 2026-08-24 (Define: the dictionary loupe)
 
-**Nothing is mid-edit.** The build is green: 1809 tests across 100 files.
+**Nothing is mid-edit.** The build is green: 1898 tests across 105 files.
+
+**Define is built, but it cannot answer yet.** The relay needs a
+Merriam-Webster key. Read *What you must do* below before you test it.
+
+### What the feature does
+
+The reader selects a word and taps **Define**. A small glass panel opens beside
+the word, and never on top of it. The panel shows the headword, the
+pronunciation, up to three senses, synonym chips, and the word's origin as a
+chain of roots from oldest to newest.
+
+The brief is `design-inspiration/define-feature-build-prompt.md`. The look is
+`design-inspiration/define-panel-prototype.html`. The prototype is the source
+of truth for the design. We wired real data into its shape and did not redesign
+it.
+
+### The pieces
+
+| File | What it holds |
+|---|---|
+| `api/define.ts` | The relay. It holds the two MW keys and calls both references at once. |
+| `web/src/reader/defineWord.ts` | The lookup order: cache, then network, then parse. |
+| `web/src/reader/dictionary.ts` | MW's JSON turned into the panel's shape. |
+| `web/src/reader/etymology.ts` | MW's origin prose turned into a chain of roots. |
+| `web/src/reader/loupe.ts` | Where the panel sits, and where its stem points. |
+| `web/src/reader/DefinePanel.tsx` | The panel. |
+| `web/src/storage/words.ts` | The word cache and the saved-word list. |
+
+### Four rules to keep
+
+1. **The cache comes before the network check.** A word looked up once works
+   with no signal. The *parsed* entry is what is kept, so the origin chain is
+   parsed one time only.
+2. **A section with no data is absent, not empty.** A heading over nothing
+   reads as a broken panel.
+3. **No raw `{token}` reaches the screen.** `clean()` in `dictionary.ts` strips
+   MW's markup.
+4. **The panel never covers the word.** `loupe.ts` is pure arithmetic, because
+   jsdom has no layout and a version that measured elements could not be
+   tested.
+
+### What you must do before Define works
+
+1. Register two free keys at <https://dictionaryapi.com>. They are separate
+   registrations, and the two keys are **not** interchangeable:
+   - *Collegiate Dictionary* → `MW_COLLEGIATE_KEY` (required)
+   - *Collegiate Thesaurus* → `MW_THESAURUS_KEY` (optional; without it, the
+     panel simply shows no synonym chips)
+2. Put both in `.env.local` at the repo root, and in the Vercel project.
+3. Never give either key a `VITE_` prefix. That puts the key in every
+   visitor's JavaScript.
+
+Until then, Define answers "Something went wrong".
+
+### What is proved, and what is not
+
+Proved: the parsers, the placement arithmetic, the panel's own render, and the
+`fundamental` golden chain from the brief. 73 new tests.
+
+Not proved: one live MW answer. No key exists on this machine. The panel was
+checked in a browser at 375px with a fixture, so the design and the theme glass
+are proved; the network path is not.
+
+### The task before this one — WP-25, something that writes a note
+
+The Notes tab reads a table that nothing fills. This is written out further
+down this file. **One question is still open: device-local or cloud.**
+Device-local is the smaller step. Ask the reader before you start.
+
+Files in scope for WP-25:
+
+- `web/src/pages/Reader.tsx` — the Notes tab and `noteRows`.
+- `web/src/storage/notes.ts` — the store that nothing writes to.
+- `web/src/storage/db.ts` — the note row's shape.
+
+Add any other path to this list with a one-line reason. Do not grep the tree.
+
+## The thread before this one — the answer that waits for you
+
+**The state then.** 1809 tests across 100 files.
 
 **The tutor is named Veda.** The reader uses many models, so the assistant is
 not called Claude any more. The stored note author stays `claude` — every note

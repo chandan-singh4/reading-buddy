@@ -299,6 +299,27 @@ Get that loop working before building any breadth.
 
 ### Recently done
 
+- **Define — the dictionary loupe** (2026-08-24). A reader selects a word,
+  taps **Define**, and a glass panel opens beside the word. It shows the
+  headword, the MW respelling, up to three senses, synonym chips, and the
+  origin as a chain of roots from oldest to newest. Merriam-Webster is the
+  source, through a new edge relay `api/define.ts` that holds the keys.
+  - **The cache is checked before the network.** What is kept is the *parsed*
+    entry, so a word looked up once opens instantly and works with no signal.
+  - **The origin chain is reversed.** MW writes the newest form first. The
+    reader wants the oldest first. `etymology.ts` does that, and falls back to
+    plain prose when it cannot find two clean hops.
+  - **Four failures, four answers.** No entry, offline, out of lookups, and
+    "something went wrong" need different remedies, so they are different
+    results. Every one of them still offers Ask Veda.
+  - **The glass follows the theme.** The panel reads `--g-*` tokens mixed from
+    the theme's own surface colour. Forest is green glass, not amber.
+  - **Not proved: one live answer.** No MW key exists on this machine. See
+    `docs/active-task.md` for the two keys to register.
+- **The tutor is named Veda, and five fixes off the phone** (2026-08-24,
+  `f602f9e`). The selection excerpt scrolls; the Notes paper scrolls with the
+  words and the red margin runs the whole page; tutor replies draw as markdown;
+  an ask that fails while the app is in the background retries once on return.
 - **A publisher's field name no longer shows as a subject tag** (2026-08-23,
   `e7c1b23`). A book listed `review_metadata` as its only subject. An EPUB's
   `dc:subject` is copied out of the file verbatim by `parse/epub.ts`, and

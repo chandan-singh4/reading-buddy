@@ -32,6 +32,29 @@
    */
   --color-accent-wash: color-mix(in srgb, var(--color-accent) 8%, transparent);
 
+  /*
+   * The glass of the Define loupe.
+   *
+   * Every one of these is mixed from a colour the theme already sets, so the
+   * panel recolours with the reader's theme instead of being amber for ever.
+   * The prototype's warm amber is what these resolve to under `paper` and
+   * `sepia`, because those themes' own surfaces are warm; under `slate` the
+   * same arithmetic makes the loupe cool, which is the point.
+   *
+   * `color-mix(… , transparent)` is how a token gets an alpha: the panel has to
+   * be see-through or it is not a loupe, and an opaque box over the words would
+   * lose the sentence the word was in.
+   */
+  --g-tint: color-mix(in srgb, var(--color-surface) 62%, transparent);
+  --g-tint-2: color-mix(in srgb, var(--color-surface-raised) 46%, transparent);
+  --g-edge-hi: color-mix(in srgb, #fff 62%, transparent);
+  --g-edge-lo: color-mix(in srgb, var(--color-accent) 26%, transparent);
+  --g-sheen: color-mix(in srgb, #fff 45%, transparent);
+  --g-shadow: rgb(0 0 0 / 0.3);
+  --g-blur: 17px;
+  --g-sat: 1.35;
+  --g-bright: 1.06;
+
   /* Spacing — a 4px scale keeps rhythm consistent across screens */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -628,6 +651,40 @@
   --deck-body: rgb(0 0 0 / 0.28);
   --deck-sheet: rgb(236 236 240 / 0.07);
   --deck-edge: rgb(236 236 240 / 0.05);
+}
+
+/*
+ * The loupe's glass over a dark page.
+ *
+ * Same tokens, held back. On a dark page the light tint reads as a lamp rather
+ * than as glass: the surface has to carry more of the panel, the top edge drops
+ * to a hairline, and the brightness lift goes entirely — lifting an already
+ * dark page only greys it.
+ *
+ * Written for all four ways a reader arrives at a dark page: the three dark
+ * themes, and a phone set to dark with no theme chosen. Missing any one of them
+ * leaves a white-hot panel on a black page.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --g-tint: color-mix(in srgb, var(--color-surface) 78%, transparent);
+    --g-tint-2: color-mix(in srgb, var(--color-surface-raised) 62%, transparent);
+    --g-edge-hi: color-mix(in srgb, #fff 16%, transparent);
+    --g-sheen: color-mix(in srgb, #fff 10%, transparent);
+    --g-shadow: rgb(0 0 0 / 0.6);
+    --g-bright: 1;
+  }
+}
+
+:root[data-theme='dark'],
+:root[data-theme='dim'],
+:root[data-theme='forest'] {
+  --g-tint: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  --g-tint-2: color-mix(in srgb, var(--color-surface-raised) 62%, transparent);
+  --g-edge-hi: color-mix(in srgb, #fff 16%, transparent);
+  --g-sheen: color-mix(in srgb, #fff 10%, transparent);
+  --g-shadow: rgb(0 0 0 / 0.6);
+  --g-bright: 1;
 }
 
 /*
