@@ -483,6 +483,12 @@
   color: var(--color-text-muted);
 }
 
+/* Kept. The button stays live, because the same tap lets the word go. */
+.save[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  color: var(--color-text);
+}
+
 /*
  * Merriam-Webster's name, on every panel.
  *

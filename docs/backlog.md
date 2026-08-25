@@ -192,7 +192,9 @@
 - [~] **WP-17 Selection menu** — Highlight / Copy / Define (local) / Ask · *after 12*
   — the menu, the four colours, the sentence/paragraph chevrons and the two
   highlight styles are built and phone-tested (2026-08-16, 2026-08-17). It also
-  survives a page turn now. Left: **Define** and **Ask**, and Ask waits on WP-19
+  survives a page turn now. **Define shipped 2026-08-24** — a Merriam-Webster
+  loupe, not the local dictionary this row first imagined. Left: **Ask**, which
+  waits on WP-19
 - [ ] **WP-18 Retrieval assembler** — manifest + chapter index + one section + learner.md · *after 05,09*
 - [ ] **WP-19 Claude API call shape** — Haiku→Sonnet tier, caching, streaming, retry · *after 18*
 - [~] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19* — the Study Lamp room, saved threads and Notes listing shipped 2026-08-21; streaming waits on WP-19
@@ -390,7 +392,11 @@
   `notes` table at Dexie v11 behind `storage/notes.ts`. Left to do: something
   that **writes** a note, highlights, and a cloud path (the table is
   device-local, because `Repository` has no notes)
-- [ ] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
+- [~] **WP-26 Vocabulary / glossary view** — surfaced from learner.md · *after 22*
+  — a first half shipped 2026-08-24 with Define: **Save word** keeps a word in a
+  `vocabulary` table (Dexie v15), and the Notes panel's **Words** tab lists them
+  across every book. The learner.md half, and anything that *practises* a word,
+  is still to come
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*
 - [ ] **WP-28 Books-stay-separate guard** — no cross-book memory/lookups · *after 18,22*
 

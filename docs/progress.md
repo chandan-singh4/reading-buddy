@@ -14,308 +14,40 @@ Ask → streamed answer (WP 01 → 03 → 04 → 05 → 08 → 11 → 12 → 17 
 Get that loop working before building any breadth.
 
 ### In flight
-- **Nothing mid-edit.** Everything below is merged and pushed; build green.
-- **The tutor is called Veda now** (2026-08-24). The reader uses many models,
-  so naming the assistant after one of them was wrong. "Ask Veda" on the
-  selection menu, "✦ Veda" on a note, "Veda" as the Notes chip. **The stored
-  value stays `claude`.** It is the author of every note already written, and
-  renaming it would orphan them. The label is what the reader reads.
-- **Five things the reader found on the phone** (2026-08-24).
-  1. A selected paragraph now scrolls. It faded out at 122px and the only offer
-     was to pin it away, so the last lines could not be read. The fade means
-     something now: on while there is more below, off at the end.
-  2. The notes paper scrolls with the words. A background painted on a
-     scrolling box is pinned to the box, not to the content, so the rules stood
-     still while the ink slid over them. The sheet is two elements now: `.sheet`
-     is the window and holds no paper, `.page` is the paper and is as tall as
-     the notes on it.
-  3. The red margin line runs the whole page. It was drawn on the window, so it
-     stopped at the fold. It is on `.page` now.
-  4. A tutor answer in Notes draws as markdown. The lamp always drew it; this
-     list showed the `**` and the `##` themselves. The slip had to stop being a
-     `<button>` — a button may not contain a heading or a list — so it is a div
-     with the button role and the two keys.
-  5. Every colour in `markdown.module.css` is a `--md-*` token with the lamp's
-     own value as its fallback. The Notes tab draws the same answer on white
-     paper and only re-names five inks.
-- **An ask that died while the reader was away is made again by itself**
-  (2026-08-24). Closing the panel was already safe; minimising the app was not.
-  Android freezes a backgrounded tab when memory is short, and a frozen tab's
-  connection dies with it. No web page can stop that. What it can do is notice:
-  `errand.ts` watches `visibilitychange`, and a failure that lands after the
-  reader went away is retried once on their return instead of being shown as a
-  Retry button under a question they already asked. A second failure is real and
-  is reported as itself. **If Android discards the tab outright, the module goes
-  with it and nothing survives** — that limit is real and is written in the file.
-- **An answer now outlives the panel that asked for it** (2026-08-24). The
-  reader asked a question, watched the model start thinking, went to another app
-  or closed the panel — and came back to the question, unanswered. The ask lives
-  in `web/src/reader/errand.ts` now, a module, which no unmount can touch. The
-  panel *watches* an errand rather than owning it, and nothing about finishing
-  an answer needs anyone watching. The errand **saves first and tells watchers
-  second**, so a render error cannot cost the answer. A second cause sat in
-  `Reader.tsx`: `keepThread` gave up when the panel was closed. It keeps the
-  passage in a ref now. **The limit, stated plainly:** a phone short of memory
-  may still freeze or discard a backgrounded tab, and no web page can stop that.
-- **A model that fails late no longer ends the ask** (2026-08-24). The reader
-  saw the model think for 10–15 seconds and then say no model would answer. A
-  rung can accept the request and fail late — usually by spending its whole
-  token budget on reasoning and returning an empty string. Failover used to stop
-  the moment a rung opened. `api/tutor.ts` keeps walking the chain after a late
-  failure, unless words have already reached the reader. Thinking is not words:
-  the client clears it when a new rung opens.
-- **The question box repeated every sentence, and the cause was not the
-  microphone** (2026-08-24). A screenshot from the phone settled it: the reader
-  is on **Android**, and the box filled with the same sentence again and again,
-  each copy longer than the last. Android's keyboard does not type finished
-  text — it holds a *composing region* for the words it is still deciding
-  about, which is how voice typing, autocorrect and glide typing all work. A
-  controlled React field writes `value` back after every change, and writing to
-  an element with a live composing region makes the keyboard commit its buffer
-  again. **The question box is uncontrolled now**: the element owns its text and
-  `draft` follows it. Everything that sets the text goes through `setBox`.
-  **The rule: never make a text field in this app a controlled React field.**
-  An earlier fix aimed at Safari's re-delivery missed this entirely — the wrong
-  platform was assumed from the symptom.
-- **The in-app microphone is removed** (2026-08-24). Two fixes did not stop the
-  write-back, and the reader decided: "Let's just remove it. I'll use the
-  keyboard microphone." `dictation.ts` and its button are gone. The keyboard's
-  own microphone works, because it feeds the field the same way typing does.
-- **Four fixes from a real afternoon of reading** (2026-08-24).
-  1. The answer ceiling is 8,000 tokens, up from 3,000. Real answers were going
-     over it and more were sitting just under, which is a ceiling shaping the
-     answer instead of catching a runaway.
-  2. The × is gone from every row in Notes. It sat a thumb's width from the note
-     and took a highlight or a whole conversation with no warning. Deleting is
-     still offered where the reader is looking at the thing itself.
-  3. The question box is a textarea that grows to the question, up to 160px,
-     then scrolls. It used to be a one-line input that scrolled sideways, so a
-     word in the middle of a long question could not be reached. Enter sends,
-     Shift+Enter makes a line.
-  4. The in-app microphone typed every word twice, and is now removed.
-- **The text selection menu stays the platform's.** The reader asked for the
-  cut/copy/paste popup in the question box to be drawn in the app's own style.
-  That bar is drawn by Android outside the page and cannot be restyled. It
-  *can* be suppressed and replaced with our own, but Paste then needs a
-  clipboard permission prompt, the drag handles stay Android's either way, and
-  the whole thing breaks when Chrome changes. Not worth it for a menu that
-  works. Revisit only if the reader asks again.
-- **Two faults in the tutor's controls, both reported by the reader**
-  (2026-08-24). First, the model and effort controls were missing for the first
-  three or four seconds of a new conversation: the roster is fetched behind a
-  sign-in and the picker waited for it. The roster the reader saw last time is
-  now kept, so the controls are on the first paint and the live roster replaces
-  them when it lands. Second, choosing a model also pressed the task chip
-  behind the sheet. The sheet chose on `pointerup` and was gone before the
-  browser sent the `click` that follows, so the browser aimed that click at
-  whatever was under the finger. Both the rows and the scrim act on the click
-  now. **The rule for any sheet in this app: never close on `pointerdown`.**
-- **The answer now streams, and it opens at its first line** (2026-08-23). The
-  relay writes one JSON object per line while the model writes, so the reader
-  watches the answer arrive instead of watching dots. Half-typed bold marks and
-  a table's raw pipes are held back, so nothing flashes on the way past. When
-  the answer finishes, the thread jumps to its **first line** — a long answer
-  used to leave the reader at the bottom of something they had not read.
-  Failover stays invisible: a provider refuses with an HTTP status before it
-  sends any bytes, so the relay can still walk down its list unseen.
-- **The prompts are the reader's own text now** (2026-08-23). `api/tutor.ts`
-  carries `design-inspiration/reading-buddy-prompts.md` word for word. The
-  explain-back probe no longer runs as a second ask; the base prompt carries the
-  rule. **Answers were also being cut off** — `MAX_TOKENS` was 1200 and
-  reasoning tokens share that budget. It is 3000 now, and the material ceiling
-  is 8000.
-- **Tables read on a phone** (2026-08-23). A markdown table draws as a list of
-  pairs: the row's first cell in bold, the rest indented under it and labelled
-  by the header. Three columns no longer collapse into one unreadable line.
-- **Four changes to the tutor panel and the book page** (2026-08-23). The
-  conversation panel now reads markdown, so bold, lists and formulas draw as
-  themselves and old answers redraw formatted. Each exchange shows its own
-  token count beside the copy and retry buttons, and the line under the message
-  bar is the sum of them. The globe sits with the model and the effort. The
-  "Refresh from Google Books" button can no longer stick on "Looking…": every
-  request now has a 20 second deadline, and the page always says why it failed.
-  **The deadline answers a hang, not a refusal.** If the button now names a
-  reason, that reason is the next thing to fix.
-- **A 503 no longer automatically means "no Google Books key"** (2026-08-23).
-  The client read the status number alone, but the host answers 503 too — a
-  paused or cold deployment — and it does it with an HTML page rather than with
-  our JSON. The client now reads the body: our own function's 503 still names
-  the key, and anything else says the host did not answer. **A reader saw the
-  old message with the key correctly set.**
-  **Solved on 2026-08-23. The cause was a stale service worker, not the key.**
-  A live probe of `https://reading-buddy-web-nu.vercel.app` settled it. An
-  unauthenticated `POST /api/books/google` answered `401 Not signed in.`, and
-  the key check in `api/books/google.ts` runs *before* the sign-in check. So
-  the request got past the key check and `GOOGLE_BOOKS_KEY` is set. The nine
-  served JavaScript files all carry the new strings. The reader's phone was
-  running an older cached build. Two full restarts of the app fixed it.
-  **Two lessons for a later thread.** First, `reading-buddy-web.vercel.app` is
-  a dead alias with no API functions at all — the live host is the `-nu` one.
-  Second, an unauthenticated probe is a clean test for a missing key, because
-  the two checks are in that order.
-- **Stages C and D of the tutor engine are built** (2026-08-22). Search, the
-  globe switch, the genre chips, and the whole digest and recap pipeline. A
-  live call proved search: five sources and a claim dated April 2026. A live
-  call also proved `reasoning: { effort: 'max' }`, which an earlier note in
-  `docs/active-task.md` wrongly said does not exist. **Recaps are off until the
-  reader switches them on**, on the "Last time on…" screen, because each one is
-  a paid call that starts while the reader reads. See `docs/active-task.md` for
-  the two other deviations from the plan.
-- **The book-kind feature is withdrawn** (2026-08-23). Migration `0008` is
-  deleted and **must not be run**. The Study Lamp now offers all seven chips to
-  every book. The "What kind of book" row is gone from the book's page, and the
-  `tutorGenre` column and `reader/genre.ts` are gone with it. Guessing the kind
-  cost a database column, a row of controls and a guess, to save the reader
-  from three chips they can simply not tap.
-- **The tutor is built and the key is live, but no answer has been seen**
-  (2026-08-22). `api/tutor.ts` holds the OpenRouter key and the whole prompt
-  library. `api/models.ts` fetches the free tool-capable roster.
-  `web/src/reader/models.ts` decides which of those a reader may pick, and hides
-  models built for one narrow job. The Study Lamp draws a picker above the input
-  and a small caption above each tutor bubble naming the model that wrote it.
-  **The picker and the caption have never drawn from a real answer.** Vite does
-  not run `api/`, so every reply in the pane is still the honest offline line.
-  To prove it: sign in on the phone, open a passage, tap "Explain simply". Two
-  bubbles must arrive, each with a name above it.
-- **The Study Lamp has message actions** (2026-08-22). Copy, edit and ask again
-  sit under each of the reader's questions. Copy and answer again sit under each
-  tutor answer. Edit and retry both drop everything after the question they act
-  on, so a thread never holds two answers to one question.
-- **A failure is no longer a message** (2026-08-22). The "could not be reached"
-  line lives in component state. Before this it was stored as a tutor turn. It
-  stacked up one bubble per attempt, it survived a reopen, and it was replayed
-  to the model as words the tutor had said. It is now drawn as a plain centred
-  note with no ✦ badge and no bubble, so it cannot be mistaken for an answer.
-- **The tutor answered nothing at all until 2026-08-22, and the cause was
-  ours.** The relay sent a four-model fallback chain. OpenRouter rejects any
-  `models` array longer than three with a `400`, so every question failed, for
-  every model the reader picked. The relay flattened all failures to `502`, and
-  the client printed one generic line for all of them, so the bug looked like an
-  outage. Fixed three ways: the chain is capped at three, the upstream status is
-  carried through, and a rate-limited model now says so.
-- **Free models are unreliable, and that is normal.** A probe on 2026-08-22
-  found `z-ai/glm-5.2:free` and `google/gemma-4-31b-it:free` returning `429`,
-  `thinkingmachines/inkling:free` returning `403`, and only
-  `nvidia/nemotron-3-super-120b-a12b:free` answering. The preferred model is now
-  that one. GLM was also a bad default for a second reason: it is a reasoning
-  model and can return `content: null` with the working-out in `reasoning`.
-- **Two things wait on OpenRouter credits** (2026-08-22). A live probe of the
-  key returned `402 Insufficient credits` for the web plugin and for every paid
-  slug. So Stage C's "Still true?" and "Historical context" cannot search, and
-  the Claude row must stay out of the picker. Keep `TUTOR_MODEL_CLAUDE` unset
-  until credits exist. Free models answer normally.
-- **`openrouter/free` is not safe as a fallback** (2026-08-22). It auto-routes
-  across every free model. The probe landed on a coding agent and on a safety
-  classifier that answered "say the word: ok" with "User Safety: safe". Neither
-  errors. The relay now falls back through four named general models.
-- **The Study Lamp chips changed** (2026-08-22). They now name real prompt
-  modules: Explain simply, Explain to a friend, Discuss, Define a term. The old
-  `explain` and `quiz` chips matched no prompt and are gone — "quiz" is now the
-  explain-back probe, which arrives on its own after an explanation. Proved in
-  the Browser pane with the real book.
-- **The Study Lamp motion is still unproved** (2026-08-21). The pane draws no
-  animation, so the dim-in, the glow and the collapse still need the phone.
-- **The touch selection is new and only half proved** (2026-08-19). On a touch
-  screen the phone can no longer select anything. A long press picks the word,
-  and a back swipe puts the menu away. All three were proved in the Browser
-  pane with the real book. **iOS's own menu cannot be shown there**, so only the
-  phone can tell you the flash is gone. Check these on the phone:
-  1. Long press a word. The app's own menu must open, with no grey flash first.
-  2. Drag a handle. The words must grow, with no flash.
-  3. Swipe back with the menu open. The menu must close and the book must stay.
-- **The page turn is measured now, and the numbers are on file.** See *The page
-  turn got faster* in Recently done. If a turn ever feels slow again, do not
-  guess: put the stopwatch back (it is one small module, deleted again on
-  2026-08-18, recoverable from git) and read the `worst` frame first, not `build`
-  and `paint` — those two time the first frame only. Remote profiling from the PC
-  does **not** work — `chrome://inspect` never left "Offline".
-- **A backward turn is now as fast as a forward one** (2026-08-18). The bands of
-  an arriving page drop the grain of the pen and keep its shape. Worst frame fell
-  from 150 ms to 50 ms. The reader signed it off on the phone. Baseline table in
-  `active-task.md`.
-- **`PARSER_VERSION` is 28, so the shelf offers to rebuild every book.** The
-  reader should accept the rebuild and check the Contents tab. Expected:
-  chapters nested under their parts, the Preface listed, the book's own printed
-  contents page still in the text, and a numbered chapter opening with the large
-  numeral. *The Mountains of My Life* is the book to look at first — it lost 28
-  invented "Page 360" chapters.
-- **The page-flip seam is closed** — see *The page turn crosses a section* in
-  Recently done. Signed off by the reader on the phone, 2026-08-17.
-- **Drop caps are parked, waiting on a screenshot.** The reader deferred them to
-  a later thread. The recommendation on file: recognise the shape (one letter,
-  offset 0, at least twice body size) and float it as print does, with the size
-  clamped to the lines it spans.
-- **The new Bookmarks and Notes panels have never been seen.** The Browser pane
-  has no book on its shelf, so both were proved by tests, not by eye. **Worth a
-  minute on the phone.** Watch the ribbon grow down when a bookmark unfurls.
-- **The Notes tab reads a table that nothing writes.** It shows its empty state
-  until something makes a note. That is the next task — see `active-task.md`.
-- **The frozen-page report is answered but not explained.** The floor under it is
-  in and proven; the *cause* is not confirmed. If a page ever freezes again, the
-  question to ask first is whether one touch clears it — if it does, a teardown
-  is still being missed somewhere and the backstop is catching it.
-- **The finger-tracked page curl has never been under a finger.** The maths is
-  covered by 24 tests and the wiring typechecks, but jsdom has no compositor and
-  the preview tree has no book on its shelf, so no drag has ever been dragged.
-  **This one is provable on the phone or not at all** — a synthetic pointer is
-  not a thumb.
-- **The 16 DOM clones a drag builds at `pointerdown` are measured and fixed.**
-  They cost 24,583 ms on a 2,542-page book — the "Aw, Snap!" crash. A drag now
-  costs 56–76 ms. See *A dragged page turn no longer clones the chapter*, below.
-  `STRIPS` in `pageCurl.ts` is still the lever if a phone hitches, but the cost
-  no longer scales with the chapter, so it should not need pulling.
-- **The reading page's new furniture has never been *seen*.** The Browser pane
-  would not composite frames all session, so the paper themes, the running head,
-  the gutter shadow and the decks were verified numerically (computed tokens
-  across all ten themes, deck widths 3px → 11px, gutter 24px) and by tests —
-  not by looking. **Worth a minute on the phone.** The three numbers most likely
-  to want tuning are `--page-deck` (11px), `--page-gutter` (24px) and
-  `--running-head` (1.5rem), all in `styles/theme.css`.
-- **`PARSER_VERSION` is 19.** Books on the shelf are behind until the idle
-  trickle catches them up, which it does one book at a time on its own.
-- **One chore only the reader can do: redeploy on Vercel** so the newly added
-  *Production* `GOOGLE_BOOKS_KEY` takes effect, then press Refresh on one book
-  before letting the 32-book backfill run. The probe reads: 401 = key present,
-  503 = key missing, 404 = endpoint not deployed.
-- **Steps 2 and 3 of the Google Books arc are shipped.** Only **step 4, Stats**,
-  is left. Migration `0007` has been run.
-- **Two older Supabase migrations still need pasting into the SQL editor** —
-  `0003_finished_at.sql` and `0006_position_within.sql`. **Both have since been
-  run** — confirmed by the reader on 2026-08-15. This note stood stale long
-  enough to send a whole round of diagnosis at the wrong bug; the real cause of
-  "reopens a few pages back" was the landing, not the save. See below.
-- **Nothing is waiting on the reader. The queue is empty as of 2026-08-10** —
-  the first time it has been, and worth not quietly refilling.
-  - **The greyed-out offline shelf was seen and approved on the phone**, along
-    with the four shelves that now hold their place when empty.
-  - **The design-hook findings are triaged.** The side-stripe was softened to a
-    wash on the reader's call (`--color-accent-wash`); the `LibraryCopy` "width
-    animation" was closed as a false positive — that rule animates a transform.
-  - **WP-55 is signed off.** The launch tempo (557 ms), the 85% page scale and
-    the gestures were all carried unseen for two days and have now been used and
-    called good. The 85% has budget to 90% if it is ever raised again, and the
-    "I don't see the logo" report closes with it — a stale cached build, as
-    suspected, which is also why the update panel got its safety net.
+- **Nothing mid-edit.** Everything below is merged and pushed; build green:
+  1909 tests across 105 files.
+- **Define needs its keys wherever it runs.** `MW_COLLEGIATE_KEY` (required) and
+  `MW_THESAURUS_KEY` (optional) are set locally and on Vercel. A new machine, or
+  a new deploy target, needs them again. Two free and separate registrations at
+  <https://dictionaryapi.com>. Never prefix either with `VITE_`.
+- **Not proved from this machine: a live MW answer under test.** Every parser is
+  tested against captured JSON. The network path was proved by hand on the
+  phone, not by a test.
 
 ### Recently done
 
-- **Define — the dictionary loupe** (2026-08-24). A reader selects a word,
-  taps **Define**, and a glass panel opens beside the word. It shows the
-  headword, the MW respelling, up to three senses, synonym chips, and the
-  origin as a chain of roots from oldest to newest. Merriam-Webster is the
-  source, through a new edge relay `api/define.ts` that holds the keys.
+- **Define — the dictionary loupe** (2026-08-24, `f79cf19` … `0200625`). A
+  reader selects a word, taps **Define**, and a glass panel opens beside it —
+  headword, MW respelling, up to three senses, synonym chips, and the origin as
+  a chain of roots from oldest to newest. Merriam-Webster is the source, through
+  a new edge relay `api/define.ts` that holds the keys.
   - **The cache is checked before the network.** What is kept is the *parsed*
     entry, so a word looked up once opens instantly and works with no signal.
-  - **The origin chain is reversed.** MW writes the newest form first. The
-    reader wants the oldest first. `etymology.ts` does that, and falls back to
-    plain prose when it cannot find two clean hops.
+  - **The origin chain is reversed.** MW writes the newest form first; the
+    reader wants the oldest first. It falls back to plain prose when it cannot
+    find two clean hops.
   - **Four failures, four answers.** No entry, offline, out of lookups, and
-    "something went wrong" need different remedies, so they are different
-    results. Every one of them still offers Ask Veda.
-  - **The glass follows the theme.** The panel reads `--g-*` tokens mixed from
-    the theme's own surface colour. Forest is green glass, not amber.
-  - **Not proved: one live answer.** No MW key exists on this machine. See
-    `docs/active-task.md` for the two keys to register.
+    "something went wrong". Every one of them still offers Ask Veda.
+  - **The glass follows the theme.** Forest is green glass, not amber.
+  - **Save word keeps a word**, in a `vocabulary` table at Dexie v15. The Notes
+    panel has a fifth tab, **Words**, listing them across every book. Tapping
+    the button again lets a word go.
+  - **Five faults found by using it, all fixed the same day.** The panel closed
+    itself in the same frame (a second `useBackDismiss` fighting the Reader's);
+    an empty rectangle list left it hidden; the speaker played nothing (MW
+    serves audio from `/audio/prons/en/us/mp3/`, and the other documented path
+    answers 403); every sense showed the same example (`def` is one entry per
+    part of speech, not per sense); and a saved word could not be un-saved.
 - **The tutor is named Veda, and five fixes off the phone** (2026-08-24,
   `f602f9e`). The selection excerpt scrolls; the Notes paper scrolls with the
   words and the red margin runs the whole page; tutor replies draw as markdown;

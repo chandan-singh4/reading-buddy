@@ -72,7 +72,10 @@ function store() {
         return Promise.resolve({ word, savedAt: '' })
       },
       isSaved: (word: string) => Promise.resolve(saved.has(word)),
-      forgetWord: () => Promise.resolve(),
+      forgetWord: (word: string) => {
+        saved.delete(word)
+        return Promise.resolve()
+      },
       savedWords: () => Promise.resolve([]),
     } as unknown as WordStore,
   }
@@ -246,6 +249,24 @@ describe('the things a reader can do in the panel', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Save word/ }))
     await screen.findByRole('button', { name: /Saved/ })
     expect(kept.saved.has('fundamental')).toBe(true)
+  })
+
+  it('lets a saved word go again', async () => {
+    /*
+     * The 2026-08-24 report: the button disabled itself once it said "Saved",
+     * so a mis-tap put a word on the list forever. Keeping a word is a small
+     * decision, and every small decision should be reversible.
+     */
+    lookUpWord.mockResolvedValue({ state: 'entry', entry: ENTRY, fromCache: false })
+    const { kept } = panel()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Save word/ }))
+    const saved = await screen.findByRole('button', { name: /Saved/ })
+    expect(kept.saved.has('fundamental')).toBe(true)
+
+    fireEvent.click(saved)
+    await screen.findByRole('button', { name: /Save word/ })
+    await waitFor(() => expect(kept.saved.has('fundamental')).toBe(false))
   })
 
   it('takes the word to the tutor, not the sentence it came from', async () => {

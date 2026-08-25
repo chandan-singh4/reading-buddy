@@ -3,26 +3,22 @@
 > What is in here: the one task in flight, and the exact files to open for it.
 > Read it at startup, before anything else.
 
-## Start here — 2026-08-24 (Define: the dictionary loupe)
+## Start here — 2026-08-24 (Define shipped; WP-25 is next)
 
-**Nothing is mid-edit.** The build is green: 1898 tests across 105 files.
+**Nothing is mid-edit.** Build green: 1909 tests across 105 files. `main` is
+pushed.
 
-**Define is built, but it cannot answer yet.** The relay needs a
-Merriam-Webster key. Read *What you must do* below before you test it.
+### What shipped this thread — Define
 
-### What the feature does
+The reader selects a word and taps **Define**. A glass panel opens beside the
+word, and never on top of it: headword, MW respelling, up to three senses,
+synonym chips, and the origin as a chain of roots from oldest to newest.
+**Save word** keeps a word; the Notes panel's **Words** tab lists them across
+every book; a second tap on **Saved** lets one go.
 
-The reader selects a word and taps **Define**. A small glass panel opens beside
-the word, and never on top of it. The panel shows the headword, the
-pronunciation, up to three senses, synonym chips, and the word's origin as a
-chain of roots from oldest to newest.
-
-The brief is `design-inspiration/define-feature-build-prompt.md`. The look is
-`design-inspiration/define-panel-prototype.html`. The prototype is the source
-of truth for the design. We wired real data into its shape and did not redesign
-it.
-
-### The pieces
+The brief was `design-inspiration/define-feature-build-prompt.md`. The look is
+`design-inspiration/define-panel-prototype.html`, which is the source of truth
+for the design. We wired real data into its shape and did not redesign it.
 
 | File | What it holds |
 |---|---|
@@ -32,61 +28,22 @@ it.
 | `web/src/reader/etymology.ts` | MW's origin prose turned into a chain of roots. |
 | `web/src/reader/loupe.ts` | Where the panel sits, and where its stem points. |
 | `web/src/reader/DefinePanel.tsx` | The panel. |
-| `web/src/storage/words.ts` | The word cache and the saved-word list. |
+| `web/src/storage/words.ts` | The word cache and the kept-word list. |
 
-### Four rules to keep
+**Five rules it now holds.** The cache comes before the network check. A section
+with no data is absent, not empty. No raw `{token}` reaches the screen. The
+panel never covers the word. Only `Reader` owns history — see `decisions.md`.
 
-1. **The cache comes before the network check.** A word looked up once works
-   with no signal. The *parsed* entry is what is kept, so the origin chain is
-   parsed one time only.
-2. **A section with no data is absent, not empty.** A heading over nothing
-   reads as a broken panel.
-3. **No raw `{token}` reaches the screen.** `clean()` in `dictionary.ts` strips
-   MW's markup.
-4. **The panel never covers the word.** `loupe.ts` is pure arithmetic, because
-   jsdom has no layout and a version that measured elements could not be
-   tested.
+**The keys.** `MW_COLLEGIATE_KEY` (required) and `MW_THESAURUS_KEY` (optional)
+are set locally and on Vercel. A new machine needs them again: two free,
+separate registrations at <https://dictionaryapi.com>. Never use a `VITE_`
+prefix on either.
 
-### What you must do before Define works
+### The next task — WP-25, something that writes a note
 
-1. Register two free keys at <https://dictionaryapi.com>. They are separate
-   registrations, and the two keys are **not** interchangeable:
-   - *Collegiate Dictionary* → `MW_COLLEGIATE_KEY` (required)
-   - *Collegiate Thesaurus* → `MW_THESAURUS_KEY` (optional; without it, the
-     panel simply shows no synonym chips)
-2. Put both in `.env.local` at the repo root, and in the Vercel project.
-3. Never give either key a `VITE_` prefix. That puts the key in every
-   visitor's JavaScript.
-
-Until then, Define answers "Something went wrong".
-
-### What is proved, and what is not
-
-Proved: the parsers, the placement arithmetic, the panel's own render, and the
-`fundamental` golden chain from the brief. 73 new tests.
-
-Not proved: one live MW answer. No key exists on this machine. The panel was
-checked in a browser at 375px with a fixture, so the design and the theme glass
-are proved; the network path is not.
-
-### Three fixes off the first real use (2026-08-24)
-
-1. **The speaker played nothing.** MW's audio is served from
-   `/audio/prons/en/us/mp3/`, not `/audio/pronunciation/mp3/`. The second
-   shape is in MW's own docs and answers 403 to every request. A recording
-   that will not play now takes its own button away.
-2. **Every sense showed the same example.** `def` is one entry per part of
-   speech, not one per sense. The senses live inside `sseq`. A sentence is
-   now used once; a sense that would repeat it shows none.
-3. **The saved words had nowhere to live.** The Notes panel has a fifth tab,
-   **Words**. It is not book-scoped — a word is learned once. A tap opens the
-   loupe on that word again, in the middle of the screen.
-
-### The task before this one — WP-25, something that writes a note
-
-The Notes tab reads a table that nothing fills. This is written out further
-down this file. **One question is still open: device-local or cloud.**
-Device-local is the smaller step. Ask the reader before you start.
+The Notes tab reads a table that nothing fills. **One question is still open:
+device-local or cloud.** Device-local is the smaller step. Ask the reader
+before you start.
 
 Files in scope for WP-25:
 

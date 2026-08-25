@@ -1275,3 +1275,21 @@ sign-in screen.
 - **The live host is `reading-buddy-web-nu.vercel.app`.** The shorter
   `reading-buddy-web.vercel.app` is a dead alias with no API functions. Probe
   the `-nu` host. — 2026-08-23
+
+- **Only one `useBackDismiss` per screen.** `Reader` counts every open layer and
+  keeps one history entry for each. A panel that ran a second copy of the hook
+  kept a rival count of the same stack, and the two closed each other. Anything
+  drawn over the page is added to the Reader's count instead. — 2026-08-24
+- **MW audio lives at `/audio/prons/en/us/mp3/`.** The other path in MW's own
+  documentation, `/audio/pronunciation/mp3/`, answers 403 to every request.
+  — 2026-08-24
+- **MW's `def` is one entry per part of speech, not per sense.** The senses are
+  a level down, in `sseq`. Reading `def[i]` gives every sense after the first
+  the same example. — 2026-08-24
+- **The parsed dictionary entry is what is cached, not MW's JSON.** A word is
+  parsed once ever, and a word looked up once works offline. — 2026-08-24
+- **A kept word is not scoped to a book.** A word is learned once, so the Words
+  tab shows the whole list wherever the reader is. — 2026-08-24
+- **Every small decision the panel offers is reversible.** Save word un-saves on
+  a second tap; a button that disables itself makes a mis-tap permanent.
+  — 2026-08-24

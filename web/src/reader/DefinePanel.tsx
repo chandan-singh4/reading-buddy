@@ -233,12 +233,30 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
     void new Audio(url).play().catch(() => setMute(true))
   }, [])
 
+  /*
+   * The one button both keeps a word and lets it go.
+   *
+   * It used to disable itself the moment it said "Saved", which made saving a
+   * word a decision the reader could not take back — reported 2026-08-24. A
+   * mis-tap, or a word that turned out to be obvious, was on the list forever.
+   *
+   * The screen changes before the database does, and only goes back if the
+   * write fails. Waiting for storage would make the tap feel dead.
+   */
   const keep = useCallback(() => {
     if (found?.state !== 'entry') return
+    const word = found.entry.headword
+
+    if (saved) {
+      setSaved(false)
+      void store.forgetWord(word).catch(() => setSaved(true))
+      return
+    }
+
     const gloss = found.entry.senseGroups[0]?.senses[0]?.text
     setSaved(true)
-    void store.saveWord(found.entry.headword, gloss ? { gloss } : {}).catch(() => setSaved(false))
-  }, [found, store])
+    void store.saveWord(word, gloss ? { gloss } : {}).catch(() => setSaved(false))
+  }, [found, saved, store])
 
   const entry = found?.state === 'entry' ? found.entry : null
 
@@ -410,7 +428,7 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
               type="button"
               className={`${styles.act} ${styles.save}`}
               onClick={keep}
-              disabled={saved}
+              aria-pressed={saved}
             >
               <BookmarkGlyph />
               {saved ? 'Saved' : 'Save word'}
