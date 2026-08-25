@@ -30,89 +30,35 @@ live model streams a warm answer into the Study Lamp. The reader picks the
 model. Notes, highlights and saved words are written and listed. Define opens a
 Merriam-Webster loupe beside the word.
 
-## Task — WP-39, ask about a picture (the epub half)
+## Task — none in flight
 
-Tap a figure on the page, and ask the tutor about it. The picture goes with the
-question, not only its caption.
+WP-39's epub half shipped on 2026-08-25. `/plan-task` fills this in next.
 
-Half of this row shipped on 2026-08-02: epub and docx images are pulled out at
-import into the `assets` table, and `blocks.tsx` already draws them. What is
-missing is the tutor half.
+**Files in scope:** none yet.
 
-**PDF regions are out of this task.** A PDF has no stored image to send — pdf.js
-must render the region first. That is a different piece of work, and it must not
-delay the half that is wiring.
+## Not proved on a device — ask about a picture
 
-## Definition of done
+1. **The whole path, on a real plate.** Every piece has tests; the path from a
+   thumb to an answer has none. Open a book with figures, tap **Ask** under one,
+   and read what comes back. The answer must describe something that is in the
+   picture and not in the caption. That is the only proof that matters.
+2. **The relay's half is untested, and cannot be here.** There is no test
+   harness for `api/` — there never has been. `pictureUrl` and the content-parts
+   message are read code, not proved code.
+3. **A day when no model can see.** The roster churns weekly. The lamp then
+   refuses and says why. Worth seeing once: it is the guard against a confident
+   answer about a plate nobody looked at.
 
-1. Tapping a figure in the reading page opens the Study Lamp with that figure as
-   its subject, exactly as tapping a paragraph does. The chips offer the figure
-   modules.
-2. The relay sends the picture *and* the text around it. Proved by a test on the
-   request the client builds, and by one real answer that describes something
-   only visible in the plate — not in its caption.
-3. A model that cannot read a picture never receives one. The reader is told
-   which models can, before they ask, and the fallback chain skips the rest.
+## Left open — WP-39's other half
 
-## The three problems, in the order they bite
+**PDF regions.** A PDF has no stored picture, so pdf.js must render the region
+first. The row stays `[~]` for that reason.
 
-**1. A tap on a picture is not a text selection.** Every route into the lamp
-today starts with selected words — `Reader.tsx` builds a `ReaderSelection` from
-a DOM range. A figure has no words to select. So the figure needs its own tap
-target and its own path into the same lamp.
+## A lesson worth keeping
 
-**2. A message is a string.** `Turn.content` in `api/tutor.ts` is `string`, all
-the way through. A picture needs OpenRouter's content-parts form: an array of
-`{type:'text'}` and `{type:'image_url'}`. That type has to widen, and the digest
-jobs must be unaffected.
+One passing example is not a rule. Test the class, not the case. Written after
+"persons" was read as proof that plurals worked, and "physicians" was not.
 
-**3. The roster does not know which models can see.** `api/models.ts` filters
-models by *shape* — "text in, text out" — and its `NOT_A_TUTOR` regex throws out
-image *generation* models. Nothing anywhere records whether a model accepts an
-image as input. So the reader's chosen model, and every rung under it, may be
-blind, and a picture sent to a blind model is dropped in silence: the answer
-comes back describing the caption and sounding confident. **This is the part to
-settle before building.**
+## Note on the docs, 2026-08-25
 
-Also true and smaller: a full-resolution plate is megabytes as base64. The
-picture must be scaled down and re-encoded before it is sent.
-
-## Files in scope
-
-Read only these. Add a path here with a one-line reason if the work needs more.
-
-- `web/src/reader/blocks.tsx` — draws the figure. The tap target goes here.
-- `web/src/reader/figures.ts` — already turns a stored blob into a `blob:` URL
-  for the page; the bytes for one figure come from here.
-- `web/src/reader/figurePicture.ts` **(new)** + its test — scale a blob down and
-  encode it for sending. Its own module because the size rule needs tests.
-- `web/src/reader/tutor.ts` — `AskTutorRequest` gains the picture.
-- `web/src/reader/context.ts` — the text around a figure, for the frame.
-- `web/src/reader/StudyLamp.tsx` — show the picture at the head of the thread.
-- `web/src/pages/Reader.tsx` — wire the tap to the lamp.
-- `api/tutor.ts` — widen `Turn.content`; pass the picture through.
-- `api/models.ts` — record which models accept an image.
-- The test file beside each of the above.
-
-## Out of scope
-
-- **pdf.js region rendering.** The PDF half of the row stays open.
-- **The parser and the import path.** The bytes are already stored. Nothing in
-  `web/src/parse/` or `web/src/import/` is touched.
-- **Tables and formulas.** WP-38 keeps each as one block, and a table is text
-  the tutor can already read. Pictures only.
-- **Storing the picture in the thread.** A saved thread keeps its text, as now.
-  The figure is found again from its anchor.
-
-## One decision before building
-
-Problem 3 has two answers, and they cost differently.
-
-- **Ask the roster.** OpenRouter publishes each model's input modalities. Read
-  it, mark the models that see, and let the picker show it. Correct, and it
-  touches the roster's shape and the picker.
-- **Name a short list.** Hard-code a few known models for pictures. Cheap, and
-  wrong the week the free roster churns — which it does weekly, by the note in
-  `api/tutor.ts`.
-
-I recommend the first. The second builds a thing we know is going stale.
+Where a backlog status box and the code disagree, trust the code and fix the box.

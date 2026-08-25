@@ -26,6 +26,23 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **Ask about a picture — the epub half of WP-39** (2026-08-25). Build green:
+  1983 tests across 108 files, up 35.
+  - An **Ask** button under every plate that has a picture. A button and not a
+    tap on the picture: the page already spends its taps, the edges to turn and
+    the middle to raise the toolbar.
+  - The plate is scaled to 1,024 pixels on its long edge and encoded as JPEG
+    before it is sent — `reader/figurePicture.ts`. The arithmetic is a pure
+    function, so it is tested without a browser.
+  - **The roster now records which models can read a picture**, from each
+    provider rather than a hand-written list. A blind model does not refuse a
+    picture; it drops it and answers from the caption. So a picture question
+    filters its whole fallback chain, not just its head, and with no seeing
+    model the lamp refuses and says why.
+  - A message in `api/tutor.ts` can now be text plus a picture. Text-only
+    conversations go out byte for byte as before.
+  - PDF regions stay open, so WP-39 stays `[~]`.
+
 - **The tutor's reach is settled: the page, and not the book** (2026-08-25).
   No code changed. Five waypoints were read against the code and closed.
   - **WP-09 and WP-18 are declined.** Both exist to search across a book. The
