@@ -371,3 +371,67 @@ describe('mwKnowsTheWord', () => {
     expect(mwKnowsTheWord('person', [{ meta: { id: 'person' } }])).toBe(false)
   })
 })
+
+/*
+ * The reader taps a plural. Reported 2026-08-25: "physicians" said there were
+ * no matches, and "physician" defined perfectly.
+ *
+ * MW was never the problem. It resolves the plural and answers with the
+ * "physician" entry — `entriesFor` then dropped every entry it sent, because it
+ * kept only entries whose headword equalled the tapped word.
+ *
+ * The shapes below are the real reply for "physicians", trimmed to the fields
+ * this code reads.
+ */
+describe('a word the reader tapped in an inflected form', () => {
+  const PHYSICIANS = [
+    {
+      meta: { id: 'physician', stems: ['physician', 'physicians'] },
+      hwi: { hw: 'phy*si*cian', prs: [{ mw: 'fə-ˈzi-shən' }] },
+      fl: 'noun',
+      shortdef: ['a person skilled in the art of healing'],
+    },
+    {
+      meta: {
+        id: 'family physician',
+        stems: ['family doctor', 'family physician', 'family physicians'],
+      },
+      fl: 'noun',
+      shortdef: ['a doctor for the whole family'],
+    },
+  ]
+
+  it('is defined from the entry MW matched it to', () => {
+    const entry = normalize('physicians', PHYSICIANS, [])
+    expect(entry).not.toBeNull()
+    expect(entry!.senseGroups[0]!.senses.length).toBeGreaterThan(0)
+  })
+
+  it('is titled with the word MW defined, not the word tapped', () => {
+    // The senses, the respelling and the recording all belong to "physician".
+    // Titling that "physicians" would be a lie in the loudest place on the panel.
+    expect(normalize('physicians', PHYSICIANS, [])!.headword).toBe('physician')
+  })
+
+  it('does not drag in the phrases MW returns alongside', () => {
+    // "family physician" does not carry a bare "physicians" among its stems.
+    const entry = normalize('physicians', PHYSICIANS, [])!
+    const senses = entry.senseGroups.flatMap((group) => group.senses)
+    expect(senses.some((sense) => sense.text.includes('whole family'))).toBe(false)
+  })
+
+  it('still prefers an exact headword when there is one', () => {
+    // An ordinary word takes exactly the path it always did. Here the stems of
+    // the *wrong* entry would match if exactness did not win first.
+    const body = [
+      { meta: { id: 'lead', stems: ['lead', 'leads'] }, fl: 'verb', shortdef: ['to guide'] },
+      { meta: { id: 'leads', stems: ['lead', 'leads'] }, fl: 'noun', shortdef: ['a wrong one'] },
+    ]
+    expect(normalize('leads', body, [])!.headword).toBe('leads')
+  })
+
+  it('is still a miss when no entry covers the word', () => {
+    const body = [{ meta: { id: 'walrus', stems: ['walrus'] }, fl: 'noun', shortdef: ['a beast'] }]
+    expect(normalize('physicians', body, [])).toBeNull()
+  })
+})

@@ -50,10 +50,19 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     hits in 30 days. Also ruled out by measurement — swapped keys, an invalid
     key, a rate limit, response caching, and common words being treated
     differently. See the note on `mwKnowsTheWord` in `reader/dictionary.ts`.
-  - **No morphology work is needed.** The reader asked for "persons" to fall
-    back to "person". MW does that itself: once the fault cleared, `persons`
-    returned the `person` entry and `unnoticed` returned its own. The report
-    was the fault above.
+  - **A tapped plural is defined again.** The reader reported "physicians"
+    saying there were no matches while "physician" worked. MW was never at
+    fault: it resolves the plural and answers with the "physician" entry, and
+    `entriesFor` then dropped everything it sent, because it kept only entries
+    whose headword equalled the tapped word. It now falls back to MW's own
+    `meta.stems` — the list of forms each entry covers — so the matching is
+    MW's answer, not a stemmer of ours. Measured live: `physicians`, `cities`,
+    `happier` and `walked` have no exact entry and one stem match each;
+    `geese`, `ran`, `running`, `mice` and `better` match exactly and are
+    untouched. The panel is titled with the word MW defined.
+  - **An earlier "nothing to build" here was wrong.** `persons` was tested and
+    happened to match exactly, and that one word was taken as proof for the
+    whole class. One passing example is not a rule.
 
 - **Four fixes off the phone** (2026-08-25). Build green: 1929 tests across 107
   files.

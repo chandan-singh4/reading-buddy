@@ -44,12 +44,17 @@ WP-28. It is the last foundation the tutor is missing.
 Smaller rows that are open and unblocked: WP-16 read-aloud, WP-43 re-scan a
 folder, WP-27 cost visibility, and the cloud path for notes.
 
-## Closed — MW does not need help with inflected forms
+## Closed — a tapped plural is defined again
 
-The reader reported that "persons" says there is no dictionary entry, and asked
-for a fall-back to "person". **Nothing to build.** Measured on 2026-08-25 once
-the MW fault cleared: `persons` returns the `person` entry, and `unnoticed`
-returns its own. MW resolves inflected forms itself.
+The reader reported "physicians": no matches, while "physician" worked. The
+fault was ours, not MW's. `entriesFor` kept only entries whose headword equalled
+the tapped word, so MW's correct answer for the plural was discarded. It now
+falls back to MW's `meta.stems`. Exact headwords still win first, so nothing
+that worked before changed.
+
+**A lesson worth keeping.** This was called "nothing to build" a day earlier on
+the strength of one word — `persons` — which happened to match exactly. One
+passing example is not a rule. Test the class, not the case.
 
 ## Not proved on a phone (2026-08-25)
 

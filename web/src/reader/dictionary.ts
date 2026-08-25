@@ -63,7 +63,7 @@ export interface DefineEntry {
 
 /** What MW hands back for a word it knows. Only the parts we read are named. */
 interface CollegiateEntry {
-  meta?: { id?: unknown }
+  meta?: { id?: unknown; stems?: unknown }
   hwi?: { hw?: unknown; prs?: { mw?: unknown; sound?: { audio?: unknown } }[] }
   fl?: unknown
   def?: { sseq?: unknown }[]
@@ -221,12 +221,52 @@ function headwordOf(entry: CollegiateEntry): string {
  * built on it. Keeping only the matching headword is what stops the panel
  * filling with definitions of "run-of-the-mill".
  */
+/** Every form an entry covers, as MW itself lists them. */
+function stemsOf(entry: CollegiateEntry): string[] {
+  const stems = entry.meta?.stems
+  if (!Array.isArray(stems)) return []
+  return stems
+    .filter((one): one is string => typeof one === 'string')
+    .map((one) => one.trim().toLowerCase())
+}
+
+/**
+ * The entries that answer the word the reader tapped.
+ *
+ * ## Why the exact headword is not enough
+ *
+ * A reader taps "physicians". MW resolves the plural and answers with the
+ * entry for "physician". Matching the headword against the tapped word threw
+ * that answer away and the panel said "no matches" — for a word MW had just
+ * defined. Reported 2026-08-25, and it is why a plural so often looked missing
+ * while its singular worked.
+ *
+ * ## Why `stems`, and not a stemmer of our own
+ *
+ * MW ships `meta.stems` on every entry: the list of forms that entry covers.
+ * "physician" carries `["physician", "physicians"]`. So the answer to "does
+ * this entry cover the word I tapped?" is already in the response, and it is
+ * MW's answer rather than a guess about English. A hand-rolled rule would have
+ * to know about "cities", "geese" and "ran", and would still be wrong somewhere.
+ *
+ * It is also *narrower* than a stemmer, which is the point. MW returns
+ * "family physician" and "physician assistant" alongside "physician", and
+ * neither lists a bare "physicians" among its stems. Those stay out.
+ *
+ * The exact headword still wins when there is one, so an ordinary word takes
+ * exactly the path it always did.
+ */
 function entriesFor(body: unknown, word: string): CollegiateEntry[] {
   if (isNotFound(body)) return []
   const wanted = word.trim().toLowerCase()
-  return (body as CollegiateEntry[]).filter(
-    (entry) => entry && typeof entry === 'object' && headwordOf(entry) === wanted,
+  const usable = (body as CollegiateEntry[]).filter(
+    (entry) => entry && typeof entry === 'object',
   )
+
+  const exact = usable.filter((entry) => headwordOf(entry) === wanted)
+  if (exact.length > 0) return exact
+
+  return usable.filter((entry) => stemsOf(entry).includes(wanted))
 }
 
 /**
@@ -385,7 +425,16 @@ export function normalize(
   const entries = entriesFor(collegiate, word)
   if (entries.length === 0) return null
 
-  const headword = word.trim().toLowerCase()
+  /*
+   * The word MW defined, which is not always the word the reader tapped.
+   *
+   * A reader who taps "physicians" is shown "physician", because that is the
+   * entry underneath and the senses, the respelling and the recording all
+   * belong to it. Titling it "physicians" over "physician"'s pronunciation
+   * would be a small lie in the loudest place on the panel.
+   */
+  const matched = entries[0] ? headwordOf(entries[0]) : ''
+  const headword = matched || word.trim().toLowerCase()
 
   // The first entry carrying each one. MW spreads them across homographs, and
   // only the first is the word said the way the reader met it.
