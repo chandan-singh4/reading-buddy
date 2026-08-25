@@ -784,3 +784,20 @@
   white-space: pre-wrap;
   opacity: 0.85;
 }
+
+/*
+ * The plate under the lamp: the picture the tutor was sent.
+ *
+ * Capped at a third of the screen. It is evidence, not the reading — the room
+ * is for the conversation, and a full-height plate would push every answer off
+ * the bottom on a phone.
+ */
+.plate {
+  display: block;
+  max-width: 100%;
+  max-height: 33dvh;
+  height: auto;
+  margin: 0 auto var(--space-2);
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}

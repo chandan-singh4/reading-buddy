@@ -23,6 +23,12 @@ import styles from './blocks.module.css'
 export type FollowLink = (anchor: Anchor) => void
 
 /**
+ * Told which plate the reader wants to ask about. Absent while no model on the
+ * roster can read a picture — see `sees` in `reader/models.ts`.
+ */
+export type AskAboutFigure = (block: Paragraph) => void
+
+/**
  * A dedication or an epigraph, set apart the way print sets it apart —
  * centred, with room around it — rather than run on as body text.
  *
@@ -200,9 +206,11 @@ export function elementIdOf(anchor: string): string {
 function Figure({
   block,
   images,
+  onAsk,
 }: {
   block: Paragraph
   images: ReadonlyMap<string, string>
+  onAsk?: AskAboutFigure
 }) {
   // A figure whose picture isn't there degrades to its caption — no image, or
   // one stored under a path this book has no bytes for, which is every book
@@ -232,6 +240,28 @@ function Figure({
         />
       )}
       {caption && <figcaption className={styles.caption}>{caption}</figcaption>}
+      {/*
+        A button, and not a tap on the picture itself.
+
+        The page already spends its taps: the edges turn, and the middle raises
+        the toolbar. A picture that opened the tutor when touched would take a
+        tap the reader meant for one of those, and a full-page plate leaves them
+        nowhere else to put it.
+
+        It appears only when a picture is actually on screen. A figure that
+        degraded to its caption has nothing to show a model, and offering to ask
+        about a plate the reader cannot see is a promise this cannot keep.
+      */}
+      {showsImage && onAsk && (
+        <button
+          type="button"
+          className={styles.ask}
+          onClick={() => onAsk(block)}
+          aria-label={caption ? `Ask about this picture: ${caption}` : 'Ask about this picture'}
+        >
+          <span aria-hidden="true">✦</span> Ask
+        </button>
+      )}
     </figure>
   )
 }
@@ -328,11 +358,14 @@ export function Block({
   block,
   onFollowLink,
   images = NO_IMAGES,
+  onAskFigure,
 }: {
   block: Paragraph
   onFollowLink?: FollowLink
   /** Stored picture paths → showable URLs, for this section's figures. */
   images?: ReadonlyMap<string, string>
+  /** Offers the Ask button on a figure. Left out, no figure offers one. */
+  onAskFigure?: AskAboutFigure
 }) {
   const id = elementIdOf(block.anchor)
   const text = <Text block={block} onFollow={onFollowLink} />
@@ -425,7 +458,7 @@ export function Block({
     case 'figure':
       return (
         <div id={id} className={opens}>
-          <Figure block={block} images={images} />
+          <Figure block={block} images={images} onAsk={onAskFigure} />
         </div>
       )
 

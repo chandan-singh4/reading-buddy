@@ -93,6 +93,21 @@ interface Row {
   busy?: boolean
   /** True for the paid Claude row, which is added by hand. */
   paid?: boolean
+  /**
+   * True when the model accepts a picture as *input*, not when it makes one.
+   *
+   * Read from each provider's roster rather than kept as a list here, because
+   * the free roster churns weekly and a hand-written list would be wrong within
+   * a month — the same reasoning as the model picker itself.
+   *
+   * It matters more than an ordinary capability flag, because a model that
+   * cannot see does not *fail* when it is sent a picture. Most providers drop
+   * the image part and answer from the words that came with it, so the reader
+   * gets a confident description of the caption and no sign that the plate was
+   * never looked at. A silent wrong answer has to be prevented here, at the
+   * roster, because nothing downstream can detect it.
+   */
+  sees?: boolean
 }
 
 /**
@@ -201,6 +216,28 @@ function trim(value: unknown): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').slice(0, 300) : ''
 }
 
+/**
+ * Whether an OpenRouter row takes a picture in.
+ *
+ * `architecture.input_modalities` is the field to read. Some rows carry the
+ * older `architecture.modality`, written `text+image->text`, so the left of the
+ * arrow is read when the list is missing. A row with neither is treated as
+ * blind: guessing wrong in that direction costs a picture the reader could have
+ * sent, and guessing wrong the other way costs a wrong answer they cannot see.
+ */
+function seesOpenRouter(row: Record<string, unknown>): boolean {
+  const architecture = row.architecture as
+    | { input_modalities?: unknown; modality?: unknown }
+    | undefined
+  if (!architecture) return false
+
+  const modalities = architecture.input_modalities
+  if (Array.isArray(modalities)) return modalities.includes('image')
+
+  const legacy = architecture.modality
+  return typeof legacy === 'string' && legacy.split('->')[0]!.includes('image')
+}
+
 /** OpenRouter: free, tool-capable, and shaped like a tutor. */
 async function openrouterRoster(key: string): Promise<Row[]> {
   const response = await fetch(ENDPOINTS.openrouter.roster, {
@@ -218,6 +255,7 @@ async function openrouterRoster(key: string): Promise<Row[]> {
       description: trim(row.description),
       contextLength: Number(row.context_length) || 0,
       source: 'openrouter' as const,
+      ...(seesOpenRouter(row) ? { sees: true } : {}),
     }))
     .filter((row) => !NOT_A_TUTOR.test(`${row.id} ${row.name}`))
     .filter((row) => row.contextLength === 0 || row.contextLength >= MIN_CONTEXT)
@@ -247,6 +285,9 @@ async function groqRoster(key: string): Promise<Row[]> {
       description: trim(row.description),
       contextLength: Number(row.context_window) || 0,
       source: 'groq' as const,
+      ...((row.supported_features as string[] | undefined)?.includes('images')
+        ? { sees: true }
+        : {}),
     }))
     .filter((row) => !NOT_A_TUTOR.test(`${row.id} ${row.name}`))
     .filter((row) => row.contextLength >= MIN_CONTEXT)
@@ -276,6 +317,10 @@ async function geminiRoster(key: string): Promise<Row[]> {
       description: trim(row.description),
       contextLength: Number(row.inputTokenLimit) || 0,
       source: 'gemini' as const,
+      // Gemini's roster describes no modalities, and every Gemini model that
+      // answers `generateContent` takes an image. Asserted here rather than
+      // read, and it is the one provider where that is safe to do.
+      sees: true,
     }))
     .filter((row) => !NOT_A_TUTOR.test(`${row.id} ${row.name}`))
     .filter((row) => row.contextLength >= MIN_CONTEXT)
@@ -450,6 +495,7 @@ export default async function handler(request: Request): Promise<Response> {
       contextLength: 200_000,
       source: 'openrouter',
       paid: true,
+      sees: true,
     })
   }
 

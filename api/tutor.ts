@@ -589,9 +589,21 @@ Keep it concise enough to read in a few seconds. This is a refresher before cont
 /* -------------------------------------------------------------------- wire */
 
 type Role = 'system' | 'user' | 'assistant'
+
+/**
+ * One message, in either of the two forms every provider on the chain accepts.
+ *
+ * A plain string is what all but one turn is, and what this file sent for its
+ * whole life. The array form is OpenAI's content-parts shape, and it is the
+ * only way to put a picture in a message. Both are sent verbatim; nothing here
+ * converts one into the other, so a text-only conversation goes out byte for
+ * byte as it did before pictures existed.
+ */
+type Part = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
+
 interface Turn {
   role: Role
-  content: string
+  content: string | Part[]
 }
 
 interface Body {
@@ -605,6 +617,11 @@ interface Body {
   context?: unknown
   mode?: unknown
   intent?: unknown
+  /**
+   * A plate the reader tapped, as a `data:` URL. Forwarded only to a model that
+   * can read one, which the client decides — see `pictureUrl`.
+   */
+  picture?: unknown
   history?: unknown
   userMessage?: unknown
   /** Stage B: the reader's pick, put at the head of the fallback chain. */
@@ -826,9 +843,61 @@ function assemble(body: Body, module: Module | undefined): Turn[] {
     : 'THE PASSAGE THE READER SELECTED — explain this one'
   const passage = excerpt ? `${label}:\n\n"""\n${excerpt}\n"""\n\n` : ''
 
-  turns.push({ role: 'user', content: `${where}${passage}${asked}` })
+  const said = `${where}${passage}${asked}`
+
+  /*
+   * A picture rides with the question, never on its own.
+   *
+   * The text goes first and the plate second. Asked the other way round, most
+   * models describe the picture and then notice the question, which reads as a
+   * tutor talking past the reader. The frame and the caption also tell it which
+   * book and which chapter it is looking at, and a plate stripped of that is a
+   * picture of a man in a hat.
+   *
+   * The relay does not check that the model can see. That is decided upstream,
+   * where the chain is built, because it has the roster and this does not — see
+   * `sees` in `api/models.ts`.
+   */
+  const picture = pictureUrl(body.picture)
+  if (picture) {
+    turns.push({
+      role: 'user',
+      content: [
+        { type: 'text', text: said },
+        { type: 'image_url', image_url: { url: picture } },
+      ],
+    })
+    return turns
+  }
+
+  turns.push({ role: 'user', content: said })
   return turns
 }
+
+/**
+ * The picture, if the client sent one this file is willing to forward.
+ *
+ * `data:` only. A remote URL would have the model's provider fetch an address
+ * chosen by whoever called this relay, which is a request made from inside our
+ * network on someone else's say-so. The plate is already bytes on the reader's
+ * phone, so there is no case where a URL is the honest answer.
+ */
+function pictureUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  if (!/^data:image\/(png|jpeg|webp|gif);base64,/i.test(value)) return undefined
+  if (value.length > MAX_PICTURE) return undefined
+  return value
+}
+
+/**
+ * The largest picture the relay forwards.
+ *
+ * The client scales every plate to 1,024 pixels on its long edge, which lands
+ * far below this. The cap is here for the request this file did not build — an
+ * edge function has a body limit, and being refused by the platform with no
+ * message is worse than refusing here.
+ */
+const MAX_PICTURE = 6_000_000
 
 interface Completion {
   text: string

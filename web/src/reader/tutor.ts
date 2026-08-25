@@ -30,8 +30,15 @@ import type { PassageContext } from './context.ts'
 import type { Effort } from './effort.ts'
 import type { Anchor } from '../structure/index.ts'
 
-/** How much of the page the reader pinned under the lamp. */
-export type PassageKind = 'sentence' | 'paragraph'
+/**
+ * How much of the page the reader pinned under the lamp.
+ *
+ * `figure` is not a quantity of text like the other two. It is a plate, a chart
+ * or a diagram the reader tapped, and its `excerpt` is the caption — the only
+ * words it has. The picture itself travels separately; see `picture` on
+ * `AskTutorRequest`.
+ */
+export type PassageKind = 'sentence' | 'paragraph' | 'figure'
 
 /** The words the conversation is about, and where they live. */
 export interface PassageAnchor {
@@ -204,6 +211,15 @@ export interface AskTutorRequest {
    */
   search?: boolean
   /**
+   * The plate itself, when the reader asked about a figure.
+   *
+   * A `data:` URL, already scaled down by `figurePicture.ts`. Sent only to
+   * models that can read one — `stepsFrom(columns, pick, true)` builds a chain
+   * of those and nothing else, because a blind model does not refuse a picture,
+   * it answers from the caption.
+   */
+  picture?: string
+  /**
    * Which models to try, in order, after the reader's own pick. Built by
    * `stepsFrom`. Left out, the relay falls back to its own list.
    *
@@ -368,6 +384,7 @@ export async function askTutor(
         intent: request.intent,
         history: request.history.map(({ role, text, isProbe }) => ({ role, text, isProbe })),
         userMessage: request.userMessage,
+        ...(request.picture ? { picture: request.picture } : {}),
         ...(request.effort ? { effort: request.effort } : {}),
         ...(request.search ? { search: true } : {}),
         ...(request.models && request.models.length > 0 ? { models: request.models } : {}),

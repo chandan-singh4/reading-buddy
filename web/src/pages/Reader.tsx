@@ -86,6 +86,7 @@ import {
   type FollowLink,
   useBackDismiss,
   useFigureImages,
+  pictureOf,
   writeFocusMode,
   DefinePanel,
   StudyLamp,
@@ -3144,6 +3145,18 @@ export default function Reader() {
     passage: PassageAnchor
     threadId: string | null
     saved: TutorMessage[]
+    /**
+     * The plate, when the lamp was opened from a figure. Scaled and encoded by
+     * `figurePicture.ts` before the lamp exists, so the panel never waits on a
+     * decode.
+     *
+     * Held here and not in the thread: the picture is already in the `assets`
+     * table, and a copy of it in every saved conversation would put the largest
+     * data in the book into the row that is written most often. A reopened
+     * thread about a figure therefore has no picture, and asks about its
+     * caption — the same as any other reopened thread.
+     */
+    picture?: string
   } | null>(null)
 
   const lampRef = useRef(lamp)
@@ -3193,6 +3206,53 @@ export default function Reader() {
       saved: thread.messages,
     })
   }, [])
+
+  /**
+   * Ask about a plate — the Ask button under a figure.
+   *
+   * Three things happen before the lamp opens, and the order matters. The bytes
+   * come out of the `assets` table, they are scaled down and re-encoded, and
+   * only then is the panel built. Opening first and decoding after would put a
+   * spinner inside the room; a plate is a megabyte on a phone and the decode is
+   * not instant.
+   *
+   * A figure with no picture never offers the button, so `image` is present by
+   * the time this runs. It can still fail — a book imported before pictures
+   * were extracted has the figure and not the bytes — and then nothing opens.
+   * Silence is right here: the reader tapped a button, and the honest answer is
+   * that there is nothing to ask about.
+   *
+   * The excerpt is the caption, which is all the words a figure has. The same
+   * caption reopens the same thread, exactly as a passage does.
+   */
+  const askAboutFigure = useCallback(
+    async (block: Paragraph) => {
+      const path = block.image?.src
+      if (!path) return
+
+      const bytes = (await loadAssets([path])).get(path)
+      if (!bytes) return
+
+      const picture = await pictureOf(bytes)
+      if (!picture) return
+
+      const caption = block.label ?? block.text
+      const existing = findThread(threads, { anchor: block.anchor, excerpt: caption })
+      if (existing) {
+        openThread(existing)
+        return
+      }
+
+      setLamp({
+        key: `${block.anchor}:${Date.now()}`,
+        passage: { anchor: block.anchor, excerpt: caption, kind: 'figure' },
+        threadId: null,
+        saved: [],
+        picture: picture.dataUrl,
+      })
+    },
+    [loadAssets, openThread, threads],
+  )
 
   /**
    * Every completed exchange, persisted whole. The first one creates the
@@ -3626,6 +3686,7 @@ export default function Reader() {
           block={block}
           onFollowLink={jumpToAnchor as FollowLink}
           images={figureImages}
+          onAskFigure={askAboutFigure}
         />
       ))}
     </>
@@ -4190,6 +4251,7 @@ export default function Reader() {
               key={lamp.key}
               passage={lamp.passage}
               context={lampContext}
+              {...(lamp.picture ? { picture: lamp.picture } : {})}
               saved={lamp.saved}
               onSave={keepThread}
               onClose={() => setLamp(null)}

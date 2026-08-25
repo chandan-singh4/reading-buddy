@@ -13,7 +13,9 @@ import {
   arrange,
   arrangementOf,
   ASSUMED_SIZE,
+  anySees,
   chainFrom,
+  stepsFrom,
   chosenFrom,
   fitForReading,
   forgetModels,
@@ -574,5 +576,61 @@ describe('the stored arrangement', () => {
     const roster = [model({ id: 'o/a' }), model({ id: 'g/a', source: 'gemini' })]
     const columns = arrange(roster)
     expect(arrange(roster, arrangementOf(columns))).toEqual(columns)
+  })
+})
+
+describe('a chain for a question that carries a picture', () => {
+  const seeing = [
+    column('gemini', [
+      model({ id: 'g/blind', source: 'gemini' }),
+      model({ id: 'g/sees', source: 'gemini', sees: true }),
+    ]),
+    column('openrouter', [
+      model({ id: 'o/sees', sees: true }),
+      model({ id: 'o/blind' }),
+    ]),
+  ]
+
+  it('keeps only the models that can see', () => {
+    const ids = chainFrom(seeing, undefined, true).map((row) => row.id)
+    expect(ids).toEqual(['g/sees', 'o/sees'])
+  })
+
+  it('keeps every model when no picture is being sent', () => {
+    const ids = chainFrom(seeing, undefined).map((row) => row.id)
+    expect(ids).toContain('g/blind')
+  })
+
+  it('drops a blind pick rather than leading with it', () => {
+    const ids = chainFrom(seeing, 'g/blind', true).map((row) => row.id)
+    expect(ids).not.toContain('g/blind')
+    expect(ids[0]).toBe('g/sees')
+  })
+
+  it('leads with a seeing pick, as it does for text', () => {
+    expect(chainFrom(seeing, 'o/sees', true).map((row) => row.id)[0]).toBe('o/sees')
+  })
+
+  it('is empty when nothing on the roster can see', () => {
+    const blind = [column('gemini', [model({ id: 'g/blind', source: 'gemini' })])]
+    expect(chainFrom(blind, undefined, true)).toEqual([])
+  })
+
+  it('carries the flag through stepsFrom', () => {
+    expect(stepsFrom(seeing, undefined, true).map((step) => step.id)).toEqual(['g/sees', 'o/sees'])
+  })
+})
+
+describe('anySees', () => {
+  it('is true when one model on the roster can read a picture', () => {
+    expect(anySees([column('openrouter', [model({ sees: true })])])).toBe(true)
+  })
+
+  it('is false for a roster of text-only models', () => {
+    expect(anySees([column('openrouter', [model()])])).toBe(false)
+  })
+
+  it('is false for an empty roster', () => {
+    expect(anySees([])).toBe(false)
   })
 })

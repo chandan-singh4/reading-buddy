@@ -7,6 +7,7 @@ export { Block, elementIdOf } from './blocks.tsx'
 export type { FollowLink } from './blocks.tsx'
 
 export { imagePathsOf, isDirectSrc, srcOf, useFigureImages } from './figures.ts'
+export { fitWithin, pictureOf, MAX_EDGE, type Picture } from './figurePicture.ts'
 export type { LoadAssets } from './figures.ts'
 
 export { runsOf, lineRunsOf } from './linkRuns.ts'

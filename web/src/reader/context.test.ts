@@ -146,3 +146,34 @@ describe('passageContext', () => {
     expect(got.chapter).toBe('First Years')
   })
 })
+
+describe('neighboursOf — a figure', () => {
+  /*
+   * A figure's own "text" is the parser's placeholder, so there are no
+   * sentences in it to sit between. What explains a plate is the prose either
+   * side of it, which is what a tapped paragraph already takes.
+   */
+  const blocks = [
+    para(1, 'The prose before the plate.'),
+    para(2, '[Figure: Figure 1. A mandala.]', 'figure'),
+    para(3, 'The prose after the plate.'),
+  ]
+
+  it('takes the prose either side, as a paragraph does', () => {
+    expect(neighboursOf(blocks, passage(2, 'Figure 1. A mandala.', 'figure'))).toEqual({
+      before: 'The prose before the plate.',
+      after: 'The prose after the plate.',
+    })
+  })
+
+  it('does not hunt for its caption inside the placeholder', () => {
+    // The caption is not a substring of the placeholder in every book, and the
+    // sentence path would have answered with the placeholder itself.
+    const found = neighboursOf(blocks, passage(2, 'A caption the block does not hold', 'figure'))
+    expect(found.before).toBe('The prose before the plate.')
+  })
+
+  it('is empty for a figure that is not in this section', () => {
+    expect(neighboursOf(blocks, passage(9, 'Figure 9.', 'figure'))).toEqual({})
+  })
+})

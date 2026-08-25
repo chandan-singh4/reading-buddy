@@ -640,3 +640,99 @@ describe('the message actions', () => {
     expect(link.getAttribute('href')).toBe('https://example.org/paper')
   })
 })
+
+/* --- asking about a picture ---------------------------------------------- */
+
+const PLATE = 'data:image/jpeg;base64,abc'
+
+const figure: PassageAnchor = {
+  anchor: 'ch02-s03-p013' as never,
+  excerpt: 'Figure 1. A mandala.',
+  kind: 'figure',
+}
+
+/** The body of the nth call to the relay, parsed. */
+function sent(fetch: ReturnType<typeof relay>, at = 0): Record<string, unknown> {
+  const call = fetch.mock.calls[at] as unknown as [string, { body: string }]
+  return JSON.parse(call[1].body) as Record<string, unknown>
+}
+
+/** A roster with one model that can read a picture, and one that cannot. */
+async function rosterThatSees() {
+  const models = await import('./models.ts')
+  return vi.spyOn(models, 'loadModels').mockResolvedValue([
+    { id: 'seeing/one:free', name: 'Seeing One', description: '', contextLength: 131_072, source: 'openrouter', sees: true },
+    { id: 'blind/one:free', name: 'Blind One', description: '', contextLength: 131_072, source: 'openrouter' },
+  ])
+}
+
+async function askAboutThePlate(over: Partial<Parameters<typeof StudyLamp>[0]> = {}) {
+  render(
+    <StudyLamp
+      passage={figure}
+      picture={PLATE}
+      saved={[]}
+      onSave={() => {}}
+      onClose={() => {}}
+      {...over}
+    />,
+  )
+  // Waiting for the roster: the chain is filtered by it, and a question asked
+  // before it lands is a different case (the relay picks its own chain).
+  await waitFor(() => expect(screen.getByLabelText(/Which model answers/)).toBeTruthy())
+  fireEvent.click(screen.getByRole('button', { name: /Explain simply/i }))
+}
+
+describe('a question about a picture', () => {
+  afterEach(() => {
+    forgetAllErrands()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('shows the reader the plate the tutor was given', () => {
+    render(
+      <StudyLamp passage={figure} picture={PLATE} saved={[]} onSave={() => {}} onClose={() => {}} />,
+    )
+    expect(screen.getByRole('img', { name: 'Figure 1. A mandala.' }).getAttribute('src')).toBe(PLATE)
+  })
+
+  it('sends the picture with the question', async () => {
+    await rosterThatSees()
+    const fetch = relay(answered())
+    await askAboutThePlate()
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+    expect(sent(fetch).picture).toBe(PLATE)
+  })
+
+  it('offers only the models that can see, and never the blind one', async () => {
+    await rosterThatSees()
+    const fetch = relay(answered())
+    await askAboutThePlate()
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+
+    const chain = sent(fetch).models as { id: string }[]
+    expect(chain.map((step) => step.id)).toEqual(['seeing/one:free'])
+  })
+
+  it('sends no picture for an ordinary passage', async () => {
+    await rosterThatSees()
+    const fetch = relay(answered())
+    render(<StudyLamp passage={passage} saved={[]} onSave={() => {}} onClose={() => {}} />)
+    await waitFor(() => expect(screen.getByLabelText(/Which model answers/)).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: /Explain simply/i }))
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
+    expect(sent(fetch).picture).toBeUndefined()
+  })
+
+  it('refuses to ask when no model on the roster can see', async () => {
+    // The roster in this file is three text-only models, so this is the whole
+    // default case: a plate opened on a day when nothing can read one.
+    const fetch = relay(answered())
+    await askAboutThePlate()
+
+    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.getByText(/No model on today’s list can look at a picture/)).toBeTruthy()
+  })
+})

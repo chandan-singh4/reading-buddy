@@ -73,6 +73,16 @@ export interface TutorModel {
   busy?: boolean
   /** True for Claude. The picker says so — the reader should know it costs. */
   paid?: boolean
+  /**
+   * The model accepts a picture as input. Read from the provider's roster by
+   * `api/models.ts`, never guessed here.
+   *
+   * Absent means "no", and deliberately so. A model that cannot see does not
+   * refuse a picture — it drops it and answers from the words, so a wrong guess
+   * in this direction produces a confident answer about a plate nobody looked
+   * at.
+   */
+  sees?: boolean
 }
 
 /** Where the roster comes from. Overridable for a dev box, as with the relay. */
@@ -337,10 +347,25 @@ export function arrange(
  */
 export const MAX_CHAIN = 6
 
-export function chainFrom(columns: readonly Column[], pick: string | undefined): TutorModel[] {
+export function chainFrom(
+  columns: readonly Column[],
+  pick: string | undefined,
+  /**
+   * Only models that can see a picture. Set when the question carries one.
+   *
+   * The whole chain is filtered, not just its head. A picture question that
+   * falls over onto a blind model does not fail; it comes back answered from
+   * the caption, and neither the reader nor this app can tell. So a rung that
+   * cannot see is not a worse rung, it is a wrong one.
+   */
+  seeing = false,
+): TutorModel[] {
+  const usable = seeing
+    ? columns.map((column) => ({ ...column, models: column.models.filter((row) => row.sees) }))
+    : columns
   const chain: TutorModel[] = []
 
-  const picked = columns.flatMap((column) => column.models).find((row) => row.id === pick)
+  const picked = usable.flatMap((column) => column.models).find((row) => row.id === pick)
   if (picked) chain.push(picked)
 
   /*
@@ -354,8 +379,8 @@ export function chainFrom(columns: readonly Column[], pick: string | undefined):
    * column later instead pushes it to the end of every pass, and the reader
    * looking at the grid would count the chain wrongly.
    */
-  const from = picked ? columns.findIndex((column) => column.source === picked.source) : 0
-  const rotated = columns.map((_, at) => columns[(from + at) % columns.length])
+  const from = picked ? usable.findIndex((column) => column.source === picked.source) : 0
+  const rotated = usable.map((_, at) => usable[(from + at) % usable.length])
 
   const deepest = Math.max(0, ...rotated.map((column) => column.models.length))
   for (let rank = 0; rank < deepest && chain.length < MAX_CHAIN; rank += 1) {
@@ -374,8 +399,14 @@ export function chainFrom(columns: readonly Column[], pick: string | undefined):
 export function stepsFrom(
   columns: readonly Column[],
   pick: string | undefined,
+  seeing = false,
 ): { id: string; source: Provider }[] {
-  return chainFrom(columns, pick).map((row) => ({ id: row.id, source: row.source }))
+  return chainFrom(columns, pick, seeing).map((row) => ({ id: row.id, source: row.source }))
+}
+
+/** Whether any model on today's roster can be sent a picture at all. */
+export function anySees(columns: readonly Column[]): boolean {
+  return columns.some((column) => column.models.some((row) => row.sees))
 }
 
 /**

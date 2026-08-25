@@ -271,8 +271,16 @@ export interface StoredTutorThread {
   anchor: Anchor
   /** The exact words the thread is about, copied from the book. */
   excerpt: string
-  /** How the passage is shown under the lamp: one line, or a shadowed block. */
-  kind: 'sentence' | 'paragraph'
+  /**
+   * How the passage is shown under the lamp: one line, a shadowed block, or a
+   * figure — a plate the reader tapped, whose `excerpt` is its caption.
+   *
+   * A thread about a figure stores no picture. The plate is already in the
+   * `assets` table, and the thread's anchor finds it again; a copy of it in
+   * every thread would put the largest data in the book into the table that is
+   * read most often.
+   */
+  kind: 'sentence' | 'paragraph' | 'figure'
   messages: {
     role: NoteAuthor
     text: string

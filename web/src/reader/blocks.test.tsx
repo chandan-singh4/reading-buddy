@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { Anchor, BlockKind, Paragraph } from '../structure/index.ts'
 import { Block, elementIdOf } from './blocks.tsx'
@@ -224,6 +224,66 @@ describe('figures', () => {
     const { container } = render(<Block block={blockOf('figure', 'Figure 3. A chart.')} />)
     expect(container.querySelector('img')).toBeNull()
     expect(screen.getByText('Figure 3. A chart.')).toBeTruthy()
+  })
+  describe('the Ask button', () => {
+    const plate = {
+      image: { src: 'OEBPS/images/fig1.png', alt: 'A mandala' },
+      label: 'Figure 1. A mandala.',
+    }
+
+    it('asks about the figure it sits under', () => {
+      const onAskFigure = vi.fn()
+      const block = blockOf('figure', '[Figure: Figure 1. A mandala.]', plate)
+      render(<Block block={block} images={shown} onAskFigure={onAskFigure} />)
+
+      fireEvent.click(screen.getByRole('button', { name: /Ask about this picture/ }))
+      expect(onAskFigure).toHaveBeenCalledWith(block)
+    })
+
+    it('names the picture, so the button is not one of many that read alike', () => {
+      render(
+        <Block
+          block={blockOf('figure', '[Figure: Figure 1. A mandala.]', plate)}
+          images={shown}
+          onAskFigure={vi.fn()}
+        />,
+      )
+      expect(
+        screen.getByRole('button', { name: 'Ask about this picture: Figure 1. A mandala.' }),
+      ).toBeTruthy()
+    })
+
+    it('is absent when the page offers no way to ask', () => {
+      render(<Block block={blockOf('figure', '[Figure]', plate)} images={shown} />)
+      expect(screen.queryByRole('button', { name: /Ask about/ })).toBeNull()
+    })
+
+    it('is absent when the figure has no picture to ask about', () => {
+      // Every book imported before the bytes were extracted. The caption still
+      // reads; there is simply nothing to show a model.
+      render(
+        <Block
+          block={blockOf('figure', '[Figure: Figure 1. A mandala.]', { label: 'Figure 1.' })}
+          images={shown}
+          onAskFigure={vi.fn()}
+        />,
+      )
+      expect(screen.queryByRole('button', { name: /Ask about/ })).toBeNull()
+    })
+
+    it('is absent when the picture is stored under a path this book has no bytes for', () => {
+      render(
+        <Block
+          block={blockOf('figure', '[Figure: Figure 1.]', {
+            image: { src: 'OEBPS/images/missing.png' },
+            label: 'Figure 1.',
+          })}
+          images={shown}
+          onAskFigure={vi.fn()}
+        />,
+      )
+      expect(screen.queryByRole('button', { name: /Ask about/ })).toBeNull()
+    })
   })
 })
 

@@ -101,6 +101,11 @@ function beside(paragraphs: readonly Paragraph[], index: number, step: -1 | 1): 
  * **sentence** takes the sentences either side of it *within* its own
  * paragraph, and falls back to the neighbouring paragraph when it is the first
  * or last sentence there — which is the common case for a short paragraph.
+ *
+ * A tapped **figure** is treated as a paragraph, and that is the whole of the
+ * difference. Its own "text" is the parser's placeholder — `[Figure: …]` — so
+ * there are no sentences in it to sit between, and the prose either side of a
+ * plate is what explains it. A figure's caption travels as the excerpt.
  */
 export function neighboursOf(
   paragraphs: readonly Paragraph[],
@@ -112,7 +117,7 @@ export function neighboursOf(
   const previous = beside(paragraphs, index, -1)
   const next = beside(paragraphs, index, 1)
 
-  if (passage.kind === 'paragraph') {
+  if (passage.kind === 'paragraph' || passage.kind === 'figure') {
     return {
       ...(previous ? { before: cap(previous, true) } : {}),
       ...(next ? { after: cap(next, false) } : {}),

@@ -200,6 +200,36 @@
   object-fit: contain;
 }
 
+/*
+ * The Ask button under a plate.
+ *
+ * Centred under the picture with the caption, in the UI face rather than the
+ * book's, because it is the app speaking and not the author. Deliberately
+ * quiet: it sits on a page somebody is reading, and a bright control beside
+ * every plate would be the loudest thing in the book.
+ */
+.ask {
+  display: block;
+  margin: var(--space-2) auto 0;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  line-height: var(--leading-ui);
+  /* The page is a strip that scrolls sideways; a control on it needs its own
+     tap to arrive, not the swipe that turns the page underneath. */
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.ask:active {
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+
 .caption {
   margin-top: var(--space-2);
   color: var(--color-text-muted);

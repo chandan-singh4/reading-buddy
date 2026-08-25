@@ -56,6 +56,7 @@ import {
   loadModels,
   rememberArrangement,
   rememberPick,
+  anySees,
   stepsFrom,
   storedArrangement,
   storedPick,
@@ -95,6 +96,15 @@ export interface StudyLampProps {
   passage: PassageAnchor
   /** Where the passage sits in the book. Sent with every question. */
   context?: PassageContext
+  /**
+   * The plate, when the reader asked about a figure — a scaled `data:` URL
+   * built by `figurePicture.ts`.
+   *
+   * It is sent with every question in the thread, not only the first. A
+   * follow-up like "what is the figure on the left?" is about the picture, and
+   * a model is not shown the earlier turn's image.
+   */
+  picture?: string
   /** The saved conversation, when the lamp is reopening one. */
   saved?: TutorMessage[]
   /** Every completed exchange, whole. The Reader persists it. */
@@ -198,6 +208,7 @@ const MAX_COMPOSER_PX = 160
 export function StudyLamp({
   passage,
   context,
+  picture,
   saved,
   onSave,
   onClose,
@@ -516,6 +527,25 @@ export function StudyLamp({
       if (!asked) return
       if (chip) intent.current = chip
 
+      /*
+       * A picture with nowhere to send it.
+       *
+       * The roster churns weekly, so a reader can open a plate on a day when
+       * every model that can see one is delisted or busy. The question is
+       * refused rather than sent, because sending it means sending a picture to
+       * a model that will quietly ignore it and answer from the caption — and
+       * that answer is indistinguishable from a real one.
+       *
+       * `columns.length === 0` is not this case. It means the roster has not
+       * arrived yet, and the relay then falls back to its own chain.
+       */
+      if (picture && columns.length > 0 && !anySees(columns)) {
+        setFailure(
+          'No model on today’s list can look at a picture. Try again later, or ask about the caption instead.',
+        )
+        return
+      }
+
       const yours: TutorMessage = { role: 'you', text: asked, ts: Date.now() }
       const history = base ?? messages
       setMessages([...history, yours])
@@ -546,7 +576,19 @@ export function StudyLamp({
         // The whole chain, not just the pick. If the reader's choice will not
         // answer, the next thing tried should be the strongest model on the
         // roster — not whatever fixed list the server happens to carry.
-        ...(columns.length > 0 ? { models: stepsFrom(columns, pick) } : {}),
+        ...(picture ? { picture } : {}),
+        /*
+         * The whole chain, not just the pick. If the reader's choice will not
+         * answer, the next thing tried should be the strongest model on the
+         * roster — not whatever fixed list the server happens to carry.
+         *
+         * With a picture the chain is filtered to models that can see one. A
+         * blind model does not refuse a picture: it drops it and answers from
+         * the words, so a failover onto one produces a confident description of
+         * the caption that neither the reader nor this app can tell from a real
+         * answer.
+         */
+        ...(columns.length > 0 ? { models: stepsFrom(columns, pick, Boolean(picture)) } : {}),
         effort,
           ...(searching ? { search: true } : {}),
         },
@@ -578,7 +620,7 @@ export function StudyLamp({
         },
       )
     },
-    [messages, passage, context, pending, columns, pick, effort, searching, onSave],
+    [messages, passage, context, picture, pending, columns, pick, effort, searching, onSave],
   )
 
   /* The nearest question at or above a message. Retrying an answer means
@@ -665,6 +707,19 @@ export function StudyLamp({
           </button>
         ) : (
           <>
+            {/*
+              The plate itself, above its caption.
+
+              The reader has to see what the tutor was given. Without it the
+              room shows a caption and an answer about a picture, and there is
+              no way to tell whether the model was looking at the same thing.
+
+              It is the scaled copy that was sent, not the page's own picture,
+              and that is on purpose: what is shown here is the evidence.
+            */}
+            {picture && (
+              <img className={styles.plate} src={picture} alt={passage.excerpt || 'The figure'} />
+            )}
             {passage.kind === 'sentence' ? (
               <blockquote className={styles.passageSentence}>“{passage.excerpt}”</blockquote>
             ) : (
