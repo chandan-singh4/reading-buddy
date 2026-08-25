@@ -260,6 +260,26 @@ describe('the things a reader can do in the panel', () => {
     expect(onAsk).toHaveBeenCalledWith('fundamental')
   })
 
+  it('leaves the history stack alone', async () => {
+    /*
+     * The 2026-08-24 report: Define did nothing on the phone. The panel used to
+     * run its own `useBackDismiss`, keeping a private count of the same history
+     * stack the Reader keeps. The Reader saw the entry the panel had just
+     * pushed, read it as one of its own left behind, and went back — and the
+     * panel read that as the reader's back gesture and closed. The panel opened
+     * and shut inside one frame.
+     *
+     * The Reader counts the loupe as one of its layers. The panel owns no
+     * history at all.
+     */
+    lookUpWord.mockResolvedValue({ state: 'entry', entry: ENTRY, fromCache: false })
+    const before = window.history.length
+    panel()
+
+    await screen.findByText('a basic principle')
+    expect(window.history.length).toBe(before)
+  })
+
   it('closes on the scrim, on the button, and on Escape', async () => {
     lookUpWord.mockResolvedValue({ state: 'entry', entry: ENTRY, fromCache: false })
     const { onClose } = panel()

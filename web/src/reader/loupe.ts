@@ -69,10 +69,24 @@ export function onScreen(rects: readonly WordRect[], width: number, height: numb
   return here.length > 0 ? here : [...rects]
 }
 
+/** A stand-in word: a point in the middle of the screen, with no height. */
+function middleOf(width: number, height: number): WordRect {
+  return { top: height / 2, left: width / 2, width: 0, height: 0 }
+}
+
 export function placeLoupe(rects: readonly WordRect[], room: LoupeRoom): Loupe {
   const { viewportWidth: width, viewportHeight: height, wants } = room
 
-  const shown = onScreen(rects, width, height)
+  /*
+   * With nothing to point at, the loupe still opens — in the middle of the
+   * screen, with the stem tucked out of the way.
+   *
+   * The panel is handed the selection's rectangles at the moment Define is
+   * tapped, and there are paths where that list arrives empty. Refusing to
+   * place it there is what the reader sees as Define doing nothing, which is
+   * far worse than a panel that is merely not beside the word.
+   */
+  const shown = rects.length > 0 ? onScreen(rects, width, height) : [middleOf(width, height)]
   const top = Math.min(...shown.map((line) => line.top))
   const bottom = Math.max(...shown.map((line) => line.top + line.height))
 

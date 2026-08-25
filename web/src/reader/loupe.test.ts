@@ -13,6 +13,8 @@ import { onScreen, placeLoupe, type WordRect } from './loupe.ts'
 /** A phone. The app is built for this screen first. */
 const PHONE = { viewportWidth: 390, viewportHeight: 800 }
 
+const PHONE_ROOM = { ...PHONE, wants: 300 }
+
 const word = (over: Partial<WordRect> = {}): WordRect => ({
   top: 300,
   left: 120,
@@ -129,3 +131,20 @@ describe('a selection spread over columns', () => {
     expect(placed.top).toBeGreaterThan(300)
   })
 })
+
+describe('a selection with no rectangles', () => {
+  it('still places a panel, in the middle of the screen', () => {
+    /*
+     * The 2026-08-24 report: Define did nothing. One of its two causes was
+     * here — an empty list threw, and a panel that cannot be placed is a panel
+     * the reader never sees. Not beside the word is a small failure. Absent is
+     * a total one.
+     */
+    const placed = placeLoupe([], PHONE_ROOM)
+    expect(Number.isFinite(placed.top)).toBe(true)
+    expect(Number.isFinite(placed.stemLeft)).toBe(true)
+    expect(placed.left).toBe(16)
+    expect(placed.top).toBeGreaterThanOrEqual(16)
+  })
+})
+

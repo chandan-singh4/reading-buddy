@@ -26,7 +26,6 @@ import { createPortal } from 'react-dom'
 import { lookUpWord, wordFrom, type Lookup } from './defineWord.ts'
 import type { DefineEntry } from './dictionary.ts'
 import { placeLoupe, type Loupe, type WordRect } from './loupe.ts'
-import { useBackDismiss } from './useBackDismiss.ts'
 import { wordStore, type WordStore } from '../storage/words.ts'
 import styles from './DefinePanel.module.css'
 
@@ -155,7 +154,16 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
   const [asked, setAsked] = useState(() => wordFrom(selected))
   const [place, setPlace] = useState<Loupe | null>(null)
 
-  useBackDismiss(1, onClose)
+  /*
+   * No `useBackDismiss` here, on purpose.
+   *
+   * `Reader` already keeps one history entry per open layer, and the loupe is
+   * one of its layers. A second copy of the hook inside the panel kept its own
+   * count of the same stack: the Reader's copy saw the entry the panel had just
+   * pushed, read it as one of its own left behind, and went back — which the
+   * panel's copy then read as the reader's back gesture and closed on. From the
+   * phone that looked like Define doing nothing at all.
+   */
 
   /*
    * The lookup, redone when a synonym chip is tapped.
@@ -194,7 +202,7 @@ export function DefinePanel({ selected, rects, onClose, onAsk, store = wordStore
    */
   useLayoutEffect(() => {
     const node = panel.current
-    if (!node || rects.length === 0) return
+    if (!node) return
     setPlace(
       placeLoupe(rects, {
         viewportWidth: window.innerWidth,

@@ -3124,6 +3124,8 @@ export default function Reader() {
   selectedRef.current = selected
   const markMenuRef = useRef(markMenu)
   markMenuRef.current = markMenu
+  const definingRef = useRef(defining)
+  definingRef.current = defining
   const dropRef = useRef(dropSelection)
   dropRef.current = dropSelection
 
@@ -3165,6 +3167,13 @@ export default function Reader() {
       return
     }
 
+    // Above the lamp: the loupe is opened from the page and is the newest
+    // thing on screen while it is up.
+    if (definingRef.current) {
+      setDefining(null)
+      return
+    }
+
     if (lampRef.current) {
       setLamp(null)
       return
@@ -3196,6 +3205,7 @@ export default function Reader() {
     (sheetOpen || searchOpen ? 1 : 0) +
     (selected ? 1 : 0) +
     (lamp ? 1 : 0) +
+    (defining ? 1 : 0) +
     (markMenu ? 1 : 0)
 
   useBackDismiss(layerDepth, dismissTopLayer)
