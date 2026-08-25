@@ -1293,3 +1293,23 @@ sign-in screen.
 - **Every small decision the panel offers is reversible.** Save word un-saves on
   a second tap; a button that disables itself makes a mis-tap permanent.
   — 2026-08-24
+
+- **The tutor's world is the page in front of the reader.** Every question
+  carries the title, the author, the chapter, the section, and the paragraph
+  before and after the selection — see `reader/context.ts`. That answers
+  "explain this", which is the question the reader asks. It cannot answer a
+  question that leaves the page: "where did she first mention the shadow?"
+  Retrieval across a book was the point of WP-09 and WP-18, and both are
+  declined. Half-built retrieval is worse than none. If the need appears, this
+  is reopened as its own decision, and the chapter gists are written while a
+  chapter is digested — never at import, which costs a model call per chapter
+  before the reader has read a word, and holds a description of every chapter
+  they have not reached. — 2026-08-25
+- **The tutor's persona and its teaching modes are prompts, not data.**
+  `BASE_PROMPT` in `api/tutor.ts` is the persona; the eight task modules are the
+  modes. Nothing about them is derived from the book, so classifying a book as
+  fiction or dense earns nothing — WP-10 asked for a tag that no code reads.
+  `reader/genre.ts` is named in a comment in `api/tutor.ts` and was never
+  built; `BookGenre` is declared and unused. The relay offers every module for
+  every book on purpose: the relay is not the place to enforce a taste
+  judgment. — 2026-08-25

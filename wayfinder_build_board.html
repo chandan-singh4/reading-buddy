@@ -56,6 +56,7 @@
   .chip.todo{background:var(--card)}
   .chip.doing{background:var(--brass-soft);border-color:var(--brass)}
   .chip.done{background:var(--teal-soft);border-color:var(--teal)}
+  .chip.cut{background:var(--card);opacity:.5;position:relative}
   .hint{font-size:12px;color:var(--ink-faint)}
   .reset{margin-left:auto;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
          background:none;border:1px solid var(--line-strong);color:var(--ink-soft);padding:6px 12px;
@@ -97,6 +98,11 @@
               background:var(--line-strong)}
   .card[data-s="doing"] .status-pip{background:var(--brass)}
   .card[data-s="done"] .status-pip{background:var(--teal)}
+  /* Cut: decided against, kept on the board so the reasoning stays visible. A
+     cut card counts in neither half of a leg's tally — see `counted`. */
+  .card[data-s="cut"]{opacity:.5}
+  .card[data-s="cut"] .c-title{text-decoration:line-through}
+  .card[data-s="cut"] .status-pip{background:transparent;box-shadow:inset 0 0 0 1.5px var(--line-strong)}
   .card .c-top .c-eff{margin-right:16px}
 
   footer{margin-top:34px;font-size:12px;color:var(--ink-faint);border-top:1px solid var(--line);padding-top:14px}
@@ -129,6 +135,7 @@
       <span><i class="chip todo"></i>To do</span>
       <span><i class="chip doing"></i>In progress</span>
       <span><i class="chip done"></i>Done</span>
+      <span><i class="chip cut"></i>Cut</span>
     </div>
     <span class="hint">Tap a card to advance &middot; shift-tap to reverse</span>
     <button class="reset" id="reset">Reset board</button>
@@ -218,7 +225,7 @@ let state={
   "30":"done","31":"done","32":"done","41":"done","42":"done","44":"done","45":"done","39":"doing","14":"done",
   "46":"done","47":"done","48":"done","49":"done","50":"done","51":"done","52":"done","53":"done","54":"done",
   "55":"done","56":"done","57":"done","58":"done","59":"doing","25":"done","17":"done","20":"done","26":"doing",
-  "19":"done","29":"done","23":"doing",
+  "19":"done","29":"done","23":"doing","10":"done","21":"done","09":"cut","18":"cut","28":"cut",
 };
 
 async function load(){
@@ -231,14 +238,28 @@ async function load(){
 async function save(){
   try{ await window.storage.set(KEY, JSON.stringify(state)); }catch(e){/* in-memory only */}
 }
+/* Cut is deliberately absent from both maps, so a tap cannot quietly restore a
+   waypoint that was decided against. Un-cutting one is an edit to `state`, and
+   should be: the reason it was cut is written in `docs/backlog.md`. */
 const cycle={todo:"doing",doing:"done",done:"todo"};
+/* `toggle` has always read this on a shift-tap. It never existed, so the status
+   became `undefined` and `statusOf` read that back as "todo" - a reverse step
+   from "done" landed two steps away. */
+const back={todo:"done",doing:"todo",done:"doing"};
 const back ={todo:"done",doing:"todo",done:"doing"};
 
 function statusOf(id){ return state[id]||"todo"; }
 
+/* A cut waypoint is not work left to do, so it must not sit in a tally's
+   denominator: nine of ten done reads worse than nine of nine, and the tenth
+   is never coming. */
+function counted(cards){ return cards.filter(c=>statusOf(c.id)!=="cut"); }
+
 function toggle(id, reverse){
   const cur=statusOf(id);
-  state[id]= reverse? back[cur] : cycle[cur];
+  const next = reverse? back[cur] : cycle[cur];
+  if(!next) return;
+  state[id]=next;
   save(); render();
 }
 
@@ -247,12 +268,13 @@ function render(){
   board.innerHTML="";
   LEGS.forEach((leg,i)=>{
     const cards=CARDS.filter(c=>c.leg===i);
-    const done=cards.filter(c=>statusOf(c.id)==="done").length;
+    const live=counted(cards);
+    const done=live.filter(c=>statusOf(c.id)==="done").length;
     const col=document.createElement("div");
     col.className="col";
     col.innerHTML=`<div class="col-head">
         <div class="leg-label">${leg.n} · ${leg.sub}</div>
-        <h2>${leg.name}<span class="count">${done}/${cards.length}</span></h2>
+        <h2>${leg.name}<span class="count">${done}/${live.length}</span></h2>
         <div class="rule"></div>
       </div>`;
     cards.forEach(c=>{
@@ -275,14 +297,15 @@ function render(){
 
 function renderSpine(){
   const trail=document.getElementById("trail");
-  const totalDone=CARDS.filter(c=>statusOf(c.id)==="done").length;
-  const pct=Math.round(totalDone/CARDS.length*100);
+  const live=counted(CARDS);
+  const totalDone=live.filter(c=>statusOf(c.id)==="done").length;
+  const pct=Math.round(totalDone/live.length*100);
   document.getElementById("pctNum").textContent=pct;
-  document.getElementById("pctCount").textContent=`${totalDone} / ${CARDS.length} waypoints`;
+  document.getElementById("pctCount").textContent=`${totalDone} / ${live.length} waypoints`;
   trail.style.setProperty("--fill", (pct*0.88)+"%"); // 88% = distance between first/last node centers
   trail.innerHTML="";
   LEGS.forEach((leg,i)=>{
-    const cards=CARDS.filter(c=>c.leg===i);
+    const cards=counted(CARDS.filter(c=>c.leg===i));
     const done=cards.filter(c=>statusOf(c.id)==="done").length;
     let cls="leg-node";
     if(done===cards.length) cls+=" complete";

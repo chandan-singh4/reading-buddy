@@ -20,8 +20,14 @@
 - [x] **WP-06 Epub parser → structure** — unzip + OPF spine, chapters via WP-35 · *after 05,35*
 - [x] **WP-07 PDF parser → structure** — pdf.js, lazy-loaded; reuse rule + running-header/footer filter · *after 06*
 - [x] **WP-08 Markdown parser → structure** — resolve present heading levels · *after 05*
-- [ ] **WP-09 Manifest + crossrefs at import** — per-chapter summaries, crossrefs once · *after 06,07,08*
-- [ ] **WP-10 Import classification** — fiction vs dense, subject tag, concepts/vocab/themes · *after 09*
+- [-] **WP-09 Manifest + crossrefs at import** — **declined 2026-08-25.** It
+  exists to make a search across the book cheap, and the tutor does not search
+  across the book — see the decision in `decisions.md`. `assemble.ts` still
+  writes `summary: ''`; nothing reads it. Crossrefs were never started.
+- [x] **WP-10 Import classification** — **closed 2026-08-25, as unnecessary.**
+  The tutor's behaviour comes from prompts, not from a tag, so no code reads a
+  book's kind. A genre string arrives from the catalogue already
+  (`catalogue/volume.ts`), which covers the shelf's needs.
 - [x] **WP-38 Non-prose blocks (KEYSTONE-ADJACENT)** — add `kind` to `Paragraph`; keep tables, figures, formulas, code, quotes, footnotes as *one* block each instead of shattering them · ***before 11** — anchors are permanent, and this changes paragraph numbering*
 - [x] **WP-11 In-app import + auto-parse** — phone picker, parse-on-import, land in library · *after 06,07,08,**38***
 - [x] **WP-35 HTML → structure (shared step)** — one heading/paragraph walker reused by epub + docx · *after 08 (inherits its level-resolution rule)*
@@ -196,7 +202,9 @@
   loupe, not the local dictionary this row first imagined. Left: **Ask**, which
   waits on WP-19. **Closed 2026-08-25:** Ask shipped with the Study Lamp, so
   every item on this row is built.
-- [ ] **WP-18 Retrieval assembler** — manifest + chapter index + one section + learner.md · *after 05,09*
+- [-] **WP-18 Retrieval assembler** — **declined 2026-08-25 with WP-09.** The
+  frame in `reader/context.ts` is what the tutor gets, and it is enough for a
+  question about the passage.
 - [x] **WP-19 Claude API call shape** — Haiku→Sonnet tier, caching, streaming, retry · *after 18*
   — **closed 2026-08-25, in a different shape than written.** `api/tutor.ts`
   holds the key, streams, retries and falls over a named chain. The tier became
@@ -204,7 +212,10 @@
   never flipped, so it read `[ ]` while the tutor answered.
 - [x] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19* — the Study Lamp room, saved threads and Notes listing shipped 2026-08-21; streaming shipped 2026-08-23 (`e82c5c7`) on both ends. **Closed 2026-08-25**
 - [~] **WP-39 Ask about a picture** — *the sourcing half shipped 2026-08-02: epub images are extracted at import into an `assets` table and shown on the page. What's left is the tutor half (tap a figure → send it to Claude), plus pdf.js region rendering.* — tap a figure/table/formula → send that image + surrounding text to Claude. Source image from the epub/docx archive where it exists; pdf.js renders the region for PDFs. The escape hatch for everything WP-38 can only describe · *after 19,20,38*
-- [ ] **WP-21 Tutor persona + teaching modes** — subject-driven, 12 modes, dense books only · *after 19,10*
+- [x] **WP-21 Tutor persona + teaching modes** — **closed 2026-08-25, in a
+  different shape.** `BASE_PROMPT` in `api/tutor.ts` is the persona; eight task
+  modules are the modes. Not subject-driven and not dense-books-only: every
+  module is offered for every book.
 - [ ] **WP-22 learner.md adaptive model** — understood/struggled/analogies/misconceptions · *after 20*
 - [~] **WP-23 Chapter recap** — zero-token summary + things learned + cheap quiz · *after 21,22*
   — the digest pipeline is built: `tutor/digest.ts` and `storage/digests.ts`.
@@ -407,7 +418,9 @@
   across every book. The learner.md half, and anything that *practises* a word,
   is still to come
 - [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*
-- [ ] **WP-28 Books-stay-separate guard** — no cross-book memory/lookups · *after 18,22*
+- [-] **WP-28 Books-stay-separate guard** — **declined 2026-08-25, moot.** It
+  guards cross-book retrieval, and there is no retrieval to guard. Reopen it
+  with WP-09 if that is ever reopened.
 
 ### Leg 5 — Landfall (deploy, install, backup)
 - [x] **WP-29 Tiny key backend** — one endpoint holding the API key · *after 19*

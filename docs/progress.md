@@ -26,6 +26,22 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **The tutor's reach is settled: the page, and not the book** (2026-08-25).
+  No code changed. Five waypoints were read against the code and closed.
+  - **WP-09 and WP-18 are declined.** Both exist to search across a book. The
+    tutor does not: `reader/context.ts` sends the title, the author, the
+    chapter, the section, and the paragraph either side. That answers "explain
+    this", which is the question the reader asks.
+  - **WP-28 goes with them.** It guards cross-book retrieval. There is none.
+  - **WP-10 and WP-21 are closed as built, in a different shape.** The persona
+    is `BASE_PROMPT` in `api/tutor.ts` and the modes are eight task modules.
+    Nothing reads a book's kind, so classifying one earns nothing.
+  - Two stale things found while reading: `reader/genre.ts` is named in a
+    comment in `api/tutor.ts` and was never built, and `BookGenre` is declared
+    and unused.
+  - The build board learned a **cut** state, which counts in neither half of a
+    tally, and a shift-tap now steps back one place instead of two.
+
 - **Search opens where the reader asked, and says where it landed**
   (2026-08-25). Build green: 1948 tests across 107 files.
   - **"Search in book" showed nothing.** The panel is drawn inside the chrome,

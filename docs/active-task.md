@@ -37,13 +37,10 @@ fills this in next.
 
 **Files in scope:** none yet.
 
-## Proposed next — WP-09, the import manifest and crossrefs
+## Proposed next — undecided
 
-Four rows wait on this one and cannot start without it: WP-10, WP-18, WP-21 and
-WP-28. It is the last foundation the tutor is missing.
-
-Smaller rows that are open and unblocked: WP-16 read-aloud, WP-43 re-scan a
-folder, WP-27 cost visibility, and the cloud path for notes.
+WP-09, WP-10, WP-18, WP-21 and WP-28 all closed on 2026-08-25, so the old
+proposal is gone. Read `docs/backlog.md` for what is open.
 
 ## Closed — a tapped plural is defined again
 
@@ -56,18 +53,6 @@ that worked before changed.
 **A lesson worth keeping.** This was called "nothing to build" a day earlier on
 the strength of one word — `persons` — which happened to match exactly. One
 passing example is not a rule. Test the class, not the case.
-
-## Not proved on a phone (2026-08-25)
-
-Three of the four fixes were proved by test and by the accessibility tree in a
-desktop browser with an empty shelf. They still want a phone:
-
-1. **The wake lock.** No desktop browser reproduces a phone locking its screen.
-   Open a book, leave it still for longer than the lock timer, and see.
-2. **The swipe on a sheet.** Proved as arithmetic in `swipeDown.test.ts`, not as
-   a thumb on glass. Check the flick as well as the slow pull.
-3. **The speaker.** The cause is timing, so a pass is never proof. "fundamental"
-   is the word that failed.
 
 ## Note on the docs, 2026-08-25
 
