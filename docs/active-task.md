@@ -32,9 +32,20 @@ Merriam-Webster loupe beside the word.
 
 ## Task — none in flight
 
-The four phone fixes shipped on 2026-08-25. `/plan-task` fills this in next.
+Two search fixes shipped on 2026-08-25. `/plan-task` fills this in next.
 
 **Files in scope:** none yet.
+
+## Not proved on a device — the two search fixes
+
+1. **"Search in book" from the selection menu.** Driving a real text selection
+   in jsdom is not practical, so there is no test for the route in. The one-line
+   cause is fixed and the panel itself is well covered. Check it on the phone:
+   select a word, tap **Search in book**, and the results must appear with no
+   tap on the page first.
+2. **The flash on a search result.** The ink and the pulse have unit tests. What
+   they cannot show is how it feels: whether 4.5 seconds is right, and whether
+   two pulses read as "look here" rather than as a fault.
 
 ## Proposed next — WP-09, the import manifest and crossrefs
 

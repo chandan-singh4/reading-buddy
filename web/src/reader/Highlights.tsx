@@ -74,6 +74,8 @@ export interface HighlightLike {
   anchor: Anchor
   quote?: string
   colour?: string
+  /** Pulse, briefly. Only the search jump sets this. See `PaintedHighlight`. */
+  flash?: boolean
 }
 
 export interface HighlightsProps {
@@ -112,6 +114,7 @@ export function paintable(highlights: readonly HighlightLike[]): PaintedHighligh
       colourKey,
       colour: colourKey ? colourOfKey(colourKey) : highlight.colour,
       seed: seedOf(highlight.id),
+      ...(highlight.flash ? { flash: true } : {}),
     })
   }
   return ready

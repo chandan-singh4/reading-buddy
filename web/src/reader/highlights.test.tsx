@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { parseAnchor, type Anchor } from '../structure/index.ts'
 import { rangeOfQuote } from './selection.ts'
+import { paintable } from './Highlights.tsx'
 
 /** The branded anchor these tests keep asking for. Parsed, so a typo throws. */
 function at(value: string): Anchor {
@@ -68,5 +69,25 @@ describe('rangeOfQuote', () => {
   it('gives nothing for an empty quote', () => {
     paragraph('It was the best of times.')
     expect(rangeOfQuote(at('[ch01-s01-p001]'), '   ')).toBeNull()
+  })
+})
+
+/*
+ * A search jump's flash reaches the renderer as an ordinary row with one extra
+ * flag. Nothing stored ever carries it — see `PaintedHighlight.flash`.
+ */
+describe('paintable and the search flash', () => {
+  it('carries the flag through to the renderer', () => {
+    const [painted] = paintable([
+      { id: 'search-flash', anchor: at('[ch01-s01-p001]'), quote: 'the best', colour: '#ffd54a', flash: true },
+    ])
+    expect(painted!.flash).toBe(true)
+  })
+
+  it('leaves an ordinary highlight without it', () => {
+    const [painted] = paintable([
+      { id: 'a', anchor: at('[ch01-s01-p001]'), quote: 'the best', colour: '#f2df6b' },
+    ])
+    expect(painted!.flash).toBeUndefined()
   })
 })

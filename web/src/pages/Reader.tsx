@@ -341,6 +341,26 @@ const SAVE_AFTER_MS = 800
  */
 const SEARCH_AFTER_MS = 200
 
+/**
+ * How long the ink left by a search jump stays lit.
+ *
+ * Long enough that a reader can look up from the jump and still find it; short
+ * enough that it is gone before it could be mistaken for a highlight they made.
+ */
+const FLASH_MS = 4500
+
+/**
+ * The colour of that ink.
+ *
+ * Deliberately not one of the reader's four highlighter colours. This is the
+ * app pointing at something, not a mark the reader left, and the two should not
+ * look alike even for the few seconds they are both on the page.
+ */
+const FLASH_COLOUR = '#ffd54a'
+
+/** The id the flash is painted under. No stored note can hold it. */
+const SEARCH_FLASH_ID = 'search-flash'
+
 /** One array, so "no section yet" is the same value every render — see
     `useFigureImages`, which re-fetches when its input changes identity. */
 const EMPTY_PARAGRAPHS: Paragraph[] = []
@@ -1494,8 +1514,22 @@ export default function Reader() {
     setSheetOpen(false)
   }, [])
 
+  /*
+   * The chrome comes up with it, always.
+   *
+   * The search panel is drawn *inside* the chrome, and the chrome is `inert`
+   * and hidden while the reader is reading. So "Search in book" from the
+   * selection menu set the query, opened the panel, and showed nothing at all
+   * — the panel was there, switched off. The reader had to tap the page to
+   * raise the toolbar, at which point the panel appeared already filled in.
+   * Reported 2026-08-25.
+   *
+   * Raising it here rather than at each call site, because there is no route
+   * into search that wants the panel without the chrome around it.
+   */
   const openSearch = useCallback(() => {
     setSheetOpen(false)
+    setChromeShown(true)
     setSearchOpen(true)
   }, [])
 
@@ -2406,9 +2440,48 @@ export default function Reader() {
    * A note without a colour is a note the reader wrote; only a highlight asks to
    * be painted back onto the paragraph it came from.
    */
+  /**
+   * The words a search jump has just landed on, lit for a few seconds.
+   *
+   * The reader's ask, 2026-08-25: arriving on the right page is not the same as
+   * finding the words on it, and a page of prose all looks alike. So the match
+   * is inked, pulses twice, holds, and then goes.
+   *
+   * It is a highlight in every respect except that nothing writes it down. It
+   * joins the painted rows below, is drawn by the same machinery that draws a
+   * highlight the reader made, and is taken away by the timer. Reusing that
+   * path is the point: ink drawn any other way would have to solve the page
+   * turn's copies all over again — see the note at the top of `Highlights.tsx`.
+   */
+  const [flash, setFlash] = useState<{ anchor: Anchor; quote: string } | null>(null)
+
+  useEffect(() => {
+    if (!flash) return
+    const timer = window.setTimeout(() => setFlash(null), FLASH_MS)
+    return () => window.clearTimeout(timer)
+  }, [flash])
+
   const highlights = useMemo(
     () => notes.filter((row) => row.quote && row.colour),
     [notes],
+  )
+
+  /**
+   * What is actually painted: the reader's highlights, plus the search flash.
+   *
+   * The flash is last so it is drawn over any highlight already on those words,
+   * and it carries `flash` so the ink pulses. Its id is fixed and unlike any
+   * note's, so nothing can mistake it for a row — see `SEARCH_FLASH_ID`.
+   */
+  const painted = useMemo(
+    () =>
+      flash
+        ? [
+            ...highlights,
+            { id: SEARCH_FLASH_ID, anchor: flash.anchor, quote: flash.quote, colour: FLASH_COLOUR, flash: true },
+          ]
+        : highlights,
+    [highlights, flash],
   )
 
   /*
@@ -2494,10 +2567,15 @@ export default function Reader() {
   }, [searchOpen, textLoaded, settledQuery])
 
   /** Going to a result closes the panel — the reader asked to be taken there. */
+  /** Going to a result closes the panel — the reader asked to be taken there. */
   const jumpToHit = useCallback(
-    (anchor: Anchor) => {
+    (anchor: Anchor, match: string) => {
       setSearchOpen(false)
+      setChromeShown(false)
       jumpToAnchor(anchor)
+      // A fresh object every time, so tapping the same result twice lights it
+      // again rather than doing nothing because the state did not change.
+      setFlash(match ? { anchor, quote: match } : null)
     },
     [jumpToAnchor],
   )
@@ -3988,7 +4066,7 @@ export default function Reader() {
           */}
           {/* The reader's own marks, found again in the page and painted. */}
           <Highlights
-            highlights={highlights}
+            highlights={painted}
             root={column}
             watch={here.section}
             style={resolveHighlighter(highlighter, settings.theme)}
@@ -4006,13 +4084,13 @@ export default function Reader() {
             the three never fight over the same paragraph.
           */}
           <Highlights
-            highlights={highlights}
+            highlights={painted}
             root={beforeColumn}
             watch={beside.previous}
             style={resolveHighlighter(highlighter, settings.theme)}
           />
           <Highlights
-            highlights={highlights}
+            highlights={painted}
             root={afterColumn}
             watch={beside.next}
             style={resolveHighlighter(highlighter, settings.theme)}

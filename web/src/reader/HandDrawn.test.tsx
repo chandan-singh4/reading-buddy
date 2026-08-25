@@ -88,3 +88,38 @@ describe('taking a highlight off', () => {
     expect(strokes()).toBe(0)
   })
 })
+
+/*
+ * The ink a search jump leaves behind.
+ *
+ * The reader's ask, 2026-08-25: landing on the right page is not the same as
+ * finding the words on it. So the match is inked and pulses, using this same
+ * renderer — a mark drawn any other way would have to solve the page turn's
+ * copies all over again, which is the whole subject of the note at the top of
+ * `Highlights.tsx`.
+ */
+describe('the mark a search jump leaves', () => {
+  it('pulses, where a highlight the reader made does not', () => {
+    const found = { ...row('search-flash', '[ch01-s01-p001]', 'the best'), flash: true }
+    render(<HandDrawn highlights={[found]} root={root} />)
+
+    const lit = root.querySelectorAll('span[class*="flash"]')
+    expect(lit.length).toBeGreaterThan(0)
+  })
+
+  it('leaves the reader’s own highlights unpulsed', () => {
+    render(<HandDrawn highlights={[row('a', '[ch01-s01-p001]', 'the best')]} root={root} />)
+
+    expect(strokes()).toBeGreaterThan(0)
+    expect(root.querySelectorAll('span[class*="flash"]').length).toBe(0)
+  })
+
+  it('goes when the flash is taken away, leaving no ink behind', () => {
+    const found = { ...row('search-flash', '[ch01-s01-p001]', 'the best'), flash: true }
+    const page = render(<HandDrawn highlights={[found]} root={root} />)
+    expect(strokes()).toBeGreaterThan(0)
+
+    page.rerender(<HandDrawn highlights={[]} root={root} />)
+    expect(strokes()).toBe(0)
+  })
+})

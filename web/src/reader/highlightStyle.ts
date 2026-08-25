@@ -200,6 +200,13 @@ export interface PaintedHighlight {
   colour: string
   /** Stable per highlight. See `seedOf`. */
   seed: number
+  /**
+   * Draw attention to this one, then stop.
+   *
+   * Set only by the search jump, and only for a few seconds. It is not a
+   * property of a highlight the reader made — nothing stored ever carries it.
+   */
+  flash?: boolean
 }
 
 /**

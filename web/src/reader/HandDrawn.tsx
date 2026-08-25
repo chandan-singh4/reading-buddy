@@ -68,6 +68,8 @@ interface Stroke {
   /** Which turbulence pair this stroke uses, and how far it tilts. */
   variant: number
   tilt: number
+  /** Pulse, briefly. See `PaintedHighlight.flash`. */
+  flash?: boolean
 }
 
 /** Every stroke that belongs in one paragraph. */
@@ -384,6 +386,7 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
             colour: highlight.colour,
             variant,
             tilt,
+            ...(highlight.flash ? { flash: true } : {}),
           })
           line += 1
         }
@@ -562,7 +565,13 @@ export function HandDrawn({ highlights, root, watch, marker = true }: HandDrawnP
             {mark.strokes.map((stroke) => (
               <span
                 key={stroke.key}
-                className={marker ? styles.stroke : `${styles.stroke} ${styles.plain}`}
+                className={[
+                  styles.stroke,
+                  marker ? '' : styles.plain,
+                  stroke.flash ? styles.flash : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 style={{
                   top: stroke.top,
                   left: stroke.left,

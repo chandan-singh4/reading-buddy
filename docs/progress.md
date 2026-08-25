@@ -26,6 +26,20 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **Search opens where the reader asked, and says where it landed**
+  (2026-08-25). Build green: 1948 tests across 107 files.
+  - **"Search in book" showed nothing.** The panel is drawn inside the chrome,
+    and the chrome is hidden and `inert` while the reader reads. So the action
+    set the query, opened the panel, and displayed nothing; the reader had to
+    tap the page to raise the toolbar, and found the panel already filled in.
+    `openSearch` now raises the chrome, because no route into search wants the
+    panel without it.
+  - **A result now says where it landed.** Tapping a hit inks the matched words,
+    pulses twice, holds, and goes after 4.5 seconds. It is an ordinary highlight
+    that nothing writes down, drawn by the same renderer — ink drawn any other
+    way would have to solve the page turn's copies again. Its colour is
+    deliberately not one of the reader's four.
+
 - **The speaker, properly this time, and a lie the dictionary was telling**
   (2026-08-25). Build green: 1938 tests across 107 files.
   - **Root cause of the vanishing speaker: the cache, not a race.** The word

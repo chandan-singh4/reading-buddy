@@ -148,7 +148,8 @@ export interface ChromeProps {
   onCloseSearch: () => void
   onQueryChange: (query: string) => void
   /** Go to a result. */
-  onJumpToHit: (anchor: Anchor) => void
+  /** The matched text goes with the anchor, so the page can light it on arrival. */
+  onJumpToHit: (anchor: Anchor, match: string) => void
 }
 
 /**
@@ -432,7 +433,7 @@ export function Chrome({
                   <button
                     type="button"
                     className={styles.searchHit}
-                    onClick={() => onJumpToHit(hit.anchor)}
+                    onClick={() => onJumpToHit(hit.anchor, hit.match)}
                   >
                     <span className={styles.searchWhere}>
                       {chapterNameOf(manifest, hit.chapter)}

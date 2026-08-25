@@ -204,3 +204,40 @@
     display: none;
   }
 }
+
+/*
+ * The ink a search jump leaves on the words it took you to.
+ *
+ * The reader's ask, 2026-08-25: tap a result, land on the page, and have
+ * something "blinking for a short time and then static, so my attention can go
+ * there directly". So it pulses twice and stops — not forever, which would be a
+ * strobe on a page meant for reading, and not once, which is easy to miss if
+ * the page is still settling from the jump.
+ *
+ * It ends at `opacity: 1`, on its own words. It stays lit until the Reader
+ * takes it away a few seconds later. A mark that faded to nothing at the end of
+ * its animation would be gone by the time a reader looked up from the jump.
+ */
+.flash {
+  animation: rb-flash 1.5s ease-in-out 2;
+}
+
+@keyframes rb-flash {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+/*
+ * A reader who asked for less motion gets the mark and none of the pulse. The
+ * point of the flash is "look here", and the colour alone still says that.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .flash {
+    animation: none;
+  }
+}
