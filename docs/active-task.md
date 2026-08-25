@@ -32,27 +32,18 @@ Merriam-Webster loupe beside the word.
 
 ## Task — none in flight
 
-WP-39's epub half shipped on 2026-08-25. `/plan-task` fills this in next.
+WP-39 closed on 2026-08-25. WP-16 read-aloud is next, by the reader's choice.
 
 **Files in scope:** none yet.
 
-## Not proved on a device — ask about a picture
+## Not proved on a device — a PDF's figures
 
-1. **The whole path, on a real plate.** Every piece has tests; the path from a
-   thumb to an answer has none. Open a book with figures, tap **Ask** under one,
-   and read what comes back. The answer must describe something that is in the
-   picture and not in the caption. That is the only proof that matters.
-2. **The relay's half is untested, and cannot be here.** There is no test
-   harness for `api/` — there never has been. `pictureUrl` and the content-parts
-   message are read code, not proved code.
-3. **A day when no model can see.** The roster churns weekly. The lamp then
-   refuses and says why. Worth seeing once: it is the guard against a confident
-   answer about a plate nobody looked at.
-
-## Left open — WP-39's other half
-
-**PDF regions.** A PDF has no stored picture, so pdf.js must render the region
-first. The row stays `[~]` for that reason.
+1. **Import a PDF with plates in it.** Every piece has tests; no test can say
+   whether the bands land on the figures. Check that a picture appears where one
+   belongs, that the Ask button under it answers about the picture, and that no
+   Ask button appears under a strip of blank paper.
+2. **A long PDF, for time.** One page is drawn for every page that holds a band.
+   A book of plates draws a lot of pages, on a phone, during import.
 
 ## A lesson worth keeping
 

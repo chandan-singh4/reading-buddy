@@ -443,8 +443,11 @@ describe('folders', () => {
     await startSelecting()
     fireEvent.click(screen.getByRole('button', { name: 'Change folders' }))
     // Ticked, because every selected book is in it.
+    // The row appears as soon as the folder is known; its tick waits on a
+    // second read, of which books are in it. Asserting straight away reads the
+    // tick before that answer arrives.
     const row = await screen.findByRole('menuitemcheckbox', { name: /Philosophy/ })
-    expect(row.getAttribute('aria-checked')).toBe('true')
+    await waitFor(() => expect(row.getAttribute('aria-checked')).toBe('true'))
 
     fireEvent.click(row)
 
@@ -980,7 +983,10 @@ describe('searching the library', () => {
 
     await search('analytical')
 
-    expect(screen.getByText('The Red Book')).toBeTruthy()
+    // `findBy`, not `getBy`: the folder list arrives on its own read, so the
+    // filter can run once before it knows this book is in a folder at all.
+    // Under a loaded test run that read lands after the keystroke.
+    expect(await screen.findByText('The Red Book')).toBeTruthy()
     expect(screen.queryByText('Filler 3')).toBeNull()
   })
 

@@ -379,5 +379,21 @@
  *   page 360 — and goes no further. Measured across all 32 books, exactly one row
  *   moves: that book loses 28 invented section titles and gains the 28 printed
  *   page numbers, and no other book changes at all.
+ *
+ * ## 29 — a PDF's figures are photographed
+ *
+ * A PDF carried no pictures at all: the parser read the text of a page and
+ * nothing else, so a book of plates imported as a book of captions. It now
+ * finds any tall band of a page with no text in it, draws that strip, and keeps
+ * it as an ordinary figure — which is what makes a PDF's plates askable, the
+ * same as an epub's.
+ *
+ * Nothing is *recognised*. A band is a fact about the page, not a judgment
+ * about what is in it, and a band that renders blank is discarded after the
+ * fact rather than guessed at beforehand. A PDF of plain prose gains nothing
+ * and is drawn not at all.
+ *
+ * Every PDF already on a shelf re-parses on this bump, which is the only way
+ * the pictures reach a book imported before today.
  */
-export const PARSER_VERSION = 28
+export const PARSER_VERSION = 29

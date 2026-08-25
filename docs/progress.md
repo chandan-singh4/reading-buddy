@@ -26,6 +26,24 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **A PDF's pictures, found without recognising them** (2026-08-25). WP-39 is
+  closed. Build green: 2006 tests across 110 files.
+  - The PDF parser read text and nothing else, so a book of plates imported as
+    a book of captions. It now finds any band of a page taller than a fifth of
+    it with no text in it, draws that strip, and keeps it as an ordinary figure.
+  - **Nothing is classified.** `pdf-layout.ts` declined to recognise figures,
+    and that stands. A gap is a fact about a page. A band that renders blank is
+    discarded after the render, when the pixels can be counted.
+  - It catches vector diagrams, which reading the embedded images would miss —
+    a chart has no picture inside the file to find.
+  - The margins stay out of it without measuring them: only the space between a
+    page's own topmost and bottommost text counts. The cost is a figure with no
+    text on one side of it, which cannot be told from a margin.
+  - `PARSER_VERSION` 29, so PDFs already on the shelf re-parse and gain their
+    pictures.
+  - Two Library tests were racing and failed under the extra load of two new
+    test files. Both asserted before a second read had landed; they now wait.
+
 - **Ask about a picture — the epub half of WP-39** (2026-08-25). Build green:
   1983 tests across 108 files, up 35.
   - An **Ask** button under every plate that has a picture. A button and not a

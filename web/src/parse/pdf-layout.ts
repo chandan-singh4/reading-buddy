@@ -250,6 +250,9 @@ interface Paragraph {
   text: string
   fontSize: number
   lineCount: number
+  /** Where it began: the page, and the baseline of its first line. */
+  page: number
+  y: number
 }
 
 /** Join a wrapped line onto the paragraph, healing hyphenation across breaks. */
@@ -279,7 +282,13 @@ function toParagraphs(lines: Line[]): Paragraph[] {
       previous.right < columnRight * SHORT_LINE
 
     if (breaks || current === null) {
-      current = { text: line.text, fontSize: line.fontSize, lineCount: 1 }
+      current = {
+        text: line.text,
+        fontSize: line.fontSize,
+        lineCount: 1,
+        page: line.page,
+        y: line.y,
+      }
       paragraphs.push(current)
       columnRight = line.right
     } else {
@@ -300,7 +309,21 @@ function toParagraphs(lines: Line[]): Paragraph[] {
  * Turn pdf.js page output into a block stream: lines rebuilt, columns ordered,
  * running furniture removed, paragraphs reflowed, headings inferred from size.
  */
-export function pdfPagesToBlocks(pages: PdfPage[]): Block[] {
+/**
+ * A rendered band, ready to be put back in the text it was found in.
+ *
+ * `pdfFigures.ts` found it, `pdfRender.ts` drew it, and this is the only thing
+ * the layout pass is told about either: where it sat, and what to call it.
+ */
+export interface PdfFigure {
+  page: number
+  /** The band's lower edge, counting up from the foot of the page. */
+  bottom: number
+  /** The asset path its picture is stored under. */
+  path: string
+}
+
+export function pdfPagesToBlocks(pages: PdfPage[], figures: readonly PdfFigure[] = []): Block[] {
   const lines = pages.flatMap((page, index) => {
     const items = page.items.filter((item) => item.str.trim() !== '')
     return splitColumns(items, page.width).flatMap((group) => toLines(group, index + 1))
@@ -325,16 +348,70 @@ export function pdfPagesToBlocks(pages: PdfPage[]): Block[] {
     ),
   ].sort((a, b) => b - a)
 
-  return paragraphs.map((paragraph): Block => {
+  const blockOf = (paragraph: Paragraph): Block => {
     const size = Math.round(paragraph.fontSize * 2) / 2
     const rank = headingSizes.indexOf(size)
     if (couldBeHeading(paragraph) && rank !== -1) {
       return { kind: 'heading', level: Math.min(rank + 1, 6), text: paragraph.text }
     }
-    // PDF carries no structural markup, so everything else is prose. Tables and
-    // figures are geometry here, not tags — recognising them would mean another
-    // round of heuristics on top of an already-lossy pass, and getting it wrong
-    // costs more than leaving the text flat. See `progress.md` → known limits.
+    // PDF carries no structural markup, so everything else is prose. *Tables*
+    // are still geometry here, not tags, and recognising them would mean
+    // another round of heuristics on an already-lossy pass.
+    //
+    // Figures are the exception, and only because they are not recognised
+    // either: `pdfFigures.ts` finds a tall band of the page with no text in it
+    // and photographs it, which is a fact about the page rather than a judgment
+    // about its contents. They arrive here already found and already drawn.
     return { kind: 'prose', text: paragraph.text }
+  }
+
+  return withFigures(paragraphs, figures, blockOf)
+}
+
+/**
+ * The paragraphs with the pictures put back between them.
+ *
+ * A figure belongs where the reader met it: after the last paragraph that began
+ * above it on the page, and before the first that begins below. Both are
+ * decided in PDF coordinates, where a *larger* `y` is further up the page.
+ *
+ * A figure whose page holds no text at all — a full-page plate — has no
+ * paragraph to sit after. It goes in when the reading reaches that page, which
+ * is the first paragraph on any later page.
+ */
+function withFigures(
+  paragraphs: readonly Paragraph[],
+  figures: readonly PdfFigure[],
+  blockOf: (paragraph: Paragraph) => Block,
+): Block[] {
+  if (figures.length === 0) return paragraphs.map(blockOf)
+
+  const waiting = [...figures].sort((one, two) =>
+    one.page === two.page ? two.bottom - one.bottom : one.page - two.page,
+  )
+  const blocks: Block[] = []
+  let at = 0
+
+  const figureBlock = (figure: PdfFigure): Block => ({
+    kind: 'figure',
+    text: '[Figure]',
+    image: { src: figure.path },
   })
+
+  for (const paragraph of paragraphs) {
+    while (
+      at < waiting.length &&
+      (waiting[at]!.page < paragraph.page ||
+        (waiting[at]!.page === paragraph.page && waiting[at]!.bottom >= paragraph.y))
+    ) {
+      blocks.push(figureBlock(waiting[at]!))
+      at += 1
+    }
+    blocks.push(blockOf(paragraph))
+  }
+
+  // Anything below the last paragraph in the book — a plate on the final page.
+  for (; at < waiting.length; at += 1) blocks.push(figureBlock(waiting[at]!))
+
+  return blocks
 }

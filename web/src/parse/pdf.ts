@@ -12,10 +12,12 @@
  * a byte of it.
  */
 
-import type { ParsedBook } from '../storage/index.ts'
+import type { BookAsset, ParsedBook } from '../storage/index.ts'
 import type { BookMeta } from '../structure/index.ts'
 import { assembleBook } from './assemble.ts'
-import { pdfPagesToBlocks, type PdfPage, type PdfTextItem } from './pdf-layout.ts'
+import { pdfPagesToBlocks, type PdfFigure, type PdfPage, type PdfTextItem } from './pdf-layout.ts'
+import { bandPath, bandsOf } from './pdfFigures.ts'
+import { renderBands } from './pdfRender.ts'
 
 export class PdfError extends Error {
   constructor(message: string) {
@@ -59,8 +61,17 @@ function toTextItem(item: TextItemLike): PdfTextItem | null {
   }
 }
 
-/** Read every page's text geometry. Exported so the layout pass can be traced. */
-export async function pdfToPages(data: ArrayBuffer | Uint8Array): Promise<PdfPage[]> {
+/** Everything one pass over a PDF produces: the text, and the pictures. */
+export interface PdfRead {
+  pages: PdfPage[]
+  /** Where each picture sits, for the layout pass. */
+  figures: PdfFigure[]
+  /** The pictures themselves, for the assets table. */
+  assets: BookAsset[]
+}
+
+/** Read every page's text geometry, and photograph its figures. */
+export async function pdfToPages(data: ArrayBuffer | Uint8Array): Promise<PdfRead> {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
 
   const pdfjs = await import('pdfjs-dist')
@@ -88,24 +99,43 @@ export async function pdfToPages(data: ArrayBuffer | Uint8Array): Promise<PdfPag
 
   try {
     const pages: PdfPage[] = []
+    const figures: PdfFigure[] = []
+    const assets: BookAsset[] = []
     for (let number = 1; number <= document.numPages; number += 1) {
       const page = await document.getPage(number)
       const viewport = page.getViewport({ scale: 1 })
       const content = await page.getTextContent()
 
-      pages.push({
+      const read: PdfPage = {
         width: viewport.width,
         height: viewport.height,
         items: (content.items as TextItemLike[])
           .map(toTextItem)
           .filter((item): item is PdfTextItem => item !== null),
-      })
+      }
+      pages.push(read)
+
+      /*
+       * The pictures are taken here, while this page is open.
+       *
+       * Not in a second pass. Opening every page twice doubles the slowest part
+       * of importing a PDF, and the page object is the thing that can draw —
+       * finding the bands afterwards would mean re-opening every page that had
+       * one. Only pages with a band are drawn at all, so a book of plain prose
+       * pays nothing for this beyond the arithmetic.
+       */
+      const bands = bandsOf(read, number)
+      for (const [band, data] of await renderBands(page as never, bands, read.height)) {
+        const path = bandPath(band)
+        figures.push({ page: band.page, bottom: band.bottom, path })
+        assets.push({ path, data })
+      }
 
       // Without this, a few hundred pages of glyph data stay resident — enough
       // to end a large import on a phone.
       page.cleanup()
     }
-    return pages
+    return { pages, figures, assets }
   } finally {
     await task.destroy()
   }
@@ -122,6 +152,7 @@ export async function parsePdf(
   data: ArrayBuffer | Uint8Array,
   meta: BookMeta,
 ): Promise<ParsedBook> {
-  const pages = await pdfToPages(data)
-  return assembleBook(pdfPagesToBlocks(pages), { ...meta, source: 'pdf' })
+  const { pages, figures, assets } = await pdfToPages(data)
+  const book = assembleBook(pdfPagesToBlocks(pages, figures), { ...meta, source: 'pdf' })
+  return assets.length > 0 ? { ...book, assets } : book
 }

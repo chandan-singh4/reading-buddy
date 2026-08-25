@@ -252,3 +252,47 @@ describe('pdfPagesToBlocks — two-column layouts', () => {
     expect(texts[0]).toBe('A Centred Heading')
   })
 })
+
+describe('figures put back between the paragraphs', () => {
+  /** One line, as pdf.js hands it over. */
+  const at = (y: number, str: string) => ({ str, x: 72, y, width: 400, height: 12 })
+
+  const pageOf = (items: ReturnType<typeof at>[]) => ({ width: 600, height: 800, items })
+
+  it('puts a figure between the paragraph above it and the one below', () => {
+    const pages = [pageOf([at(700, 'Above the plate.'), at(300, 'Below the plate.')])]
+    const blocks = pdfPagesToBlocks(pages, [{ page: 1, bottom: 320, path: 'pdf/one.png' }])
+
+    expect(blocks.map((block) => block.kind)).toEqual(['prose', 'figure', 'prose'])
+    expect(blocks[1]).toEqual({ kind: 'figure', text: '[Figure]', image: { src: 'pdf/one.png' } })
+  })
+
+  it('puts a plate on an earlier page before the text that follows it', () => {
+    const pages = [pageOf([]), pageOf([at(700, 'The text after the plate.')])]
+    const blocks = pdfPagesToBlocks(pages, [{ page: 1, bottom: 0, path: 'pdf/plate.png' }])
+    expect(blocks.map((block) => block.kind)).toEqual(['figure', 'prose'])
+  })
+
+  it('keeps a figure below the last paragraph in the book', () => {
+    const pages = [pageOf([at(700, 'The last words.')])]
+    const blocks = pdfPagesToBlocks(pages, [{ page: 1, bottom: 100, path: 'pdf/last.png' }])
+    expect(blocks.map((block) => block.kind)).toEqual(['prose', 'figure'])
+  })
+
+  it('reads two plates on one page down the page, not up it', () => {
+    const pages = [pageOf([at(780, 'First.'), at(60, 'Last.')])]
+    const blocks = pdfPagesToBlocks(pages, [
+      { page: 1, bottom: 150, path: 'pdf/lower.png' },
+      { page: 1, bottom: 600, path: 'pdf/upper.png' },
+    ])
+    const paths = blocks
+      .filter((block) => block.kind === 'figure')
+      .map((block) => (block as { image?: { src: string } }).image?.src)
+    expect(paths).toEqual(['pdf/upper.png', 'pdf/lower.png'])
+  })
+
+  it('changes nothing about a PDF with no figures', () => {
+    const pages = [pageOf([at(700, 'Just words.')])]
+    expect(pdfPagesToBlocks(pages, [])).toEqual(pdfPagesToBlocks(pages))
+  })
+})

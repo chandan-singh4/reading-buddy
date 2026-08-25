@@ -211,7 +211,12 @@
   a reader-facing model picker through OpenRouter, not Haiku→Sonnet. The row was
   never flipped, so it read `[ ]` while the tutor answered.
 - [x] **WP-20 Inline popup + streaming UI** — popup, follow-up box, auto-saved Q&A · *after 17,19* — the Study Lamp room, saved threads and Notes listing shipped 2026-08-21; streaming shipped 2026-08-23 (`e82c5c7`) on both ends. **Closed 2026-08-25**
-- [~] **WP-39 Ask about a picture** — *the sourcing half shipped 2026-08-02: epub images are extracted at import into an `assets` table and shown on the page. What's left is the tutor half (tap a figure → send it to Claude), plus pdf.js region rendering.* — tap a figure/table/formula → send that image + surrounding text to Claude. Source image from the epub/docx archive where it exists; pdf.js renders the region for PDFs. The escape hatch for everything WP-38 can only describe · *after 19,20,38*
+- [x] **WP-39 Ask about a picture** — **closed 2026-08-25.** Epub and docx
+  plates carry an Ask button that sends the picture to a model that can read
+  one. A PDF's figures are found by rendering any tall band of a page with no
+  text in it — nothing is classified, and a band that renders blank is thrown
+  away after the fact. `PARSER_VERSION` 29 re-parses the PDFs already on the
+  shelf.
 - [x] **WP-21 Tutor persona + teaching modes** — **closed 2026-08-25, in a
   different shape.** `BASE_PROMPT` in `api/tutor.ts` is the persona; eight task
   modules are the modes. Not subject-driven and not dense-books-only: every
