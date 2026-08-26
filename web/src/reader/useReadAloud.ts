@@ -44,6 +44,18 @@ export interface AloudControls {
   resume: () => void
   stop: () => void
   skip: (by: number) => void
+  /**
+   * Say one short line in a voice, so the reader can hear it before choosing.
+   *
+   * Every system voice picker does this, and here it does a second job: it is
+   * the one place a reader can tell "the app ignored my choice" apart from
+   * "this phone only really has one voice". Several Android phones list a dozen
+   * names that are all the same engine underneath.
+   *
+   * Does nothing while the book is being read. The change is already audible in
+   * the next sentence, and two voices at once helps nobody.
+   */
+  sample: (voiceName?: string) => void
 }
 
 export interface AloudOptions {
@@ -55,13 +67,14 @@ export interface AloudOptions {
   /** Called for each sentence, so the page can turn to it. */
   onSaying?: (utterance: Utterance) => void
   /**
-   * Called for each word, with how far into the sentence it is.
+   * Where the sentence runs off the page, counted from its own start.
    *
-   * The page uses it to turn as the last word on it is said, rather than at the
-   * start of the next sentence. Nothing may depend on it: an engine that
-   * reports no boundaries simply never calls it.
+   * Only the screen can answer it, so only the screen is asked. `null` — the
+   * ordinary answer — means the rest of the sentence is on this page.
    */
-  onWord?: (utterance: Utterance, charIndex: number) => void
+  breakAt?: (utterance: Utterance, from: number) => number | null
+  /** The voice has read the last words on the page. Turn it. */
+  onCross?: (utterance: Utterance, at: number) => void
   /** Called whenever the voice goes quiet, so the page can drop any timer. */
   onStopped?: () => void
   /**
@@ -75,7 +88,8 @@ export interface AloudOptions {
 }
 
 export function useReadAloud(options: AloudOptions): AloudControls {
-  const { paragraphs, voiceName, rate, onSaying, onWord, onStopped, onSectionEnd } = options
+  const { paragraphs, voiceName, rate, onSaying, breakAt, onCross, onStopped, onSectionEnd } =
+    options
 
   const [playing, setPlaying] = useState(false)
   const [running, setRunning] = useState(false)
@@ -95,8 +109,10 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   saying.current = onSaying
   const sectionEnd = useRef(onSectionEnd)
   sectionEnd.current = onSectionEnd
-  const word = useRef(onWord)
-  word.current = onWord
+  const breaks = useRef(breakAt)
+  breaks.current = breakAt
+  const cross = useRef(onCross)
+  cross.current = onCross
   const stopped = useRef(onStopped)
   stopped.current = onStopped
   const planNow = useRef(plan)
@@ -149,7 +165,8 @@ export function useReadAloud(options: AloudOptions): AloudControls {
           setPlaying(moved)
           setRunning(moved)
         },
-        onWord: (line, charIndex) => word.current?.(line, charIndex),
+        breakAt: (line, from) => breaks.current?.(line, from) ?? null,
+        onCross: (line, at) => cross.current?.(line, at),
       },
     )
   }
@@ -201,6 +218,22 @@ export function useReadAloud(options: AloudOptions): AloudControls {
 
   const skip = useCallback((by: number) => reader.current?.skip(by), [])
 
+  const sample = useCallback(
+    (name?: string) => {
+      if (!engine || running) return
+      const voice = voices.find((one) => one.name === name) ?? null
+      engine.cancel()
+      const spoken = utteranceOf(SAMPLE)
+      spoken.voice = voice
+      spoken.rate = rate
+      if (voice?.lang) spoken.lang = voice.lang
+      asSpeech(engine).speak(spoken)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the two adapters
+    // are plain casts and are stable by construction.
+    [engine, rate, running, voices],
+  )
+
   /*
    * A new section landed while the voice was reading. Pick it up at its top.
    *
@@ -244,5 +277,9 @@ export function useReadAloud(options: AloudOptions): AloudControls {
     resume,
     stop,
     skip,
+    sample,
   }
 }
+
+/** What a voice says when it is tried. One short line, about this book. */
+const SAMPLE = 'This is how your book will sound.'

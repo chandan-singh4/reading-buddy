@@ -116,6 +116,8 @@ export interface ChromeProps {
   onHighlighterChange?: (choice: HighlighterChoice) => void
   /** The device's reading voices, for the Aa tab's voice row (WP-16). */
   voices?: readonly SpeechSynthesisVoice[]
+  /** Say a line in a voice as the reader picks it (WP-16). */
+  onTryVoice?: (voiceName?: string) => void
 
   /** Every mark in this book, already in the book's own order. */
   bookmarks: readonly BookmarkRow[]
@@ -186,6 +188,7 @@ export function Chrome({
   highlighter,
   onHighlighterChange,
   voices,
+  onTryVoice,
   onToggleFocus,
   onOpenSheet,
   onCloseSheet,
@@ -504,6 +507,7 @@ export function Chrome({
               highlighter={highlighter}
               onHighlighterChange={onHighlighterChange}
               voices={voices}
+              onTryVoice={onTryVoice}
             />
           </div>
         </div>

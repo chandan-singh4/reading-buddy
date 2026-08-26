@@ -131,29 +131,6 @@ function plainly(text: string): string {
 }
 
 /**
- * How long a run of text takes to say, in milliseconds.
- *
- * An estimate, and it exists because the exact answer is not available. The
- * page has to turn as the voice reaches the foot of it, and the engine is
- * supposed to say where it is by reporting each word — but several engines,
- * iOS among them, report nothing at all. On those the clock is the only thing
- * left to follow.
- *
- * `CHARS_PER_SECOND` is measured against ordinary English prose read at a
- * normal pace: about 160 words a minute, and about 5.5 characters a word with
- * its space. It is wrong for a page of long names and wrong for a page of
- * dialogue, and being a little wrong is the point — a page turned a beat early
- * or a beat late is a small fault, and a page not turned at all is the fault
- * being fixed.
- */
-export function msToSpeak(characters: number, rate = 1): number {
-  const pace = CHARS_PER_SECOND * (rate > 0 ? rate : 1)
-  return Math.max(0, (characters / pace) * 1000)
-}
-
-const CHARS_PER_SECOND = 14.7
-
-/**
  * The parts of `speechSynthesis` this module uses.
  *
  * Named rather than reached for globally, so a test can drive the reader.
@@ -180,14 +157,14 @@ export interface SpokenLike {
   onend: (() => void) | null
   onerror: (() => void) | null
   /**
-   * Reported as each word starts, with how far into the sentence it is.
+   * The language of the words, as a tag like `en-GB`.
    *
-   * Optional in practice as well as in name: several engines never fire it, and
-   * an engine that does not is the reason nothing important may depend on it.
-   * Here it decides only *when* the page turns, and the page turns at the next
-   * sentence regardless.
+   * Set from the chosen voice, and not decoration. Several engines pick a voice
+   * from the language and ignore the `voice` property when the two disagree or
+   * when the language is unset — which is exactly the "I choose a voice and
+   * nothing changes" fault. Setting both leaves nothing to disagree about.
    */
-  onboundary?: ((event: { charIndex: number }) => void) | null
+  lang?: string
 }
 
 /** How the voice is set up for one sentence. */
@@ -208,8 +185,19 @@ export interface Told {
   onPlace?: (at: number | null) => void
   /** The plan was read to its end. Not called when the reader stops it. */
   onFinished?: () => void
-  /** Each word as it is said. Silent on an engine that reports no boundaries. */
-  onWord?: (line: Utterance, charIndex: number) => void
+  /**
+   * Where the sentence runs off the page, counted from the start of the line.
+   *
+   * Answered by the screen, which is the only thing that knows: it depends on
+   * the type size, the margins and where the paragraph happens to fall. `null`
+   * means "all of what is left is on this page", which is the ordinary answer.
+   *
+   * `from` is where the voice is about to start reading, so a sentence that
+   * covers three pages is asked three times.
+   */
+  breakAt?: (line: Utterance, from: number) => number | null
+  /** The voice has reached the foot of the page. Turn it. */
+  onCross?: (line: Utterance, at: number) => void
 }
 
 /**
@@ -218,6 +206,29 @@ export interface Told {
  * Deliberately a plain object rather than a hook. The rules here — what plays
  * next, what a pause means, which endings are real — are worth testing on their
  * own, and a hook drags a renderer into every one of those tests.
+ *
+ * ## Why an ended utterance cannot simply advance
+ *
+ * ## A sentence that runs off the page is said in two halves
+ *
+ * A sentence often begins near the foot of a page and ends on the next one, and
+ * the page has to turn as its last visible word is said — not a sentence later,
+ * with the reader listening to words they cannot see.
+ *
+ * Two ways to know when that moment arrives were tried and both were wrong. The
+ * engine's own `onboundary` reports the character each word starts at, and is
+ * exact — on the engines that fire it. Many never do, and a page that never
+ * turns is the fault itself. A clock, timed from an estimate of how fast prose
+ * is spoken, turns *something* on every engine, but it is a guess, and a guess
+ * lands early on a page of long names and late on a page of dialogue.
+ *
+ * So the sentence is cut instead. The part that fits on the page is one
+ * utterance and the remainder is another. The engine says exactly when the
+ * first one ends — that is what `onend` is — and the page turns there. No
+ * estimate, no engine-specific event, and the same code on every phone.
+ *
+ * The cost is a small pause at the page break, in the middle of a sentence.
+ * That pause falls exactly where the page turns, so it reads as the turn.
  *
  * ## Why an ended utterance cannot simply advance
  *
@@ -230,6 +241,8 @@ export interface Told {
 export class AloudReader {
   private plan: readonly Utterance[] = []
   private at = 0
+  /** How far into the current sentence the voice has been carried by a break. */
+  private from = 0
   private generation = 0
   private speaking = false
   private voicing: Voicing = {}
@@ -238,8 +251,10 @@ export class AloudReader {
   private readonly make: (text: string) => SpokenLike
   /** Told the place in the plan when it moves, and `null` when it stops. */
   private readonly onPlace: (at: number | null) => void
-  /** Told which word is being said, and how far into the sentence it is. */
-  private readonly onWord: (line: Utterance, charIndex: number) => void
+  /** Asked where the words run off the page. See `Told`. */
+  private readonly breakAt: (line: Utterance, from: number) => number | null
+  /** Told when the voice has read the last words on a page. */
+  private readonly onCross: (line: Utterance, at: number) => void
   /**
    * Told when the plan has been *read to the end* — and at no other time.
    *
@@ -258,7 +273,8 @@ export class AloudReader {
     this.make = make
     this.onPlace = told.onPlace ?? (() => {})
     this.onFinished = told.onFinished ?? (() => {})
-    this.onWord = told.onWord ?? (() => {})
+    this.breakAt = told.breakAt ?? (() => null)
+    this.onCross = told.onCross ?? (() => {})
   }
 
   get index(): number {
@@ -274,6 +290,7 @@ export class AloudReader {
     this.silence()
     this.plan = plan
     this.at = Math.max(0, Math.min(from, Math.max(0, plan.length - 1)))
+    this.from = 0
     this.voicing = voicing
     if (plan.length === 0) {
       this.onPlace(null)
@@ -316,6 +333,7 @@ export class AloudReader {
     this.silence()
     this.plan = []
     this.at = 0
+    this.from = 0
     this.onPlace(null)
   }
 
@@ -337,6 +355,7 @@ export class AloudReader {
     const wasPlaying = this.speaking
     this.silence()
     this.at = to
+    this.from = 0
     this.onPlace(this.at)
     if (wasPlaying) {
       this.speaking = true
@@ -370,40 +389,58 @@ export class AloudReader {
     }
 
     this.onPlace(this.at)
+    this.speakFrom(line, this.from)
+  }
+
+  /**
+   * Say one sentence from `from` to wherever the page ends, or to its own end.
+   *
+   * The unit of speech is therefore *a sentence, or as much of it as fits* —
+   * see the note on the class for why a sentence that runs off the page is cut
+   * in two rather than timed or guessed at.
+   */
+  private speakFrom(line: Utterance, from: number): void {
+    this.from = from
+
+    /*
+     * Where the page ends inside these words, if it does. Guarded on both
+     * sides: an answer at or before where the voice already is would speak
+     * nothing and ask again forever, and one at the very end is not a break.
+     */
+    const asked = this.breakAt(line, from)
+    const cut = asked !== null && asked > from && asked < line.text.length ? asked : null
+    const text = line.text.slice(from, cut ?? line.text.length)
+
+    if (!text.trim()) {
+      // Nothing left worth saying. Take the rest as read rather than handing an
+      // engine an empty utterance, which some of them never end.
+      this.after()
+      return
+    }
 
     const mine = this.generation
-    const spoken = this.make(line.text)
+    const spoken = this.make(text)
     spoken.voice = this.voicing.voice ?? null
     spoken.rate = this.voicing.rate ?? 1
+    // Both, together. See `SpokenLike.lang`: an engine given a voice and no
+    // language will often use neither.
+    if (this.voicing.voice?.lang) spoken.lang = this.voicing.voice.lang
 
     const next = () => {
       // The utterance that just ended may be one this reader has already
       // abandoned — `cancel()` ends it too. See the note on the class.
       if (mine !== this.generation || !this.speaking) return
-      this.at += 1
-      if (this.at >= this.plan.length) {
-        this.finish()
+
+      if (cut !== null) {
+        // The last words on the page have been said. Turn it, then read on from
+        // the first word of the next one — in that order, so the words arriving
+        // are already in front of the reader.
+        this.onCross(line, cut)
+        this.speakFrom(line, cut)
         return
       }
-      this.say()
-    }
 
-    /*
-     * Where the voice is *inside* the sentence.
-     *
-     * The page used to turn on the sentence after the one that ran off it: a
-     * long sentence that began at the foot of a page was read to its end while
-     * the reader looked at the words above it. The engine reports each word, so
-     * the page can turn as the last word on it is said.
-     *
-     * Same generation guard as the ending: an abandoned utterance can report a
-     * boundary or two before the engine has finished stopping it, and a page
-     * turn from a sentence nobody is listening to is a page turn out of
-     * nowhere.
-     */
-    spoken.onboundary = (event) => {
-      if (mine !== this.generation || !this.speaking) return
-      this.onWord(line, event.charIndex)
+      this.after()
     }
 
     spoken.onend = next
@@ -413,5 +450,16 @@ export class AloudReader {
     spoken.onerror = next
 
     this.speech.speak(spoken)
+  }
+
+  /** The sentence is done. On to the next, or to the end of the plan. */
+  private after(): void {
+    this.at += 1
+    this.from = 0
+    if (this.at >= this.plan.length) {
+      this.finish()
+      return
+    }
+    this.say()
   }
 }

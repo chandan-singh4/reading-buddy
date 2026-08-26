@@ -1338,23 +1338,27 @@ sign-in screen.
   stop again moved on again. `AloudReader` now reports the place through
   `onPlace` and the end of the plan through `onFinished`, and only `onFinished`
   turns the page into the next section. — 2026-08-25
-- **The page turns with the voice, on word boundaries.** A sentence that starts
-  at the foot of a page is often read to its end on the page after it. Following
-  the *sentence* therefore left the reader looking at the wrong page for as long
-  as the sentence lasted. The speech engine reports each word as a character
-  offset, so the page turns as the last word on it is said. Nothing depends on
-  it: an engine that reports no boundaries falls back to turning at the next
-  sentence. The cost is guarded — whether a sentence crosses a column is worked
-  out once when it starts, and a sentence that does not costs nothing per
-  word. — 2026-08-25
-- **The page turn is timed when the engine will not say where it is.** The
-  proper signal is `onboundary`, which reports the character each word starts
-  at. Several engines, iOS most of all, never fire it — so following it alone
-  left the page still until the next sentence, which is the fault it was meant
-  to fix. Both are used now: a clock is armed when a crossing sentence starts,
-  and the first word the engine reports throws the clock away. An engine that
-  says where it is always beats an estimate of where it ought to be.
-  `msToSpeak` holds the estimate, at about 160 words a minute. — 2026-08-25
+- **A sentence that runs off the page is said in two utterances.** A sentence
+  that starts at the foot of a page is often read to its end on the page after
+  it, so following the *sentence* left the reader looking at the wrong page for
+  as long as the sentence lasted. Two other ways were tried and both failed. The
+  engine's own `onboundary` reports the character each word starts at and is
+  exact, but many engines — iOS most of all — never fire it, and a page that
+  never turns is the fault itself. A clock, timed from an estimate of how fast
+  prose is spoken, turns something on every engine, but it is a guess: early on
+  a page of long names, late on a page of dialogue. So the sentence is cut
+  instead. The part that fits on the page is one utterance and the rest is
+  another, and the engine's `onend` says exactly when to turn. No estimate and
+  no engine-specific event. The cut is backed up to a space, so no word is said
+  in halves. The cost is a small pause at the break, which falls where the page
+  turns and reads as the turn. — 2026-08-25
+- **A spoken utterance carries the language as well as the voice.** Choosing a
+  voice changed nothing on the phone. Several engines pick a voice from `lang`
+  and ignore `voice` when the language is unset or disagrees with it. Both are
+  set together now, from the chosen voice's own language tag. Picking a voice in
+  the Aa tab also says one short line in it, so a reader can hear the choice —
+  and can tell "the app ignored me" apart from "this phone has one voice under
+  many names". — 2026-08-25
 - **A reading starts at the sentence the reader picked.** An anchor names a
   paragraph, so starting from the anchor read the paragraph from its first word
   however far down the reader had selected — reported from the phone. `startOf`

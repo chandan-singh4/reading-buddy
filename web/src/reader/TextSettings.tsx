@@ -106,6 +106,8 @@ export interface TextSettingsProps {
    * with no book open — has no way to supply. Left out, the row is not drawn.
    */
   voices?: readonly SpeechSynthesisVoice[]
+  /** Say a line in a voice, so a reader hears it as they pick it. */
+  onTryVoice?: (voiceName?: string) => void
 }
 
 export function TextSettings({
@@ -114,6 +116,7 @@ export function TextSettings({
   highlighter,
   onHighlighterChange,
   voices,
+  onTryVoice,
 }: TextSettingsProps) {
   const [pane, setPane] = useState<Pane>('text')
   const [adjusting, setAdjusting] = useState<Adjusting>(null)
@@ -335,16 +338,18 @@ export function TextSettings({
                 className={styles.picker}
                 value={settings.aloudVoice ?? ''}
                 aria-label="Reading voice"
-                onChange={(event) =>
+                onChange={(event) => {
+                  const chosen = event.target.value
                   onSettingsChange(
                     // An empty choice clears the setting rather than storing an
                     // empty name: "this device's own voice" is the absence of a
                     // choice, and it has to survive being chosen again.
-                    event.target.value
-                      ? { aloudVoice: event.target.value }
-                      : { aloudVoice: undefined },
+                    chosen ? { aloudVoice: chosen } : { aloudVoice: undefined },
                   )
-                }
+                  // Heard, not just chosen. A list of forty system names tells a
+                  // reader nothing about how any of them sound.
+                  onTryVoice?.(chosen || undefined)
+                }}
               >
                 <option value="">This device’s voice</option>
                 {voices.map((voice) => (

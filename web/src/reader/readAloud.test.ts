@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AloudReader, msToSpeak, planOf, startOf } from './readAloud.ts'
+import { AloudReader, planOf, startOf } from './readAloud.ts'
 import type { SpeechLike, SpokenLike, Utterance } from './readAloud.ts'
 import type { Anchor, Paragraph } from '../structure/index.ts'
 
@@ -25,7 +25,6 @@ function fakeSpeech() {
     rate: 1,
     onend: null,
     onerror: null,
-    onboundary: null,
   })
   /** What a real engine does when a sentence finishes — or when it is cancelled. */
   const finish = (at = said.length - 1) => said[at]?.onend?.()
@@ -116,22 +115,127 @@ describe('startOf', () => {
   })
 })
 
-describe('msToSpeak', () => {
-  it('is longer for more text and shorter for a faster voice', () => {
-    expect(msToSpeak(200)).toBeGreaterThan(msToSpeak(100))
-    expect(msToSpeak(200, 2)).toBeLessThan(msToSpeak(200, 1))
+/*
+ * A sentence that runs off the foot of the page.
+ *
+ * The reported fault, twice over: the page turned a sentence late, because
+ * knowing where the voice was inside a sentence depended first on an event many
+ * engines never send, and then on a guess at how fast prose is spoken. The
+ * sentence is cut at the page break instead, and the engine's own "this
+ * utterance ended" says exactly when to turn.
+ */
+describe('a sentence that runs off the page', () => {
+  const long: Utterance[] = [
+    { anchor: anchor('p1'), text: 'Half of this is here and half is over there.', at: 0 },
+    { anchor: anchor('p1'), text: 'After.', at: 1 },
+  ]
+
+  /** The page ends after "here and ". */
+  const breakAt = (_line: Utterance, from: number) => (from === 0 ? 25 : null)
+
+  it('says the part on this page first, then turns, then says the rest', () => {
+    const fake = fakeSpeech()
+    const turns: number[] = []
+    const reader = new AloudReader(fake.speech, fake.make, {
+      breakAt,
+      onCross: (_line, at) => turns.push(at),
+    })
+
+    reader.start(long)
+    expect(fake.spoken()).toEqual(['Half of this is here and '])
+    expect(turns).toEqual([])
+
+    fake.finish()
+    expect(turns).toEqual([25])
+    expect(fake.spoken()).toEqual(['Half of this is here and ', 'half is over there.'])
   })
 
-  it('puts ordinary prose in the range a person actually reads it', () => {
-    // 100 characters is about 18 words. Between five and ten seconds is the
-    // band every real reading falls in; tighter than that is false precision.
-    expect(msToSpeak(600)).toBeGreaterThan(30_000)
-    expect(msToSpeak(600)).toBeLessThan(60_000)
+  it('goes on to the next sentence after the far half', () => {
+    const fake = fakeSpeech()
+    const reader = new AloudReader(fake.speech, fake.make, { breakAt })
+    reader.start(long)
+    fake.finish()
+    fake.finish()
+    expect(fake.spoken()[2]).toBe('After.')
   })
 
-  it('answers zero for nothing, and treats a nonsense rate as normal', () => {
-    expect(msToSpeak(0)).toBe(0)
-    expect(msToSpeak(100, 0)).toBe(msToSpeak(100, 1))
+  it('does not turn the page for a sentence that fits', () => {
+    const fake = fakeSpeech()
+    const turns: number[] = []
+    const reader = new AloudReader(fake.speech, fake.make, {
+      onCross: (_line, at) => turns.push(at),
+    })
+    reader.start(plan)
+    fake.finish()
+    expect(turns).toEqual([])
+    expect(fake.spoken()).toEqual(['One.', 'Two.'])
+  })
+
+  it('refuses a break that would say nothing, or that is past the end', () => {
+    const fake = fakeSpeech()
+    const reader = new AloudReader(fake.speech, fake.make, {
+      // Both are answers a measurement can honestly give, and both would leave
+      // the reading stuck asking the same question of the same words.
+      breakAt: () => 0,
+    })
+    reader.start(long)
+    expect(fake.spoken()).toEqual(['Half of this is here and half is over there.'])
+
+    const other = fakeSpeech()
+    new AloudReader(other.speech, other.make, { breakAt: (line) => line.text.length }).start(long)
+    expect(other.spoken()).toEqual(['Half of this is here and half is over there.'])
+  })
+
+  it('does not turn the page from a sentence it has abandoned', () => {
+    const fake = fakeSpeech()
+    const turns: number[] = []
+    const reader = new AloudReader(fake.speech, fake.make, {
+      breakAt,
+      onCross: (_line, at) => turns.push(at),
+    })
+    reader.start(long)
+    reader.stop()
+    fake.finish()
+    expect(turns).toEqual([])
+  })
+
+  it('starts the far half again when a pause lands in it', () => {
+    const fake = fakeSpeech()
+    const reader = new AloudReader(fake.speech, fake.make, { breakAt })
+    reader.start(long)
+    fake.finish()
+    reader.pause()
+    reader.resume()
+    expect(fake.spoken()[fake.spoken().length - 1]).toBe('half is over there.')
+  })
+
+  it('starts a skipped-to sentence at its beginning, not mid-way', () => {
+    const fake = fakeSpeech()
+    const reader = new AloudReader(fake.speech, fake.make, { breakAt })
+    reader.start(long)
+    fake.finish()
+    reader.skip(1)
+    expect(fake.spoken()[fake.spoken().length - 1]).toBe('After.')
+  })
+})
+
+describe('the chosen voice', () => {
+  it('sets the language as well as the voice', () => {
+    const fake = fakeSpeech()
+    const reader = new AloudReader(fake.speech, fake.make)
+    const voice = { name: 'Daniel', lang: 'en-GB' } as SpeechSynthesisVoice
+    reader.start(plan, 0, { voice })
+    // Several engines pick a voice from the language and ignore `voice` when
+    // the language is unset. That is the "I choose a voice and nothing changes"
+    // fault, reported from the phone.
+    expect(fake.said[0]?.lang).toBe('en-GB')
+    expect(fake.said[0]?.voice).toBe(voice)
+  })
+
+  it('leaves the language alone when no voice is chosen', () => {
+    const fake = fakeSpeech()
+    new AloudReader(fake.speech, fake.make).start(plan)
+    expect(fake.said[0]?.lang).toBeUndefined()
   })
 })
 
@@ -179,33 +283,6 @@ describe('AloudReader', () => {
     fake.finish()
     fake.finish()
     expect(done).toHaveBeenCalledTimes(1)
-  })
-
-  it('reports each word, with how far into the sentence it is', () => {
-    const fake = fakeSpeech()
-    const words: [string, number][] = []
-    const reader = new AloudReader(fake.speech, fake.make, {
-      onWord: (line, at) => words.push([line.text, at]),
-    })
-    reader.start(plan)
-    fake.said[0]?.onboundary?.({ charIndex: 0 })
-    fake.said[0]?.onboundary?.({ charIndex: 4 })
-    expect(words).toEqual([
-      ['One.', 0],
-      ['One.', 4],
-    ])
-  })
-
-  it('ignores a word reported by a sentence it has abandoned', () => {
-    const fake = fakeSpeech()
-    const words: number[] = []
-    const reader = new AloudReader(fake.speech, fake.make, {
-      onWord: (_line, at) => words.push(at),
-    })
-    reader.start(plan)
-    reader.stop()
-    fake.said[0]?.onboundary?.({ charIndex: 2 })
-    expect(words).toEqual([])
   })
 
   it('does not say the plan is finished when a skip runs off an end', () => {

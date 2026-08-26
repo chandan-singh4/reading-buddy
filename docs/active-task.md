@@ -45,14 +45,15 @@ WP-16 closed on 2026-08-25. Nothing is chosen for next. Run `/plan-task`.
 3. **The transport.** Pause, resume, back, next, and each speed. A resumed
    sentence starts again from its beginning — that is on purpose.
 4. **The voice list.** The Aa tab's Mode pane lists the phone's voices. Choose
-   one mid-sentence: the current sentence restarts in the new voice.
+   one while nothing is being read: it must say a short line in that voice. If
+   every voice sounds the same, the phone has one engine under many names, and
+   the app is not at fault. Choose one mid-sentence: the sentence restarts in
+   the new voice.
 5. **Leave the book while it is reading.** The voice must stop.
 6. **A sentence that runs over a page break.** The page must turn as the last
    word on it is said, not when the next sentence starts, and the turn must be
-   the ordinary sheet. **This one is timed on a phone whose engine reports no
-   words, so watch whether the turn lands early or late.** If it is out by more
-   than a word or so, `CHARS_PER_SECOND` in `reader/readAloud.ts` is the number
-   to change.
+   the ordinary sheet. Expect a short pause at the break: the sentence is said
+   as two utterances and the pause is where the page turns.
 7. **Start in the middle of a paragraph.** Select its third or fourth sentence
    and ask to be read to. It must start there, not at the paragraph's top.
 8. **Press stop.** It must stop. It must not move to the next chapter — that

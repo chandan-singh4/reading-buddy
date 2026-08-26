@@ -54,19 +54,23 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     the book. The hook's cleanup does.
   - `aloudRate` and `aloudVoice` joined the reader's settings, so both survive a
     reload.
-  - **Fixed after a second phone report:** the page still turned a sentence
-    late, because the engine on the phone reports no word boundaries at all. A
-    crossing sentence now also arms a clock, and the first word an engine
-    reports throws the clock away. It no longer matters which kind of engine is
-    speaking.
+  - **Fixed after a third phone report:** the page still turned a sentence late.
+    Both earlier attempts depended on knowing where the voice was inside a
+    sentence — first from an event many engines never send, then from an
+    estimate of how fast prose is spoken. Neither is needed. A sentence that
+    runs off the page is now said as two utterances, cut at the page break, and
+    the engine's own "this utterance ended" turns the page at the exact moment.
+  - **Fixed after the same report:** choosing a reading voice changed nothing.
+    An utterance now carries the language as well as the voice, because several
+    engines ignore the voice when the language is unset. Picking a voice also
+    says one short line in it.
   - **Fixed after a phone report:** a reader who selected the fourth sentence of
     a paragraph was read the first. An anchor names a paragraph; the selected
     words now say which sentence.
   - **Fixed after a phone report:** the page turned a sentence late. A long
     sentence that began at the foot of a page was read to its end while the
-    reader looked at the page above it. The page now turns as the last word on
-    it is said, using the engine's word boundaries, and one page forward is a
-    real turn with its sheet rather than a silent jump.
+    reader looked at the page above it. One page forward is also a real turn
+    with its sheet now, rather than a silent jump.
   - **Fixed after a phone report:** stop moved the reader to the next chapter
     and started reading it, and a second stop moved them on again. "Stopped" and
     "read to the end" were the same event. They are two callbacks now, and only
