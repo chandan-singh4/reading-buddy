@@ -103,12 +103,37 @@ export interface SpokenLike {
    */
   onend: (() => void) | null
   onerror: (() => void) | null
+  /**
+   * Reported as each word starts, with how far into the sentence it is.
+   *
+   * Optional in practice as well as in name: several engines never fire it, and
+   * an engine that does not is the reason nothing important may depend on it.
+   * Here it decides only *when* the page turns, and the page turns at the next
+   * sentence regardless.
+   */
+  onboundary?: ((event: { charIndex: number }) => void) | null
 }
 
 /** How the voice is set up for one sentence. */
 export interface Voicing {
   voice?: SpeechSynthesisVoice | null
   rate?: number
+}
+
+/**
+ * What the reader reports, and to whom.
+ *
+ * An object rather than three positional arguments. They are all optional, they
+ * are all functions, and `new AloudReader(speech, make, undefined, undefined,
+ * fn)` is not something anybody should have to write or read.
+ */
+export interface Told {
+  /** The place in the plan when it moves, and `null` when it stops. */
+  onPlace?: (at: number | null) => void
+  /** The plan was read to its end. Not called when the reader stops it. */
+  onFinished?: () => void
+  /** Each word as it is said. Silent on an engine that reports no boundaries. */
+  onWord?: (line: Utterance, charIndex: number) => void
 }
 
 /**
@@ -137,6 +162,8 @@ export class AloudReader {
   private readonly make: (text: string) => SpokenLike
   /** Told the place in the plan when it moves, and `null` when it stops. */
   private readonly onPlace: (at: number | null) => void
+  /** Told which word is being said, and how far into the sentence it is. */
+  private readonly onWord: (line: Utterance, charIndex: number) => void
   /**
    * Told when the plan has been *read to the end* — and at no other time.
    *
@@ -150,16 +177,12 @@ export class AloudReader {
    */
   private readonly onFinished: () => void
 
-  constructor(
-    speech: SpeechLike,
-    make: (text: string) => SpokenLike,
-    onPlace: (at: number | null) => void = () => {},
-    onFinished: () => void = () => {},
-  ) {
+  constructor(speech: SpeechLike, make: (text: string) => SpokenLike, told: Told = {}) {
     this.speech = speech
     this.make = make
-    this.onPlace = onPlace
-    this.onFinished = onFinished
+    this.onPlace = told.onPlace ?? (() => {})
+    this.onFinished = told.onFinished ?? (() => {})
+    this.onWord = told.onWord ?? (() => {})
   }
 
   get index(): number {
@@ -287,6 +310,24 @@ export class AloudReader {
         return
       }
       this.say()
+    }
+
+    /*
+     * Where the voice is *inside* the sentence.
+     *
+     * The page used to turn on the sentence after the one that ran off it: a
+     * long sentence that began at the foot of a page was read to its end while
+     * the reader looked at the words above it. The engine reports each word, so
+     * the page can turn as the last word on it is said.
+     *
+     * Same generation guard as the ending: an abandoned utterance can report a
+     * boundary or two before the engine has finished stopping it, and a page
+     * turn from a sentence nobody is listening to is a page turn out of
+     * nowhere.
+     */
+    spoken.onboundary = (event) => {
+      if (mine !== this.generation || !this.speaking) return
+      this.onWord(line, event.charIndex)
     }
 
     spoken.onend = next

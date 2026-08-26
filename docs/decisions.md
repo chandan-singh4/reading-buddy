@@ -1338,3 +1338,12 @@ sign-in screen.
   stop again moved on again. `AloudReader` now reports the place through
   `onPlace` and the end of the plan through `onFinished`, and only `onFinished`
   turns the page into the next section. — 2026-08-25
+- **The page turns with the voice, on word boundaries.** A sentence that starts
+  at the foot of a page is often read to its end on the page after it. Following
+  the *sentence* therefore left the reader looking at the wrong page for as long
+  as the sentence lasted. The speech engine reports each word as a character
+  offset, so the page turns as the last word on it is said. Nothing depends on
+  it: an engine that reports no boundaries falls back to turning at the next
+  sentence. The cost is guarded — whether a sentence crosses a column is worked
+  out once when it starts, and a sentence that does not costs nothing per
+  word. — 2026-08-25

@@ -50,6 +50,14 @@ export interface AloudOptions {
   /** Called for each sentence, so the page can turn to it. */
   onSaying?: (utterance: Utterance) => void
   /**
+   * Called for each word, with how far into the sentence it is.
+   *
+   * The page uses it to turn as the last word on it is said, rather than at the
+   * start of the next sentence. Nothing may depend on it: an engine that
+   * reports no boundaries simply never calls it.
+   */
+  onWord?: (utterance: Utterance, charIndex: number) => void
+  /**
    * Asked for the next section when this one is finished.
    *
    * Returns `true` if it moved. The reading then waits, quietly, until the new
@@ -60,7 +68,7 @@ export interface AloudOptions {
 }
 
 export function useReadAloud(options: AloudOptions): AloudControls {
-  const { paragraphs, voiceName, rate, onSaying, onSectionEnd } = options
+  const { paragraphs, voiceName, rate, onSaying, onWord, onSectionEnd } = options
 
   const [playing, setPlaying] = useState(false)
   const [running, setRunning] = useState(false)
@@ -80,6 +88,8 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   saying.current = onSaying
   const sectionEnd = useRef(onSectionEnd)
   sectionEnd.current = onSectionEnd
+  const word = useRef(onWord)
+  word.current = onWord
   const planNow = useRef(plan)
   planNow.current = plan
 
@@ -106,27 +116,30 @@ export function useReadAloud(options: AloudOptions): AloudControls {
     reader.current = new AloudReader(
       asSpeech(engine),
       utteranceOf,
-      (at) => {
-        setPlace(at)
-        if (at === null) {
-          // Quiet, and nothing on the page marked. Whether the book goes on is
-          // the *other* callback's business — see it below.
-          setPlaying(false)
-          setRunning(false)
-          return
-        }
-        const line = planNow.current[at]
-        if (line) saying.current?.(line)
-      },
-      () => {
-        // The section was read to its end. This never runs when the reader
-        // presses stop, which is the whole reason it is a separate callback:
-        // stop used to be indistinguishable from "finished", so it carried the
-        // reader into the next chapter instead of ending the reading.
-        const moved = sectionEnd.current?.() ?? false
-        carryOn.current = moved
-        setPlaying(moved)
-        setRunning(moved)
+      {
+        onPlace: (at) => {
+          setPlace(at)
+          if (at === null) {
+            // Quiet, and nothing on the page marked. Whether the book goes on
+            // is the *other* callback's business — see `onFinished` below.
+            setPlaying(false)
+            setRunning(false)
+            return
+          }
+          const line = planNow.current[at]
+          if (line) saying.current?.(line)
+        },
+        onFinished: () => {
+          // The section was read to its end. This never runs when the reader
+          // presses stop, which is the whole reason it is a separate callback:
+          // stop used to be indistinguishable from "finished", so it carried
+          // the reader into the next chapter instead of ending the reading.
+          const moved = sectionEnd.current?.() ?? false
+          carryOn.current = moved
+          setPlaying(moved)
+          setRunning(moved)
+        },
+        onWord: (line, charIndex) => word.current?.(line, charIndex),
       },
     )
   }

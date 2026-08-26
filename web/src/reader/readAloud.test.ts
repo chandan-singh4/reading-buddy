@@ -25,6 +25,7 @@ function fakeSpeech() {
     rate: 1,
     onend: null,
     onerror: null,
+    onboundary: null,
   })
   /** What a real engine does when a sentence finishes — or when it is cancelled. */
   const finish = (at = said.length - 1) => said[at]?.onend?.()
@@ -95,7 +96,7 @@ describe('AloudReader', () => {
   it('reports the place as it moves, and null at the end', () => {
     const fake = fakeSpeech()
     const places: (number | null)[] = []
-    const reader = new AloudReader(fake.speech, fake.make, (at) => places.push(at))
+    const reader = new AloudReader(fake.speech, fake.make, { onPlace: (at) => places.push(at) })
     reader.start(plan)
     fake.finish()
     fake.finish()
@@ -115,7 +116,7 @@ describe('AloudReader', () => {
   it('says the plan is finished only when it is read to the end', () => {
     const fake = fakeSpeech()
     const done = vi.fn()
-    const reader = new AloudReader(fake.speech, fake.make, () => {}, done)
+    const reader = new AloudReader(fake.speech, fake.make, { onFinished: done })
 
     reader.start(plan)
     reader.stop()
@@ -128,10 +129,37 @@ describe('AloudReader', () => {
     expect(done).toHaveBeenCalledTimes(1)
   })
 
+  it('reports each word, with how far into the sentence it is', () => {
+    const fake = fakeSpeech()
+    const words: [string, number][] = []
+    const reader = new AloudReader(fake.speech, fake.make, {
+      onWord: (line, at) => words.push([line.text, at]),
+    })
+    reader.start(plan)
+    fake.said[0]?.onboundary?.({ charIndex: 0 })
+    fake.said[0]?.onboundary?.({ charIndex: 4 })
+    expect(words).toEqual([
+      ['One.', 0],
+      ['One.', 4],
+    ])
+  })
+
+  it('ignores a word reported by a sentence it has abandoned', () => {
+    const fake = fakeSpeech()
+    const words: number[] = []
+    const reader = new AloudReader(fake.speech, fake.make, {
+      onWord: (_line, at) => words.push(at),
+    })
+    reader.start(plan)
+    reader.stop()
+    fake.said[0]?.onboundary?.({ charIndex: 2 })
+    expect(words).toEqual([])
+  })
+
   it('does not say the plan is finished when a skip runs off an end', () => {
     const fake = fakeSpeech()
     const done = vi.fn()
-    const reader = new AloudReader(fake.speech, fake.make, () => {}, done)
+    const reader = new AloudReader(fake.speech, fake.make, { onFinished: done })
     reader.start(plan)
     reader.skip(-1)
     expect(done).not.toHaveBeenCalled()
@@ -246,7 +274,7 @@ describe('AloudReader', () => {
   it('says nothing for an empty plan', () => {
     const fake = fakeSpeech()
     const place = vi.fn()
-    const reader = new AloudReader(fake.speech, fake.make, place)
+    const reader = new AloudReader(fake.speech, fake.make, { onPlace: place })
     reader.start([])
     expect(fake.spoken()).toEqual([])
     expect(place).toHaveBeenCalledWith(null)

@@ -380,6 +380,68 @@ export function rangeOfQuote(anchor: Anchor, quote: string): Range | null {
 }
 
 /**
+ * A short range covering one character inside a longer range.
+ *
+ * Read-aloud needs it. The speech engine reports its progress through a
+ * sentence as a character offset, and turning that into a place on the page
+ * means finding the character itself: the sentence can begin on one page and
+ * end on the next, and where the *word being said* sits is the only thing that
+ * says which of the two the reader should be looking at.
+ *
+ * Walks the text nodes the range covers, because a sentence is rarely one text
+ * node — an italic word or a link cuts it into three.
+ *
+ * Returns `null` for an offset past the end of the range, which is not an
+ * error: an engine can report a boundary at the very end of the utterance.
+ */
+function textNodesIn(root: Node): Node[] {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const found: Node[] = []
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) found.push(node)
+  return found
+}
+
+export function rangeAtOffset(range: Range, offset: number): Range | null {
+  if (offset < 0) return null
+
+  /*
+   * The common ancestor is the paragraph when the range covers several nodes,
+   * and the text node *itself* when it covers one — the ordinary case, a
+   * sentence in a plain paragraph. A tree walker never returns its own root, so
+   * walking from a text node finds nothing at all. Hence the two cases.
+   */
+  const root = range.commonAncestorContainer
+  const nodes: Node[] =
+    root.nodeType === Node.TEXT_NODE ? [root] : textNodesIn(root)
+
+  let seen = 0
+
+  // Each node is clipped to the part the range actually covers before its
+  // characters are counted.
+  for (const node of nodes) {
+    if (!range.intersectsNode(node)) continue
+    const text = node.textContent ?? ''
+    const from = node === range.startContainer ? range.startOffset : 0
+    const to = node === range.endContainer ? range.endOffset : text.length
+    const length = to - from
+    if (length <= 0) continue
+
+    if (offset < seen + length) {
+      const at = from + (offset - seen)
+      const spot = document.createRange()
+      spot.setStart(node, at)
+      // One character, not a collapsed point: a collapsed range measures as
+      // nothing in several browsers, and nothing has no column.
+      spot.setEnd(node, Math.min(at + 1, to))
+      return spot
+    }
+    seen += length
+  }
+
+  return null
+}
+
+/**
  * The same words, in every copy of their paragraph that is on screen.
  *
  * A page turn puts a *clone* of the page over the real one and flips that. The

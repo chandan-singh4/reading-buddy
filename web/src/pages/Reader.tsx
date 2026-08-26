@@ -109,6 +109,7 @@ import {
   keepScreenAwake,
   AloudBar,
   useReadAloud,
+  rangeAtOffset,
   rangeOfQuote,
   type HighlightLike,
   type Utterance,
@@ -2501,27 +2502,92 @@ export default function Reader() {
    * spoken, mark it, and hand over the next section when this one ends.
    */
 
+  /**
+   * Bring a column into view for the voice.
+   *
+   * One page forward is a *turn*, with the sheet that a tap on the page edge
+   * gets. That matters more than it sounds: the reader is listening, not
+   * looking, and a page that changes with no movement reads as a glitch. Any
+   * other distance is a jump — several columns of animation would be a long
+   * wait for a voice that has already moved on.
+   */
+  const carryPageTo = useCallback(
+    (column: number) => {
+      const showing = pageShowing()
+      if (column === showing) return
+      if (column === showing + 1) turnPage(1)
+      else showPage(column, true)
+    },
+    [pageShowing, showPage, turnPage],
+  )
+
+  /**
+   * Which column a stretch of the page is in. `null` when it cannot be found.
+   *
+   * The range and not the paragraph element: a paragraph can straddle two
+   * columns, and both the sentence being said and the word inside it are
+   * ranges.
+   */
+  const columnOfRange = useCallback((range: Range | null) => {
+    const box = range?.getBoundingClientRect()
+    return box && (box.width > 0 || box.height > 0) ? columnOfRect(box, strip.current) : null
+  }, [])
+
+  /**
+   * Whether the sentence being said runs off the page it starts on.
+   *
+   * Worked out once when the sentence starts, and read on every word. A word
+   * boundary fires several times a second, and asking the browser for a
+   * rectangle forces it to lay the page out — so on the ordinary sentence,
+   * which is entirely on one page, no word costs anything at all.
+   */
+  const aloudCrosses = useRef(false)
+
   /** Keep the spoken sentence on the page in front of the reader. */
   const followAloud = useCallback(
     (one: Utterance) => {
       setAnchorHere(one.anchor)
-      // The sentence, not the paragraph it is in: a paragraph can straddle two
-      // columns, and the voice reads on across the boundary.
       const range = rangeOfQuote(one.anchor, one.text)
-      const box = range?.getBoundingClientRect()
       const node = document.getElementById(elementIdOf(one.anchor))
-      const column =
-        box && box.width > 0
-          ? columnOfRect(box, strip.current)
-          : node
-            ? columnOf(node, strip.current)
-            : null
-      if (column === null) return
+      const column = columnOfRange(range) ?? (node ? columnOf(node, strip.current) : null)
+      if (column === null) {
+        aloudCrosses.current = false
+        return
+      }
+
+      // Does it end on a later page than it starts on? If it does, the words
+      // themselves decide when to turn — see `followAloudWord`.
+      const last = range ? rangeAtOffset(range, one.text.length - 1) : null
+      aloudCrosses.current = (columnOfRange(last) ?? column) > column
+
       // Only when it has actually left the page. Assigning the same page on
       // every sentence would fight a reader who is looking ahead.
-      if (column !== pageShowing()) showPage(column, true)
+      carryPageTo(column)
     },
-    [pageShowing, showPage],
+    [carryPageTo, columnOfRange],
+  )
+
+  /**
+   * Turn the page as the last word on it is said.
+   *
+   * The reported fault: a long sentence that starts at the foot of a page was
+   * read to its end while the reader looked at the page above it, and the page
+   * only turned when the *next* sentence began. The engine reports each word,
+   * so the page can move with the voice instead of behind it.
+   *
+   * Silent on an engine that reports no word boundaries. The page then turns at
+   * the next sentence, exactly as it did before — a worse experience, not a
+   * broken one.
+   */
+  const followAloudWord = useCallback(
+    (one: Utterance, charIndex: number) => {
+      if (!aloudCrosses.current) return
+      const range = rangeOfQuote(one.anchor, one.text)
+      const column = columnOfRange(range ? rangeAtOffset(range, charIndex) : null)
+      if (column === null) return
+      carryPageTo(column)
+    },
+    [carryPageTo, columnOfRange],
   )
 
   /** Off the end of this section: go on into the next one, if there is one. */
@@ -2538,6 +2604,7 @@ export default function Reader() {
     voiceName: settings.aloudVoice,
     rate: settings.aloudRate,
     onSaying: followAloud,
+    onWord: followAloudWord,
     onSectionEnd: aloudSectionEnd,
   })
 

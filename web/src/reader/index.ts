@@ -88,6 +88,7 @@ export {
   selectAround,
   highlightAt,
   pivotFor,
+  rangeAtOffset,
   rangeOfQuote,
   rangeOfSelection,
   selectionBetween,

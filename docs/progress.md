@@ -15,7 +15,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2036 tests across 112 files.
+  2041 tests across 112 files.
 - **A flaky test teardown, not ours to blame on WP-16.** `vitest run` reports one
   unhandled error from `HandDrawn.tsx` — a coalesced measure fires after jsdom
   has been torn down and the stored range can no longer be measured. Every test
@@ -33,7 +33,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 ### Recently done
 
 - **The book reads itself out loud** (2026-08-25). WP-16 is closed. Build green:
-  2036 tests across 112 files.
+  2041 tests across 112 files.
   - Read aloud was one sentence, said once, with no way to stop it. It is now a
     voice that keeps going: from the selection, through the section, into the
     next one, until the reader stops it.
@@ -54,6 +54,11 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     the book. The hook's cleanup does.
   - `aloudRate` and `aloudVoice` joined the reader's settings, so both survive a
     reload.
+  - **Fixed after a phone report:** the page turned a sentence late. A long
+    sentence that began at the foot of a page was read to its end while the
+    reader looked at the page above it. The page now turns as the last word on
+    it is said, using the engine's word boundaries, and one page forward is a
+    real turn with its sheet rather than a silent jump.
   - **Fixed after a phone report:** stop moved the reader to the next chapter
     and started reading it, and a second stop moved them on again. "Stopped" and
     "read to the end" were the same event. They are two callbacks now, and only

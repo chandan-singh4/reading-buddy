@@ -7,6 +7,7 @@ import {
   selectAround,
   pivotFor,
   selectionBetween,
+  rangeAtOffset,
   rangeOfQuote,
   type ReaderSelection,
 } from './selection.ts'
@@ -142,5 +143,36 @@ describe('a quote that covers more than one paragraph', () => {
   it('still refuses words that are not on the page', () => {
     pages()
     expect(rangeOfQuote('[ch01-s01-p001]' as Anchor, 'four four four')).toBeNull()
+  })
+
+  /*
+   * Read-aloud's use: the speech engine reports its progress as a character
+   * offset, and the page has to turn to the character that offset names.
+   */
+  describe('rangeAtOffset', () => {
+    const quoted = (quote: string) => rangeOfQuote('[ch01-s01-p001]' as Anchor, quote)!
+
+    it('finds the character at an offset', () => {
+      pages()
+      const range = quoted('one one.')
+      expect(rangeAtOffset(range, 0)?.toString()).toBe('o')
+      expect(rangeAtOffset(range, 4)?.toString()).toBe('o')
+      expect(rangeAtOffset(range, 7)?.toString()).toBe('.')
+    })
+
+    it('counts on across the paragraphs a range covers', () => {
+      pages()
+      // The range is "one one.Two two two.Three"; offset 8 is the "T" that
+      // opens the second paragraph.
+      const range = quoted('one one.Two two two.Three')
+      expect(rangeAtOffset(range, 8)?.toString()).toBe('T')
+    })
+
+    it('answers null past the end, and for a negative offset', () => {
+      pages()
+      const range = quoted('one one.')
+      expect(rangeAtOffset(range, 99)).toBeNull()
+      expect(rangeAtOffset(range, -1)).toBeNull()
+    })
   })
 })
