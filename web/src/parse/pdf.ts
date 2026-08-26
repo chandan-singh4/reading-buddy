@@ -18,6 +18,7 @@ import { assembleBook } from './assemble.ts'
 import {
   pdfPagesToBlocks,
   type PdfFigure,
+  type PdfLinkArea,
   type PdfOutlineEntry,
   type PdfPage,
   type PdfTextItem,
@@ -76,6 +77,72 @@ export interface PdfRead {
   assets: BookAsset[]
   /** The file's own bookmark tree, flattened. Empty when it has none. */
   outline: PdfOutlineEntry[]
+  /** Every link rectangle in the file, with where it goes. */
+  areas: PdfLinkArea[]
+}
+
+/** The subset of a pdf.js link annotation we read. */
+interface AnnotationLike {
+  subtype?: string
+  rect?: number[]
+  dest?: string | unknown[] | null
+  url?: string | null
+}
+
+/**
+ * The link rectangles on one page.
+ *
+ * An external link carries its address. An internal one carries a destination,
+ * resolved to a page the same way an outline entry is — and for the same reason:
+ * the reference is opaque, and only the document can read it.
+ *
+ * A link that resolves to neither is skipped. There is nothing to do with it.
+ */
+async function areasOn(
+  document: DestinationResolver,
+  page: { getAnnotations(): Promise<unknown[]> },
+  number: number,
+): Promise<PdfLinkArea[]> {
+  let notes: unknown[] = []
+  try {
+    notes = await page.getAnnotations()
+  } catch {
+    return []
+  }
+
+  const areas: PdfLinkArea[] = []
+  for (const one of notes as AnnotationLike[]) {
+    if (one.subtype !== 'Link') continue
+    const rect = one.rect
+    if (!rect || rect.length < 4) continue
+
+    const area: PdfLinkArea = {
+      page: number,
+      // A PDF rectangle is not guaranteed to be given corner-first.
+      x0: Math.min(rect[0], rect[2]),
+      y0: Math.min(rect[1], rect[3]),
+      x1: Math.max(rect[0], rect[2]),
+      y1: Math.max(rect[1], rect[3]),
+    }
+
+    if (one.url) {
+      area.url = one.url
+    } else if (one.dest !== null && one.dest !== undefined) {
+      try {
+        const dest = typeof one.dest === 'string' ? await document.getDestination(one.dest) : one.dest
+        const ref = Array.isArray(dest) ? dest[0] : null
+        if (ref === null || ref === undefined) continue
+        area.targetPage = (await document.getPageIndex(ref)) + 1
+      } catch {
+        continue
+      }
+    } else {
+      continue
+    }
+
+    areas.push(area)
+  }
+  return areas
 }
 
 /** The shape of a pdf.js outline node, narrowed to what we read. */
@@ -170,6 +237,7 @@ export async function pdfToPages(data: ArrayBuffer | Uint8Array): Promise<PdfRea
     const pages: PdfPage[] = []
     const figures: PdfFigure[] = []
     const assets: BookAsset[] = []
+    const areas: PdfLinkArea[] = []
     for (let number = 1; number <= document.numPages; number += 1) {
       const page = await document.getPage(number)
       const viewport = page.getViewport({ scale: 1 })
@@ -183,6 +251,7 @@ export async function pdfToPages(data: ArrayBuffer | Uint8Array): Promise<PdfRea
           .filter((item): item is PdfTextItem => item !== null),
       }
       pages.push(read)
+      areas.push(...(await areasOn(document as unknown as DestinationResolver, page, number)))
 
       /*
        * The pictures are taken here, while this page is open.
@@ -204,7 +273,7 @@ export async function pdfToPages(data: ArrayBuffer | Uint8Array): Promise<PdfRea
       // to end a large import on a phone.
       page.cleanup()
     }
-    return { pages, figures, assets, outline }
+    return { pages, figures, assets, outline, areas }
   } finally {
     await task.destroy()
   }
@@ -221,8 +290,8 @@ export async function parsePdf(
   data: ArrayBuffer | Uint8Array,
   meta: BookMeta,
 ): Promise<ParsedBook> {
-  const { pages, figures, assets, outline } = await pdfToPages(data)
-  const book = assembleBook(pdfPagesToBlocks(pages, figures, outline), {
+  const { pages, figures, assets, outline, areas } = await pdfToPages(data)
+  const book = assembleBook(pdfPagesToBlocks(pages, figures, outline, areas), {
     ...meta,
     source: 'pdf',
   })

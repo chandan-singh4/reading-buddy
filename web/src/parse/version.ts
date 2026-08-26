@@ -463,4 +463,25 @@
  *
  * Every PDF on a shelf re-parses on this bump. No other format reads this code.
  */
-export const PARSER_VERSION = 32
+/**
+ * 33 — a PDF's links work.
+ *
+ * The contents page of a collection is a list of links, and every one of them
+ * was dead: the parser read a page's text and threw its annotations away. So a
+ * reader tapped the name of a volume and nothing happened, while the same tap
+ * in any PDF viewer went straight there.
+ *
+ * A PDF link is a rectangle and a destination, and it carries no text at all.
+ * The words under it have to be found from the geometry: the line is matched by
+ * its baseline, and the words are the fragments whose own strip of page overlaps
+ * the box. So the tappable stretch is the words the file marked, not the whole
+ * paragraph.
+ *
+ * An external link keeps its address. An internal one names a page, and the
+ * paragraph that opens that page is given an id to be pointed at — after which
+ * `parse/links.ts` resolves it to a permanent anchor exactly as it does for an
+ * epub. A rectangle covering no words is dropped rather than guessed at.
+ *
+ * Every PDF on a shelf re-parses on this bump. No other format reads this code.
+ */
+export const PARSER_VERSION = 33

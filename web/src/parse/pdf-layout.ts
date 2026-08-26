@@ -15,7 +15,7 @@
  * The goal is a book that reads correctly top to bottom, not a facsimile.
  */
 
-import type { Block } from './assemble.ts'
+import type { Block, RawLink } from './assemble.ts'
 
 /** One text fragment as pdf.js reports it. Origin is bottom-left. */
 export interface PdfTextItem {
@@ -34,8 +34,18 @@ export interface PdfPage {
 }
 
 /** A reconstructed line of text, with the geometry needed to group it. */
+/** Where one run of glyphs landed: its characters, and its strip of page. */
+interface Span {
+  start: number
+  end: number
+  x0: number
+  x1: number
+}
+
 interface Line {
   text: string
+  /** One per fragment pdf.js reported, in reading order. */
+  spans: Span[]
   x: number
   y: number
   /** Right-hand edge, used to tell a wrapped line from a paragraph's last line. */
@@ -105,22 +115,37 @@ const MARGIN_BAND = 0.12
  * change, so "however" can arrive as "how" + "ever" — but a genuine word gap
  * shows up as horizontal distance, which is what we test.
  */
-function joinItems(items: PdfTextItem[]): string {
+function joinItems(items: PdfTextItem[]): { text: string; spans: Span[] } {
+  const spans: Span[] = []
   let text = ''
   let previousRight: number | null = null
 
   for (const item of items) {
     if (!item.str) continue
+    const piece = item.str.replace(/\s+/g, ' ')
     if (previousRight !== null) {
       const gap = item.x - previousRight
-      const needsSpace = gap > item.height * 0.2 && !/\s$/.test(text) && !/^\s/.test(item.str)
+      const needsSpace = gap > item.height * 0.2 && !/\s$/.test(text) && !/^\s/.test(piece)
       if (needsSpace) text += ' '
     }
-    text += item.str
+    const start = text.length
+    text += piece
+    // Where this fragment's characters ended up, and the strip of page they
+    // were printed on. A link annotation is a rectangle and nothing else, so
+    // this is the only way to say which words it covers.
+    spans.push({ start, end: text.length, x0: item.x, x1: item.x + item.width })
     previousRight = item.x + item.width
   }
 
-  return text.replace(/\s+/g, ' ').trim()
+  const lead = text.length - text.trimStart().length
+  if (lead > 0) {
+    for (const span of spans) {
+      span.start = Math.max(0, span.start - lead)
+      span.end = Math.max(0, span.end - lead)
+    }
+  }
+
+  return { text: text.trim(), spans }
 }
 
 /** Group a set of items into lines, in reading order. */
@@ -145,11 +170,12 @@ function toLines(items: PdfTextItem[], pageNumber: number): Line[] {
   const lines = groups
     .map((group) => {
       const ordered = [...group].sort((a, b) => a.x - b.x)
-      const text = joinItems(ordered)
+      const { text, spans } = joinItems(ordered)
       if (!text) return null
 
       return {
         text,
+        spans,
         x: ordered[0].x,
         y: ordered[0].y,
         right: Math.max(...ordered.map((item) => item.x + item.width)),
@@ -308,6 +334,12 @@ interface Paragraph {
   /** Right edge of the widest line in it, and of its column. */
   right: number
   measure: number
+  /**
+   * The lines this paragraph was reflowed from, each with the offset at which
+   * its text begins. A link is a rectangle on one line; this is what turns that
+   * rectangle back into a character range in the paragraph a reader sees.
+   */
+  parts: { line: Line; offset: number }[]
 }
 
 /** Join a wrapped line onto the paragraph, healing hyphenation across breaks. */
@@ -347,12 +379,19 @@ function toParagraphs(lines: Line[]): Paragraph[] {
         columnLeft: line.columnLeft,
         right: line.right,
         measure: line.measure,
+        parts: [{ line, offset: 0 }],
       }
       paragraphs.push(current)
     } else {
-      current.text = appendLine(current.text, line.text)
+      // Where this line's first character lands once it is joined on. The two
+      // cases are `appendLine`'s two cases: a healed hyphen eats a character,
+      // and every other join adds a space.
+      const before = current.text
+      const offset = /[-‐]$/.test(before) ? before.length - 1 : before.length + 1
+      current.text = appendLine(before, line.text)
       current.lineCount += 1
       current.right = Math.max(current.right, line.right)
+      current.parts.push({ line, offset })
     }
 
     previous = line
@@ -513,6 +552,7 @@ function applyOutline(
         columnLeft: 0,
         right: 0,
         measure: 0,
+        parts: [],
       }
       levels.set(paragraph, Math.min(entry.depth + 1, 6))
       return paragraph
@@ -544,10 +584,103 @@ function looksCentred(paragraph: Paragraph): boolean {
   return Math.abs(leftGap - rightGap) < size * CENTRED_SLACK
 }
 
+/**
+ * One link annotation, as the file records it.
+ *
+ * A PDF link is a rectangle with a destination. It carries no text: the words
+ * under it are whatever happens to be printed there, which is why this has to be
+ * matched back to the page geometry rather than read off.
+ */
+export interface PdfLinkArea {
+  page: number
+  /** In PDF space: origin bottom-left, so `y1` is the *top* of the box. */
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+  /** Somewhere else in this file. */
+  targetPage?: number
+  /** Somewhere outside it. */
+  url?: string
+}
+
+/** The id given to the paragraph that opens a page something links to. */
+function pageId(page: number): string {
+  return `pdf-page-${page}`
+}
+
+/**
+ * Turn link rectangles into character ranges.
+ *
+ * The destination is the easy half. The hard half is *which words* — a rectangle
+ * says nothing about text, so the line it sits on is found by its baseline, and
+ * the words are the fragments whose own strip of page overlaps it.
+ *
+ * A link whose rectangle matches no text is dropped. That is the honest outcome:
+ * a link with no words to tap cannot be drawn, and inventing a range would put a
+ * tappable stretch somewhere the file never asked for one.
+ */
+function attachLinks(
+  paragraphs: Paragraph[],
+  areas: readonly PdfLinkArea[],
+): { links: Map<Paragraph, RawLink[]>; ids: Map<Paragraph, string[]> } {
+  const links = new Map<Paragraph, RawLink[]>()
+  const ids = new Map<Paragraph, string[]>()
+
+  for (const area of areas) {
+    const href = area.url ?? (area.targetPage === undefined ? null : `#${pageId(area.targetPage)}`)
+    if (!href) continue
+
+    for (const paragraph of paragraphs) {
+      let found = false
+      for (const part of paragraph.parts) {
+        if (part.line.page !== area.page) continue
+        // The baseline sits inside the box. A rectangle is drawn round the
+        // whole line, so its foot is at or just below where the glyphs stand.
+        if (part.line.y < area.y0 - part.line.fontSize || part.line.y > area.y1) continue
+
+        const covered = part.line.spans.filter((span) => span.x1 > area.x0 && span.x0 < area.x1)
+        if (covered.length === 0) continue
+
+        const start = Math.min(...covered.map((span) => span.start)) + part.offset
+        const end = Math.max(...covered.map((span) => span.end)) + part.offset
+        if (end <= start) continue
+
+        const list = links.get(paragraph) ?? []
+        list.push({ start, end, href })
+        links.set(paragraph, list)
+        found = true
+        break
+      }
+      if (found) break
+    }
+  }
+
+  /*
+   * Give every page something points at a name to be pointed at.
+   *
+   * `parse/links.ts` resolves a link by looking its destination up among the
+   * ids blocks carry, so a destination with no id resolves to nothing and the
+   * link is dropped as inert. The first paragraph on the page is the closest
+   * thing a PDF has to the place a page-level destination means.
+   */
+  const wanted = new Set(
+    areas.map((area) => area.targetPage).filter((page): page is number => page !== undefined),
+  )
+  for (const page of wanted) {
+    const opener = paragraphs.find((paragraph) => paragraph.page === page)
+    if (!opener) continue
+    ids.set(opener, [...(ids.get(opener) ?? []), pageId(page)])
+  }
+
+  return { links, ids }
+}
+
 export function pdfPagesToBlocks(
   pages: PdfPage[],
   figures: readonly PdfFigure[] = [],
   outline: readonly PdfOutlineEntry[] = [],
+  areas: readonly PdfLinkArea[] = [],
 ): Block[] {
   const lines = pages.flatMap((page, index) => {
     const items = page.items.filter((item) => item.str.trim() !== '')
@@ -570,6 +703,14 @@ export function pdfPagesToBlocks(
    */
   const fromOutline = outline.length > 0 ? applyOutline(paragraphs, outline) : null
 
+  /*
+   * The file's own links, matched to the words they cover.
+   *
+   * After the outline, because promoting a two-line title joins two paragraphs
+   * into one and moves every offset in it.
+   */
+  const { links: linksIn, ids: idsIn } = attachLinks(paragraphs, areas)
+
   // Rank the heading sizes present, largest first, so the biggest text in the
   // document becomes level 1 and the next size down level 2. The assembler then
   // maps whatever it finds onto chapters and sections.
@@ -583,6 +724,13 @@ export function pdfPagesToBlocks(
       paragraphs.filter(couldBeHeading).map((p) => Math.round(p.fontSize * 2) / 2),
     ),
   ].sort((a, b) => b - a)
+
+  const dress = (paragraph: Paragraph, block: Block): Block => {
+    const links = linksIn.get(paragraph)
+    const ids = idsIn.get(paragraph)
+    if (!links && !ids) return block
+    return { ...block, ...(links ? { links } : {}), ...(ids ? { ids } : {}) }
+  }
 
   const blockOf = (paragraph: Paragraph): Block => {
     if (fromOutline) {
@@ -630,7 +778,7 @@ export function pdfPagesToBlocks(
     return { kind: 'prose', text: paragraph.text }
   }
 
-  return withFigures(paragraphs, figures, blockOf)
+  return withFigures(paragraphs, figures, (paragraph) => dress(paragraph, blockOf(paragraph)))
 }
 
 /**

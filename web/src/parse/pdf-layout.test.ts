@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { pdfPagesToBlocks, type PdfPage, type PdfTextItem } from './pdf-layout.ts'
+import { assembleBook } from './assemble.ts'
 
 const PAGE_WIDTH = 600
 const PAGE_HEIGHT = 800
@@ -470,5 +471,77 @@ describe('pdfPagesToBlocks — headings the outline does not name', () => {
       ['heading', 'IV. THE TRUTH WHICH CONSCIOUS CERTAINTY OF SELF REALIZES'],
       ['prose', 'IN the kinds of certainty hitherto considered, the truth is.'],
     ])
+  })
+})
+
+describe('pdfPagesToBlocks — the links a PDF carries', () => {
+  /*
+   * A PDF link is a rectangle and a destination. It holds no text at all, so the
+   * words under it have to be found from the page geometry — which is what
+   * these check. `line()` places text at `x` with a given width, and the
+   * rectangle is written in PDF space, where y counts up from the foot.
+   */
+  const y = (fromTop: number) => PAGE_HEIGHT - fromTop
+
+  it('links exactly the words the rectangle covers', () => {
+    // pdf.js reports a line in fragments, not whole. Two here, so the rectangle
+    // has something to cover and something to leave alone.
+    const blocks = pdfPagesToBlocks(
+      [
+        page([
+          line('Read the', 100, { x: LEFT, width: 60 }),
+          line('preface and then begin.', 100, { x: LEFT + 64, width: 200 }),
+        ]),
+      ],
+      [],
+      [],
+      [{ page: 1, x0: LEFT, y0: y(100) - 4, x1: LEFT + 60, y1: y(100) + 10, url: 'https://x.test' }],
+    )
+    const [block] = blocks
+    expect(block.links).toBeDefined()
+    const link = block.links![0]
+    // The range is a real slice of the text a reader sees, not the whole line.
+    expect(block.text.slice(link.start, link.end)).toBe('Read the')
+    expect(link.href).toBe('https://x.test')
+  })
+
+  it('turns a destination page into an anchor a reader can follow', () => {
+    const book = assembleBook(
+      pdfPagesToBlocks(
+        [
+          page([line('Go to the second volume.', 100, { width: 120 })]),
+          page([line('The second volume begins here.', 100, { width: 150 })]),
+        ],
+        [],
+        [],
+        [{ page: 1, x0: LEFT, y0: y(100) - 4, x1: LEFT + 200, y1: y(100) + 10, targetPage: 2 }],
+      ),
+      { id: 'b', title: 'T', author: 'A', source: 'pdf', shelf: 'book', importedAt: '2026-08-26T00:00:00.000Z' } as never,
+    )
+
+    const all = book.sections.flatMap((section) => section.paragraphs)
+    const from = all.find((paragraph) => paragraph.links)
+    const to = all.find((paragraph) => paragraph.text.startsWith('The second volume'))
+    expect(from?.links?.[0].anchor).toBe(to?.anchor)
+    // Resolved links drop the raw destination, so nothing can follow both.
+    expect(from?.links?.[0].url).toBeUndefined()
+    // The ids used to resolve it never reach storage.
+    expect(to?.ids).toBeUndefined()
+  })
+
+  it('drops a rectangle that covers no words', () => {
+    const blocks = pdfPagesToBlocks(
+      [page([line('Nothing is linked here.', 100)])],
+      [],
+      [],
+      [{ page: 1, x0: 0, y0: y(400), x1: 20, y1: y(390), url: 'https://x.test' }],
+    )
+    expect(blocks[0].links).toBeUndefined()
+  })
+
+  it('adds nothing to a file with no links', () => {
+    const blocks = pdfPagesToBlocks([page([line('Plain prose.', 100, { width: 80 })])])
+    expect(blocks[0].links).toBeUndefined()
+    expect(blocks[0].ids).toBeUndefined()
   })
 })
