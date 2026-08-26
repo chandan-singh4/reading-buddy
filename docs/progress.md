@@ -15,7 +15,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2049 tests across 112 files.
+  2053 tests across 112 files.
 - **A flaky test teardown, not ours to blame on WP-16.** `vitest run` reports one
   unhandled error from `HandDrawn.tsx` — a coalesced measure fires after jsdom
   has been torn down and the stored range can no longer be measured. Every test
@@ -33,7 +33,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 ### Recently done
 
 - **The book reads itself out loud** (2026-08-25). WP-16 is closed. Build green:
-  2049 tests across 112 files.
+  2053 tests across 112 files.
   - Read aloud was one sentence, said once, with no way to stop it. It is now a
     voice that keeps going: from the selection, through the section, into the
     next one, until the reader stops it.
@@ -148,134 +148,6 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     by `scrollWidth`, and a transform never changes `scrollWidth`. The toolbar
     now stays up during a jump, as it always did.
 
-- **The speaker, properly this time, and a lie the dictionary was telling**
-  (2026-08-25). Build green: 1938 tests across 107 files.
-  - **Root cause of the vanishing speaker: the cache, not a race.** The word
-    cache keeps the *parsed* entry and is read before the network, and the row
-    had no version. So the audio-path fix of 2026-08-24 never reached any word
-    the reader had already looked up. Measured: the old path answers 403, the
-    new one 200. New `DEFINITION_VERSION` in `storage/words.ts`, now 2. A row
-    from an older parser counts as a miss. The first guess — an unheld `Audio`
-    element being collected — was wrong, and "it fails every time" is what
-    ruled it out.
-  - **The speaker never disappears again, for any reason.** It dims, disables
-    and says "no recording" to a screen reader.
-  - **A malfunctioning MW is no longer reported as "no dictionary entry".** A
-    broken MW and a word MW lacks are the same 200 and the same array of
-    strings. On 2026-08-25 the Collegiate endpoint answered that way for
-    `cat`, `dog`, `water`, `person` and `fundamental` for about half an hour,
-    then recovered on its own. `mwKnowsTheWord` reads MW echoing the word back
-    as its own first suggestion, which a genuine miss cannot do, and the panel
-    says "try again in a moment" instead of naming the word as unknown.
-  - **The first explanation for that was wrong, and is recorded as wrong.** It
-    was called a spent daily quota. The reader's usage report disproved it: 30
-    hits in 30 days. Also ruled out by measurement — swapped keys, an invalid
-    key, a rate limit, response caching, and common words being treated
-    differently. See the note on `mwKnowsTheWord` in `reader/dictionary.ts`.
-  - **A tapped plural is defined again.** The reader reported "physicians"
-    saying there were no matches while "physician" worked. MW was never at
-    fault: it resolves the plural and answers with the "physician" entry, and
-    `entriesFor` then dropped everything it sent, because it kept only entries
-    whose headword equalled the tapped word. It now falls back to MW's own
-    `meta.stems` — the list of forms each entry covers — so the matching is
-    MW's answer, not a stemmer of ours. Measured live: `physicians`, `cities`,
-    `happier` and `walked` have no exact entry and one stem match each;
-    `geese`, `ran`, `running`, `mice` and `better` match exactly and are
-    untouched. The panel is titled with the word MW defined.
-  - **An earlier "nothing to build" here was wrong.** `persons` was tested and
-    happened to match exactly, and that one word was taken as proof for the
-    whole class. One passing example is not a rule.
-
-- **Four fixes off the phone** (2026-08-25). Build green: 1929 tests across 107
-  files.
-  - **Home paints once.** The greeting sat outside the load gate and the shelf
-    inside it, so a cold launch showed the greeting alone for about a second
-    while the covers loaded. Both are behind the gate now.
-  - **The screen stays awake in a book.** New `reader/wakeLock.ts`. The browser
-    drops a wake lock every time the page hides and does not give it back, so
-    the module re-takes it on `visibilitychange` — a one-shot request would have
-    worked until the reader's first interruption and then stopped silently.
-  - **A sheet closes on a swipe down.** In `Sheet`, so every sheet gains it. The
-    gesture is on the handle strip only: `ModelGrid` drags its own columns.
-  - **The speaker stops vanishing.** `new Audio(url).play()` kept no reference to
-    the element, and an unreachable media element that is still loading can be
-    collected, which rejects the `play()` in flight. The panel now holds one
-    element. It also no longer removes the button on any failure — only on
-    `NotSupportedError`. Not the URL: "fundamental" maps to `fundam02`, which
-    answers 200.
-
-- **Define — the dictionary loupe** (2026-08-24, `f79cf19` … `0200625`). A
-  reader selects a word, taps **Define**, and a glass panel opens beside it —
-  headword, MW respelling, up to three senses, synonym chips, and the origin as
-  a chain of roots from oldest to newest. Merriam-Webster is the source, through
-  a new edge relay `api/define.ts` that holds the keys.
-  - **The cache is checked before the network.** What is kept is the *parsed*
-    entry, so a word looked up once opens instantly and works with no signal.
-  - **The origin chain is reversed.** MW writes the newest form first; the
-    reader wants the oldest first. It falls back to plain prose when it cannot
-    find two clean hops.
-  - **Four failures, four answers.** No entry, offline, out of lookups, and
-    "something went wrong". Every one of them still offers Ask Veda.
-  - **The glass follows the theme.** Forest is green glass, not amber.
-  - **Save word keeps a word**, in a `vocabulary` table at Dexie v15. The Notes
-    panel has a fifth tab, **Words**, listing them across every book. Tapping
-    the button again lets a word go.
-  - **Five faults found by using it, all fixed the same day.** The panel closed
-    itself in the same frame (a second `useBackDismiss` fighting the Reader's);
-    an empty rectangle list left it hidden; the speaker played nothing (MW
-    serves audio from `/audio/prons/en/us/mp3/`, and the other documented path
-    answers 403); every sense showed the same example (`def` is one entry per
-    part of speech, not per sense); and a saved word could not be un-saved.
-- **The tutor is named Veda, and five fixes off the phone** (2026-08-24,
-  `f602f9e`). The selection excerpt scrolls; the Notes paper scrolls with the
-  words and the red margin runs the whole page; tutor replies draw as markdown;
-  an ask that fails while the app is in the background retries once on return.
-- **A publisher's field name no longer shows as a subject tag** (2026-08-23,
-  `e7c1b23`). A book listed `review_metadata` as its only subject. An EPUB's
-  `dc:subject` is copied out of the file verbatim by `parse/epub.ts`, and
-  nothing judged it. `subjectTags` in `pages/BookInfo.tsx` now drops a tag that
-  has no space *and* contains an underscore. The rule is narrow on purpose:
-  `Self-Help` and `Philosophy` keep their place. It runs at display time, so
-  the stored record stays a true copy of the file.
-- **Study Lamp round two — the reader's first-use feedback** (2026-08-21).
-  Four fixes off one report:
-  - **A slip per sentence.** `TutorMarks.tsx` places each thread's slip at the
-    end of its own last inked line, clamped inside the paragraph. Two threads
-    in one paragraph no longer stack their slips on the same corner.
-  - **Notes can be deleted.** Every row in the Notes tab carries a small ×.
-    A tutor row's × deletes the whole thread and its page marks
-    (`dropNoteRow` in `Reader.tsx`).
-  - **Tutor threads show under Notes → Claude.** `Reader.tsx` merges threads
-    into `noteRows` through `inNoteOrder`. A row shows the elided passage and
-    Claude's last reply; a tap reopens the thread under the lamp, not the page.
-  - **Larger fonts** in the Study Lamp and the Notes slips. The Caveat
-    handwriting stayed at 22 px — its line height must equal the 32 px rule.
-  - 4 new NotesPanel tests; 1512 total, all green. The slip positions and the
-    delete feel still need the phone.
-
-- **The Study Lamp — Ask Claude is a room now** (2026-08-21). This is the first
-  visible piece of the tutor loop (WP-17 → 20).
-  - The selection menu's four Ask rows became one bronze `✦ ASK CLAUDE` entry.
-  - It opens a full-screen, always-dark room over the page: the passage in
-    Cormorant Garamond, four question chips, and a composer. A long passage
-    fades into shadow with `▴ TAP TO PIN`; after the first exchange the passage
-    collapses to a one-line pinned bar.
-  - Your words are handwriting; Claude's are a printed slip with a ✦ badge.
-  - Threads live in a new `tutor` table (Dexie `version(12)`), device-local
-    like notes. One thread per passage — asking again reopens it.
-  - Closing the room leaves a hand-drawn ink line under the passage and a tiny
-    tucked slip at its corner. `TutorMarks.tsx` paints them with the same
-    column-fold measuring machinery as `HandDrawn.tsx`, now shared via exports.
-  - `askTutor` posts to `/api/tutor`. No relay exists yet, so a canned reply
-    says the tutor is offline. It never fakes an answer. The system prompt and
-    the key belong to the relay, server-side only, never a `VITE_` variable.
-  - The lamp counts as a layer: back swipe and Escape close it first.
-  - Proved in the running app: the full loop, persistence across a reload, and
-    the marks returning from the database. 8 new tests cover `elide`,
-    `passageKindOf` and the store. Deleting a book now clears its notes and
-    tutor threads too — the notes cascade was a pre-existing gap.
-
-
 > **Older entries are deleted, not archived.** Only the five newest survive —
 > see this file's own header. Git holds every earlier version of this file, so
 > nothing is lost: `git log -p docs/progress.md` brings back any entry ever
@@ -291,6 +163,14 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   worker problem. Don't raise it again.
 
 ### Next up
+**Prove the reading voice on the phone.** WP-16 is built and tested, but three
+of its faults were only visible on a device. `active-task.md` lists eight checks.
+The voice choice is the one that still needs proof: the fix assumes the engine
+ignores a voice when no language is set.
+
+**Then choose the next waypoint with `/plan-task`.** WP-09 is the next
+foundation — WP-10, WP-18, WP-21 and WP-28 all wait on it.
+
 **Judge the parser on the phone.** Accept the rebuild to `PARSER_VERSION` 28 and
 check the Contents tab. This needs no code. It is the only way to know if the
 four parser rounds have landed.

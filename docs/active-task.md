@@ -23,7 +23,7 @@ rewriting, and a finished WP-25 sat at the top and was proposed three times.
 
 ## State — 2026-08-25
 
-Nothing is mid-edit. Build green: 2049 tests across 112 files. `main` is pushed.
+Nothing is mid-edit. Build green: 2053 tests across 112 files. `main` is pushed.
 
 The AI tutor works end to end: a reader selects a passage, taps a chip, and a
 live model streams a warm answer into the Study Lamp. The reader picks the
@@ -33,6 +33,9 @@ Merriam-Webster loupe beside the word.
 ## Task — none in flight
 
 WP-16 closed on 2026-08-25. Nothing is chosen for next. Run `/plan-task`.
+
+**Do the device checks below first.** Three of WP-16's faults were only visible
+on a phone. The voice fix is the one that is still unproved.
 
 **Files in scope:** none yet.
 
