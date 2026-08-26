@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { NotesPanel, type NoteRow, type WordRow } from './NotesPanel.tsx'
+import styles from './NotesPanel.module.css'
 import type { Anchor } from '../structure/index.ts'
 
 function note(id: string, author: 'you' | 'claude', chapter = 1): NoteRow {
@@ -61,6 +62,25 @@ describe('the notes tab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Bold and plain/ }))
     expect(onOpenThread).toHaveBeenCalledWith('thread-2')
+  })
+
+  it('gives Veda a hand of her own, apart from the reader’s', () => {
+    /*
+     * Two hands share this list: the reader's kept quotes in blue Caveat, and
+     * Veda's answers in violet Kalam. The colours live in the stylesheet, but
+     * the split that carries them is structural — the tutor's words go through
+     * the markdown container, the reader's do not — so that is what is checked
+     * here. If a change ever routes a quote through the same container, the two
+     * hands become one and this fails.
+     */
+    draw([note('1', 'you'), note('2', 'claude')])
+
+    const veda = screen.getByText('Claude says 2')
+    expect(veda.closest(`.${styles.txt}`)).toBeTruthy()
+
+    const mine = screen.getByText('My thought 1')
+    expect(mine.className).toContain(styles.hand)
+    expect(mine.closest(`.${styles.txt}`)).toBeNull()
   })
 
   it('marks Veda’s notes as Veda’s, and never the reader’s', () => {

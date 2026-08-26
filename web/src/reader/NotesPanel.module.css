@@ -206,15 +206,25 @@
 /* --- Claude's slip -------------------------------------------------------- */
 
 .slip {
+  /*
+   * Veda's inks. Named here rather than in the theme because they belong to one
+   * voice, not to the app: nothing outside this slip should be able to reach
+   * them. The bar, the bullets and the quote rule are all the same violet, so
+   * the slip reads as one hand's marginalia and not as four decorations.
+   */
+  --veda-ink: #463a8d;
+  --veda-ink-strong: #291f66;
+  --veda-bar: #7c6fca;
+
   position: relative;
   display: block;
   width: 100%;
   margin: 6px 0 4px;
-  padding: 10px 12px;
-  border: 1px solid #ddd3f0;
-  border-left: 3px solid var(--claude);
+  padding: 10px 12px 10px 14px;
+  border: 1px solid #dcd8f0;
+  border-left: 3px solid var(--veda-bar);
   border-radius: 3px;
-  background: #f2eef8;
+  background: linear-gradient(180deg, #eeecf8, #e9e6f6);
   box-shadow: 1px 2px 6px rgb(60 48 28 / 10%);
   text-align: left;
   cursor: pointer;
@@ -241,7 +251,7 @@
 .who {
   display: block;
   margin-bottom: 4px;
-  color: var(--claude);
+  color: var(--veda-bar);
   font-family: var(--font-ui);
   font-size: 11px;
   font-weight: 700;
@@ -250,29 +260,102 @@
 }
 
 /*
- * The answer, in markdown, printed rather than lit.
+ * The answer, in Veda's own hand.
  *
  * `markdown.module.css` is written for the lamp — warm ink on a dark page — and
- * every colour in it reads a `--md-*` token first. The same answer on white
- * paper needs those five inks re-named and nothing else. Without this the
- * headings and the table rules would be pale gold on near-white, which is a
- * heading you cannot read.
+ * every colour in it reads a `--md-*` token first. Re-naming those tokens is
+ * what stops the headings and the table rules from arriving as pale gold on
+ * near-white paper, which is a heading nobody can read.
+ *
+ * Here they are re-named to violet, and the face becomes Kalam. The point is
+ * to say who wrote the words without a label: the reader's own kept quotes are
+ * blue Caveat a few slips down this same list, so two hands on one page must
+ * differ in both the face and the ink. One alone is too easy to miss.
  */
 .txt {
-  --md-strong: var(--ink);
-  --md-quiet: var(--ink-soft);
-  --md-faint: var(--ink-faint);
-  --md-mark: var(--claude);
-  --md-link: var(--pen);
-  --md-code: var(--ink);
-  --md-edge: rgb(122 92 192 / 28%);
-  --md-wash: rgb(122 92 192 / 8%);
+  --md-strong: var(--veda-ink-strong);
+  --md-quiet: var(--veda-ink);
+  --md-faint: rgb(70 58 141 / 62%);
+  --md-mark: var(--veda-bar);
+  --md-link: var(--veda-ink-strong);
+  --md-code: var(--veda-ink-strong);
+  --md-edge: rgb(124 111 202 / 34%);
+  --md-wash: rgb(124 111 202 / 12%);
 
   display: block;
-  color: var(--ink);
-  font-family: var(--font-ui);
+  color: var(--veda-ink);
+  font-family: Kalam, cursive;
+  font-size: 18px;
+  line-height: 29px;
+}
+
+/*
+ * Why the rules below are written against elements and not against the classes
+ * in `markdown.module.css`.
+ *
+ * The renderer is shared: the same component draws the tutor's answer in the
+ * lamp, where it is warm ink on a dark page. Its colours all come through
+ * `--md-*` tokens, which is why the block above is mostly a list of inks. But a
+ * face and a weight are not tokens there, and inventing tokens for them would
+ * push a decision that belongs to this one slip back into the shared file.
+ *
+ * So the handwriting is applied from outside, by element, scoped to `.txt`.
+ * Nothing here can reach any other caller of the renderer — the Ask-Veda chat
+ * overlay keeps its typeset face — and `markdown.module.css` never changes.
+ */
+
+/* Kalam has no 600, so the shared 600 would be synthesised. 700 is a real cut,
+   and it is the weight that makes `**bold**` read as bold in a hand. */
+.txt h1,
+.txt h2,
+.txt h3,
+.txt h4,
+.txt h5,
+.txt h6 {
+  color: var(--veda-ink-strong);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.txt strong {
+  font-weight: 700;
+}
+
+.txt em {
+  font-style: italic;
+}
+
+/* The disc a browser draws is a printed mark sitting next to a written line.
+   Replaced with a violet bullet of the note's own. Bullet lists only: a
+   numbered list keeps its numbers. */
+.txt ul {
+  padding-left: 0;
+  list-style: none;
+}
+
+.txt ul > li {
+  position: relative;
+  padding-left: 20px;
+}
+
+.txt ul > li::before {
+  content: '•';
+  position: absolute;
+  left: 3px;
+  color: var(--veda-bar);
+}
+
+.txt blockquote {
+  border-left: 2.5px solid var(--veda-bar);
+}
+
+/* The one thing that is not written by hand. Handwritten code cannot be read
+   character by character, which is the only way code is ever read. */
+.txt code,
+.txt pre {
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 /* --- Chapter dividers ----------------------------------------------------- */

@@ -1,81 +1,64 @@
 # Active task
 
-> **What's in here (read at every startup).** The single task in flight right
-> now — its goal, its definition of done, the exact list of files to open, and
-> what's explicitly out of scope. This is the linchpin of the token strategy: the
-> build session reads *only* the paths under "Files in scope" and nothing else. If
-> a task genuinely needs another file, add its path here with a one-line reason
-> rather than scanning the repo. Rewritten at the end of every session by
-> `/wrap-session` so the next one resumes without re-reading code.
+> **What's in here:** the one task in flight, its definition of done, and the
+> exact files the build session may open. Read this first, every session.
 
----
+## Task
 
-**Rewrite this file. Do not add to it.** One task lives here at a time.
+**VEDA-INK — Veda's notes in a handwriting face (Kalam, violet ink).**
 
-**Where the overflow goes.** If a task needs more background than fits here,
-put it in `docs/progress.md` and link to it — do not grow this file. When a task
-is finished, delete it from *both* files. `progress.md` keeps only the five most
-recent done items and drops the rest. Nothing is archived to a third file: git
-holds every earlier version, and `git log -p` brings any of it back.
+This is not a backlog waypoint. It is a styling change the reader asked for.
+The source is `design-inspiration/veda-handwriting-build-prompt.md`. The visual
+truth is `design-inspiration/veda-handwriting-fonts.html`.
 
-This file grew to 36 KB by 2026-08-25 because sessions appended instead of
-rewriting, and a finished WP-25 sat at the top and was proposed three times.
+Veda's notes render in the app's typeset face. They must read as a tutor's hand
+in the reader's notebook. The reader's own Quotes stay in blue Caveat. Veda must
+look like a different hand: a different face **and** a different ink.
 
-## State — 2026-08-25
+## Definition of done
 
-Nothing is mid-edit. Build green: 2053 tests across 112 files. `main` is pushed.
+1. A Veda note in the Notes tab shows Kalam in violet ink. A heading, `**bold**`,
+   `*italic*`, a bullet list, and a block quote all use the hand. Bold uses true
+   Kalam 700, not a faux weight.
+2. Inline code and fenced code stay in the monospace face, in a soft tinted box.
+3. A Quote note and a Veda note in the same list read as two different hands.
+   The Quotes rules do not change.
+4. `npm run build` is green and the Notes tests still pass.
 
-The AI tutor works end to end: a reader selects a passage, taps a chip, and a
-live model streams a warm answer into the Study Lamp. The reader picks the
-model. Notes, highlights and saved words are written and listed. Define opens a
-Merriam-Webster loupe beside the word.
+## How to do it (the shape, not the code)
 
-## Task — none in flight
+The markdown renderer already reads every colour from a `--md-*` token, with a
+fallback. `NotesPanel.module.css` already names five of those tokens for the
+Notes tab. So the change is a token override plus a `font-family` on the note
+slip. **Do not edit `markdown.tsx`.**
 
-WP-16 closed on 2026-08-25. Nothing is chosen for next. Run `/plan-task`.
+- Put the new tokens and the face on `.txt` (or `.slip`) in
+  `NotesPanel.module.css`. That class *is* the `veda-note` gate the build prompt
+  asks for. The Ask-Veda chat overlay in `StudyLamp` uses the same renderer with
+  its own tokens, so it stays typeset. This answers the prompt's open question.
+- Kalam is self-hosted with `@fontsource`, not Google Fonts. The app must work
+  offline, so **do not add a `fonts.googleapis.com` link.** `fonts.css` declares
+  Kalam 400 and 700. If the prompt's weight 300 is wanted, add a third
+  `@font-face` that points at the `@fontsource/kalam` 300 file. Check that file
+  exists first. If it does not, use 400 and say so.
+- The reference file gives the sizes: body about 21px on a 38px line, `h3` about
+  26px at weight 700. The Notes slip is narrow. Scale the sizes down if 21px
+  breaks the slip, and report what you chose.
 
-**Do the device checks below first.** Three of WP-16's faults were only visible
-on a phone. The voice fix is the one that is still unproved.
+## Files in scope
 
-**Files in scope:** none yet.
+- `web/src/reader/NotesPanel.module.css` — the tokens, the face, the ink.
+- `web/src/styles/fonts.css` — a Kalam 300 `@font-face`, only if needed.
+- `web/src/reader/markdown.module.css` — only if a rule cannot be reached by a
+  token. Prefer a new token over a rule change here.
+- `web/src/reader/NotesPanel.test.tsx` — a test that a Veda note carries the
+  Veda class and a Quote does not.
+- `design-inspiration/veda-handwriting-fonts.html` — read only. The visual truth.
 
-## Not proved on a device — the reading voice
+## Out of scope
 
-1. **Ask for read-aloud and leave it running.** It must cross paragraphs and
-   then a section boundary without being touched.
-2. **Watch the mark and the page.** The blue wash must sit on the sentence being
-   said, and the page must turn itself when the voice leaves it.
-3. **The transport.** Pause, resume, back, next, and each speed. A resumed
-   sentence starts again from its beginning — that is on purpose.
-4. **The voice list.** The Aa tab's Mode pane lists the phone's voices. Choose
-   one while nothing is being read: it must say a short line in that voice. If
-   every voice sounds the same, the phone has one engine under many names, and
-   the app is not at fault. Choose one mid-sentence: the sentence restarts in
-   the new voice.
-5. **Leave the book while it is reading.** The voice must stop.
-6. **A sentence that runs over a page break.** The page must turn as the last
-   word on it is said, not when the next sentence starts, and the turn must be
-   the ordinary sheet. Expect a short pause at the break: the sentence is said
-   as two utterances and the pause is where the page turns.
-7. **Start in the middle of a paragraph.** Select its third or fourth sentence
-   and ask to be read to. It must start there, not at the paragraph's top.
-8. **Press stop.** It must stop. It must not move to the next chapter — that
-   was the reported fault, and it is fixed and tested, but prove it by hand.
-
-## Not proved on a device — a PDF's figures
-
-1. **Import a PDF with plates in it.** Every piece has tests; no test can say
-   whether the bands land on the figures. Check that a picture appears where one
-   belongs, that the Ask button under it answers about the picture, and that no
-   Ask button appears under a strip of blank paper.
-2. **A long PDF, for time.** One page is drawn for every page that holds a band.
-   A book of plates draws a lot of pages, on a phone, during import.
-
-## A lesson worth keeping
-
-One passing example is not a rule. Test the class, not the case. Written after
-"persons" was read as proof that plurals worked, and "physicians" was not.
-
-## Note on the docs, 2026-08-25
-
-Where a backlog status box and the code disagree, trust the code and fix the box.
+- `web/src/reader/markdown.tsx`. No parsing change. No sanitizing change.
+- The Quotes note rules: `.hand`, `.tag`, `.tagRow`, and the Caveat face.
+- `web/src/reader/StudyLamp.module.css` and the Ask-Veda chat overlay.
+- Any PDF or EPUB parsing file.
+- `PARSER_VERSION`. This change does not touch a parsed book.
