@@ -829,3 +829,26 @@
   background: transparent;
 }
 
+
+/*
+ * The twist beside a chapter that has rows under it.
+ *
+ * Set in the muted colour rather than the accent: it says a row can open, and
+ * the row's own words are what the reader is reading. A `flex: none` so it never
+ * squeezes the title, and a fixed width so every title in the list starts at the
+ * same place whether or not its chapter has one.
+ */
+.contentsTwist {
+  flex: none;
+  width: 1em;
+  margin-right: 0.15em;
+  font-size: 0.75em;
+  color: var(--color-text-muted);
+  transition: transform var(--motion-ui) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contentsTwist {
+    transition: none;
+  }
+}

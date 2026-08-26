@@ -24,7 +24,7 @@
  *   paper, not in the toolbar.
  */
 
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
 import { stepThrough, swipeOf, type Touch } from './swipe.ts'
@@ -256,6 +256,50 @@ export function Chrome({
       entry.chapter === here.chapter &&
       entry.section === here.section,
   )
+
+  /**
+   * How many rows each chapter has under it.
+   *
+   * A chapter with none is an ordinary link and must stay one: most epubs have
+   * no second level at all, and giving those books a twist to press would be a
+   * control that never does anything.
+   */
+  const childCount = new Map<number, number>()
+  for (const entry of outline) {
+    if (entry.section === undefined) continue
+    childCount.set(entry.chapter, (childCount.get(entry.chapter) ?? 0) + 1)
+  }
+
+  /*
+   * Which chapters are open.
+   *
+   * Collapsed by default, because the list this exists for is long: a collected
+   * works gives 19 volumes and 321 children, and 340 rows in one scroll is not
+   * a contents page, it is a haystack.
+   *
+   * The chapter the reader is in is always open. Two reasons, and the second is
+   * the one that would have been a bug: it is the part of the book they are
+   * most likely to be asking about, and the "open the list at the reader"
+   * effect below scrolls to their row — which cannot be found if it is inside a
+   * chapter that is shut.
+   */
+  const [openChapters, setOpenChapters] = useState<ReadonlySet<number>>(
+    () => new Set([here.chapter]),
+  )
+
+  const toggleChapter = (chapter: number) =>
+    setOpenChapters((was) => {
+      const next = new Set(was)
+      if (!next.delete(chapter)) next.add(chapter)
+      return next
+    })
+
+  /* Opening the panel always reveals where the reader is. Runs before the
+     scroll effect below, which depends on that row being rendered. */
+  useLayoutEffect(() => {
+    if (!sheetOpen || sheetTab !== 'contents') return
+    setOpenChapters((was) => (was.has(here.chapter) ? was : new Set(was).add(here.chapter)))
+  }, [sheetOpen, sheetTab, here.chapter])
 
   /*
    * Open the contents at the reader, not at page one.
@@ -600,6 +644,14 @@ export function Chrome({
 
               <ul className={styles.contentsList}>
                 {outline.map((entry) => {
+                  // A child of a shut chapter is not drawn at all.
+                  if (entry.section !== undefined && !openChapters.has(entry.chapter)) {
+                    return null
+                  }
+
+                  const children = entry.section === undefined ? (childCount.get(entry.chapter) ?? 0) : 0
+                  const open = openChapters.has(entry.chapter)
+
                   /*
                     The one row that is *you*, and it must be exactly one.
                     Marking the chapter row as well as the section row inside it
@@ -630,9 +682,25 @@ export function Chrome({
                         aria-current={reading ? 'true' : undefined}
                         /* The dots are decoration, so the number has to be said
                            in words to anyone who can't see them line up. */
-                        aria-label={label}
-                        onClick={() => onJumpTo(entry.chapter, entry.section ?? 1)}
+                        aria-label={
+                          children > 0
+                            ? `${entry.title}, ${children} inside${open ? ', open' : ''}`
+                            : label
+                        }
+                        /* A chapter with rows under it opens them; every other
+                           row goes where it says. See `openChapters`. */
+                        aria-expanded={children > 0 ? open : undefined}
+                        onClick={() =>
+                          children > 0
+                            ? toggleChapter(entry.chapter)
+                            : onJumpTo(entry.chapter, entry.section ?? 1)
+                        }
                       >
+                        {children > 0 && (
+                          <span className={styles.contentsTwist} aria-hidden="true">
+                            {open ? '▾' : '▸'}
+                          </span>
+                        )}
                         <span className={styles.contentsTitle}>{entry.title}</span>
                         <span className={styles.contentsLeader} aria-hidden="true" />
                         <span className={styles.contentsPage} aria-hidden="true">

@@ -101,8 +101,12 @@ function bookOf(): ParsedBook {
         title: 'The Beginning',
         path: chapterPath(1),
         sections: [
-          { section: 1, path: sectionPath(1, 1), words: 300 },
-          { section: 2, path: sectionPath(1, 2), words: 300 },
+          // Named, so the contents list has rows to fold under chapter 1 —
+          // which is what the collapsing is for. Chapter 2's stay unnamed, so
+          // the "a chapter with nothing under it is a plain link" path is
+          // covered by the same fixture.
+          { section: 1, title: 'First Part', path: sectionPath(1, 1), words: 300 },
+          { section: 2, title: 'Second Part', path: sectionPath(1, 2), words: 300 },
         ],
       },
       {
@@ -706,7 +710,10 @@ describe('bookmarks', () => {
     await screen.findByRole('button', { name: UNMARK })
 
     openSheetAt('Contents')
-    fireEvent.click(screen.getByRole('button', { name: /The Beginning/ }))
+    // Chapter 1 has rows under it, so its own row folds them rather than going
+    // anywhere. It is still open from the start of this test, and its first
+    // part is where the chapter begins.
+    fireEvent.click(screen.getByRole('button', { name: /First Part/ }))
     await screen.findByText('The opening words.')
 
     openSheetAt('Bookmarks')
@@ -1179,5 +1186,50 @@ describe('following a link in the text', () => {
     await screen.findByText(/See/)
 
     expect(screen.queryByRole('button', { name: /^↩ Back to/ })).toBeNull()
+  })
+})
+
+describe('the contents fold up', () => {
+  /*
+   * The list this exists for is long: a collected works gives 19 volumes and
+   * 321 children, and 340 rows in one scroll is a haystack, not a contents
+   * page.
+   */
+  it('hides a chapter’s parts until its row is tapped', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+    openSheetAt('Contents')
+
+    // Chapter 1 is where the reader is, so it is already open.
+    expect(screen.queryByRole('button', { name: /First Part/ })).toBeTruthy()
+
+    // Shut it, and its parts go with it.
+    fireEvent.click(screen.getByRole('button', { name: /The Beginning/ }))
+    expect(screen.queryByRole('button', { name: /First Part/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Second Part/ })).toBeNull()
+
+    // Open it again, and they come back.
+    fireEvent.click(screen.getByRole('button', { name: /The Beginning/ }))
+    expect(screen.queryByRole('button', { name: /Second Part/ })).toBeTruthy()
+  })
+
+  it('leaves a chapter with nothing under it as a plain link', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+    openSheetAt('Contents')
+
+    // Chapter 2's sections are unnamed, so it has no rows to fold and its own
+    // row must still go where it says.
+    fireEvent.click(screen.getByRole('button', { name: 'The Middle, page 3' }))
+    expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
+  })
+
+  /* The row the reader is on has to be reachable, or the list cannot open
+     itself at them — see `openChapters` in `Chrome.tsx`. */
+  it('opens the chapter the reader is in', async () => {
+    openReader()
+    await screen.findByText('The opening words.')
+    openSheetAt('Contents')
+    expect(screen.getByRole('button', { name: /First Part/ })).toBeTruthy()
   })
 })
