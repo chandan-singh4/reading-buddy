@@ -296,3 +296,43 @@ describe('figures put back between the paragraphs', () => {
     expect(pdfPagesToBlocks(pages, [])).toEqual(pdfPagesToBlocks(pages))
   })
 })
+
+describe('pdfPagesToBlocks — a column of short lines', () => {
+  /*
+   * The regression: the column measure used to be seeded from the first line of
+   * each paragraph, so a paragraph that *began* short compared that line with
+   * itself. The short-line test could never fire and every following entry was
+   * welded on. A real contents page — the Delphi Classics *Collected Works of
+   * Hegel* — came out as four run-on paragraphs instead of fifteen entries.
+   */
+  it('keeps a contents list as one paragraph per entry', () => {
+    const entries = [
+      'The Books',
+      'The Phenomenology of Spirit',
+      'The Logic of Hegel',
+      'The Criticism',
+    ]
+    expect(
+      textsOf([
+        page([
+          // A long line somewhere on the page, so the column has a real measure.
+          line('A full line of ordinary prose that reaches the right edge.', 40),
+          ...entries.map((text, index) =>
+            line(text, 120 + index * 14, { width: 60 + index * 20 }),
+          ),
+        ]),
+      ]),
+    ).toEqual(['A full line of ordinary prose that reaches the right edge.', ...entries])
+  })
+
+  it('still joins prose that wraps to the column edge', () => {
+    expect(
+      textsOf([
+        page([
+          line('A sentence that runs the whole width of the column and', 100),
+          line('then wraps once before it ends here.', 114, { width: 180 }),
+        ]),
+      ]),
+    ).toEqual(['A sentence that runs the whole width of the column and then wraps once before it ends here.'])
+  })
+})

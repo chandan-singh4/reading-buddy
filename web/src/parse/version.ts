@@ -396,4 +396,23 @@
  * Every PDF already on a shelf re-parses on this bump, which is the only way
  * the pictures reach a book imported before today.
  */
-export const PARSER_VERSION = 29
+
+/**
+ * 30 — a PDF's column measure is the column's, not the paragraph's.
+ *
+ * A contents page came out as four run-on paragraphs instead of fifteen
+ * entries: "The Books The Phenomenology of Spirit The Logic of Hegel" on one
+ * line. The rule that ends a paragraph when a line stops well short of the
+ * column edge was comparing each line against a measure seeded from the first
+ * line of the paragraph being built — so a paragraph that *began* with a short
+ * line compared that line with itself, the test could never fire, and every
+ * following line was welded on.
+ *
+ * The measure is now taken across the whole column, once, before paragraphs are
+ * formed. Per column and not per page, so the left column of a two-column
+ * spread keeps its own edge and academic PDFs are unaffected.
+ *
+ * Every PDF on a shelf re-parses on this bump. Epub, docx, md and txt do not
+ * pass through this code at all.
+ */
+export const PARSER_VERSION = 30

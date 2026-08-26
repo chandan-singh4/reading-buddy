@@ -40,6 +40,15 @@ interface Line {
   y: number
   /** Right-hand edge, used to tell a wrapped line from a paragraph's last line. */
   right: number
+  /**
+   * The right-hand edge of the *column* this line sits in — how far a full line
+   * of this text reaches. A line that stops well short of it ended a paragraph
+   * rather than wrapping.
+   *
+   * Stamped per column group, which is what makes the short-line test safe on a
+   * two-column page: the left column's measure is its own, not the spread's.
+   */
+  measure: number
   fontSize: number
   page: number
 }
@@ -116,7 +125,7 @@ function toLines(items: PdfTextItem[], pageNumber: number): Line[] {
     }
   }
 
-  return groups
+  const lines = groups
     .map((group) => {
       const ordered = [...group].sort((a, b) => a.x - b.x)
       const text = joinItems(ordered)
@@ -127,11 +136,29 @@ function toLines(items: PdfTextItem[], pageNumber: number): Line[] {
         x: ordered[0].x,
         y: ordered[0].y,
         right: Math.max(...ordered.map((item) => item.x + item.width)),
+        // Filled in below, once every line in this column is known.
+        measure: 0,
         fontSize: Math.max(...ordered.map((item) => item.height)),
         page: pageNumber,
       } satisfies Line
     })
     .filter((line): line is Line => line !== null)
+
+  /*
+   * How far a full line reaches in this column.
+   *
+   * It has to be measured across the whole column, and it cannot be measured
+   * one paragraph at a time. That was the defect this replaces: the measure was
+   * seeded from the first line of each paragraph, so a paragraph that *began*
+   * with a short line compared that line against itself, the short-line test
+   * could never fire, and every following line was welded on. A contents page —
+   * a column of short entries, the first of them short — came out as four long
+   * paragraphs instead of fifteen entries.
+   */
+  const measure = Math.max(...lines.map((line) => line.right))
+  for (const line of lines) line.measure = measure
+
+  return lines
 }
 
 // --- Columns ----------------------------------------------------------------
@@ -265,7 +292,6 @@ function toParagraphs(lines: Line[]): Paragraph[] {
   const paragraphs: Paragraph[] = []
   let current: Paragraph | null = null
   let previous: Line | null = null
-  let columnRight = 0
 
   for (const line of lines) {
     const breaks =
@@ -278,8 +304,9 @@ function toParagraphs(lines: Line[]): Paragraph[] {
       // A first-line indent.
       line.x > previous.x + previous.fontSize * INDENT ||
       // The previous line stopped well short of the column edge, so it ended a
-      // paragraph rather than wrapping.
-      previous.right < columnRight * SHORT_LINE
+      // paragraph rather than wrapping. The edge is the column's own measure —
+      // see `Line.measure`.
+      previous.right < previous.measure * SHORT_LINE
 
     if (breaks || current === null) {
       current = {
@@ -290,11 +317,9 @@ function toParagraphs(lines: Line[]): Paragraph[] {
         y: line.y,
       }
       paragraphs.push(current)
-      columnRight = line.right
     } else {
       current.text = appendLine(current.text, line.text)
       current.lineCount += 1
-      columnRight = Math.max(columnRight, line.right)
     }
 
     previous = line
