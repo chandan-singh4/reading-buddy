@@ -336,3 +336,75 @@ describe('pdfPagesToBlocks — a column of short lines', () => {
     ).toEqual(['A sentence that runs the whole width of the column and then wraps once before it ends here.'])
   })
 })
+
+describe('pdfPagesToBlocks — the PDF outline', () => {
+  const two = (): PdfPage[] => [
+    page([line('The Phenomenology of Spirit', 60, { size: 20, width: 300 })]),
+    page([line('Preface', 60, { size: 14, width: 90 }), line('Ordinary prose.', 90, { width: 120 })]),
+  ]
+
+  it('promotes the page’s own title rather than printing it twice', () => {
+    const blocks = pdfPagesToBlocks(two(), [], [
+      { title: 'The Phenomenology of Spirit', page: 1, depth: 0 },
+    ])
+    expect(blocks[0]).toEqual({
+      kind: 'heading',
+      level: 1,
+      text: 'The Phenomenology of Spirit',
+    })
+    expect(blocks.filter((b) => b.text === 'The Phenomenology of Spirit')).toHaveLength(1)
+  })
+
+  it('nests a child under its volume', () => {
+    const blocks = pdfPagesToBlocks(two(), [], [
+      { title: 'The Phenomenology of Spirit', page: 1, depth: 0 },
+      { title: 'Preface', page: 2, depth: 1 },
+    ])
+    expect(blocks.map((b) => [b.kind, 'level' in b ? b.level : null, b.text])).toEqual([
+      ['heading', 1, 'The Phenomenology of Spirit'],
+      ['heading', 2, 'Preface'],
+      ['prose', null, 'Ordinary prose.'],
+    ])
+  })
+
+  it('inserts a heading where the page does not say its own name', () => {
+    const blocks = pdfPagesToBlocks(
+      [page([line('Straight into the prose.', 60, { width: 200 })])],
+      [],
+      [{ title: 'Volume One', page: 1, depth: 0 }],
+    )
+    expect(blocks.map((b) => b.text)).toEqual(['Volume One', 'Straight into the prose.'])
+    expect(blocks[0].kind).toBe('heading')
+  })
+
+  /*
+   * The outline is a fact recorded in the file; a font size is a guess about
+   * one. Blending them would let a large-set pull quote outrank a real chapter.
+   */
+  it('switches the font-size guess off entirely', () => {
+    const blocks = pdfPagesToBlocks(
+      [
+        page([
+          line('Volume One', 40, { size: 10, width: 80 }),
+          line('A HUGE PULL QUOTE', 80, { size: 30, width: 300 }),
+        ]),
+      ],
+      [],
+      [{ title: 'Volume One', page: 1, depth: 0 }],
+    )
+    expect(blocks.map((b) => [b.kind, b.text])).toEqual([
+      ['heading', 'Volume One'],
+      ['prose', 'A HUGE PULL QUOTE'],
+    ])
+  })
+
+  it('adds nothing when the file carries no outline', () => {
+    // The guess still runs and nothing synthetic is spliced in: the same words,
+    // in the same order, as before an outline was ever read.
+    expect(pdfPagesToBlocks(two()).map((b) => b.text)).toEqual([
+      'The Phenomenology of Spirit',
+      'Preface',
+      'Ordinary prose.',
+    ])
+  })
+})

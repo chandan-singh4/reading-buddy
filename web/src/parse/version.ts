@@ -415,4 +415,26 @@
  * Every PDF on a shelf re-parses on this bump. Epub, docx, md and txt do not
  * pass through this code at all.
  */
-export const PARSER_VERSION = 30
+/**
+ * 31 — a PDF's contents come from the PDF, not from a guess.
+ *
+ * Every division in a PDF used to be inferred from font size, because that was
+ * all this parser looked at. But most published PDFs carry an outline — the
+ * bookmark tree a PDF viewer shows down its side — and that is the publisher
+ * stating, in the file, which page begins which division. It is the only
+ * structural truth a PDF ever holds.
+ *
+ * Where a file has one, it is now read and it wins outright: the font-size
+ * guess is switched off rather than blended with it. Blending would let a
+ * large-set pull quote outrank a real chapter, and a collected works has plenty
+ * of both. A file with no outline is parsed exactly as before.
+ *
+ * The tree's depth becomes heading level, so a volume's children are its
+ * sections and the contents list nests them under it.
+ *
+ * Measured on the Delphi Classics Collected Works of Hegel: 340 entries, 19
+ * volumes and 321 children, against a font-size guess that found neither.
+ *
+ * Every PDF on a shelf re-parses on this bump. No other format reads this code.
+ */
+export const PARSER_VERSION = 31

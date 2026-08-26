@@ -348,7 +348,116 @@ export interface PdfFigure {
   path: string
 }
 
-export function pdfPagesToBlocks(pages: PdfPage[], figures: readonly PdfFigure[] = []): Block[] {
+/**
+ * One entry of the PDF's own bookmark tree, resolved to a page.
+ *
+ * This is the only structural truth a PDF ever carries. Everything else in this
+ * file is inference from geometry; an outline entry is the publisher saying, in
+ * the file, "this page begins this division". Where a book has one, it wins.
+ */
+export interface PdfOutlineEntry {
+  title: string
+  /** 1-based, matching `PdfPage` order. */
+  page: number
+  /** 0 for a top-level entry, 1 for its children, and so on. */
+  depth: number
+}
+
+/** Compare two titles the way a reader would: case and spacing do not count. */
+function titleKey(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[^a-z0-9']+/g, ' ')
+    .trim()
+}
+
+/**
+ * Put the outline's divisions into the paragraph stream.
+ *
+ * Two ways in, and the order matters:
+ *
+ * 1. **Promote.** The page usually prints the division's title as its first
+ *    words. Turning that paragraph into the heading keeps the book's own words
+ *    and avoids printing the title twice.
+ * 2. **Insert.** Where the page does not say its own name — a volume that opens
+ *    straight into prose — the heading is added before the page's first
+ *    paragraph. The reader gains a line the page never had, which is the lesser
+ *    fault: without it the division has no name to tap.
+ *
+ * Every other paragraph is left as prose. Once an outline exists, the font-size
+ * guess is not consulted at all — see `pdfPagesToBlocks`.
+ */
+function applyOutline(
+  paragraphs: Paragraph[],
+  outline: readonly PdfOutlineEntry[],
+): Map<Paragraph, number> {
+  const levels = new Map<Paragraph, number>()
+  const inserted = new Map<number, PdfOutlineEntry[]>()
+
+  // First paragraph of each page, so an entry can find where its page starts.
+  const opensPage = new Map<number, number>()
+  paragraphs.forEach((paragraph, at) => {
+    if (!opensPage.has(paragraph.page)) opensPage.set(paragraph.page, at)
+  })
+
+  for (const entry of outline) {
+    const level = Math.min(entry.depth + 1, 6)
+    const start = opensPage.get(entry.page)
+    const wanted = titleKey(entry.title)
+
+    // Look only at the head of the page. A title matched deep in the prose
+    // would promote a sentence that merely quotes it.
+    let promoted: Paragraph | null = null
+    if (start !== undefined && wanted.length > 0) {
+      for (let at = start; at < paragraphs.length && at < start + 3; at += 1) {
+        const paragraph = paragraphs[at]
+        if (paragraph.page !== entry.page) break
+        if (levels.has(paragraph)) continue
+        if (titleKey(paragraph.text) === wanted) {
+          promoted = paragraph
+          break
+        }
+      }
+    }
+
+    if (promoted) {
+      levels.set(promoted, level)
+    } else {
+      const list = inserted.get(entry.page) ?? []
+      list.push(entry)
+      inserted.set(entry.page, list)
+    }
+  }
+
+  // The synthetic headings, spliced in from the back so the indices hold.
+  const pages = [...inserted.keys()].sort((a, b) => b - a)
+  for (const page of pages) {
+    const at = opensPage.get(page)
+    if (at === undefined) continue
+    const made = (inserted.get(page) ?? []).map((entry) => {
+      const paragraph: Paragraph = {
+        text: entry.title,
+        fontSize: 0,
+        lineCount: 1,
+        page: entry.page,
+        y: 0,
+      }
+      levels.set(paragraph, Math.min(entry.depth + 1, 6))
+      return paragraph
+    })
+    paragraphs.splice(at, 0, ...made)
+  }
+
+  return levels
+}
+
+export function pdfPagesToBlocks(
+  pages: PdfPage[],
+  figures: readonly PdfFigure[] = [],
+  outline: readonly PdfOutlineEntry[] = [],
+): Block[] {
   const lines = pages.flatMap((page, index) => {
     const items = page.items.filter((item) => item.str.trim() !== '')
     return splitColumns(items, page.width).flatMap((group) => toLines(group, index + 1))
@@ -358,6 +467,17 @@ export function pdfPagesToBlocks(pages: PdfPage[], figures: readonly PdfFigure[]
 
   const body = bodyFontSize(content)
   const paragraphs = toParagraphs(content)
+
+  /*
+   * The publisher's own answer, where the file carries one.
+   *
+   * A PDF outline names every division and the page it opens on. That is not a
+   * heuristic, it is a fact recorded in the file, so where it exists the
+   * font-size guess below is switched off entirely rather than blended with it.
+   * Blending would let a large-set pull quote outrank a real chapter, and a
+   * 6,500-page collected works has plenty of both.
+   */
+  const fromOutline = outline.length > 0 ? applyOutline(paragraphs, outline) : null
 
   // Rank the heading sizes present, largest first, so the biggest text in the
   // document becomes level 1 and the next size down level 2. The assembler then
@@ -374,6 +494,13 @@ export function pdfPagesToBlocks(pages: PdfPage[], figures: readonly PdfFigure[]
   ].sort((a, b) => b - a)
 
   const blockOf = (paragraph: Paragraph): Block => {
+    if (fromOutline) {
+      const level = fromOutline.get(paragraph)
+      return level === undefined
+        ? { kind: 'prose', text: paragraph.text }
+        : { kind: 'heading', level, text: paragraph.text }
+    }
+
     const size = Math.round(paragraph.fontSize * 2) / 2
     const rank = headingSizes.indexOf(size)
     if (couldBeHeading(paragraph) && rank !== -1) {

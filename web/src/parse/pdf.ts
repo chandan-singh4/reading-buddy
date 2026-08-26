@@ -15,7 +15,13 @@
 import type { BookAsset, ParsedBook } from '../storage/index.ts'
 import type { BookMeta } from '../structure/index.ts'
 import { assembleBook } from './assemble.ts'
-import { pdfPagesToBlocks, type PdfFigure, type PdfPage, type PdfTextItem } from './pdf-layout.ts'
+import {
+  pdfPagesToBlocks,
+  type PdfFigure,
+  type PdfOutlineEntry,
+  type PdfPage,
+  type PdfTextItem,
+} from './pdf-layout.ts'
 import { bandPath, bandsOf } from './pdfFigures.ts'
 import { renderBands } from './pdfRender.ts'
 
@@ -68,6 +74,68 @@ export interface PdfRead {
   figures: PdfFigure[]
   /** The pictures themselves, for the assets table. */
   assets: BookAsset[]
+  /** The file's own bookmark tree, flattened. Empty when it has none. */
+  outline: PdfOutlineEntry[]
+}
+
+/** The shape of a pdf.js outline node, narrowed to what we read. */
+interface OutlineNode {
+  title?: string
+  dest?: string | unknown[] | null
+  items?: OutlineNode[]
+}
+
+/** What we need from the document to turn a destination into a page number. */
+interface DestinationResolver {
+  getOutline(): Promise<OutlineNode[] | null>
+  getDestination(id: string): Promise<unknown[] | null>
+  getPageIndex(ref: unknown): Promise<number>
+}
+
+/**
+ * Flatten the PDF's bookmark tree into entries with real page numbers.
+ *
+ * A destination is either an array whose first element is a page reference, or
+ * the *name* of one, which has to be looked up. Either way the reference is
+ * opaque and only the document can turn it into an index.
+ *
+ * Every lookup is guarded and a failure drops that one entry. A malformed
+ * bookmark is common in the wild, and it must cost the reader one row of the
+ * contents, never the import.
+ */
+export async function outlineOf(document: DestinationResolver): Promise<PdfOutlineEntry[]> {
+  let tree: OutlineNode[] | null = null
+  try {
+    tree = await document.getOutline()
+  } catch {
+    return []
+  }
+  if (!tree || tree.length === 0) return []
+
+  const entries: PdfOutlineEntry[] = []
+
+  const walk = async (nodes: OutlineNode[], depth: number): Promise<void> => {
+    for (const node of nodes) {
+      const title = (node.title ?? '').replace(/\s+/g, ' ').trim()
+      if (title) {
+        try {
+          const dest = typeof node.dest === 'string' ? await document.getDestination(node.dest) : node.dest
+          const ref = Array.isArray(dest) ? dest[0] : null
+          if (ref !== null && ref !== undefined) {
+            entries.push({ title, page: (await document.getPageIndex(ref)) + 1, depth })
+          }
+        } catch {
+          // One bad bookmark, one missing row. See the note above.
+        }
+      }
+      if (node.items && node.items.length > 0) await walk(node.items, depth + 1)
+    }
+  }
+
+  await walk(tree, 0)
+  // Reading order, and a parent before its children where both land on one page.
+  entries.sort((a, b) => a.page - b.page || a.depth - b.depth)
+  return entries
 }
 
 /** Read every page's text geometry, and photograph its figures. */
@@ -98,6 +166,7 @@ export async function pdfToPages(data: ArrayBuffer | Uint8Array): Promise<PdfRea
   }
 
   try {
+    const outline = await outlineOf(document as unknown as DestinationResolver)
     const pages: PdfPage[] = []
     const figures: PdfFigure[] = []
     const assets: BookAsset[] = []
@@ -135,7 +204,7 @@ export async function pdfToPages(data: ArrayBuffer | Uint8Array): Promise<PdfRea
       // to end a large import on a phone.
       page.cleanup()
     }
-    return { pages, figures, assets }
+    return { pages, figures, assets, outline }
   } finally {
     await task.destroy()
   }
@@ -152,7 +221,10 @@ export async function parsePdf(
   data: ArrayBuffer | Uint8Array,
   meta: BookMeta,
 ): Promise<ParsedBook> {
-  const { pages, figures, assets } = await pdfToPages(data)
-  const book = assembleBook(pdfPagesToBlocks(pages, figures), { ...meta, source: 'pdf' })
+  const { pages, figures, assets, outline } = await pdfToPages(data)
+  const book = assembleBook(pdfPagesToBlocks(pages, figures, outline), {
+    ...meta,
+    source: 'pdf',
+  })
   return assets.length > 0 ? { ...book, assets } : book
 }
