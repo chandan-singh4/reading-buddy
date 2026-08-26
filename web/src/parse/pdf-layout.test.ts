@@ -408,3 +408,67 @@ describe('pdfPagesToBlocks — the PDF outline', () => {
     ])
   })
 })
+
+describe('pdfPagesToBlocks — headings the outline does not name', () => {
+  /* The column has a real measure, so the centred test has margins to read. */
+  const withProse = (extra: PdfTextItem[]): PdfPage[] => [
+    page([
+      line('A full line of prose that runs to the right edge of the column.', 40),
+      ...extra,
+      line('More prose, also running the whole width of the column here.', 200),
+    ]),
+  ]
+
+  it('marks a centred line as a subheading, not as a division', () => {
+    const centred = line('The Truth which Conscious Certainty Realizes', 120, {
+      x: 200,
+      width: 200,
+    })
+    const blocks = pdfPagesToBlocks(withProse([centred]), [], [
+      { title: 'Somewhere else', page: 1, depth: 0 },
+    ])
+    const row = blocks.find((b) => b.text.startsWith('The Truth'))
+    // Prose with a label: it is drawn as a heading and divides nothing, so it
+    // can never become a chapter or move an anchor.
+    expect(row).toEqual({
+      kind: 'prose',
+      label: 'subheading',
+      text: 'The Truth which Conscious Certainty Realizes',
+    })
+  })
+
+  it('leaves a block quote alone, indented but running to the measure', () => {
+    const quote = line('An indented quotation that still reaches the right edge.', 120, {
+      x: 90,
+    })
+    const blocks = pdfPagesToBlocks(withProse([quote]), [], [
+      { title: 'Somewhere else', page: 1, depth: 0 },
+    ])
+    expect(blocks.find((b) => b.text.startsWith('An indented'))?.kind).toBe('prose')
+    expect(blocks.find((b) => b.text.startsWith('An indented'))).not.toHaveProperty('label')
+  })
+
+  it('promotes a title the page sets over two lines, and prints it once', () => {
+    const blocks = pdfPagesToBlocks(
+      [
+        page([
+          line('IV. THE TRUTH WHICH CONSCIOUS CERTAINTY OF', 40, { x: 120, width: 300 }),
+          line('SELF REALIZES', 60, { x: 220, width: 100 }),
+          line('IN the kinds of certainty hitherto considered, the truth is.', 100),
+        ]),
+      ],
+      [],
+      [
+        {
+          title: 'IV. THE TRUTH WHICH CONSCIOUS CERTAINTY OF SELF REALIZES',
+          page: 1,
+          depth: 1,
+        },
+      ],
+    )
+    expect(blocks.map((b) => [b.kind, b.text])).toEqual([
+      ['heading', 'IV. THE TRUTH WHICH CONSCIOUS CERTAINTY OF SELF REALIZES'],
+      ['prose', 'IN the kinds of certainty hitherto considered, the truth is.'],
+    ])
+  })
+})

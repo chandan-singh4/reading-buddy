@@ -437,4 +437,30 @@
  *
  * Every PDF on a shelf re-parses on this bump. No other format reads this code.
  */
-export const PARSER_VERSION = 31
+/**
+ * 32 — the headings a PDF's outline does not name.
+ *
+ * With the outline in charge, anything it did not list came out as ordinary
+ * prose. But an outline stops at the divisions a publisher thought worth
+ * listing, and a book still has headings below them. The Phenomenology sets its
+ * part titles in the body face, centred — so the size test could not see them
+ * either, and a title stood in the text looking exactly like the paragraph
+ * above it.
+ *
+ * Two rules now catch them. A line set larger than the body, as before. And a
+ * line that stands clear of the column's left edge with near-equal margins:
+ * centred, which is what a book does when it will not change the size.
+ *
+ * Both mark the line as a *subheading* — prose with a label. It is drawn as a
+ * heading and divides nothing, so a line that merely looks important can never
+ * become a chapter or a section and can never move an anchor. The outline stays
+ * the only thing that divides a book.
+ *
+ * Also fixed: a title the page sets over two lines matched no outline entry, so
+ * the entry inserted a heading of its own and the reader met the title three
+ * times — once inserted, then both halves as prose beneath it. The two halves
+ * are now joined and promoted, and it appears once.
+ *
+ * Every PDF on a shelf re-parses on this bump. No other format reads this code.
+ */
+export const PARSER_VERSION = 32

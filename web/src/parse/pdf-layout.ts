@@ -49,6 +49,8 @@ interface Line {
    * two-column page: the left column's measure is its own, not the spread's.
    */
   measure: number
+  /** The left edge of the same column. With `measure`, it gives the margins. */
+  columnLeft: number
   fontSize: number
   page: number
 }
@@ -66,6 +68,21 @@ const INDENT = 0.8
 const SHORT_LINE = 0.85
 /** Font this much larger than body text is a heading. */
 const HEADING_RATIO = 1.15
+
+/**
+ * A centred line is a heading the size test cannot see.
+ *
+ * Plenty of books set a section title in the body face and centre it instead —
+ * the *Phenomenology*'s part titles do exactly that. Size says nothing about
+ * those lines; their position says everything.
+ *
+ * Two conditions, and both are needed. The line must stand clear of the
+ * column's left edge, which rules out ordinary prose and a first-line indent.
+ * And its two margins must be near enough equal, which rules out a block quote
+ * — indented on the left, and running to the measure on the right.
+ */
+const CENTRED_INSET = 1.5
+const CENTRED_SLACK = 2
 /**
  * Headings may wrap — real titles routinely run to two lines — but not further,
  * and not for long. Length is the better discriminator against the thing we're
@@ -136,8 +153,9 @@ function toLines(items: PdfTextItem[], pageNumber: number): Line[] {
         x: ordered[0].x,
         y: ordered[0].y,
         right: Math.max(...ordered.map((item) => item.x + item.width)),
-        // Filled in below, once every line in this column is known.
+        // Both filled in below, once every line in this column is known.
         measure: 0,
+        columnLeft: 0,
         fontSize: Math.max(...ordered.map((item) => item.height)),
         page: pageNumber,
       } satisfies Line
@@ -156,7 +174,11 @@ function toLines(items: PdfTextItem[], pageNumber: number): Line[] {
    * paragraphs instead of fifteen entries.
    */
   const measure = Math.max(...lines.map((line) => line.right))
-  for (const line of lines) line.measure = measure
+  const columnLeft = Math.min(...lines.map((line) => line.x))
+  for (const line of lines) {
+    line.measure = measure
+    line.columnLeft = columnLeft
+  }
 
   return lines
 }
@@ -280,6 +302,12 @@ interface Paragraph {
   /** Where it began: the page, and the baseline of its first line. */
   page: number
   y: number
+  /** Left edge of the paragraph's first line, and of its column. */
+  x: number
+  columnLeft: number
+  /** Right edge of the widest line in it, and of its column. */
+  right: number
+  measure: number
 }
 
 /** Join a wrapped line onto the paragraph, healing hyphenation across breaks. */
@@ -315,11 +343,16 @@ function toParagraphs(lines: Line[]): Paragraph[] {
         lineCount: 1,
         page: line.page,
         y: line.y,
+        x: line.x,
+        columnLeft: line.columnLeft,
+        right: line.right,
+        measure: line.measure,
       }
       paragraphs.push(current)
     } else {
       current.text = appendLine(current.text, line.text)
       current.lineCount += 1
+      current.right = Math.max(current.right, line.right)
     }
 
     previous = line
@@ -415,9 +448,30 @@ function applyOutline(
         const paragraph = paragraphs[at]
         if (paragraph.page !== entry.page) break
         if (levels.has(paragraph)) continue
+
         if (titleKey(paragraph.text) === wanted) {
           promoted = paragraph
           break
+        }
+
+        /*
+         * A title set over two lines.
+         *
+         * A display title is routinely broken where the designer wanted it,
+         * and the two halves are two paragraphs here because the first stops
+         * well short of the measure. Neither half matches the outline alone,
+         * so without this the entry found nothing, inserted a heading of its
+         * own, and the reader met the title three times: once inserted, then
+         * both halves as prose underneath it.
+         */
+        const next = paragraphs[at + 1]
+        if (next && next.page === entry.page && !levels.has(next)) {
+          if (titleKey(`${paragraph.text} ${next.text}`) === wanted) {
+            paragraph.text = `${paragraph.text} ${next.text}`
+            paragraphs.splice(at + 1, 1)
+            promoted = paragraph
+            break
+          }
         }
       }
     }
@@ -431,6 +485,15 @@ function applyOutline(
     }
   }
 
+  /*
+   * Where each page starts, worked out again. A two-line title promoted above
+   * removed a paragraph, so the indices taken before that pass are stale.
+   */
+  opensPage.clear()
+  paragraphs.forEach((paragraph, at) => {
+    if (!opensPage.has(paragraph.page)) opensPage.set(paragraph.page, at)
+  })
+
   // The synthetic headings, spliced in from the back so the indices hold.
   const pages = [...inserted.keys()].sort((a, b) => b - a)
   for (const page of pages) {
@@ -439,10 +502,17 @@ function applyOutline(
     const made = (inserted.get(page) ?? []).map((entry) => {
       const paragraph: Paragraph = {
         text: entry.title,
+        // No geometry: this line was never on the page. A zero font size keeps
+        // it out of `bodyFontSize` and out of every look-like-a-heading test,
+        // which is right — it *is* a heading, on the outline's authority.
         fontSize: 0,
         lineCount: 1,
         page: entry.page,
         y: 0,
+        x: 0,
+        columnLeft: 0,
+        right: 0,
+        measure: 0,
       }
       levels.set(paragraph, Math.min(entry.depth + 1, 6))
       return paragraph
@@ -451,6 +521,27 @@ function applyOutline(
   }
 
   return levels
+}
+
+/**
+ * Is this paragraph a centred line standing on its own?
+ *
+ * Length is checked as well as position. A centred *sentence* is an epigraph or
+ * a verse line, not a title, and the same limits the size test uses apply here
+ * for the same reason.
+ */
+function looksCentred(paragraph: Paragraph): boolean {
+  if (paragraph.lineCount > MAX_HEADING_LINES) return false
+  if (paragraph.text.length > MAX_HEADING_CHARS) return false
+
+  const size = paragraph.fontSize
+  if (size <= 0) return false
+
+  const leftGap = paragraph.x - paragraph.columnLeft
+  const rightGap = paragraph.measure - paragraph.right
+  if (leftGap < size * CENTRED_INSET) return false
+
+  return Math.abs(leftGap - rightGap) < size * CENTRED_SLACK
 }
 
 export function pdfPagesToBlocks(
@@ -496,9 +587,31 @@ export function pdfPagesToBlocks(
   const blockOf = (paragraph: Paragraph): Block => {
     if (fromOutline) {
       const level = fromOutline.get(paragraph)
-      return level === undefined
-        ? { kind: 'prose', text: paragraph.text }
-        : { kind: 'heading', level, text: paragraph.text }
+      if (level !== undefined) return { kind: 'heading', level, text: paragraph.text }
+
+      /*
+       * A line the outline does not name, set larger than the body.
+       *
+       * The outline stops at the divisions a publisher thought worth listing.
+       * Below them a book still has headings — the title standing over a
+       * chapter's fourth part, set apart on the page — and with the outline in
+       * charge those were coming out as ordinary prose, indistinguishable from
+       * the paragraph above.
+       *
+       * They are marked as subheadings, not as headings. That is the whole
+       * point: a `label` changes how the line is drawn and nothing else, so a
+       * line that merely *looks* important can never become a chapter or a
+       * section and cannot move an anchor. The outline stays the only thing
+       * that divides the book.
+       */
+      const bigger =
+        couldBeHeading(paragraph) && headingSizes.includes(Math.round(paragraph.fontSize * 2) / 2)
+
+      if (bigger || looksCentred(paragraph)) {
+        return { kind: 'prose', label: 'subheading', text: paragraph.text }
+      }
+
+      return { kind: 'prose', text: paragraph.text }
     }
 
     const size = Math.round(paragraph.fontSize * 2) / 2
