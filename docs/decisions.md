@@ -1347,3 +1347,18 @@ sign-in screen.
   sentence. The cost is guarded — whether a sentence crosses a column is worked
   out once when it starts, and a sentence that does not costs nothing per
   word. — 2026-08-25
+- **The page turn is timed when the engine will not say where it is.** The
+  proper signal is `onboundary`, which reports the character each word starts
+  at. Several engines, iOS most of all, never fire it — so following it alone
+  left the page still until the next sentence, which is the fault it was meant
+  to fix. Both are used now: a clock is armed when a crossing sentence starts,
+  and the first word the engine reports throws the clock away. An engine that
+  says where it is always beats an estimate of where it ought to be.
+  `msToSpeak` holds the estimate, at about 160 words a minute. — 2026-08-25
+- **A reading starts at the sentence the reader picked.** An anchor names a
+  paragraph, so starting from the anchor read the paragraph from its first word
+  however far down the reader had selected — reported from the phone. `startOf`
+  now takes the selected words too and finds the sentence they begin in.
+  Selections come in three sizes — part of a sentence, one sentence, several —
+  and all three begin in the same place, so it matches either way round.
+  Unmatched words fall back to the paragraph's opening. — 2026-08-25

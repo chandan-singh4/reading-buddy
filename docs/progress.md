@@ -15,7 +15,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2041 tests across 112 files.
+  2049 tests across 112 files.
 - **A flaky test teardown, not ours to blame on WP-16.** `vitest run` reports one
   unhandled error from `HandDrawn.tsx` — a coalesced measure fires after jsdom
   has been torn down and the stored range can no longer be measured. Every test
@@ -33,7 +33,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 ### Recently done
 
 - **The book reads itself out loud** (2026-08-25). WP-16 is closed. Build green:
-  2041 tests across 112 files.
+  2049 tests across 112 files.
   - Read aloud was one sentence, said once, with no way to stop it. It is now a
     voice that keeps going: from the selection, through the section, into the
     next one, until the reader stops it.
@@ -54,6 +54,14 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     the book. The hook's cleanup does.
   - `aloudRate` and `aloudVoice` joined the reader's settings, so both survive a
     reload.
+  - **Fixed after a second phone report:** the page still turned a sentence
+    late, because the engine on the phone reports no word boundaries at all. A
+    crossing sentence now also arms a clock, and the first word an engine
+    reports throws the clock away. It no longer matters which kind of engine is
+    speaking.
+  - **Fixed after a phone report:** a reader who selected the fourth sentence of
+    a paragraph was read the first. An anchor names a paragraph; the selected
+    words now say which sentence.
   - **Fixed after a phone report:** the page turned a sentence late. A long
     sentence that began at the foot of a page was read to its end while the
     reader looked at the page above it. The page now turns as the last word on

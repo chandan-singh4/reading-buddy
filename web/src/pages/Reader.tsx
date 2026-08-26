@@ -109,6 +109,7 @@ import {
   keepScreenAwake,
   AloudBar,
   useReadAloud,
+  msToSpeak,
   rangeAtOffset,
   rangeOfQuote,
   type HighlightLike,
@@ -391,6 +392,15 @@ const ALOUD_COLOUR = '#9fd3ff'
 
 /** The id that wash is painted under. Like the flash, no note can hold it. */
 const ALOUD_MARK_ID = 'aloud-saying'
+
+/**
+ * How long an engine takes to start speaking, near enough.
+ *
+ * Added to every timed page turn. Without it the estimate runs ahead of the
+ * voice by this much on every sentence, and a page that turns before its last
+ * word is said is the fault being fixed, in the other direction.
+ */
+const START_LAG_MS = 120
 
 /** One array, so "no section yet" is the same value every render — see
     `useFigureImages`, which re-fetches when its input changes identity. */
@@ -2534,60 +2544,146 @@ export default function Reader() {
   }, [])
 
   /**
-   * Whether the sentence being said runs off the page it starts on.
+   * ## Turning the page in the middle of a sentence
    *
-   * Worked out once when the sentence starts, and read on every word. A word
-   * boundary fires several times a second, and asking the browser for a
-   * rectangle forces it to lay the page out — so on the ordinary sentence,
-   * which is entirely on one page, no word costs anything at all.
+   * A sentence that starts at the foot of a page is read to its end on the page
+   * after it. Following the *sentence* therefore left the reader listening to
+   * words that were not on the screen until the next sentence began — the
+   * reported fault.
+   *
+   * There is a proper answer and a rough one, and both are here because the
+   * proper one is not always available.
+   *
+   * - **The engine's own report.** `onboundary` gives the character each word
+   *   starts at. Exact, and free of guessing.
+   * - **The clock.** Several engines — iOS most of all — never fire it. The
+   *   page cannot simply stay put on those, so the crossing is timed from an
+   *   estimate of how fast prose is spoken.
+   *
+   * The clock is armed when the sentence starts and thrown away the moment a
+   * word is reported, so an engine that talks is always believed over an
+   * estimate. Nothing here runs at all for a sentence that stays on one page,
+   * which is nearly all of them.
    */
-  const aloudCrosses = useRef(false)
+  const crossing = useRef<{ at: number; from: number; to: number; timer: number } | null>(null)
+
+  /**
+   * Carry the page across, but only from the page the sentence started on.
+   *
+   * A reader can turn pages while the voice reads — looking ahead, or back at
+   * something. Turning to an absolute page a second later would drag them off
+   * whatever they went to look at, and it would look like the app fighting
+   * them. If they have moved, the crossing is simply dropped: the next sentence
+   * puts the page right.
+   */
+  const carryCrossing = useCallback(
+    (from: number, to: number) => {
+      if (pageShowing() !== from) return
+      carryPageTo(to)
+    },
+    [carryPageTo, pageShowing],
+  )
+
+  const stopCrossing = useCallback(() => {
+    if (crossing.current) window.clearTimeout(crossing.current.timer)
+    crossing.current = null
+  }, [])
+
+  /**
+   * The first character of a range that falls on a later column.
+   *
+   * A binary search, because the alternative is a rectangle for every character
+   * and each one forces the browser to lay the page out. A sentence of 300
+   * characters costs about nine measurements instead of 300.
+   *
+   * The text is laid out left to right and top to bottom, so the column number
+   * never goes down as the offset goes up — which is what makes the search
+   * sound.
+   */
+  const crossesAt = useCallback(
+    (range: Range, length: number, from: number): number | null => {
+      let low = 0
+      let high = length - 1
+      let found: number | null = null
+
+      while (low <= high) {
+        const middle = Math.floor((low + high) / 2)
+        const column = columnOfRange(rangeAtOffset(range, middle))
+        if (column !== null && column > from) {
+          found = middle
+          high = middle - 1
+        } else {
+          low = middle + 1
+        }
+      }
+
+      return found
+    },
+    [columnOfRange],
+  )
 
   /** Keep the spoken sentence on the page in front of the reader. */
   const followAloud = useCallback(
     (one: Utterance) => {
       setAnchorHere(one.anchor)
+      stopCrossing()
+
       const range = rangeOfQuote(one.anchor, one.text)
       const node = document.getElementById(elementIdOf(one.anchor))
       const column = columnOfRange(range) ?? (node ? columnOf(node, strip.current) : null)
-      if (column === null) {
-        aloudCrosses.current = false
-        return
-      }
-
-      // Does it end on a later page than it starts on? If it does, the words
-      // themselves decide when to turn — see `followAloudWord`.
-      const last = range ? rangeAtOffset(range, one.text.length - 1) : null
-      aloudCrosses.current = (columnOfRange(last) ?? column) > column
+      if (column === null) return
 
       // Only when it has actually left the page. Assigning the same page on
       // every sentence would fight a reader who is looking ahead.
       carryPageTo(column)
+
+      if (!range) return
+      const at = crossesAt(range, one.text.length, column)
+      if (at === null) return
+
+      /*
+       * The clock, armed. The engine takes a moment to begin speaking, and
+       * every millisecond of that would make the turn early, so the lag is
+       * added back. Late is the kinder way to be wrong: a reader can still see
+       * the words they are hearing, which is the whole point of turning at all.
+       */
+      const wait = msToSpeak(at, settings.aloudRate) + START_LAG_MS
+      crossing.current = {
+        at,
+        from: column,
+        to: column + 1,
+        timer: window.setTimeout(() => {
+          crossing.current = null
+          carryCrossing(column, column + 1)
+        }, wait),
+      }
     },
-    [carryPageTo, columnOfRange],
+    [carryCrossing, carryPageTo, columnOfRange, crossesAt, settings.aloudRate, stopCrossing],
   )
 
   /**
    * Turn the page as the last word on it is said.
    *
-   * The reported fault: a long sentence that starts at the foot of a page was
-   * read to its end while the reader looked at the page above it, and the page
-   * only turned when the *next* sentence began. The engine reports each word,
-   * so the page can move with the voice instead of behind it.
-   *
-   * Silent on an engine that reports no word boundaries. The page then turns at
-   * the next sentence, exactly as it did before — a worse experience, not a
-   * broken one.
+   * Only called by an engine that reports its words. The first such report
+   * throws the clock away: an engine that says where it is beats a guess about
+   * where it ought to be.
    */
   const followAloudWord = useCallback(
-    (one: Utterance, charIndex: number) => {
-      if (!aloudCrosses.current) return
-      const range = rangeOfQuote(one.anchor, one.text)
-      const column = columnOfRange(range ? rangeAtOffset(range, charIndex) : null)
-      if (column === null) return
-      carryPageTo(column)
+    (_one: Utterance, charIndex: number) => {
+      const held = crossing.current
+      if (!held) return
+
+      window.clearTimeout(held.timer)
+      if (charIndex < held.at) {
+        // Still on this page. The clock is gone, and the words now decide.
+        crossing.current = { ...held, timer: 0 }
+        return
+      }
+
+      crossing.current = null
+      carryCrossing(held.from, held.to)
     },
-    [carryPageTo, columnOfRange],
+    [carryCrossing],
   )
 
   /** Off the end of this section: go on into the next one, if there is one. */
@@ -2605,6 +2701,7 @@ export default function Reader() {
     rate: settings.aloudRate,
     onSaying: followAloud,
     onWord: followAloudWord,
+    onStopped: stopCrossing,
     onSectionEnd: aloudSectionEnd,
   })
 
@@ -3700,7 +3797,11 @@ export default function Reader() {
           // here". The selection is where the voice starts, and it goes on
           // through the section and into the next one until the reader stops
           // it. See `useReadAloud`.
-          aloud.start(at.anchor)
+          //
+          // The words as well as the paragraph. An anchor names a paragraph,
+          // and a reader who picked its fourth sentence was read the first —
+          // reported from the phone. `startOf` matches the words.
+          aloud.start(at.anchor, at.text)
           break
 
         case 'ask': {

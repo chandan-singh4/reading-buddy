@@ -70,12 +70,88 @@ export function planOf(paragraphs: readonly Paragraph[]): Utterance[] {
   return plan
 }
 
-/** Where in the plan a paragraph's first sentence sits. `0` when it is absent. */
-export function startOf(plan: readonly Utterance[], anchor: Anchor | undefined): number {
+/**
+ * Where in the plan to start, given what the reader picked.
+ *
+ * The anchor alone is not enough, and that was a reported fault: a reader who
+ * selected the fourth sentence of a paragraph and asked to be read to heard the
+ * paragraph from its first word. An anchor names a *paragraph*, and a paragraph
+ * is many sentences.
+ *
+ * So the words matter too. Among that paragraph's sentences, this looks for the
+ * one the selection begins in — the selection may be part of a sentence, a whole
+ * sentence, or several of them, and all three start in the same place.
+ *
+ * Falls back to the paragraph's first sentence, which is what it always did.
+ * That is the honest answer when the words cannot be matched: the reader still
+ * gets read to, from somewhere sensible and nearby.
+ */
+export function startOf(
+  plan: readonly Utterance[],
+  anchor: Anchor | undefined,
+  excerpt?: string,
+): number {
   if (!anchor) return 0
-  const at = plan.findIndex((one) => one.anchor === anchor)
-  return at < 0 ? 0 : at
+  const first = plan.findIndex((one) => one.anchor === anchor)
+  if (first < 0) return 0
+
+  const wanted = plainly(excerpt ?? '')
+  if (!wanted) return first
+
+  for (let at = first; at < plan.length && plan[at]?.anchor === anchor; at += 1) {
+    const line = plainly(plan[at]?.text ?? '')
+    if (!line) continue
+    /*
+     * Either way round, because a selection and a sentence can be either size.
+     * A reader who dragged across half a sentence gives words *inside* it; a
+     * reader who tapped Paragraph gives words that *contain* it.
+     *
+     * The opening of the selection rather than the whole of it: a selection
+     * that runs over three sentences matches none of them whole, and it is the
+     * first of the three the reading should start at.
+     */
+    if (line.includes(wanted.slice(0, MATCH_ON)) || wanted.startsWith(line)) return at
+  }
+
+  return first
 }
+
+/**
+ * How much of a selection has to be recognised in a sentence.
+ *
+ * Long enough not to match the wrong sentence — "the" would match most of
+ * them — and short enough to survive a selection that starts mid-word, which a
+ * drag often does.
+ */
+const MATCH_ON = 24
+
+/** One spacing, one case. What the page shows and what was stored differ in both. */
+function plainly(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+/**
+ * How long a run of text takes to say, in milliseconds.
+ *
+ * An estimate, and it exists because the exact answer is not available. The
+ * page has to turn as the voice reaches the foot of it, and the engine is
+ * supposed to say where it is by reporting each word — but several engines,
+ * iOS among them, report nothing at all. On those the clock is the only thing
+ * left to follow.
+ *
+ * `CHARS_PER_SECOND` is measured against ordinary English prose read at a
+ * normal pace: about 160 words a minute, and about 5.5 characters a word with
+ * its space. It is wrong for a page of long names and wrong for a page of
+ * dialogue, and being a little wrong is the point — a page turned a beat early
+ * or a beat late is a small fault, and a page not turned at all is the fault
+ * being fixed.
+ */
+export function msToSpeak(characters: number, rate = 1): number {
+  const pace = CHARS_PER_SECOND * (rate > 0 ? rate : 1)
+  return Math.max(0, (characters / pace) * 1000)
+}
+
+const CHARS_PER_SECOND = 14.7
 
 /**
  * The parts of `speechSynthesis` this module uses.

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { AloudReader, planOf, startOf } from './readAloud.ts'
+import { AloudReader, msToSpeak, planOf, startOf } from './readAloud.ts'
 import type { SpeechLike, SpokenLike, Utterance } from './readAloud.ts'
 import type { Anchor, Paragraph } from '../structure/index.ts'
 
@@ -80,6 +80,58 @@ describe('startOf', () => {
   it('starts at the top when the anchor is absent or missing', () => {
     expect(startOf(plan, anchor('nowhere'))).toBe(0)
     expect(startOf(plan, undefined)).toBe(0)
+  })
+
+  /*
+   * The reported fault: "I select something in the middle of the paragraph and
+   * it starts reading from the start of the paragraph, no matter where I
+   * select." An anchor names a paragraph. The words say which sentence.
+   */
+  it('starts at the sentence the reader picked, not the paragraph', () => {
+    expect(startOf(plan, anchor('a1'), 'Two.')).toBe(1)
+  })
+
+  it('starts at the sentence a part-selection begins in', () => {
+    const long: Utterance[] = [
+      { anchor: anchor('p1'), text: 'The first sentence of the paragraph.', at: 0 },
+      { anchor: anchor('p1'), text: 'The second one, which was chosen.', at: 1 },
+    ]
+    expect(startOf(long, anchor('p1'), 'second one, which was chos')).toBe(1)
+  })
+
+  it('starts at the first of the sentences a wide selection covers', () => {
+    const long: Utterance[] = [
+      { anchor: anchor('p1'), text: 'Alpha beta gamma delta.', at: 0 },
+      { anchor: anchor('p1'), text: 'Epsilon zeta eta theta.', at: 1 },
+    ]
+    expect(startOf(long, anchor('p1'), 'Alpha beta gamma delta. Epsilon zeta')).toBe(0)
+  })
+
+  it('ignores spacing and case, which the page and the store disagree on', () => {
+    expect(startOf(plan, anchor('a1'), '  two.  ')).toBe(1)
+  })
+
+  it('falls back to the paragraph when the words are not among its sentences', () => {
+    expect(startOf(plan, anchor('a1'), 'words from another book entirely')).toBe(0)
+  })
+})
+
+describe('msToSpeak', () => {
+  it('is longer for more text and shorter for a faster voice', () => {
+    expect(msToSpeak(200)).toBeGreaterThan(msToSpeak(100))
+    expect(msToSpeak(200, 2)).toBeLessThan(msToSpeak(200, 1))
+  })
+
+  it('puts ordinary prose in the range a person actually reads it', () => {
+    // 100 characters is about 18 words. Between five and ten seconds is the
+    // band every real reading falls in; tighter than that is false precision.
+    expect(msToSpeak(600)).toBeGreaterThan(30_000)
+    expect(msToSpeak(600)).toBeLessThan(60_000)
+  })
+
+  it('answers zero for nothing, and treats a nonsense rate as normal', () => {
+    expect(msToSpeak(0)).toBe(0)
+    expect(msToSpeak(100, 0)).toBe(msToSpeak(100, 1))
   })
 })
 

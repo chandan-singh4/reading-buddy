@@ -34,7 +34,12 @@ export interface AloudControls {
   saying: Utterance | null
   /** The voices this browser offers. Empty until the engine reports them. */
   voices: SpeechSynthesisVoice[]
-  start: (from?: Anchor) => void
+  /**
+   * Read from here. `from` names the paragraph; `excerpt` is what the reader
+   * actually picked, so the reading starts at their sentence and not at the
+   * paragraph's first one.
+   */
+  start: (from?: Anchor, excerpt?: string) => void
   pause: () => void
   resume: () => void
   stop: () => void
@@ -57,6 +62,8 @@ export interface AloudOptions {
    * reports no boundaries simply never calls it.
    */
   onWord?: (utterance: Utterance, charIndex: number) => void
+  /** Called whenever the voice goes quiet, so the page can drop any timer. */
+  onStopped?: () => void
   /**
    * Asked for the next section when this one is finished.
    *
@@ -68,7 +75,7 @@ export interface AloudOptions {
 }
 
 export function useReadAloud(options: AloudOptions): AloudControls {
-  const { paragraphs, voiceName, rate, onSaying, onWord, onSectionEnd } = options
+  const { paragraphs, voiceName, rate, onSaying, onWord, onStopped, onSectionEnd } = options
 
   const [playing, setPlaying] = useState(false)
   const [running, setRunning] = useState(false)
@@ -90,6 +97,8 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   sectionEnd.current = onSectionEnd
   const word = useRef(onWord)
   word.current = onWord
+  const stopped = useRef(onStopped)
+  stopped.current = onStopped
   const planNow = useRef(plan)
   planNow.current = plan
 
@@ -122,6 +131,7 @@ export function useReadAloud(options: AloudOptions): AloudControls {
           if (at === null) {
             // Quiet, and nothing on the page marked. Whether the book goes on
             // is the *other* callback's business — see `onFinished` below.
+            stopped.current?.()
             setPlaying(false)
             setRunning(false)
             return
@@ -159,18 +169,19 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   )
 
   const start = useCallback(
-    (from?: Anchor) => {
+    (from?: Anchor, excerpt?: string) => {
       const one = reader.current
       if (!one || plan.length === 0) return
       setRunning(true)
       setPlaying(true)
-      one.start(plan, startOf(plan, from), voicing)
+      one.start(plan, startOf(plan, from, excerpt), voicing)
     },
     [plan, voicing],
   )
 
   const pause = useCallback(() => {
     reader.current?.pause()
+    stopped.current?.()
     setPlaying(false)
   }, [])
 
