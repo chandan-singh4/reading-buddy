@@ -22,18 +22,57 @@
 
   font-family: var(--font-ui);
   color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
+
+  /*
+   * Glass, in the house recipe — the same `--g-*` tokens the Define loupe and
+   * the sheets use, so this recolours with the reader's theme instead of being
+   * one fixed grey. Two tints for a body with a direction to it, a blur that
+   * carries the page's colour through, and the depth entirely in the edges: a
+   * lit hairline along the top and a faint one all the way round. Without those
+   * two insets this is a translucent rectangle, not glass.
+   */
+  background: linear-gradient(155deg, var(--g-tint) 0%, var(--g-tint-2) 100%);
+  backdrop-filter: blur(var(--g-blur)) saturate(var(--g-sat)) brightness(var(--g-bright));
+  -webkit-backdrop-filter: blur(var(--g-blur)) saturate(var(--g-sat)) brightness(var(--g-bright));
+  /* Transparent, not none: the border still holds the box's own size. */
+  border: 1px solid transparent;
+  /* A pill. A transport is a row of controls, not a card. */
+  border-radius: 999px;
+  box-shadow:
+    0 18px 34px -12px var(--g-shadow),
+    0 6px 14px -8px var(--g-shadow),
+    inset 0 1px 0 var(--g-edge-hi),
+    inset 0 0 0 1px rgb(255 255 255 / 12%);
 }
 
+/*
+ * Where the blur cannot be drawn, the tints alone would leave the page's words
+ * legible straight through the bar. Fall back to the opaque surface.
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bar {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
+  }
+}
+
+/*
+ * Every button is the same two rows: a glyph row, then a label row. Back and
+ * Next are the only two that put a word in the second row, and the others leave
+ * it empty rather than collapsing it.
+ *
+ * This is the whole reason the play triangle used to sit low. The bar centres
+ * button *boxes*. A box with a word under it is taller, so centring lifted its
+ * arrow above the middle line while the label-less play glyph stayed on it —
+ * the arrows were high, not the triangle low. A fixed glyph row puts every
+ * glyph on one line no matter what is underneath it.
+ */
 .bar button {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 1.5rem 0.75rem;
+  justify-items: center;
   align-items: center;
-  justify-content: center;
-  gap: 0.1rem;
 
   /* The phone's own minimum for a target you press without looking. */
   min-width: 3rem;
@@ -44,12 +83,14 @@
   color: inherit;
   background: none;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   cursor: pointer;
 }
 
 .bar button:hover {
-  background: var(--color-surface-raised);
+  /* Mixed toward transparent: an opaque fill here would punch a hole in the
+     glass and show as a solid tile floating on it. */
+  background: color-mix(in srgb, var(--color-surface-raised) 55%, transparent);
 }
 
 .bar button:focus-visible {
@@ -77,6 +118,7 @@
 /* Under the arrows, so a first-time reader knows which way they go. */
 .label {
   font-size: 0.625rem;
+  line-height: 1;
   color: var(--color-text-muted);
 }
 

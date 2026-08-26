@@ -95,7 +95,10 @@ export function AloudBar({
         onClick={() => onRate(nextRate(rate))}
         aria-label={`Speed ${rate} times. Tap to change.`}
       >
-        {rate}×
+        {/* Wrapped, so it is a grid item on the glyph row like every other
+            control. Bare text would be an anonymous item and harder to reason
+            about when the rows change. */}
+        <span aria-hidden="true">{rate}×</span>
       </button>
 
       <button type="button" className={styles.stop} onClick={onStop} aria-label="Stop reading">
