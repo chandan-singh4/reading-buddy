@@ -303,22 +303,34 @@ export class AloudReader {
   /**
    * Pause where it is.
    *
-   * The engine is asked to pause as well as being silenced, because on a phone
-   * pausing is instant. On resume the sentence is said again from its start
-   * rather than trusted to carry on: desktop Chrome has resumed on its own
-   * after a timeout for years, and a repeated sentence is a fault a listener
-   * forgives where a silent stop is not.
+   * It cancels; it does not ask the engine to pause. This looks like the wrong
+   * verb and is the right one.
+   *
+   * `speechSynthesis.pause()` pauses the *engine*, not the utterance, and the
+   * engine is one global object shared by the whole page. On Android the paused
+   * state is sticky: everything handed to `speak()` afterwards is queued and
+   * never spoken, and `resume()` does not reliably lift it. So a reader who
+   * paused once could never be read to again — the engine was still paused and
+   * swallowing every new utterance in silence.
+   *
+   * Cancelling costs nothing here, because resume was never going to carry on
+   * mid-sentence: it says the sentence again from its start, by design (desktop
+   * Chrome has resumed on its own after a timeout for years, and a repeated
+   * sentence is a fault a listener forgives where a silent stop is not). The
+   * place — `at` and `from` — is untouched by `silence()`, so the sentence to
+   * say again is already known. This is the same pattern `skip` uses.
    */
   pause(): void {
     if (!this.speaking) return
-    this.speaking = false
-    this.generation += 1
-    this.speech.pause()
+    this.silence()
   }
 
   resume(): void {
     if (this.speaking || this.plan.length === 0) return
     this.speaking = true
+    // A belt-and-braces lift, for an engine some *other* code — or a
+    // backgrounded tab — left paused. On an engine that is not paused it does
+    // nothing.
     this.speech.resume()
     this.say()
   }

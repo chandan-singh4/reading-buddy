@@ -332,6 +332,20 @@ describe('AloudReader', () => {
     expect(reader.playing).toBe(true)
   })
 
+  /*
+   * The regression this guards: `speechSynthesis.pause()` pauses the shared
+   * engine, and on Android that state is sticky — every later `speak()` is
+   * queued and never spoken. A reader who paused once was never read to again.
+   */
+  it('cancels rather than pausing the engine, so a later speak is heard', () => {
+    const fake = fakeSpeech()
+    const reader = new AloudReader(fake.speech, fake.make)
+    reader.start(plan)
+    reader.pause()
+    expect(fake.calls).toContain('cancel')
+    expect(fake.calls).not.toContain('pause')
+  })
+
   it('ignores a resume when it is already playing', () => {
     const fake = fakeSpeech()
     const reader = new AloudReader(fake.speech, fake.make)

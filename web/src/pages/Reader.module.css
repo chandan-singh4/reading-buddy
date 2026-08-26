@@ -198,6 +198,18 @@
  * worth distorting the portrait one for, so it is left rather than guarded.
  */
 .stage[data-shrunk='true'] {
+  transform: scale(var(--page-scale));
+}
+
+/*
+ * Lifted as well as scaled, which is the toolbar's case and only its case.
+ *
+ * The push described above spends the head's share of the freed room on
+ * clearing the top bar. The read-aloud transport raises no top bar, so there is
+ * nothing to clear: it drops the push and takes the whole of the freed room at
+ * the foot, under the page number, where the transport sits.
+ */
+.stage[data-shrunk='true'][data-lifted='true'] {
   transform: translateY(calc(var(--reader-bar-top) - var(--space-4)))
     scale(var(--page-scale));
 }

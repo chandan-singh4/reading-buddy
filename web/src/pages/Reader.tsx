@@ -599,7 +599,24 @@ export default function Reader() {
    * copies the page and has to draw the copy at the size the reader is
    * actually looking at.
    */
-  const drawnAt = chromeShown ? PAGE_SCALE : 1
+  /*
+   * Whether the reading transport is up.
+   *
+   * A mirror of `aloud.running`, which is declared far below this line and
+   * cannot be read here. It is set from an effect, so it settles one commit
+   * after the voice starts — imperceptible against a transform that is
+   * transitioned anyway, and safe because *both* consumers below read this same
+   * flag. The trap this avoids is the two of them disagreeing, not the lag.
+   */
+  const [aloudRunning, setAloudRunning] = useState(false)
+  /*
+   * The page steps back for the transport as well as for the toolbar. The
+   * transport is fixed over the foot of the page, and without this it covers
+   * the last two lines — which are, while the voice is reading, exactly the
+   * lines the reader is following.
+   */
+  const pageShrunk = chromeShown || aloudRunning
+  const drawnAt = pageShrunk ? PAGE_SCALE : 1
   /** Whether the search panel is up. Declared here with the other two layers
       rather than beside the search machinery below, because the three of them
       are governed together — see "the layers over the page". */
@@ -2628,6 +2645,7 @@ export default function Reader() {
   )
 
   /** Off the end of this section: go on into the next one, if there is one. */
+  /* Keep the mirror above in step with the voice. See `aloudRunning`. */
   const aloudSectionEnd = useCallback(() => {
     const target = neighbours.next
     if (!target) return false
@@ -2645,6 +2663,15 @@ export default function Reader() {
     onCross: crossAloud,
     onSectionEnd: aloudSectionEnd,
   })
+
+  /*
+   * The mirror declared with the other page-scale state, filled in here where
+   * the voice finally exists. See `aloudRunning` for why it is a mirror and not
+   * a direct read.
+   */
+  useEffect(() => {
+    setAloudRunning(aloud.running)
+  }, [aloud.running])
 
   const highlights = useMemo(
     () => notes.filter((row) => row.quote && row.colour),
@@ -4024,7 +4051,15 @@ export default function Reader() {
           */}
           <div
             className={styles.stage}
-            data-shrunk={chromeShown}
+            data-shrunk={pageShrunk}
+            /*
+              Lifted only for the toolbar. The shrink frees room at both ends,
+              and the downward push spends the head's share on clearing the top
+              bar. With no top bar there is nothing to clear, so the push is
+              dropped and the whole of the freed room falls at the foot, where
+              the transport is.
+            */
+            data-lifted={chromeShown}
             style={{ '--page-scale': PAGE_SCALE } as React.CSSProperties}
           >
           {/*
