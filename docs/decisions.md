@@ -1366,3 +1366,47 @@ sign-in screen.
   Selections come in three sizes — part of a sentence, one sentence, several —
   and all three begin in the same place, so it matches either way round.
   Unmatched words fall back to the paragraph's opening. — 2026-08-25
+
+## Settled 2026-08-26 — keeping a line Veda said
+
+**The reader can keep one sentence out of one of Veda's answers.** Select words
+inside an answer, and a small card gives two choices: **Save** and **Ask**.
+
+- **Save** writes a note with `author: 'claude'` and a new field, `fromThread`.
+- **Ask** puts the words in the question box as a block quote, and stops.
+
+### Why `fromThread` and not a new author
+
+The author is who said the words, and Veda said them. `fromThread` names the
+conversation the line came out of. Its presence is the whole difference between
+a kept line and a whole conversation, and it is a stored fact, not a guess at
+the text. It also sends a tap on the quote back into the conversation. A line is
+worth keeping because of what it answered.
+
+### Why Ask writes no question
+
+A prefilled question is a question the reader did not ask, and a canned question
+earns a canned answer. The block quote is enough: Veda is sent the whole thread,
+so she sees her own line in the place she said it.
+
+**The model needs no prompt change.** This is an ordinary next turn.
+
+### Why the popup is not `SelectionMenu`
+
+The book's menu carries drag handles, sentence and paragraph snapping, and five
+highlight colours, and every one of them is filed against a paragraph's anchor.
+An answer is markdown in a bubble. It has no anchor grammar and nothing to
+highlight it with.
+
+### "By chapter" stopped being a chip
+
+The chips ask *which notes*. "By chapter" asked *arranged how*, and it showed
+exactly what All showed — two of five chips looked like one button. It is now a
+switch beside the chips, and it applies to whichever chip is on. **Quotes by
+chapter** is a thing a reader wants, and the chip could never offer it.
+
+**Veda quotes** took the empty place. The chips now read: All · Quotes · Veda ·
+Veda quotes · Words. Quotes are the book's best sentences; Veda quotes are hers.
+
+The switch is hidden on **Words**. A word has no anchor, so it belongs to no
+chapter.

@@ -2478,7 +2478,20 @@ export default function Reader() {
         page: pageOfAnchor(parts),
         createdAt: row.createdAt,
         colour: 'colour' in row ? row.colour : undefined,
-        threadId: 'threadId' in row ? row.threadId : undefined,
+        /*
+         * A kept line of Veda's has no `threadId` of its own — it is a note,
+         * not a conversation — but it names the thread it came out of, and a
+         * tap on it should land back in that conversation. So the two ids meet
+         * here: `fromThread` says what the row is, and it is also what says
+         * where a tap goes.
+         */
+        threadId:
+          'threadId' in row
+            ? row.threadId
+            : 'fromThread' in row
+              ? row.fromThread
+              : undefined,
+        fromThread: 'fromThread' in row ? row.fromThread : undefined,
       }
     })
   }, [notes, threads, frame, pageOfAnchor])
@@ -3652,6 +3665,33 @@ export default function Reader() {
     [id],
   )
 
+  /**
+   * Keep a line the reader picked out of one of Veda's answers.
+   *
+   * Filed against the paragraph the conversation was about, because that is the
+   * only place in the book it belongs to — Veda's words have no page of their
+   * own. `fromThread` is what makes it a kept line rather than a note somebody
+   * wrote, and it is what sends a tap back into the conversation it came from.
+   *
+   * `saving.current` and not `lamp`, for the reason written out on `keepThread`:
+   * it is the record of which thread is being written to, and it stays right
+   * even when the panel has moved on.
+   */
+  const keepVedaLine = useCallback(
+    async (text: string) => {
+      const open = saving.current
+      if (!id || !open?.threadId) return
+      const row = await noteStore.addNote(id, {
+        anchor: open.passage.anchor,
+        author: 'claude',
+        text,
+        fromThread: open.threadId,
+      })
+      setNotes((rows) => [...rows, row])
+    },
+    [id],
+  )
+
   /** Change the colour of a highlight already on the page. */
   const recolour = useCallback(
     (noteId: string, colour: string) => {
@@ -4516,6 +4556,7 @@ export default function Reader() {
               {...(lamp.picture ? { picture: lamp.picture } : {})}
               saved={lamp.saved}
               onSave={keepThread}
+              onKeep={keepVedaLine}
               onClose={() => setLamp(null)}
             />
           )}

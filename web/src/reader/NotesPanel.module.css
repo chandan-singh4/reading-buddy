@@ -65,6 +65,83 @@
   outline-offset: 2px;
 }
 
+/* --- Arranged how ---------------------------------------------------------- */
+
+/*
+ * The grouping switch, set apart from the chips above it on purpose.
+ *
+ * It is a different question. The chips ask which notes to show; this asks how
+ * to lay them out, and it stays true whichever chip is on. Drawn quieter than a
+ * chip and squared off rather than rounded, so a glance never reads it as a
+ * sixth one — which is the mistake it is here to undo.
+ */
+.arrange {
+  display: flex;
+  flex: 0 0 auto;
+  padding: 0 14px 10px;
+  font-family: var(--font-ui);
+}
+
+.toggle {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.toggle::before {
+  content: '⌄ ';
+}
+
+.toggle[aria-pressed='true'] {
+  border-color: var(--rule);
+  background: var(--paper2);
+  color: var(--ink-soft);
+}
+
+.toggle[aria-pressed='true']::before {
+  content: '⌃ ';
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- A line kept from an answer ------------------------------------------- */
+
+/*
+ * Veda's words, but not Veda's slip.
+ *
+ * The slip is a boxed exchange with tape on the corner. A kept line is one
+ * sentence standing on its own, so it gets what a kept line gets everywhere:
+ * a rule down its left side and nothing else. It shares the slip's inks, so the
+ * hand is unmistakably the same — the box is what changes, not the voice.
+ */
+.kept {
+  --veda-ink: #463a8d;
+  --veda-ink-strong: #291f66;
+  --veda-bar: #7c6fca;
+
+  display: block;
+  width: 100%;
+  margin: 6px 0 4px;
+  padding: 2px 0 2px 12px;
+  border-inline-start: 3px solid var(--veda-bar);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kept:focus-visible {
+  outline: 2px solid var(--veda-bar);
+  outline-offset: 3px;
+}
+
 /* --- The sheet ------------------------------------------------------------ */
 
 /*

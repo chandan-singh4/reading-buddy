@@ -109,6 +109,15 @@ export interface StudyLampProps {
   saved?: TutorMessage[]
   /** Every completed exchange, whole. The Reader persists it. */
   onSave: (messages: TutorMessage[]) => void
+  /**
+   * Keep a line the reader picked out of one of Veda's answers.
+   *
+   * The lamp hands up the words and nothing else. Which thread they were said
+   * in, and which paragraph the thread is about, are both facts the Reader
+   * already holds — asking the lamp to carry them would be copying state
+   * downward so it could be handed straight back.
+   */
+  onKeep?: (text: string) => void
   onClose: () => void
 }
 
@@ -211,6 +220,7 @@ export function StudyLamp({
   picture,
   saved,
   onSave,
+  onKeep,
   onClose,
 }: StudyLampProps) {
   const [messages, setMessages] = useState<TutorMessage[]>(saved ?? [])
@@ -514,6 +524,112 @@ export function StudyLamp({
 
   useLayoutEffect(grow, [draft, grow])
 
+  /*
+   * ## Keeping a line Veda said
+   *
+   * Veda sometimes says one sentence worth more than the answer around it. The
+   * reader selects it and gets two things to do with it: keep it, or ask about
+   * it.
+   *
+   * ### Why this is not `SelectionMenu`
+   *
+   * The book's selection menu carries drag handles, sentence and paragraph
+   * snapping, and five highlight colours, and every one of them is filed
+   * against a paragraph's anchor. None of that exists here. An answer is
+   * markdown in a bubble: it has no anchor grammar, it is re-drawn whenever the
+   * thread changes, and there is nothing to highlight it *with*. Reusing that
+   * component would mean teaching it a second world it has no use for.
+   *
+   * ### What counts as a selection worth acting on
+   *
+   * Both ends inside one of Veda's answers. Both, because a drag that starts in
+   * her answer and ends in the reader's question would keep words nobody said
+   * in one place. And her answers only — a reader's own question is already
+   * theirs, and keeping it would file their words under Veda's name.
+   */
+  const [picked, setPicked] = useState<{ text: string; top: number; left: number } | null>(null)
+
+  useEffect(() => {
+    /*
+     * `selectionchange` rather than `pointerup`, because a selection is also
+     * made by dragging a phone's own handles, by a double-tap, and by the
+     * keyboard — and `pointerup` sees none of those. It fires on every
+     * character of a drag, so the work in here stays cheap and idempotent.
+     */
+    const read = () => {
+      const selection = document.getSelection()
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+        setPicked(null)
+        return
+      }
+
+      const inAnswer = (node: Node | null) =>
+        (node instanceof Element ? node : node?.parentElement)?.closest(`.${styles.slip}`) ?? null
+
+      const from = inAnswer(selection.anchorNode)
+      const to = inAnswer(selection.focusNode)
+      if (!from || from !== to) {
+        setPicked(null)
+        return
+      }
+
+      const text = selection.toString().trim()
+      if (text.length === 0) {
+        setPicked(null)
+        return
+      }
+
+      /*
+       * The card goes above the selection, because on a phone the reader's own
+       * hand is below it. `getBoundingClientRect` on the range is the box
+       * around every line of it, so a selection spanning three lines puts the
+       * card above the first — which is where the reader's eye already is.
+       */
+      const box = selection.getRangeAt(0).getBoundingClientRect()
+      setPicked({ text, top: box.top, left: box.left + box.width / 2 })
+    }
+
+    document.addEventListener('selectionchange', read)
+    return () => document.removeEventListener('selectionchange', read)
+  }, [])
+
+  const clearPick = useCallback(() => {
+    document.getSelection()?.removeAllRanges()
+    setPicked(null)
+  }, [])
+
+  const keep = useCallback(() => {
+    if (!picked) return
+    onKeep?.(picked.text)
+    clearPick()
+  }, [picked, onKeep, clearPick])
+
+  /*
+   * Ask puts the words in the box as a block quote and stops.
+   *
+   * It does not write the question. A prefilled "can you say more about this?"
+   * is a question the reader did not ask, and a canned question earns a canned
+   * answer — the reader reached for this because they had something specific in
+   * mind. The blockquote is enough on its own: Veda is already being sent the
+   * whole thread, so she can see the line in the place she said it, and a
+   * quoted line above a question reads as "this is the bit I mean" without
+   * anybody having to say so.
+   */
+  const askAbout = useCallback(() => {
+    if (!picked) return
+    const quoted = picked.text
+      .split('\n')
+      .map((line) => `> ${line}`)
+      .join('\n')
+    setBox(`${quoted}\n\n`)
+    clearPick()
+    const box = input.current
+    box?.focus()
+    // The end, not the start. The reader types under the quote, not over it.
+    box?.setSelectionRange(box.value.length, box.value.length)
+  }, [picked, setBox, clearPick])
+
+
   const send = useCallback(
     /**
      * `base` replaces the thread this question is asked against. A retry passes
@@ -687,6 +803,34 @@ export function StudyLamp({
       <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
         ×
       </button>
+
+      {picked && onKeep && (
+        /*
+          Fixed, and placed from the selection's own box rather than laid out in
+          the flow. The conversation scrolls; a card in the flow would have to
+          be inserted between two messages, which reflows the thread under the
+          reader's finger at the exact moment they are aiming at it.
+
+          `onPointerDown` with `preventDefault` on the card itself: a tap
+          anywhere else clears the selection before the click lands, and the
+          button would fire with nothing selected.
+        */
+        <div
+          className={styles.pick}
+          style={{ top: `${picked.top}px`, left: `${picked.left}px` }}
+          role="group"
+          aria-label="What to do with these words"
+          onPointerDown={(event) => event.preventDefault()}
+        >
+          <button type="button" className={styles.pickAction} onClick={keep}>
+            Save
+          </button>
+          <span className={styles.pickRule} aria-hidden="true" />
+          <button type="button" className={styles.pickAction} onClick={askAbout}>
+            Ask
+          </button>
+        </div>
+      )}
 
       <div className={styles.anchor}>
         {collapsed ? (

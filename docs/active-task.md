@@ -5,60 +5,85 @@
 
 ## Task
 
-**VEDA-INK — Veda's notes in a handwriting face (Kalam, violet ink).**
+**VEDA-QUOTES — keep a line Veda said.**
 
-This is not a backlog waypoint. It is a styling change the reader asked for.
-The source is `design-inspiration/veda-handwriting-build-prompt.md`. The visual
-truth is `design-inspiration/veda-handwriting-fonts.html`.
+Not a backlog waypoint. The reader asked for it.
 
-Veda's notes render in the app's typeset face. They must read as a tutor's hand
-in the reader's notebook. The reader's own Quotes stay in blue Caveat. Veda must
-look like a different hand: a different face **and** a different ink.
+Veda sometimes says one line that is worth more than the answer around it.
+Today the reader can copy the whole answer, or nothing. They want to select
+words inside Veda's answer and do one of two things with them:
+
+- **Save** — keep the words under Notes, as Veda's quote.
+- **Ask** — put the words in the question box, to ask Veda about her own line.
+
+## What the code already gives us
+
+Read this before planning any new machinery. Four parts exist:
+
+1. `StudyLamp` holds `setBox(text)`. Every path that writes to the question box
+   goes through it. **That is the whole of Ask.**
+2. `StoredNote` already has `author: 'claude'`. Nothing stores one yet. The
+   `'claude'` rows in the notes list are made on the fly from tutor threads.
+3. `StoredNote.colour` proves an unindexed field needs no schema version.
+4. `SelectionMenu` is the book's popup. **Do not reuse it.** It carries drag
+   handles, snapping and highlight colours, and it is anchored to a book
+   paragraph. Veda's answer is markdown in a bubble. It needs a small popup of
+   its own with two buttons.
+
+## The one new field
+
+`StoredNote.fromThread?: string` — the tutor thread the words were said in.
+
+With `author: 'claude'`, its presence means "an excerpt of Veda's answer", and
+not a whole conversation. It also lets a tap on the quote reopen the
+conversation the line came from, which is where the reader will want to go.
+
+Unindexed, so no Dexie version bump.
 
 ## Definition of done
 
-1. A Veda note in the Notes tab shows Kalam in violet ink. A heading, `**bold**`,
-   `*italic*`, a bullet list, and a block quote all use the hand. Bold uses true
-   Kalam 700, not a faux weight.
-2. Inline code and fenced code stay in the monospace face, in a soft tinted box.
-3. A Quote note and a Veda note in the same list read as two different hands.
-   The Quotes rules do not change.
-4. `npm run build` is green and the Notes tests still pass.
+1. The reader selects words inside one of Veda's answers in the lamp. A small
+   card appears with **Save** and **Ask**.
+2. **Save** writes a note with `author: 'claude'`, the selected words, and
+   `fromThread`. It shows under Notes on a new **Veda quotes** chip, in Veda's
+   violet hand, drawn as a quotation and not as a slip. Tapping it reopens the
+   thread.
 
-## How to do it (the shape, not the code)
-
-The markdown renderer already reads every colour from a `--md-*` token, with a
-fallback. `NotesPanel.module.css` already names five of those tokens for the
-Notes tab. So the change is a token override plus a `font-family` on the note
-slip. **Do not edit `markdown.tsx`.**
-
-- Put the new tokens and the face on `.txt` (or `.slip`) in
-  `NotesPanel.module.css`. That class *is* the `veda-note` gate the build prompt
-  asks for. The Ask-Veda chat overlay in `StudyLamp` uses the same renderer with
-  its own tokens, so it stays typeset. This answers the prompt's open question.
-- Kalam is self-hosted with `@fontsource`, not Google Fonts. The app must work
-  offline, so **do not add a `fonts.googleapis.com` link.** `fonts.css` declares
-  Kalam 400 and 700. If the prompt's weight 300 is wanted, add a third
-  `@font-face` that points at the `@fontsource/kalam` 300 file. Check that file
-  exists first. If it does not, use 400 and say so.
-- The reference file gives the sizes: body about 21px on a 38px line, `h3` about
-  26px at weight 700. The Notes slip is narrow. Scale the sizes down if 21px
-  breaks the slip, and report what you chose.
+   **"By chapter" leaves the chip row** and becomes a switch beside it, so
+   grouping applies to whichever chip is on. **Veda quotes** takes its place.
+   The switch is hidden on Words: a word has no anchor.
+3. **Ask** puts the words in the question box as a block quote, puts the cursor
+   after them, and raises the keyboard. It does not send.
+4. Selecting the reader's own question, or plain text outside a message, shows
+   no card.
+5. `npm run build` is green. New tests cover the popup and the saved quote.
 
 ## Files in scope
 
-- `web/src/reader/NotesPanel.module.css` — the tokens, the face, the ink.
-- `web/src/styles/fonts.css` — a Kalam 300 `@font-face`, only if needed.
-- `web/src/reader/markdown.module.css` — only if a rule cannot be reached by a
-  token. Prefer a new token over a rule change here.
-- `web/src/reader/NotesPanel.test.tsx` — a test that a Veda note carries the
-  Veda class and a Quote does not.
-- `design-inspiration/veda-handwriting-fonts.html` — read only. The visual truth.
+- `web/src/storage/db.ts` — the `fromThread` field and its note.
+- `web/src/storage/notes.ts` — carry the field through.
+- `web/src/reader/StudyLamp.tsx` — the selection watcher, the card, the two
+  actions. `setBox` is already there.
+- `web/src/reader/StudyLamp.module.css` — the card.
+- `web/src/pages/Reader.tsx` — save the note; keep quotes out of the thread
+  rows so a quote is not counted twice.
+- `web/src/reader/notes.ts` — the chips, and the switch's own rule.
+- `web/src/reader/NotesPanel.tsx` — the new chip, the switch, the quotation.
+- `web/src/reader/NotesPanel.module.css` — its rules.
+- `web/src/reader/StudyLamp.test.tsx`, `web/src/reader/NotesPanel.test.tsx`.
 
 ## Out of scope
 
-- `web/src/reader/markdown.tsx`. No parsing change. No sanitizing change.
-- The Quotes note rules: `.hand`, `.tag`, `.tagRow`, and the Caveat face.
-- `web/src/reader/StudyLamp.module.css` and the Ask-Veda chat overlay.
-- Any PDF or EPUB parsing file.
-- `PARSER_VERSION`. This change does not touch a parsed book.
+- `api/tutor.ts` and every prompt. The model needs no instruction for this.
+- `web/src/reader/SelectionMenu.tsx` and `selection.ts` — the book's gesture
+  does not change.
+- `web/src/reader/markdown.tsx`. No parsing change.
+- Any parsing file, and `PARSER_VERSION`.
+- Syncing notes to the cloud. Notes stay device-local.
+
+---
+
+## Done, 2026-08-26
+
+Built and shipped. 2,088 tests pass, build green. The decisions are written up
+in `docs/decisions.md` under "keeping a line Veda said".

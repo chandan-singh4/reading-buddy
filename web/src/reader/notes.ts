@@ -17,17 +17,29 @@ export interface NoteLike {
   anchor: Anchor
   author: NoteAuthor
   createdAt?: string
+  /**
+   * The tutor thread a line of Veda's was kept from.
+   *
+   * Only a kept line has one. It is the whole of the difference between the two
+   * Veda chips: a conversation is an exchange the reader had, a quote is one
+   * sentence out of it that they thought was worth keeping on its own.
+   */
+  fromThread?: string
 }
 
 /**
- * The four chips over the notes list.
+ * The chips over the notes list. Every one of them narrows it.
  *
- * Three of them narrow the list; `chapter` does not. It is a *grouping* mode —
- * every note is still there, gathered under the chapter it belongs to. A chip
- * that hid four fifths of a reader's notes and called itself "by chapter" would
- * be answering a question nobody asked.
+ * `chapter` used to be here and is not a filter — it is a *grouping*, and it
+ * was the odd chip in the row: the other four answered "which of these?" and it
+ * answered "arranged how?". Sitting among them it also read as a near-duplicate
+ * of All, because it showed exactly the same notes. It is now a toggle beside
+ * the chips, and it applies to whichever chip is chosen — see `groupByChapter`.
+ *
+ * `vedaQuotes` took the place it left. See `NOTE_FILTERS` for what the five
+ * are, and `notesUnder` for how the two Veda chips are told apart.
  */
-export type NoteFilter = 'all' | 'you' | 'claude' | 'chapter' | 'words'
+export type NoteFilter = 'all' | 'you' | 'claude' | 'vedaQuotes' | 'words'
 
 /**
  * What each chip calls itself.
@@ -39,15 +51,25 @@ export type NoteFilter = 'all' | 'you' | 'claude' | 'chapter' | 'words'
  * wrote. The stored `author` is still `'you'`, because that is a fact about who
  * made the row and it stays right whatever the chip is called.
  *
- * See `docs/decisions.md` for what each of the four is for.
+ * **Veda quotes** is the same idea one voice over: lines the reader picked out
+ * of what Veda said. The pair reads straight across — Quotes are the book's
+ * best sentences, Veda quotes are hers — and it is why the new chip sits next
+ * to the old one rather than at the end.
+ *
+ * See `docs/decisions.md` for what each of the five is for.
  */
 export const NOTE_FILTERS: { value: NoteFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'you', label: 'Quotes' },
   { value: 'claude', label: 'Veda' },
-  { value: 'chapter', label: 'By chapter' },
+  { value: 'vedaQuotes', label: 'Veda quotes' },
   { value: 'words', label: 'Words' },
 ]
+
+/** Chapter headings make no sense over the kept words: a word has no anchor. */
+export function canGroupByChapter(filter: NoteFilter): boolean {
+  return filter !== 'words'
+}
 
 /**
  * Notes read in the book's order, not the order they were written.
@@ -78,15 +100,29 @@ export function inNoteOrder<T extends NoteLike>(notes: readonly T[]): T[] {
   })
 }
 
-/** Which notes a chip leaves on screen. `all` and `chapter` leave all of them. */
+/**
+ * Which notes a chip leaves on screen.
+ *
+ * The two Veda chips split one author. Both hold rows written by the tutor, and
+ * `fromThread` is the whole of the difference — a kept line names the thread it
+ * came out of, a conversation does not. It is a stored fact and not a guess at
+ * the text, for the same reason `author` is: the reader must never be shown one
+ * thing labelled as the other.
+ */
 export function notesUnder<T extends NoteLike>(
   notes: readonly T[],
   filter: NoteFilter,
 ): T[] {
-  if (filter === 'all' || filter === 'chapter') return [...notes]
+  if (filter === 'all') return [...notes]
   // 'words' is not a kind of note. The saved words are a different list from a
   // different table, and the panel draws them instead of this one.
   if (filter === 'words') return []
+  if (filter === 'vedaQuotes') {
+    return notes.filter((note) => note.author === 'claude' && note.fromThread !== undefined)
+  }
+  if (filter === 'claude') {
+    return notes.filter((note) => note.author === 'claude' && note.fromThread === undefined)
+  }
   return notes.filter((note) => note.author === filter)
 }
 

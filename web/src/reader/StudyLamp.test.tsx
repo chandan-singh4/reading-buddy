@@ -7,7 +7,7 @@
 // know draws no name at all. The second is the one a refactor breaks — falling
 // back to "the current model" is the obvious convenience, and it would label
 // every thread saved before this feature with a model that never saw it.
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { forgetAllErrands } from './errand.ts'
@@ -471,6 +471,92 @@ describe('an answer arriving', () => {
     // One copy button, and it belongs to the question above.
     expect(screen.getAllByRole('button', { name: /copy/i })).toHaveLength(1)
     stream.close()
+  })
+})
+
+/**
+ * Select the words of one element, the way a reader's drag does.
+ *
+ * `selectionchange` is dispatched by hand. jsdom keeps a Selection and answers
+ * questions about it, but it does not fire the event when a script builds a
+ * range — and that event is the whole of how the lamp learns about a drag.
+ */
+function selectWordsIn(element: Element) {
+  /*
+   * jsdom has no layout, so a Range cannot measure itself. The lamp asks for
+   * the selection's box to place the card above it, which is a question only a
+   * real browser can answer. A fixed box is enough here: these tests are about
+   * which words were picked and what happens to them, not about where the card
+   * lands.
+   */
+  Range.prototype.getBoundingClientRect = () =>
+    ({ top: 100, left: 40, width: 200, height: 20 }) as DOMRect
+
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  const selection = document.getSelection()!
+  selection.removeAllRanges()
+  selection.addRange(range)
+  // `act`, because this is a plain DOM event and not a React one: without it
+  // the state it sets is scheduled and the assertion runs before the card does.
+  act(() => {
+    document.dispatchEvent(new Event('selectionchange'))
+  })
+}
+
+describe('keeping a line Veda said', () => {
+  const spoken: TutorMessage[] = [
+    { role: 'you', text: 'What is a symbol?', ts: 1 },
+    {
+      role: 'claude',
+      text: 'A symbol is a picture the mind can hold.',
+      model: 'google/gemma-4-31b-it:free',
+      ts: 2,
+    },
+  ]
+
+  it('offers Save and Ask on words picked out of an answer', async () => {
+    lamp(spoken, { onKeep: () => {} })
+    selectWordsIn(await screen.findByText('A symbol is a picture the mind can hold.'))
+
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
+  })
+
+  it('hands the words up when they are saved', async () => {
+    const onKeep = vi.fn()
+    lamp(spoken, { onKeep })
+    selectWordsIn(await screen.findByText('A symbol is a picture the mind can hold.'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(onKeep).toHaveBeenCalledWith('A symbol is a picture the mind can hold.')
+  })
+
+  it('puts the words in the box as a quote, and does not send them', async () => {
+    /*
+     * Ask writes no question. A prefilled one is a question the reader did not
+     * ask, and it would go out the moment they tapped send without reading it.
+     */
+    const onKeep = vi.fn()
+    lamp(spoken, { onKeep })
+    selectWordsIn(await screen.findByText('A symbol is a picture the mind can hold.'))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
+
+    const composer = screen.getByLabelText('Ask about this passage') as HTMLTextAreaElement
+    expect(composer.value).toBe('> A symbol is a picture the mind can hold.\n\n')
+    expect(onKeep).not.toHaveBeenCalled()
+    // Still two messages: the question and the answer. Nothing was asked.
+    expect(screen.getAllByRole('button', { name: 'Copy this answer' })).toHaveLength(1)
+  })
+
+  it('offers nothing on the reader’s own question', async () => {
+    // Keeping the reader's words under Veda's name would put a sentence in her
+    // mouth that she never said.
+    lamp(spoken, { onKeep: () => {} })
+    selectWordsIn(await screen.findByText('What is a symbol?'))
+
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
   })
 })
 

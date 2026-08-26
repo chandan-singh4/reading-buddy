@@ -113,7 +113,8 @@ describe('the notes tab', () => {
 
   it('groups by chapter without hiding anything', () => {
     draw()
-    fireEvent.click(screen.getByRole('radio', { name: 'By chapter' }))
+    // A switch beside the chips now, not a sixth chip among them.
+    fireEvent.click(screen.getByRole('button', { name: 'By chapter' }))
 
     expect(screen.getAllByRole('heading', { level: 3 }).map((head) => head.textContent)).toEqual([
       'Chapter 1',
@@ -170,6 +171,71 @@ describe('the notes tab', () => {
     draw([thread])
 
     expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull()
+  })
+})
+
+describe('Veda quotes', () => {
+  function kept(id: string): NoteRow {
+    return {
+      ...note(id, 'claude'),
+      text: 'A symbol is a picture the mind can hold.',
+      fromThread: 'thread-9',
+      threadId: 'thread-9',
+    }
+  }
+
+  it('keeps kept lines off the Veda chip, and conversations off theirs', () => {
+    /*
+     * Both are Veda's, so the split has to come from `fromThread` and not from
+     * the author. Without it, keeping one sentence would drop a near-copy of
+     * the whole conversation into the list beside it.
+     */
+    draw([note('2', 'claude'), kept('4')])
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Veda' }))
+    expect(screen.getByText('Claude says 2')).toBeTruthy()
+    expect(screen.queryByText(/A symbol is a picture/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Veda quotes' }))
+    expect(screen.getByText(/A symbol is a picture/)).toBeTruthy()
+    expect(screen.queryByText('Claude says 2')).toBeNull()
+  })
+
+  it('sends a tap on a kept line back to the conversation it came from', () => {
+    // A line is worth keeping because of what it answered. A quote the reader
+    // cannot get back behind is a fortune-cookie slip.
+    const { onOpenThread } = draw([kept('4')])
+
+    fireEvent.click(screen.getByRole('button', { name: /A symbol is a picture/ }))
+    expect(onOpenThread).toHaveBeenCalledWith('thread-9')
+  })
+})
+
+describe('arranging by chapter', () => {
+  it('groups whichever chip is chosen, and is off to begin with', () => {
+    /*
+     * "By chapter" was a chip, which put a question about *arrangement* in a
+     * row of questions about *which notes*. It also showed exactly what All
+     * showed, so two of the chips looked like one button. As a switch it can do
+     * the thing the chip never could: Quotes, by chapter.
+     */
+    draw([note('1', 'you'), note('3', 'you', 2)])
+
+    expect(screen.queryByText('Chapter 1')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'By chapter' }))
+    expect(screen.getByRole('button', { name: 'By chapter' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+    expect(screen.getByText('Chapter 1')).toBeTruthy()
+    expect(screen.getByText('Chapter 2')).toBeTruthy()
+  })
+
+  it('is not offered over the kept words, which belong to no chapter', () => {
+    draw()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Words' }))
+    expect(screen.queryByRole('button', { name: 'By chapter' })).toBeNull()
   })
 })
 

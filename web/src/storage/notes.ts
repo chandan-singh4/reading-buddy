@@ -29,6 +29,8 @@ export interface NewNote {
   quote?: string
   /** A highlight's colour, as CSS. Only a highlight carries one. */
   colour?: string
+  /** The tutor thread a kept line of Veda's was said in. */
+  fromThread?: string
 }
 
 /** Built against a database so tests can hand it a scratch one. */
@@ -51,6 +53,7 @@ export function createNoteStore(database: ReadingBuddyDB = defaultDb) {
         // would have to know the difference.
         ...(note.quote ? { quote: note.quote } : {}),
         ...(note.colour ? { colour: note.colour } : {}),
+        ...(note.fromThread ? { fromThread: note.fromThread } : {}),
       }
       await database.notes.put(row)
       return row

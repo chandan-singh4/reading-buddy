@@ -15,7 +15,13 @@
 import { useRef, useState } from 'react'
 
 import { Markdown } from './markdown.tsx'
-import { groupByChapter, NOTE_FILTERS, notesUnder, type NoteFilter } from './notes.ts'
+import {
+  canGroupByChapter,
+  groupByChapter,
+  NOTE_FILTERS,
+  notesUnder,
+  type NoteFilter,
+} from './notes.ts'
 import type { NoteAuthor } from '../storage/index.ts'
 import type { Anchor } from '../structure/index.ts'
 import styles from './NotesPanel.module.css'
@@ -38,6 +44,11 @@ export interface NoteRow {
   /** Set when the row is a tutor conversation — tapping it reopens the
    *  thread under the lamp rather than jumping to the paragraph. */
   threadId?: string
+  /** Set when the row is a line the reader kept out of one of Veda's answers.
+   *  Names the thread it was said in, which is also what `threadId` carries —
+   *  the two are the same id doing two jobs. `threadId` says where a tap goes;
+   *  this says what the row *is*, and it is what the Veda quotes chip reads. */
+  fromThread?: string
 }
 
 /** A word the reader kept from the Define panel. */
@@ -78,6 +89,37 @@ function whereItIs(note: NoteRow): string {
  * list is for finding your way back to them.
  */
 function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
+  if (note.fromThread) {
+    /*
+     * A line the reader kept out of an answer, drawn as a quotation and not as
+     * a slip. The difference is the point: a slip is a whole exchange the
+     * reader can go back into, and this is one sentence they thought was worth
+     * more than the answer around it. Same violet hand — it is still Veda — but
+     * set against a rule rather than boxed, the way a kept line looks anywhere
+     * anybody keeps them.
+     */
+    return (
+      <li className={styles.note}>
+        <div
+          role="button"
+          tabIndex={0}
+          className={styles.kept}
+          onClick={onJump}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return
+            event.preventDefault()
+            onJump()
+          }}
+        >
+          <Markdown className={styles.txt} text={note.text} />
+        </div>
+        <span className={styles.tagRow}>
+          <span className={styles.tag}>{whereItIs(note)}</span>
+        </span>
+      </li>
+    )
+  }
+
   if (note.author === 'claude') {
     return (
       <li className={styles.note}>
@@ -138,9 +180,21 @@ export function NotesPanel({
   onDefineWord,
 }: NotesPanelProps) {
   const [filter, setFilter] = useState<NoteFilter>('all')
+  /*
+   * Grouping, which is not filtering.
+   *
+   * "By chapter" used to be a sixth chip, which put it in a row that answers
+   * "which of these notes?" while it answered "arranged how?". It also showed
+   * every note, exactly as All did, so two of the five chips looked to the
+   * reader like the same button. It is a switch now, and it applies to whatever
+   * chip is chosen — Quotes by chapter is a thing a reader wants, and the chip
+   * row could never offer it.
+   */
+  const [grouped, setGrouped] = useState(false)
   const chips = useRef<(HTMLButtonElement | null)[]>([])
 
   const shown = notesUnder(notes, filter)
+  const groupable = canGroupByChapter(filter)
 
   /** A tutor row reopens its conversation; every other note goes to its page. */
   function visit(note: NoteRow) {
@@ -192,6 +246,24 @@ export function NotesPanel({
         ))}
       </div>
 
+      {groupable && (
+        <div className={styles.arrange}>
+          {/*
+            A switch, not a radio: it does not belong to the group above it, and
+            arrowing onto it from the chips would make it look as though it did.
+            `aria-pressed` is what says "on", and it is read out that way.
+          */}
+          <button
+            type="button"
+            className={styles.toggle}
+            aria-pressed={grouped}
+            onClick={() => setGrouped((was) => !was)}
+          >
+            By chapter
+          </button>
+        </div>
+      )}
+
       <div className={styles.sheet}>
         <div className={styles.page}>
           {filter === 'words' ? (
@@ -234,11 +306,11 @@ export function NotesPanel({
                 ? 'No notes yet. Ask the tutor about a passage, or write your own — they all land here, filed by chapter.'
                 : 'No notes of that kind in this book yet.'}
             </p>
-          ) : filter === 'chapter' ? (
+          ) : grouped ? (
             /*
-              "By chapter" groups; it does not hide. Every note the reader has is
-              still on the page, gathered under the chapter it belongs to — which
-              is the only reading of the words that is any use.
+              "By chapter" groups; it does not hide. Every note the chosen chip
+              shows is still on the page, gathered under the chapter it belongs
+              to — which is the only reading of the words that is any use.
             */
             groupByChapter(shown).map((group) => (
               <section key={group.chapter}>

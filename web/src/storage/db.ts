@@ -237,6 +237,23 @@ export interface StoredNote {
    */
   quote?: string
   /**
+   * The tutor conversation these words were said in.
+   *
+   * Present only on an excerpt of one of Veda's answers — a line the reader
+   * picked out of what she said and kept. With `author: 'claude'`, its presence
+   * is what tells a kept line apart from a whole conversation, and its absence
+   * is what tells the reader's own highlight apart from nothing at all.
+   *
+   * It is a thread id and not a copy of the exchange, so the quote can send the
+   * reader back to the place the line was said. A line is worth keeping because
+   * of what it answered, and a reader who cannot get back to that has kept a
+   * fortune-cookie slip.
+   *
+   * Unindexed, like `colour`, so no schema version is needed — Dexie declares
+   * only the keys it searches by, and no query asks for notes by thread.
+   */
+  fromThread?: string
+  /**
    * A highlight's colour, as CSS — `#f2df6b`.
    *
    * Present only on a highlight. Stored rather than derived, because readers

@@ -1,10 +1,27 @@
 import { describe, expect, it } from 'vitest'
 
-import { groupByChapter, inNoteOrder, notesUnder, type NoteLike } from './notes.ts'
+import {
+  canGroupByChapter,
+  groupByChapter,
+  inNoteOrder,
+  notesUnder,
+  type NoteLike,
+} from './notes.ts'
 import type { Anchor } from '../structure/index.ts'
 
-function note(id: string, anchor: string, author: 'you' | 'claude' = 'you'): NoteLike {
-  return { id, anchor: anchor as Anchor, author, createdAt: `2026-01-0${id}T00:00:00.000Z` }
+function note(
+  id: string,
+  anchor: string,
+  author: 'you' | 'claude' = 'you',
+  fromThread?: string,
+): NoteLike {
+  return {
+    id,
+    anchor: anchor as Anchor,
+    author,
+    createdAt: `2026-01-0${id}T00:00:00.000Z`,
+    ...(fromThread ? { fromThread } : {}),
+  }
 }
 
 describe('the order notes read in', () => {
@@ -37,10 +54,34 @@ describe('the chips', () => {
     expect(notesUnder(all, 'claude').map((row) => row.id)).toEqual(['2'])
   })
 
-  it('hides nothing under "All" or "By chapter"', () => {
+  it('hides nothing under "All"', () => {
     expect(notesUnder(all, 'all')).toHaveLength(3)
-    // The point of the mode: it groups, it does not filter.
-    expect(notesUnder(all, 'chapter')).toHaveLength(3)
+  })
+
+  it('splits Veda’s conversations from the lines kept out of them', () => {
+    /*
+     * Both rows are Veda's, so `author` cannot tell them apart. `fromThread` is
+     * the fact that does it: a kept line names the exchange it came out of.
+     * Without this split, keeping one sentence would put a near-duplicate of
+     * the whole conversation into the list beside it.
+     */
+    const rows = [
+      note('1', '[ch01-s01-p001]', 'claude'),
+      note('2', '[ch01-s01-p002]', 'claude', 'thread-9'),
+      note('3', '[ch01-s01-p003]', 'you'),
+    ]
+
+    expect(notesUnder(rows, 'claude').map((row) => row.id)).toEqual(['1'])
+    expect(notesUnder(rows, 'vedaQuotes').map((row) => row.id)).toEqual(['2'])
+    expect(notesUnder(rows, 'all')).toHaveLength(3)
+  })
+
+  it('offers chapter grouping everywhere except the kept words', () => {
+    // A word has no anchor, so it belongs to no chapter. Offering the switch
+    // there would be a control that does nothing.
+    expect(canGroupByChapter('all')).toBe(true)
+    expect(canGroupByChapter('vedaQuotes')).toBe(true)
+    expect(canGroupByChapter('words')).toBe(false)
   })
 })
 
