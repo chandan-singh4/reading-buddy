@@ -246,7 +246,6 @@ const cycle={todo:"doing",doing:"done",done:"todo"};
    became `undefined` and `statusOf` read that back as "todo" - a reverse step
    from "done" landed two steps away. */
 const back={todo:"done",doing:"todo",done:"doing"};
-const back ={todo:"done",doing:"todo",done:"doing"};
 
 function statusOf(id){ return state[id]||"todo"; }
 
