@@ -52,10 +52,20 @@ export function booksByRecency(positions: ReadingPosition[]): BookId[] {
     .map((position) => position.bookId)
 }
 
-/** One chapter that could be summarised. */
+/** One chapter, or one titled section of one, that could be summarised. */
 export interface Job {
   bookId: BookId
   chapter: number
+  /**
+   * The titled section this job covers, when it covers one.
+   *
+   * Absent means the whole chapter. Both are wanted: the chapter recap is the
+   * paragraph that ties the chapter together, and the section summaries sit
+   * under it. See `titledSections` for why untitled parts are never jobs.
+   */
+  section?: number
+  /** The section's title. Present exactly when `section` is. */
+  sectionTitle?: string
   /**
    * Whether this may run without being asked.
    *
@@ -91,14 +101,68 @@ export function plan(
 
   order.forEach((bookId, index) => {
     const position = positions.find((row) => row.bookId === bookId)
-    for (const chapter of finishedChapters(chaptersOf(bookId), position)) {
-      if (alreadyDone.has(`${bookId}:${chapter}`)) continue
-      jobs.push({ bookId, chapter, automatic: index === 0 })
+    const spine = chaptersOf(bookId)
+
+    for (const chapter of finishedChapters(spine, position)) {
+      const automatic = index === 0
+      // The chapter first, and not only for tidiness: the Librarian adds new
+      // concept names to the canonical list as it goes, and the chapter-wide
+      // pass is the one most likely to raise them. Sections that follow then
+      // match against a list that already has them.
+      if (!alreadyDone.has(`${bookId}:${chapter}`)) {
+        jobs.push({ bookId, chapter, automatic })
+      }
+
+      const entry = spine.find((row) => row.chapter === chapter)
+      for (const part of titledSections(entry)) {
+        if (alreadyDone.has(`${bookId}:${chapter}:${part.section}`)) continue
+        jobs.push({
+          bookId,
+          chapter,
+          section: part.section,
+          sectionTitle: part.title,
+          automatic,
+        })
+      }
     }
   })
 
   return jobs
 }
 
-/** What `plan` checks against. A `Set` in practice; named for what it means. */
+/**
+ * The sections of a chapter that are worth a summary of their own.
+ *
+ * A section qualifies only if it has a title. Two reasons, and the reader chose
+ * both. A titled section is a thing the author named and the contents page
+ * lists, so a summary of it has something to be called; an untitled one is a
+ * scene break, and a row reading "Chapter 4, part 3" is worse than no row.
+ * And every summary is a paid call — a book of unnamed breaks would multiply
+ * the bill for a list nobody can navigate.
+ *
+ * A chapter with one titled section is skipped too: a lone section covers the
+ * same ground as the chapter recap above it, so it would be the same call
+ * charged twice for near-identical words.
+ */
+export function titledSections(
+  chapter: ChapterIndex | undefined,
+): { section: number; title: string }[] {
+  if (!chapter) return []
+  const titled = chapter.sections
+    .filter((entry): entry is typeof entry & { title: string } => {
+      return typeof entry.title === 'string' && entry.title.trim().length > 0
+    })
+    .map((entry) => ({ section: entry.section, title: entry.title.trim() }))
+    .sort((a, b) => a.section - b.section)
+
+  return titled.length > 1 ? titled : []
+}
+
+/**
+ * What `plan` checks against.
+ *
+ * Keys are `${bookId}:${chapter}` for a chapter and
+ * `${bookId}:${chapter}:${section}` for a section, so the two can never be
+ * mistaken for one another. A `Set` in practice; named for what it means.
+ */
 export type ReadySet = { has(key: string): boolean }

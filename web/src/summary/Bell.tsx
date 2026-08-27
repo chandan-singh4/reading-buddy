@@ -89,7 +89,7 @@ export function Bell() {
   async function onApprove(alert: StoredAlert) {
     setBusy(alert.id)
     try {
-      await approve(alert.bookId, alert.chapter)
+      await approve(alert.bookId, alert.chapter, partOf(alert))
     } catch {
       // Left in the list, so the reader can try again. Nothing was spent.
     } finally {
@@ -110,7 +110,7 @@ export function Bell() {
     for (const [index, alert] of group.chapters.entries()) {
       setBusy(`${group.bookId}:${index + 1}/${group.chapters.length}`)
       try {
-        await approve(alert.bookId, alert.chapter)
+        await approve(alert.bookId, alert.chapter, partOf(alert))
       } catch {
         // One chapter failing must not abandon the rest of the book.
       }
@@ -182,10 +182,7 @@ export function Bell() {
                 return (
                   <li key={group.bookId} className={styles.item}>
                     <div className={styles.book}>{group.bookTitle}</div>
-                    <div className={styles.chapter}>
-                      {group.chapters.length} finished{' '}
-                      {many ? 'chapters' : 'chapter'} with no summary yet
-                    </div>
+                    <div className={styles.chapter}>{countLabel(group.chapters)}</div>
 
                     <div className={styles.choices}>
                       <button
@@ -222,9 +219,7 @@ export function Bell() {
                       <ul className={styles.chapterList}>
                         {group.chapters.map((alert) => (
                           <li key={alert.id} className={styles.chapterRow}>
-                            <span className={styles.chapterName}>
-                              {alert.chapter} · {alert.chapterTitle}
-                            </span>
+                            <span className={styles.chapterName}>{labelOf(alert)}</span>
                             <button
                               type="button"
                               className={styles.pick}
@@ -246,4 +241,33 @@ export function Bell() {
       )}
     </div>
   )
+}
+
+/** The section a line is about, in the shape the engine wants. */
+function partOf(alert: StoredAlert) {
+  if (alert.section === undefined) return undefined
+  return { section: alert.section, title: alert.sectionTitle ?? '' }
+}
+
+/** How one waiting line reads in the picker. */
+function labelOf(alert: StoredAlert): string {
+  if (alert.section === undefined) return `${alert.chapter} · ${alert.chapterTitle}`
+  // Indented under its chapter by the em space, so a reader scanning the list
+  // can see at a glance which rows are parts of something bigger.
+  return `\u2003${alert.sectionTitle}`
+}
+
+/**
+ * "3 finished chapters", "2 parts of chapter 4", or both.
+ *
+ * Counted separately because they are different things and cost differently. A
+ * reader deciding whether to spend should be told what they are buying.
+ */
+function countLabel(rows: readonly StoredAlert[]): string {
+  const chapters = rows.filter((row) => row.section === undefined).length
+  const parts = rows.length - chapters
+  const said: string[] = []
+  if (chapters > 0) said.push(`${chapters} finished ${chapters === 1 ? 'chapter' : 'chapters'}`)
+  if (parts > 0) said.push(`${parts} named ${parts === 1 ? 'section' : 'sections'}`)
+  return `${said.join(' and ')} with no summary yet`
 }

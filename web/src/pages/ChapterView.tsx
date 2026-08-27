@@ -5,9 +5,11 @@ import { repository } from '../storage/repository.ts'
 import type { BookId } from '../structure/index.ts'
 import { backLabel, backTo } from '../summary/backTo.ts'
 import { summaryData } from '../summary/dataSource.ts'
+import { approve } from '../summary/engine.ts'
+import { finishedChapters } from '../summary/queue.ts'
 import { Flourish, Paper, Rail, RichText, type RailItem } from '../summary/Paper.tsx'
 import styles from '../summary/summary.module.css'
-import type { ChapterListEntry, ChapterSummary } from '../summary/types.ts'
+import type { ChapterListEntry, ChapterSummary, SectionSummary } from '../summary/types.ts'
 
 /**
  * One chapter, in two sections.
@@ -16,6 +18,10 @@ import type { ChapterListEntry, ChapterSummary } from '../summary/types.ts'
  *    it gave for the chapter underneath.
  * 2. **What we worked through** — the Scribe's summary of the reader's
  *    conversation with Veda about this chapter.
+ * 3. **The parts of the chapter**, when the author named them — the same two
+ *    things again, one set per titled section. A chapter of six named sections
+ *    gets one recap that ties it together and six that go into detail. Books
+ *    whose sections have no names show nothing here, which is most fiction.
  *
  * Read-only. Nothing here runs a model or edits what one wrote.
  */
@@ -43,6 +49,11 @@ export default function ChapterView() {
    * page rather than an honest "nothing here yet".
    */
   const [listed, setListed] = useState(false)
+  /* Whether the reader has read past this chapter, so asking for a summary of
+     it is a fair thing to offer. Unread chapters are never offered: a recap of
+     a chapter you have not reached is a spoiler. */
+  const [finished, setFinished] = useState(false)
+  const [asking, setAsking] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -80,6 +91,33 @@ export default function ChapterView() {
   const asked = params.get('chapter')
   const opening = chapters.find((entry) => entry.distilled) ?? chapters[0]
   const current = asked ?? (opening ? String(opening.chapter) : '')
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all([
+      repository.listChapterIndexes(id),
+      repository.getPosition(id),
+    ]).then(([spine, position]) => {
+      if (cancelled) return
+      const done = finishedChapters(spine, position ?? undefined)
+      setFinished(done.includes(Number(current)))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [id, current])
+
+  async function onAsk() {
+    setAsking(true)
+    try {
+      await approve(id, Number(current))
+      setOpen(await summaryData().getChapter(id, current))
+    } catch {
+      // Nothing was stored, so the page is unchanged and the button comes back.
+    } finally {
+      setAsking(false)
+    }
+  }
 
   useEffect(() => {
     if (title === undefined || !listed) return
@@ -147,11 +185,34 @@ export default function ChapterView() {
                 summarised here.
               </p>
             )}
+
+            {open.sections?.map((part) => <Part key={part.section} part={part} />)}
           </>
         ) : (
-          <p className={styles.empty}>
-            This chapter has not been summarised yet. It appears here once you have read it.
-          </p>
+          /*
+           * An empty page used to be a dead end: it said "not yet" and gave the
+           * reader nothing to do about it. The button is the way out. It is the
+           * same call the bell makes, so a chapter can be asked for from
+           * wherever the reader happens to be standing.
+           */
+          <>
+            <p className={styles.empty}>
+              This chapter has no summary yet.{' '}
+              {finished
+                ? 'Ask for one and Veda will read the whole chapter.'
+                : 'It appears here once you have finished reading it.'}
+            </p>
+            {finished && (
+              <button
+                type="button"
+                className={styles.ask}
+                disabled={asking}
+                onClick={() => void onAsk()}
+              >
+                {asking ? 'Reading the chapter…' : 'Summarise this chapter'}
+              </button>
+            )}
+          </>
         )}
       </main>
     </Paper>
@@ -175,5 +236,32 @@ function Tags({ tags }: { tags: string[] }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+/**
+ * One titled section of the chapter, under the chapter's own summary.
+ *
+ * Deliberately quieter than the chapter above it. The heading carries the
+ * author's own name for the part, so the reader recognises it from the contents
+ * page, and the two labels are the same two as above — the same job at a
+ * smaller scale should not need a second vocabulary.
+ */
+function Part({ part }: { part: SectionSummary }) {
+  return (
+    <section className={styles.part}>
+      <h2 className={styles.partTtl}>{part.title}</h2>
+      <RichText text={part.recapText} className={styles.recap} />
+      {part.tags.length > 0 && <Tags tags={part.tags} />}
+      {/* No "nothing asked yet" line here. The chapter above already says it
+          once, and saying it again under every section would bury the summaries
+          in apologies for conversations that never happened. */}
+      {part.qaText && (
+        <>
+          <div className={styles.secLabel}>What we worked through</div>
+          <RichText text={part.qaText} className={styles.recap} />
+        </>
+      )}
+    </section>
   )
 }

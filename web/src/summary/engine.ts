@@ -6,6 +6,7 @@ import { alertStore, conceptStore, summaryStore } from '../storage/summaries.ts'
 import { tutorStore } from '../storage/tutor.ts'
 import {
   chapterPath,
+  sectionPath,
   type BookId,
   type ChapterIndex,
   type Section,
@@ -73,12 +74,35 @@ export function chapterMaterial(sections: readonly Section[], chapter: number): 
     .join('\n\n')
 }
 
+/**
+ * The prose of one titled section. What the Librarian is given for a section.
+ *
+ * The section is the atom the book is stored in, so this is one row, not a
+ * filtered join — the chapter-wide version above has to gather and order.
+ */
+export function sectionMaterial(
+  sections: readonly Section[],
+  chapter: number,
+  section: number,
+): string {
+  const found = sections.find((row) => row.chapter === chapter && row.section === section)
+  return found ? proseOf(found) : ''
+}
+
 /** The reader's conversations inside one chapter. What the Scribe is given. */
 export function threadsInChapter(
   threads: readonly StoredTutorThread[],
   chapter: number,
+  section?: number,
 ): StoredTutorThread[] {
-  return threads.filter((thread) => tryParseAnchor(thread.anchor)?.chapter === chapter)
+  return threads.filter((thread) => {
+    const parts = tryParseAnchor(thread.anchor)
+    if (parts?.chapter !== chapter) return false
+    // A chapter-wide run takes every thread in the chapter. A section run takes
+    // only the ones anchored inside it, so the same conversation is not
+    // summarised twice under two headings.
+    return section === undefined || parts.section === section
+  })
 }
 
 /**
@@ -100,15 +124,32 @@ export interface RunResult {
   added: string[]
 }
 
+/** Which titled section a run covers. Absent means the whole chapter. */
+export interface Part {
+  section: number
+  title: string
+}
+
 /**
- * Run both models over one finished chapter and store the result.
+ * Run both models over one finished chapter — or over one titled section of it
+ * — and store the result.
+ *
+ * The two are the same job at two scales, so they are one function. Only three
+ * things differ: which prose goes to the Librarian, which conversations go to
+ * the Scribe, and the key the answer is stored under. Everything else — the
+ * order of the models, the vocabulary, the staleness rule — is identical, and
+ * splitting it in two would be two copies of the careful part.
  *
  * Rebuilds are refused rather than repeated. A chapter that already has a
  * recap gets only the Scribe, and only when it has gained conversations since —
  * both calls are paid, and asking again for words nothing changed is money for
  * the same answer.
  */
-export async function runChapter(bookId: BookId, chapter: number): Promise<RunResult | undefined> {
+export async function runChapter(
+  bookId: BookId,
+  chapter: number,
+  part?: Part,
+): Promise<RunResult | undefined> {
   const book = await repository.getBook(bookId)
   if (!book) return undefined
 
@@ -116,10 +157,12 @@ export async function runChapter(bookId: BookId, chapter: number): Promise<RunRe
   const entry = spine.find((row) => row.chapter === chapter)
   if (!entry) return undefined
 
-  const chapterId = String(chapterPath(chapter))
+  const chapterId = part
+    ? String(sectionPath(chapter, part.section))
+    : String(chapterPath(chapter))
   const existing = await summaryStore.get(bookId, chapterId)
 
-  const threads = threadsInChapter(await tutorStore.listThreads(bookId), chapter)
+  const threads = threadsInChapter(await tutorStore.listThreads(bookId), chapter, part?.section)
   const conversationsNow = threads.length
 
   // Nothing has changed since the last run: same recap, same conversations.
@@ -131,7 +174,9 @@ export async function runChapter(bookId: BookId, chapter: number): Promise<RunRe
 
   if (!existing) {
     const sections = await repository.listSections(bookId)
-    const material = chapterMaterial(sections, chapter)
+    const material = part
+      ? sectionMaterial(sections, chapter, part.section)
+      : chapterMaterial(sections, chapter)
     if (material.trim().length === 0) return undefined
 
     const canonical = await conceptStore.names()
@@ -170,6 +215,7 @@ export async function runChapter(bookId: BookId, chapter: number): Promise<RunRe
     chapterId,
     chapter,
     chapterTitle: entry.title,
+    ...(part ? { section: part.section, sectionTitle: part.title } : {}),
     recap,
     concepts,
     ...(items === undefined ? {} : { items }),
@@ -185,7 +231,10 @@ export async function runChapter(bookId: BookId, chapter: number): Promise<RunRe
 
 /** One line for the bell. `put`-keyed on the chapter, so a rerun replaces it. */
 export function alertFor(
-  summary: Pick<StoredChapterSummary, 'bookId' | 'chapterId' | 'chapter' | 'chapterTitle'>,
+  summary: Pick<
+    StoredChapterSummary,
+    'bookId' | 'chapterId' | 'chapter' | 'chapterTitle' | 'section' | 'sectionTitle'
+  >,
   bookTitle: string,
   kind: StoredAlert['kind'],
   at: string,
@@ -198,6 +247,9 @@ export function alertFor(
     chapterId: summary.chapterId,
     chapter: summary.chapter,
     chapterTitle: summary.chapterTitle,
+    ...(summary.section === undefined
+      ? {}
+      : { section: summary.section, sectionTitle: summary.sectionTitle ?? '' }),
     at,
     seen: false,
   }
@@ -227,13 +279,17 @@ export async function sweep(): Promise<void> {
 
   const done = new Set<string>()
   for (const position of positions) {
+    const threadsOf = await tutorStore.listThreads(position.bookId)
     for (const row of await summaryStore.list(position.bookId)) {
-      // A chapter with conversations the summary predates is not done.
-      const threads = threadsInChapter(
-        await tutorStore.listThreads(position.bookId),
-        row.chapter,
-      ).length
-      if (threads === row.coversNConversations) done.add(`${position.bookId}:${row.chapter}`)
+      // A summary whose chapter has gained conversations since is not done.
+      const threads = threadsInChapter(threadsOf, row.chapter, row.section).length
+      if (threads !== row.coversNConversations) continue
+      // Two key shapes, so a chapter and a section of it can never collide.
+      done.add(
+        row.section === undefined
+          ? `${position.bookId}:${row.chapter}`
+          : `${position.bookId}:${row.chapter}:${row.section}`,
+      )
     }
   }
 
@@ -241,10 +297,14 @@ export async function sweep(): Promise<void> {
 
   for (const job of jobs) {
     try {
+      const part =
+        job.section === undefined
+          ? undefined
+          : { section: job.section, title: job.sectionTitle ?? '' }
       if (job.automatic) {
-        await runChapter(job.bookId, job.chapter)
+        await runChapter(job.bookId, job.chapter, part)
       } else {
-        await proposeChapter(job.bookId, job.chapter)
+        await proposeChapter(job.bookId, job.chapter, part)
       }
     } catch {
       // One chapter failing must not stop the rest, and must not reach a screen.
@@ -254,7 +314,7 @@ export async function sweep(): Promise<void> {
 }
 
 /** Raise the question in the bell, without spending anything. */
-async function proposeChapter(bookId: BookId, chapter: number): Promise<void> {
+async function proposeChapter(bookId: BookId, chapter: number, part?: Part): Promise<void> {
   const book = await repository.getBook(bookId)
   if (!book) return
 
@@ -262,7 +322,9 @@ async function proposeChapter(bookId: BookId, chapter: number): Promise<void> {
   const entry = spine.find((row) => row.chapter === chapter)
   if (!entry) return
 
-  const chapterId = String(chapterPath(chapter))
+  const chapterId = part
+    ? String(sectionPath(chapter, part.section))
+    : String(chapterPath(chapter))
   const id = `${bookId}:${chapterId}`
 
   // Never overwrite a line the reader has already dealt with, and never turn a
@@ -272,7 +334,13 @@ async function proposeChapter(bookId: BookId, chapter: number): Promise<void> {
 
   await alertStore.save(
     alertFor(
-      { bookId, chapterId, chapter, chapterTitle: entry.title },
+      {
+        bookId,
+        chapterId,
+        chapter,
+        chapterTitle: entry.title,
+        ...(part ? { section: part.section, sectionTitle: part.title } : {}),
+      },
       book.title,
       'approval',
       new Date().toISOString(),
@@ -281,8 +349,8 @@ async function proposeChapter(bookId: BookId, chapter: number): Promise<void> {
 }
 
 /** The reader said yes in the bell. Run it now. */
-export async function approve(bookId: BookId, chapter: number): Promise<void> {
-  await runChapter(bookId, chapter)
+export async function approve(bookId: BookId, chapter: number, part?: Part): Promise<void> {
+  await runChapter(bookId, chapter, part)
 }
 
 /**

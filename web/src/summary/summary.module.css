@@ -359,3 +359,49 @@
     transition: none;
   }
 }
+
+/*
+ * A titled section, under the chapter it belongs to.
+ *
+ * The rule above it is what says "this is part of what you just read", not a
+ * new page. Indented a little for the same reason.
+ */
+.part {
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 1px solid var(--rule);
+}
+
+.partTtl {
+  font-family: 'EB Garamond', serif;
+  font-size: 19px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--ink);
+  margin: 0 0 14px;
+}
+
+/*
+ * The way out of an empty page.
+ *
+ * Drawn as a considered yes rather than an obvious tap: it spends money, and
+ * the reader asked for every call outside their current book to be their own
+ * decision.
+ */
+.ask {
+  font-family: 'EB Garamond', serif;
+  font-size: 15px;
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  /* 44px, the smallest thing a thumb reliably hits. */
+  min-height: 44px;
+  padding: 0 18px;
+  cursor: pointer;
+}
+
+.ask:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}

@@ -99,7 +99,7 @@ describe('the chapter summary page', () => {
     fireEvent.click(await screen.findByRole('button', { name: '6 · The Tower' }))
 
     expect(await screen.findByRole('heading', { name: 'Chapter 6' })).toBeTruthy()
-    expect(screen.getByText(/has not been summarised yet/)).toBeTruthy()
+    expect(screen.getByText(/has no summary yet/)).toBeTruthy()
   })
 
   it('says so plainly for a book with nothing summarised at all', async () => {
@@ -121,7 +121,7 @@ describe('the chapter summary page', () => {
     })
 
     open(`/book/${OTHER}/chapters`)
-    expect(await screen.findByText(/has not been summarised yet/)).toBeTruthy()
+    expect(await screen.findByText(/has no summary yet/)).toBeTruthy()
   })
 
   it('renders emphasis in a summary as emphasis', async () => {

@@ -2,7 +2,7 @@ import { repository } from '../storage/repository.ts'
 import { summaryStore } from '../storage/summaries.ts'
 import type { BookId } from '../structure/index.ts'
 import type { SummaryDataSource } from './dataSource.ts'
-import type { ChapterListEntry, ChapterSummary } from './types.ts'
+import type { ChapterListEntry, ChapterSummary, SectionSummary } from './types.ts'
 
 /**
  * The real source: what the Librarian and the Scribe actually wrote.
@@ -30,7 +30,12 @@ export const liveDataSource: SummaryDataSource = {
     const bookId = book as BookId
     const spine = await repository.listChapterIndexes(bookId)
     const summaries = await summaryStore.list(bookId)
-    const done = new Set(summaries.map((row) => row.chapter))
+    // Only chapter-wide rows mark a chapter as distilled. A chapter with one
+    // section summarised and no recap has not been done, and the rail must not
+    // claim that it has.
+    const done = new Set(
+      summaries.filter((row) => row.section === undefined).map((row) => row.chapter),
+    )
 
     return spine
       .sort((a, b) => a.chapter - b.chapter)
@@ -46,8 +51,22 @@ export const liveDataSource: SummaryDataSource = {
     const wanted = Number(chapter)
     if (!Number.isFinite(wanted)) return undefined
 
-    const row = (await summaryStore.list(bookId)).find((entry) => entry.chapter === wanted)
+    const rows = await summaryStore.list(bookId)
+    const row = rows.find((entry) => entry.chapter === wanted && entry.section === undefined)
     if (!row) return undefined
+
+    const sections: SectionSummary[] = rows
+      .filter((entry) => entry.chapter === wanted && entry.section !== undefined)
+      .sort((a, b) => (a.section ?? 0) - (b.section ?? 0))
+      .map((entry) => ({
+        section: entry.section ?? 0,
+        title: entry.sectionTitle ?? '',
+        recapText: entry.recap,
+        tags: entry.concepts.map((concept) => concept.name),
+        ...(entry.items && entry.items.length > 0
+          ? { qaText: entry.items.map((item) => item.claim).join('\n\n') }
+          : {}),
+      }))
 
     const meta = await repository.getBook(bookId)
 
@@ -60,6 +79,7 @@ export const liveDataSource: SummaryDataSource = {
       ...(row.items && row.items.length > 0
         ? { qaText: row.items.map((item) => item.claim).join('\n\n') }
         : {}),
+      ...(sections.length > 0 ? { sections } : {}),
     }
   },
 }

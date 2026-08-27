@@ -46,4 +46,22 @@ export interface ChapterSummary {
    * read without a single question, and that is not a gap.
    */
   qaText?: string
+  /**
+   * The titled sections of this chapter that have summaries of their own.
+   *
+   * Empty for a book whose sections the author did not name, which is most
+   * fiction — the chapter recap above is then the whole of it. Drawn under the
+   * chapter, in reading order, because a section summary is a detail of the
+   * chapter and not a rival to it.
+   */
+  sections?: SectionSummary[]
+}
+
+/** One titled section of a chapter, summarised on its own. */
+export interface SectionSummary {
+  section: number
+  title: string
+  recapText: string
+  tags: string[]
+  qaText?: string
 }

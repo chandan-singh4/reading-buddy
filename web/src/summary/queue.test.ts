@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ReadingPosition } from '../storage/db.ts'
 import type { Anchor, BookId, ChapterIndex } from '../structure/index.ts'
-import { booksByRecency, finishedChapters, plan } from './queue.ts'
+import { booksByRecency, finishedChapters, plan, titledSections } from './queue.ts'
 
 /*
  * The rules the reader stated, in order:
@@ -108,5 +108,52 @@ describe('the plan', () => {
   it('has nothing to do when every finished chapter is summarised', () => {
     const everything = new Set([`${A}:1`, `${A}:2`, `${B}:1`, `${B}:2`])
     expect(plan(positions, spine, everything)).toEqual([])
+  })
+})
+
+describe('the sections inside a finished chapter', () => {
+  function withSections(...titles: (string | undefined)[]): ChapterIndex {
+    return {
+      chapter: 1,
+      title: 'One',
+      path: 'ch01' as ChapterIndex['path'],
+      sections: titles.map((title, index) => ({
+        section: index + 1,
+        ...(title === undefined ? {} : { title }),
+        path: `ch01-s0${index + 1}` as ChapterIndex['sections'][number]['path'],
+      })),
+    }
+  }
+
+  it('offers the ones the author named', () => {
+    expect(titledSections(withSections('Ego', 'Shadow', 'Anima'))).toEqual([
+      { section: 1, title: 'Ego' },
+      { section: 2, title: 'Shadow' },
+      { section: 3, title: 'Anima' },
+    ])
+  })
+
+  it('leaves unnamed breaks alone', () => {
+    // A row reading "Chapter 4, part 3" tells the reader nothing, and every
+    // summary is a paid call.
+    expect(titledSections(withSections(undefined, undefined))).toEqual([])
+    expect(titledSections(withSections('Ego', undefined, 'Anima'))).toEqual([
+      { section: 1, title: 'Ego' },
+      { section: 3, title: 'Anima' },
+    ])
+  })
+
+  it('treats a blank title as no title', () => {
+    expect(titledSections(withSections('   ', 'Shadow'))).toEqual([])
+  })
+
+  it('does not split a chapter that has only one named part', () => {
+    // It would cover the same ground as the chapter recap above it: the same
+    // call, charged twice, for near-identical words.
+    expect(titledSections(withSections('Ego'))).toEqual([])
+  })
+
+  it('has nothing to offer for a chapter that is not in the book', () => {
+    expect(titledSections(undefined)).toEqual([])
   })
 })

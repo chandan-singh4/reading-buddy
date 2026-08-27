@@ -400,10 +400,31 @@ export interface StoredDigest {
  */
 export interface StoredChapterSummary {
   bookId: BookId
-  /** The chapter's path — `ch02`. */
+  /**
+   * The path of the thing summarised — `ch02` for a chapter, `ch02-s03` for one
+   * titled section inside it.
+   *
+   * Two levels share one table, and one key tells them apart, because a section
+   * summary *is* a chapter summary in every way that matters here: same two
+   * models, same shape of result, same staleness rule. A second table would be
+   * this one with a different name.
+   *
+   * `section` below is what a reader of the row checks. A row with no `section`
+   * covers the whole chapter.
+   */
   chapterId: string
   chapter: number
   chapterTitle: string
+  /**
+   * Which titled section this covers, 1-based, when it covers one.
+   *
+   * Absent on a chapter-wide summary. The two live side by side on purpose: the
+   * chapter recap ties the whole thing together, and the section summaries go
+   * under it. The reader asked for both.
+   */
+  section?: number
+  /** The section's own title. Present exactly when `section` is. */
+  sectionTitle?: string
   /** The Librarian's plain-language recap of the chapter. */
   recap: string
   /**
@@ -479,7 +500,11 @@ export interface StoredConcept {
  * book they opened last runs on its own, everything else waits to be asked.
  */
 export interface StoredAlert {
-  /** `${bookId}:${chapterId}` for a ready alert, so one chapter is one line. */
+  /**
+   * `${bookId}:${chapterId}`, and `chapterId` is a chapter path or a section
+   * path. One line per thing summarised, and a chapter never collides with a
+   * section inside it.
+   */
   id: string
   kind: 'ready' | 'approval'
   bookId: BookId
@@ -487,6 +512,10 @@ export interface StoredAlert {
   chapterId: string
   chapter: number
   chapterTitle: string
+  /** Set when this line is about one titled section rather than the chapter. */
+  section?: number
+  /** The section's title. Present exactly when `section` is. */
+  sectionTitle?: string
   /** ISO 8601 — the bell lists newest first. */
   at: string
   /** Whether the reader has seen it. The count on the bell is of unseen ones. */
