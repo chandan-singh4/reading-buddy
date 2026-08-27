@@ -52,6 +52,23 @@ describe('the notes tab', () => {
     expect(screen.queryByText(/\*\*/)).toBeNull()
   })
 
+  it('puts the chapter above the note, whatever kind of note it is', () => {
+    /*
+     * The reader's ask: the chapter name first, then the words. It already read
+     * that way over a Quote, and it now reads that way over one of Veda's
+     * conversations and over a line kept out of one. Where a note came from is
+     * how the reader finds it again, so it goes where the eye lands first.
+     */
+    const talk = { ...note('2', 'claude'), threadId: 'thread-2' }
+    const kept = { ...note('4', 'claude'), fromThread: 'thread-4', threadId: 'thread-4' }
+    draw([note('1', 'you'), talk, kept])
+
+    for (const row of document.querySelectorAll('li')) {
+      const first = row.firstElementChild
+      expect(first?.className).toContain(styles.tagRow)
+    }
+  })
+
   it('still opens the thread when the answer is markdown', () => {
     // The slip stopped being a `<button>` when it began holding headings and
     // lists, which a button may not contain. It must still act like one.

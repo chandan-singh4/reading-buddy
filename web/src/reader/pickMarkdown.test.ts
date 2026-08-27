@@ -110,3 +110,36 @@ describe('finding a kept line again', () => {
     expect(wordsIn(root, '   ')).toBeNull()
   })
 })
+
+describe('the answer from the reader’s screenshot', () => {
+  /*
+   * The report, 2026-08-26, with two pictures side by side: a numbered list
+   * with bold lead-ins, a bold line under it, and three bullets. Saved, it
+   * arrived as one run of prose with the sentences welded together —
+   * "noticed.Unconscious →". This is that answer's shape, kept as a test so it
+   * cannot quietly go flat again.
+   */
+  it('keeps every line on its own line, with its marks', () => {
+    const root = answer(
+      '<ol>' +
+        '<li data-md="item"><strong>Experiences → Unconscious:</strong> Everything you perceive.</li>' +
+        '<li data-md="item"><strong>Unconscious → Perception:</strong> Later, that material <em>reaches back up</em>.</li>' +
+        '</ol>' +
+        '<p data-md="paragraph"><strong>So it’s not A or B.</strong></p>' +
+        '<ul>' +
+        '<li data-md="item">You are not the sole author of your life.</li>' +
+        '<li data-md="item">You are the editor.</li>' +
+        '</ul>',
+    )
+
+    expect(allOf(root)).toBe(
+      [
+        '1. **Experiences → Unconscious:** Everything you perceive.',
+        '2. **Unconscious → Perception:** Later, that material _reaches back up_.',
+        '**So it’s not A or B.**',
+        '- You are not the sole author of your life.',
+        '- You are the editor.',
+      ].join('\n\n'),
+    )
+  })
+})

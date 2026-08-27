@@ -419,6 +419,23 @@
   color: var(--veda-bar);
 }
 
+/*
+ * A numbered list, deliberately rather than by accident.
+ *
+ * The bullets above are drawn by hand because `::marker` draws a dot too small
+ * to see at this size. A number is not too small — it is a glyph, and it is
+ * already violet, because `.item::marker` reads `--md-mark`. What it does need
+ * is room: Kalam's digits are wide, and the shared indent was measured against
+ * a serif face. Without this the number and the first word of the item touch.
+ */
+.txt ol {
+  padding-left: 1.6em;
+}
+
+.txt ol > li {
+  padding-left: 3px;
+}
+
 .txt blockquote {
   border-left: 2.5px solid var(--veda-bar);
 }

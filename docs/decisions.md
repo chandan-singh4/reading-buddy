@@ -1522,3 +1522,16 @@ be edited away. When the words are not there, the conversation still opens.
 
 **The chapter now sits above a kept line**, as it does above a Quote. Where a
 line came from is how the reader finds it again.
+
+### The chapter name goes above every note — 2026-08-26
+
+The reader asked for it over Veda's conversations, after it moved over Veda's
+Quotes. All three kinds now read the same way: chapter first, then the words.
+Where a note came from is how the reader finds it again, so it goes where the
+eye lands first.
+
+A numbered list in Veda's hand also got a rule of its own. The bullets are drawn
+by hand because `::marker` draws a dot too small to see; a number is large
+enough, and it is already violet because `.item::marker` reads `--md-mark`. What
+it needed was room — Kalam's digits are wide, and the shared indent was measured
+against a serif face.

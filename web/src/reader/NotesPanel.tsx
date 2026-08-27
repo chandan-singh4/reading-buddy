@@ -129,6 +129,11 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
   if (note.author === 'claude') {
     return (
       <li className={styles.note}>
+        {/* The chapter first, as it is over every other kind of note. Where a
+            conversation happened is how the reader finds it again. */}
+        <span className={styles.tagRow}>
+          <span className={styles.tag}>{whereItIs(note)}</span>
+        </span>
         {/*
           A div wearing a button's clothes, and it has to be one. The answer is
           markdown now, so this holds headings, lists and stacked tables — and
@@ -151,9 +156,6 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
               the Notes tab showed the marks themselves until now. */}
           <Markdown className={styles.txt} text={note.text} />
         </div>
-        <span className={styles.tagRow}>
-          <span className={styles.tag}>{whereItIs(note)}</span>
-        </span>
       </li>
     )
   }
