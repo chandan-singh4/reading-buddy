@@ -544,6 +544,38 @@ export default function BookInfo() {
         </Link>
       </section>
 
+      {/*
+       * The way in to the two summary views, and for now the only way in.
+       *
+       * Both pages read sample content: the engine that distils a chapter into
+       * a recap and a set of claims is separate work and is not built. They are
+       * here so the design can be judged on a real phone, which is the only
+       * place a page like this can be judged. Deliberately not in the
+       * navigation drawer — the app should not advertise a feature whose data
+       * is invented.
+       */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionHeading}>What we worked through</h2>
+        <p className={styles.genreNote}>
+          Two ways to read the same notes: by the chapter you met them in, or by the idea they are
+          about. Showing sample content for now.
+        </p>
+        <div className={styles.summaryLinks}>
+          <Link
+            className={styles.returnLink}
+            to={`/book/${book.id}/chapters?from=${encodeURIComponent(`/book/${book.id}/info`)}`}
+          >
+            Chapter view
+          </Link>
+          <Link
+            className={styles.returnLink}
+            to={`/commonplace?from=${encodeURIComponent(`/book/${book.id}/info`)}`}
+          >
+            Commonplace book
+          </Link>
+        </div>
+      </section>
+
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Your rating</h2>
         <StarRow label="Overall" value={book.rating} onChange={rate} />

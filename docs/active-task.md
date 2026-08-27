@@ -5,48 +5,79 @@
 
 ## Task
 
-**Nothing is mid-edit.** Veda's Quotes is built, shipped and confirmed on the
-phone. Pick the next task with `/plan-task`, or take one of the two below.
+**Nothing is mid-edit.** The two summary views are built, tested and shipped.
+Pick the next task with `/plan-task`, or take one of the three below.
 
-## Option A — make the update prompt hard to miss
+## Option A — judge the two summary views on the phone
 
-The smaller task, and the one this session earned.
+The task this session earned. No code unless something is wrong.
 
-Reading Buddy is a PWA with `registerType: 'prompt'` in `web/vite.config.ts`. A
-new build waits for the reader to accept it. This session shipped four fixes
-that could not reach the phone, and the reader reported the same fault four
-times. The choice to ask first is right; how loudly it asks may not be.
+Open a book → **Book details** → **What we worked through** → both links.
+Everything you see is sample content. The engine that makes real notes is not
+built.
 
 ### Definition of done
 
-1. Look at the update panel on a phone screen and decide, with the reader,
-   whether it is loud enough.
-2. Change it only if the reader says it is too quiet. A change with no
-   complaint behind it is not worth the risk.
-3. Write the decision in `docs/decisions.md` either way.
+1. Look at both pages on the phone. Say whether the paper reads as paper.
+2. Answer the one open question: these pages **do not** follow your theme. In
+   Dark, at night, you get a bright page. Is that right or wrong?
+3. Check the rail. On a phone it lies down and scrolls sideways. Check that it
+   works with a thumb.
+4. Write the answer to point 2 in `docs/decisions.md` either way.
 
 ### Files in scope
 
-- `web/src/app/updates.ts` — the registration and the check timer.
-- `web/vite.config.ts` — the `registerType` note, if the mode itself changes.
-- Whatever draws the panel — find it from `onNeedRefresh` in `updates.ts`.
+None, unless a fault appears. Then:
 
-## Option B — prove the reading voice on the phone
+- `web/src/summary/summary.module.css` — every rule for both pages.
+- `web/src/pages/Commonplace.tsx`, `web/src/pages/ChapterView.tsx`.
 
-Carried from the last session, and still true. WP-16 is built and tested, but
-three of its faults were only visible on a device. The voice choice is the one
-that still needs proof: the fix assumes the engine ignores a voice when no
-language is set.
+## Option B — the Scribe/Librarian engine
 
-No files. This is a device check, not an edit.
+The work the views were built to wait for. It is a large task and needs
+`/plan-task` of its own. The seam is ready:
+`web/src/summary/dataSource.ts` holds the interface and the labelled stubs.
 
-## Out of scope for both
+Build it in this order, because each part needs the one before it:
+
+1. The **chapter pass** — one chapter in; a plain-language recap and a list of
+   concepts out.
+2. The **concept-list store** — the running controlled vocabulary. It grows
+   across chapters and goes into every later call.
+3. The **Q&A pass** — that chapter's Q&A into items, each tagged against the
+   current list. An off-list name becomes a `candidate`.
+4. **Model routing**, the chapter-end trigger, the storage writes, the export.
+5. The **approval flow** — promote a candidate, or merge it.
+
+One decision to settle before any of it: which model, and through OpenRouter or
+through the `api/` endpoint that already holds the Claude key.
+
+## Option C — make the update prompt hard to miss
+
+Carried, and still true. Reading Buddy asks before it updates itself. One
+session shipped four fixes that could not reach the phone.
+
+1. Look at the update panel on a phone and decide if it is loud enough.
+2. Change it only if you say it is too quiet.
+3. Write the decision in `docs/decisions.md` either way.
+
+Files: `web/src/app/updates.ts`, `web/src/app/UpdatePrompt.tsx`,
+`web/vite.config.ts`.
+
+## Out of scope for all three
 
 - `api/tutor.ts` and every prompt.
 - Any parsing file, and `PARSER_VERSION`.
 - Syncing notes to the cloud. Notes stay device-local.
 
 ---
+
+## Done, 2026-08-27
+
+**The two summary views.** The Commonplace Book and the Chapter View, built to
+the two reference designs. 2,169 tests pass, build green. The engine is stubbed
+and not started. Written up in `docs/decisions.md` under "the two summary
+views", in ten headings from the fonts to the stubs.
 
 ## Done, 2026-08-26
 

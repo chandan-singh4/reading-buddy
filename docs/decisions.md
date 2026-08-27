@@ -1614,3 +1614,150 @@ closed, so the renderer drew the marks themselves.
 The slice now takes the marks immediately after the last word, and only those:
 never across a line break, because the marks that open the following block
 belong to it.
+
+## Settled 2026-08-27 — the two summary views
+
+The Commonplace Book and the Chapter View. Two read-only pages. They show the
+same distilled notes with two different indexes. The Commonplace Book files a
+note by concept, across all books. The Chapter View files it by chapter, in one
+book. Built from `design-inspiration/build-prompt-summary-views.md` and its two
+reference HTML files.
+
+The engine that makes the data is not built. See "the stubs" below.
+
+### The fonts are self-hosted, not loaded from Google
+
+The build prompt says to load Playfair Display, EB Garamond and Caveat from
+Google Fonts. `web/src/styles/fonts.css` forbids this. The rule at the top of
+that file is clear: a font from a CDN does not exist on a train, and it sends a
+third party a request each time a reader opens a book.
+
+The reader chose to keep the rule. So:
+
+- EB Garamond and Caveat were already in the bundle. They needed no work.
+- Playfair Display is now `@fontsource-variable/playfair-display`. The Latin
+  file only, as `fonts.css` does for every other face.
+
+Playfair is **not** in the `--face-*` list in `theme.css`. Those tokens feed
+`--font-reading` and the reader's own font picker. Playfair is a display face
+with high contrast. It is good for a heading and bad for a page of prose. No
+reader should be able to choose it for a chapter.
+
+One thing this fixed by accident: `Home.module.css` named Playfair for years
+without the font being in the bundle. That heading fell back to Merriweather.
+It now shows Playfair.
+
+### These two pages ignore the reader's theme
+
+Every other screen takes its colour from `theme.css` and follows one of the ten
+themes. These two do not. They use one fixed palette: paper `#F4EEDF`, page
+`#EAE2CE`, ink `#302C24`, violet `#5D4F9E`, bronze `#A9814B`.
+
+The reason: the design is a paper object. It has a spine crease, a thumb index,
+a bronze manicule and a note in Veda's hand. Mapped onto `--color-bg` the page
+stops being that object and becomes one more screen.
+
+**The known cost.** A reader in Dark who opens this at night gets a bright page.
+The reader chose this with the cost stated. If it turns out to be wrong, the fix
+is a dark set of these tokens only. Every rule already reads them through
+`var()`.
+
+### The pages sit outside `AppShell`
+
+`/commonplace` and `/book/:bookId/chapters` are full-bleed, like Reader and
+BookInfo. The shell's top bar and drawer are in the app's own colours. Wrapped
+around a page that pretends to be paper, they undo the thing the design does.
+Each page carries its own way back instead.
+
+`/commonplace` is not under a book. The point of that lens is that it gathers
+passages from every book. A book-scoped route would fight it.
+
+### The way in is one section on Book Details, not a drawer entry
+
+Both pages show sample content. The engine is not built. A navigation entry
+would advertise a feature whose data is invented.
+
+So `BookInfo.tsx` has a section, "What we worked through", with two links. It is
+built like the "Coming back to it" section above it, so it looks native.
+
+### A candidate concept is held out of the Commonplace Book
+
+An item whose concept has status `candidate` shows in the Chapter View with the
+dashed amber chip and the words "awaiting Librarian". It appears under no
+heading in the Commonplace Book.
+
+The reason: a candidate has no confirmed heading to live under. The Q&A pass met
+a name that is not on the running list. It refused to invent a node for it.
+
+The chip for a candidate is **not** a link. A link would promise a page that
+does not exist.
+
+This rule is applied in the data source, not in the view. Every future source
+must then do the same thing to work.
+
+### A claim is parsed, never set as HTML
+
+A claim carries a little inline markup: `<em>`, and `<a class="link">` for a
+concept named inside a sentence. `summary/claimNodes.ts` turns that string into
+a list of pieces. The views render real elements from them.
+
+`dangerouslySetInnerHTML` would be shorter. It is wrong here. Today a claim is
+hand-written and safe. Tomorrow a claim is what a model wrote about what a
+reader pasted into a book. A model asked for `<em>` will sometimes give more
+than `<em>`. By then the hole is in shipped code that nobody looks at.
+
+Two tags are understood. Everything else is text. A `<script>` renders as the
+characters `<script>`.
+
+### The fixture answers for any book, and this is temporary
+
+`summary/fixture.ts` gives its sample chapters for **every** book it is asked
+about, not only for *Memories, Dreams, Reflections*.
+
+This is a deliberate lie and it is marked as one in the file. The Chapter View
+is reached from a button on a book's own details page. A reader opens it on the
+book in front of them. Keyed strictly by title, the sample content would only
+appear for a book nobody owns. The page would be blank exactly when someone
+went to look at it. That defeats the reason for shipping the view early.
+
+A real data source keys by book, and this goes away with it. The page prints the
+reader's **own** book title above the sample chapter, so nothing claims to be
+Jung's book.
+
+### The Chapter View opens on the first chapter that has something in it
+
+Not on chapter 1. Most of a book is undistilled for most of its life. Opening on
+chapter 1 shows an empty page and reads as a feature that does not work.
+
+`ChapterListEntry.distilled` says which chapters have been through the passes.
+The rail still lists every chapter, done or not — a reader needs to see the
+whole book, not only the finished parts.
+
+### The stubs, and where the engine joins
+
+`summary/dataSource.ts` holds the one seam. It is an interface with a swap
+function. The fixture is the only implementation today.
+
+Not built, and marked `TODO: Scribe/Librarian engine`:
+
+1. The **chapter pass** — reads one chapter, gives the plain-language recap and
+   the concepts it extracts. It runs first.
+2. The **concept-list store** — the running controlled vocabulary. The passes
+   read it and add to it. It is carried forward, so chapter 9 reuses chapter
+   4's canonical names.
+3. The **Q&A pass** — runs after the chapter pass, so the list is current. It
+   flags an off-list concept as a candidate.
+4. **Model routing** — best available model through OpenRouter, the chapter-end
+   trigger, the storage writes, and the Obsidian export.
+5. The **approval flow** — promoting a candidate, or merging it.
+
+### One thing the two reference files disagree about
+
+The annex-dream passage is worded differently in each reference. The Commonplace
+Book's version is longer and has an inline concept link. The Chapter View's
+version is shorter.
+
+Both are in the fixture, as two items. The instruction was to match the
+references exactly, and picking one would have broken one of them. If the engine
+gives one item per passage, delete one of the two. Nothing depends on there
+being two.

@@ -1,0 +1,598 @@
+/*
+ * The two summary views, in one stylesheet.
+ *
+ * Ported value for value from `design-inspiration/commonplace-book.html` and
+ * `chapter-view.html`. Where the two references share a rule — the bound book,
+ * the rail, the page, the eyebrow, the flourish — it is written once here and
+ * both pages use it. Nothing has been restyled or "improved"; if a number
+ * looks arbitrary it is because the design says so.
+ *
+ * ## These pages do not follow the app's theme, on purpose
+ *
+ * Everywhere else in Reading Buddy, colour comes from `theme.css` and follows
+ * whichever of the ten themes the reader chose. Not here. A commonplace book
+ * is a paper object, and the whole design — the spine crease, the thumb index,
+ * the bronze manicule, the violet in Veda's hand — is one fixed palette
+ * pretending to be a physical page. Mapped onto `--color-bg` and friends it
+ * stops being that object and becomes another screen.
+ *
+ * The cost is real and known: a reader in Dark who opens this at night gets a
+ * bright page. That was a deliberate call, not an oversight. If it turns out
+ * to be the wrong one, the fix is a dark palette for these tokens only, and
+ * every rule below already reads them through `var()`.
+ */
+
+.shell {
+  /* Paper */
+  --paper: #f4eedf;
+  --paper-deep: #faf5e9;
+  --page-bg: #eae2ce;
+  /* Ink */
+  --ink: #302c24;
+  --ink-soft: #6a6154;
+  --ink-faint: #9a9182;
+  /* Rules */
+  --rule: #d9ceb6;
+  --rule-soft: #e5dcc7;
+  /* Veda, and the concept layer she keeps */
+  --veda: #5d4f9e;
+  --veda-soft: #7c6fbc;
+  /* Bronze marks the physical page; amber marks a thing not yet decided */
+  --bronze: #a9814b;
+  --amber: #b07b2e;
+
+  min-height: 100%;
+  background: var(--page-bg);
+  font-family: 'EB Garamond', Georgia, serif;
+  color: var(--ink);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  /* The reference pads the body. Here it pads the screen instead, plus the
+     safe areas — this app runs full-bleed under an iPhone's notch. */
+  padding:
+    calc(28px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+    calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Holds the way back, and nothing else. Same width as the book below it, so
+   the mark lines up with the book's own right edge rather than the screen's. */
+.topBar {
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 10px;
+}
+
+.book {
+  width: 100%;
+  max-width: 860px;
+  align-self: flex-start;
+  background: var(--paper);
+  border-radius: 3px;
+  box-shadow:
+    0 1px 0 #fff inset,
+    0 18px 40px -20px rgba(48, 44, 36, 0.4);
+  display: grid;
+  grid-template-columns: 118px 1fr;
+  overflow: hidden;
+  position: relative;
+}
+
+/* The faint crease where the two halves of a bound book meet. */
+.book::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 118px;
+  width: 22px;
+  background: linear-gradient(90deg, rgba(48, 44, 36, 0.09), rgba(48, 44, 36, 0) 60%);
+  pointer-events: none;
+}
+
+/* ---- the thumb index ----------------------------------------------------- */
+
+.rail {
+  background: var(--paper-deep);
+  border-right: 1px solid var(--rule);
+  padding: 26px 0;
+}
+
+.railLabel {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 0 14px 14px;
+}
+
+/*
+ * A real `<button>`, where the reference used a `<span>`. It is a control that
+ * changes what the page shows, so it must be reachable by a keyboard and
+ * announced as a button; the rules below undo the UA's button styling so it
+ * looks exactly like the reference's span.
+ */
+.tab {
+  display: block;
+  width: 100%;
+  font-family: inherit;
+  font-size: 15px;
+  text-align: left;
+  background: none;
+  color: var(--ink-soft);
+  padding: 7px 14px 7px 16px;
+  border: none;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.tab:hover {
+  background: rgba(93, 79, 158, 0.06);
+  color: var(--ink);
+}
+
+.tab.on {
+  color: var(--veda);
+  border-left-color: var(--veda);
+  background: rgba(93, 79, 158, 0.09);
+  font-weight: 500;
+}
+
+.railNote {
+  font-size: 12.5px;
+  font-style: italic;
+  color: var(--ink-faint);
+  padding: 18px 14px 0;
+  line-height: 1.5;
+}
+
+/* ---- the open page ------------------------------------------------------- */
+
+.page {
+  padding: 40px 46px 46px;
+}
+
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--bronze);
+  margin-bottom: 20px;
+}
+
+.flourish {
+  margin: 16px 0 6px;
+  height: 14px;
+  width: 150px;
+  color: var(--veda-soft);
+}
+
+.flourish svg {
+  display: block;
+  overflow: visible;
+}
+
+/* ---- the Commonplace Book ------------------------------------------------ */
+
+.concept {
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  font-size: 38px;
+  line-height: 1.12;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.count {
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-soft);
+  margin: 0 0 34px;
+}
+
+.count b {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--veda);
+}
+
+.entry {
+  position: relative;
+  padding: 0 0 30px 40px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.entry:last-of-type {
+  border-bottom: none;
+}
+
+/* The manicule — the pointing hand a commonplace-keeper drew beside a passage
+   worth coming back to. `aria-hidden` in the markup: it is a mark, not a word. */
+.manicule {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  font-size: 22px;
+  color: var(--bronze);
+  line-height: 1;
+  user-select: none;
+}
+
+.claim {
+  font-size: 20px;
+  line-height: 1.62;
+  color: var(--ink);
+  margin: 0;
+}
+
+.claim em {
+  font-style: italic;
+}
+
+.claimLink {
+  color: var(--veda);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(93, 79, 158, 0.35);
+  padding-bottom: 1px;
+  font: inherit;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  cursor: pointer;
+}
+
+/* Provenance: which book this passage came out of. */
+.prov {
+  margin-top: 12px;
+  font-size: 14.5px;
+  font-style: italic;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.provTitle {
+  font-style: normal;
+  color: var(--ink);
+}
+
+.provDot {
+  color: var(--ink-faint);
+}
+
+.provDomain {
+  font-style: normal;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bronze);
+  border: 1px solid rgba(169, 129, 75, 0.4);
+  border-radius: 20px;
+  padding: 2px 9px;
+}
+
+/* Veda's marginal hand. */
+.veda {
+  margin-top: 34px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.vedaRule {
+  flex: none;
+  width: 2px;
+  align-self: stretch;
+  background: var(--veda-soft);
+  opacity: 0.5;
+  border-radius: 2px;
+}
+
+.vedaNote {
+  font-family: 'Caveat', cursive;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--veda);
+  margin: 0;
+}
+
+.vedaWho {
+  display: block;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--veda-soft);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* ---- the Chapter View ---------------------------------------------------- */
+
+.chapterNo {
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  font-size: 38px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.chapterTtl {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 20px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+/* The Chapter View's flourish sits further from what follows it. */
+.flourishWide {
+  margin-bottom: 30px;
+}
+
+/* A small caps label with a rule running off to the right of it. */
+.secLabel {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.secLabel::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule-soft);
+}
+
+.recap {
+  font-size: 19px;
+  line-height: 1.66;
+  color: var(--ink);
+  padding-left: 16px;
+  border-left: 2px solid var(--veda-soft);
+  margin: 0 0 40px;
+}
+
+.recapSig {
+  display: block;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--veda-soft);
+  margin-top: 10px;
+  letter-spacing: 0.02em;
+}
+
+.item {
+  padding: 0 0 26px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.item:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.itemClaim {
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0;
+}
+
+.itemClaim em {
+  font-style: italic;
+}
+
+.foot {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* The passage anchor — where in the chapter this came from, in words. */
+.anchor {
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--ink-faint);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.anchor::before {
+  content: '¶';
+  font-style: normal;
+  color: var(--bronze);
+}
+
+/* "filed under <concept>" — the tap that crosses to the other lens. */
+.chip {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--veda);
+  background: rgba(93, 79, 158, 0.09);
+  border: 1px solid rgba(93, 79, 158, 0.28);
+  border-radius: 20px;
+  padding: 3px 12px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.chip::before {
+  content: 'filed under';
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--veda-soft);
+}
+
+.chip:hover {
+  background: rgba(93, 79, 158, 0.15);
+}
+
+/*
+ * A candidate concept: one the Q&A pass met that is not on the running list.
+ * Dashed and amber because it is a proposal, not a heading — and not a link,
+ * because there is nowhere for it to lead until the Librarian approves it.
+ */
+.chip.pending {
+  color: var(--amber);
+  background: rgba(176, 123, 46, 0.07);
+  border: 1px dashed rgba(176, 123, 46, 0.5);
+  cursor: default;
+}
+
+.chip.pending::before {
+  content: 'candidate';
+  color: var(--amber);
+  opacity: 0.8;
+}
+
+.chip.pending:hover {
+  background: rgba(176, 123, 46, 0.07);
+}
+
+.pendingHint {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--amber);
+  opacity: 0.85;
+}
+
+/* ---- when there is nothing yet ------------------------------------------- */
+
+/*
+ * Not in either reference, and unavoidable: six of the seven headings hold no
+ * passages, and five of the six chapters have no recap. Written in the page's
+ * own italic ink rather than as a designed empty state, so it reads as a blank
+ * page in a book rather than as a piece of app furniture.
+ */
+.empty {
+  font-size: 17px;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+/* ---- the way back -------------------------------------------------------- */
+
+/*
+ * The reference is a standalone page with nowhere to go. Inside the app these
+ * are routes, and a route with no way out strands a reader. It sits above the
+ * book rather than on it: the page is meant to read as a paper object, and a
+ * control printed on the paper breaks that. Above the top edge it is furniture
+ * around the book, which is what it is.
+ */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.back:hover {
+  color: var(--ink-soft);
+}
+
+@media (max-width: 640px) {
+  .book {
+    grid-template-columns: 1fr;
+  }
+
+  .book::before {
+    display: none;
+  }
+
+  /* The rail lies down and becomes a strip you scroll sideways. */
+  .rail {
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    padding: 14px 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .railLabel,
+  .railNote {
+    display: none;
+  }
+
+  .tab {
+    width: auto;
+    white-space: nowrap;
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    padding: 6px 12px;
+    border-radius: 4px;
+  }
+
+  .tab.on {
+    border-left: none;
+    border-bottom-color: var(--veda);
+  }
+
+  .page {
+    padding: 28px 22px 34px;
+  }
+
+  .concept,
+  .chapterNo {
+    font-size: 29px;
+  }
+
+  .claim {
+    font-size: 18px;
+  }
+
+  .entry {
+    padding-left: 32px;
+  }
+
+  .recap,
+  .itemClaim {
+    font-size: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
+}

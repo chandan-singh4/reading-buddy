@@ -289,3 +289,35 @@
   src: url('@fontsource/libre-caslon-text/files/libre-caslon-text-latin-700-normal.woff2')
     format('woff2');
 }
+
+/* --- Playfair Display ---------------------------------------------------- */
+/*
+ * A display face, not a reading face — high-contrast didone, drawn for
+ * headings and unpleasant at paragraph size. So it is deliberately *not* in
+ * the `--face-*` list in `theme.css`: those feed `--font-reading` and the
+ * reader's own font picker, and nobody should be able to choose this for a
+ * chapter of prose.
+ *
+ * Named directly by the two summary views (`summary/summary.module.css`) and
+ * by `DefinePanel.module.css`, both of which set it on headings only. It was
+ * named in `Home.module.css` for a long time without being bundled, so that
+ * heading quietly fell through to Merriweather; it now resolves.
+ */
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('@fontsource-variable/playfair-display/files/playfair-display-latin-wght-normal.woff2')
+    format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('@fontsource-variable/playfair-display/files/playfair-display-latin-wght-italic.woff2')
+    format('woff2-variations');
+}

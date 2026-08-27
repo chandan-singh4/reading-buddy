@@ -686,3 +686,12 @@
   display: inline-block;
   text-decoration: none;
 }
+
+/* The pair of links into the summary views. Two links, one row on any phone
+   wide enough; they wrap rather than shrink, because a truncated label on a
+   pill reads as a bug. */
+.summaryLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

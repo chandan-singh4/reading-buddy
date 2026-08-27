@@ -15,7 +15,14 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2130 tests across 116 files.
+  2,169 tests across 120 files.
+- **Waiting on the phone: the two summary views.** They are built and shipped,
+  but they were judged on a desktop browser only. The reader has not seen them
+  on a device. Open a book, then **Book details → What we worked through**.
+  Judge the paper, the type sizes, and the sideways rail under the heading.
+- **A design question the views leave open.** These two pages do not follow the
+  reader's theme. A reader in Dark gets a bright page at night. This was chosen
+  with the cost known. Only a look on the phone can settle it.
 - **Waiting on the phone: the mended notes.** The last fix went up as
   `bc15dc2`. The reader must accept the app's update prompt before any of it
   runs on the device — see the note under "Next up".
@@ -34,6 +41,36 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **The two summary views** (2026-08-27). Not a waypoint — built from
+  `design-inspiration/build-prompt-summary-views.md`. Build green: 2,169 tests
+  across 120 files, up 39.
+  - Two read-only pages over the same notes, with two indexes. The
+    **Commonplace Book** (`/commonplace`) files a passage by concept, across
+    every book. The **Chapter View** (`/book/:bookId/chapters`) files it by
+    chapter, with a plain-language recap on top.
+  - **The way in is one section on Book Details**, "What we worked through",
+    with two links. Not a drawer entry: the data is sample content, and the app
+    must not advertise a feature it cannot yet do.
+  - **The engine is not built and is not started.** `summary/dataSource.ts` is
+    the one seam — an interface, a swap function, and a labelled
+    `TODO: Scribe/Librarian engine` listing the five parts. A mock fixture
+    holds the exact content from the two reference designs.
+  - **Playfair Display is now self-hosted.** The build prompt asked for Google
+    Fonts; `fonts.css` forbids a CDN. The reader kept the rule. This also fixed
+    `Home.module.css`, which named Playfair for years without it in the bundle.
+  - **These two pages ignore the reader's theme** — one fixed paper palette, by
+    choice, with the night-time cost stated in `decisions.md`.
+  - **A candidate concept is held out of the Commonplace Book**, and its chip is
+    not a link. It has no confirmed heading to lead to.
+  - **A claim is parsed, never set as HTML** — `summary/claimNodes.ts`. Two tags
+    are understood and everything else is text, because a claim will one day be
+    model-written.
+  - **Two faults the browser found, not the tests.** A book with no distilled
+    chapters waited forever on a load that was never started, and showed a
+    blank page. And the view opened on chapter 1, which is empty in most books,
+    so the reader would have met an empty page on the first tap. It now opens
+    on the first chapter that has something in it.
 
 - **Veda's Quotes: a kept line keeps its marks, and knows its way home**
   (2026-08-26). Not a waypoint — the reader asked for it. Build green: 2130
