@@ -1,27 +1,32 @@
 /*
- * Turns the two golden prompt files into a TypeScript module.
+ * Writes the two golden prompts into `api/tutor.ts`.
  *
- * ## Why the folder starts with an underscore
+ * ## Why they are injected rather than imported
  *
- * Vercel treats every file under `api/` as a serverless function and requires a
- * default export from each one. `text.ts` is a module of two strings, so the
- * build failed — silently, as far as this repo could tell: five commits sat on
- * `main` undeployed while the phone kept running the last good build. A leading
- * underscore is Vercel's documented way to say "helper, not a route".
+ * Two Vercel builds failed before this shape was found, and both failures were
+ * invisible from inside this repo — `main` moved five commits ahead while the
+ * phone kept running the last good build.
  *
- * The `.md` files in `api/_prompts/` are the source of truth. They were written
- * outside this repo and must never be edited here — not a word, not a line
- * break. `api/_prompts/text.ts` is generated from them so the serverless
- * functions can import the text without reading a file at runtime, which is
- * the part Vercel makes fragile.
+ *   1. The prompts started at `api/prompts/text.ts`. Vercel builds every file
+ *      under `api/` as a serverless function and wants a default export from
+ *      each. A module of two strings is not a function.
+ *   2. Moved to `api/_prompts/text.ts` and imported, it failed again: Vercel
+ *      typechecks `api/` without `allowImportingTsExtensions`, so the `.ts` on
+ *      the end of an import path is an error there (TS5097), and the Edge
+ *      bundler then could not resolve the module at all.
  *
- * The text is emitted with `JSON.stringify`, not as a template literal. A
- * template literal would need the backticks inside these prompts escaped by
- * hand, and a hand-written escape is exactly the kind of thing that quietly
- * alters a golden file. `JSON.stringify` cannot get it wrong.
+ * `api/tutor.ts` had no imports whatsoever before this work, and the only
+ * import anywhere in `api/` is an npm package. There is no working example of
+ * one file in `api/` importing another, so this stops trying to be the first.
  *
+ * The text is written directly into `api/tutor.ts`, between two markers, which
+ * is exactly where `BASE_PROMPT` and `RECORDER_PROMPT` already live. No module,
+ * no import, nothing for a bundler to resolve.
+ *
+ * The two `.md` files stay the source of truth. They sit in `prompts/` at the
+ * root, outside `api/`, so Vercel never looks at them.
  * `web/src/summary/prompts.test.ts` re-runs this and compares, so an edited
- * `.md` that was never regenerated fails the suite.
+ * prompt that was never regenerated fails the suite.
  *
  * Run: `node scripts/build-prompts.mjs`
  */
@@ -33,32 +38,51 @@ export const PROMPT_FILES = [
   ['SCRIBE_PROMPT', 'scribe.md'],
 ]
 
-export const PROMPT_DIR = join(import.meta.dirname, '..', 'api', '_prompts')
+const ROOT = join(import.meta.dirname, '..')
+export const PROMPT_DIR = join(ROOT, 'prompts')
+export const TARGET = join(ROOT, 'api', 'tutor.ts')
 
-const HEAD = `/*
- * GENERATED FILE — DO NOT EDIT.
+export const BEGIN = '/* --- BEGIN GENERATED PROMPTS - scripts/build-prompts.mjs --- */'
+export const END = '/* --- END GENERATED PROMPTS --- */'
+
+/**
+ * The block that goes between the markers, given the folder to read from.
  *
- * Written by \`scripts/build-prompts.mjs\` from \`librarian.md\` and \`scribe.md\`
- * in this folder. Those two files are the golden source. They came from outside
- * this repo and are copied byte for byte; nothing here may reword them.
- *
- * To change a prompt: edit the \`.md\`, then run \`node scripts/build-prompts.mjs\`.
- * \`web/src/summary/prompts.test.ts\` fails if the two ever drift apart.
+ * `JSON.stringify`, not a template literal. Both prompts contain backticks, and
+ * a hand-written escape is exactly how a golden file quietly changes.
  */
-`
-
-/** The exact bytes of the generated module, given the folder to read from. */
-export function generate(dir) {
-  const parts = [HEAD]
+export function block(dir) {
+  const lines = [
+    BEGIN,
+    '/*',
+    ' * The Librarian and the Scribe, copied byte for byte from the two files in',
+    ' * `prompts/` at the root of this repo.',
+    ' *',
+    ' * DO NOT EDIT THESE TWO STRINGS. They were written outside this repo and',
+    ' * nothing here may reword them. To change one: edit the `.md`, then run',
+    ' * `node scripts/build-prompts.mjs`.',
+    ' */',
+  ]
   for (const [name, file] of PROMPT_FILES) {
     const text = readFileSync(join(dir, file), 'utf8')
-    parts.push(`\nexport const ${name} = ${JSON.stringify(text)}\n`)
+    lines.push(`const ${name} = ${JSON.stringify(text)}`)
   }
-  return parts.join('')
+  lines.push(END)
+  return lines.join('\n')
 }
 
-// Only write when run directly, so the test can import `generate` in peace.
+/** Replace the block in `source`, leaving every other line untouched. */
+export function inject(source, dir) {
+  const start = source.indexOf(BEGIN)
+  const finish = source.indexOf(END)
+  if (start === -1 || finish === -1) {
+    throw new Error('markers not found in api/tutor.ts')
+  }
+  return source.slice(0, start) + block(dir) + source.slice(finish + END.length)
+}
+
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replaceAll('\\', '/'))) {
-  writeFileSync(join(PROMPT_DIR, 'text.ts'), generate(PROMPT_DIR), 'utf8')
-  console.log('wrote api/_prompts/text.ts')
+  const source = readFileSync(TARGET, 'utf8')
+  writeFileSync(TARGET, inject(source, PROMPT_DIR), 'utf8')
+  console.log('wrote the golden prompts into api/tutor.ts')
 }

@@ -4,27 +4,27 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 // @ts-expect-error — a plain .mjs build script, deliberately not typed.
-import { generate } from '../../../scripts/build-prompts.mjs'
+import { PROMPT_DIR, TARGET, inject } from '../../../scripts/build-prompts.mjs'
 
 /*
  * The two prompts are golden.
  *
  * They were written outside this repo and copied in byte for byte. Nobody may
  * reword them here — not to fit a schema, not to shorten them, not to make a
- * sentence read better. `api/_prompts/text.ts` is generated from the two `.md`
- * files so the serverless functions can import them.
+ * sentence read better. The two `.md` files in `prompts/` are the source; the
+ * build script writes them into `api/tutor.ts` between a pair of markers.
  *
- * This test is the guard. It regenerates from the `.md` files and compares. It
- * fails if someone edits the generated file by hand, or edits a `.md` and
- * forgets to run `node scripts/build-prompts.mjs`.
+ * This test is the guard. It re-runs the injection and compares. It fails if
+ * someone edits the generated block by hand, or edits a `.md` and forgets to
+ * run `node scripts/build-prompts.mjs`.
  */
 
-const DIR = join(import.meta.dirname, '..', '..', '..', 'api', '_prompts')
+const DIR = join(import.meta.dirname, '..', '..', '..', 'prompts')
 
 describe('the golden prompts', () => {
-  it('has a generated module that matches the two source files', () => {
-    const committed = readFileSync(join(DIR, 'text.ts'), 'utf8')
-    expect(committed).toBe(generate(DIR))
+  it('is written into api/tutor.ts exactly as the two source files read', () => {
+    const committed = readFileSync(TARGET, 'utf8')
+    expect(committed).toBe(inject(committed, PROMPT_DIR))
   })
 
   it('still holds the Librarian, whole', () => {
