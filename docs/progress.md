@@ -15,7 +15,10 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2053 tests across 112 files.
+  2130 tests across 116 files.
+- **Waiting on the phone: the mended notes.** The last fix went up as
+  `bc15dc2`. The reader must accept the app's update prompt before any of it
+  runs on the device — see the note under "Next up".
 - **A flaky test teardown, not ours to blame on WP-16.** `vitest run` reports one
   unhandled error from `HandDrawn.tsx` — a coalesced measure fires after jsdom
   has been torn down and the stored range can no longer be measured. Every test
@@ -31,6 +34,35 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **Veda's Quotes: a kept line keeps its marks, and knows its way home**
+  (2026-08-26). Not a waypoint — the reader asked for it. Build green: 2130
+  tests across 116 files.
+  - The reader picks words inside one of Veda's answers and gets **Copy**,
+    **Save** and **Ask**. Saved lines live under a **Veda's Quotes** chip.
+  - **"By chapter" left the chip row** and became a switch beside it, so
+    grouping now applies to whichever chip is on.
+  - The chapter name sits **above** the words on every kind of note.
+  - **The marks are written back on** — `reader/pickMarkdown.ts`. A selection's
+    text is plain, so a saved line arrived flat. It now walks the picked nodes
+    and puts the bold, the bullets, the numbers and the headings back.
+  - **Four fixes changed nothing on the phone.** Two reasons, both written up in
+    `decisions.md`: a note already written is not touched by fixing the writer,
+    and this is a prompt-to-update PWA, so a deploy does not reach the device
+    until the reader accepts. Both cost the reader four rounds.
+  - **`recoverMarkdown` mends the old notes.** A kept line names its thread, the
+    thread still holds Veda's answer as markdown, so the words are found in it
+    and the marks read off around them. Confirmed on the phone.
+  - **The serializer read a copy that had lost its parents.** `cloneContents()`
+    keeps what is below the range's common ancestor and nothing above it, so a
+    pick starting inside the first list item gave bare items with no list — every
+    number became a bullet. It walks the live page now.
+  - **The tests hid both faults** by building their own HTML and selecting whole
+    nodes. A test now renders a real answer and builds the range the way a finger
+    builds one.
+  - A tap on a quote lands on the saved line, not at the top of the thread. The
+    search strips the marks off and falls back to the longest opening really
+    there, so notes saved before the plain words existed still land.
 
 - **The book reads itself out loud** (2026-08-25). WP-16 is closed. Build green:
   2053 tests across 112 files.
@@ -127,27 +159,6 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   - The build board learned a **cut** state, which counts in neither half of a
     tally, and a shift-tap now steps back one place instead of two.
 
-- **Search opens where the reader asked, and says where it landed**
-  (2026-08-25). Build green: 1948 tests across 107 files.
-  - **"Search in book" showed nothing.** The panel is drawn inside the chrome,
-    and the chrome is hidden and `inert` while the reader reads. So the action
-    set the query, opened the panel, and displayed nothing; the reader had to
-    tap the page to raise the toolbar, and found the panel already filled in.
-    `openSearch` now raises the chrome, because no route into search wants the
-    panel without it.
-  - **A result now says where it landed.** Tapping a hit inks the matched words,
-    pulses twice, holds, and goes after 4.5 seconds. It is an ordinary highlight
-    that nothing writes down, drawn by the same renderer — ink drawn any other
-    way would have to solve the page turn's copies again. Its colour is
-    deliberately not one of the reader's four.
-  - **The jump landed between two columns** (fixed same day). The first version
-    of the above closed the toolbar as it jumped. Showing the toolbar scales the
-    page, and the scale is transitioned; `columnOf` divides by the scale it
-    reads at that instant, so the jump measured against a scale that was still
-    moving. `settleOn` could not correct it, because it judges a settled layout
-    by `scrollWidth`, and a transform never changes `scrollWidth`. The toolbar
-    now stays up during a jump, as it always did.
-
 > **Older entries are deleted, not archived.** Only the five newest survive —
 > see this file's own header. Git holds every earlier version of this file, so
 > nothing is lost: `git log -p docs/progress.md` brings back any entry ever
@@ -163,6 +174,10 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   worker problem. Don't raise it again.
 
 ### Next up
+**The update prompt is worth a look of its own.** A prompt-to-update PWA cost
+the reader four rounds of "still broken" on work that was already shipped. The
+prompt may be too quiet on a phone. Deciding this is a small task, not a bug.
+
 **Prove the reading voice on the phone.** WP-16 is built and tested, but three
 of its faults were only visible on a device. `active-task.md` lists eight checks.
 The voice choice is the one that still needs proof: the fix assumes the engine

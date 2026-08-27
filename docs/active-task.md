@@ -5,79 +5,44 @@
 
 ## Task
 
-**VEDA-QUOTES — keep a line Veda said.**
+**Nothing is mid-edit.** Veda's Quotes is built, shipped and confirmed on the
+phone. Pick the next task with `/plan-task`, or take one of the two below.
 
-Not a backlog waypoint. The reader asked for it.
+## Option A — make the update prompt hard to miss
 
-Veda sometimes says one line that is worth more than the answer around it.
-Today the reader can copy the whole answer, or nothing. They want to select
-words inside Veda's answer and do one of two things with them:
+The smaller task, and the one this session earned.
 
-- **Save** — keep the words under Notes, as Veda's quote.
-- **Ask** — put the words in the question box, to ask Veda about her own line.
+Reading Buddy is a PWA with `registerType: 'prompt'` in `web/vite.config.ts`. A
+new build waits for the reader to accept it. This session shipped four fixes
+that could not reach the phone, and the reader reported the same fault four
+times. The choice to ask first is right; how loudly it asks may not be.
 
-## What the code already gives us
+### Definition of done
 
-Read this before planning any new machinery. Four parts exist:
+1. Look at the update panel on a phone screen and decide, with the reader,
+   whether it is loud enough.
+2. Change it only if the reader says it is too quiet. A change with no
+   complaint behind it is not worth the risk.
+3. Write the decision in `docs/decisions.md` either way.
 
-1. `StudyLamp` holds `setBox(text)`. Every path that writes to the question box
-   goes through it. **That is the whole of Ask.**
-2. `StoredNote` already has `author: 'claude'`. Nothing stores one yet. The
-   `'claude'` rows in the notes list are made on the fly from tutor threads.
-3. `StoredNote.colour` proves an unindexed field needs no schema version.
-4. `SelectionMenu` is the book's popup. **Do not reuse it.** It carries drag
-   handles, snapping and highlight colours, and it is anchored to a book
-   paragraph. Veda's answer is markdown in a bubble. It needs a small popup of
-   its own with two buttons.
+### Files in scope
 
-## The one new field
+- `web/src/app/updates.ts` — the registration and the check timer.
+- `web/vite.config.ts` — the `registerType` note, if the mode itself changes.
+- Whatever draws the panel — find it from `onNeedRefresh` in `updates.ts`.
 
-`StoredNote.fromThread?: string` — the tutor thread the words were said in.
+## Option B — prove the reading voice on the phone
 
-With `author: 'claude'`, its presence means "an excerpt of Veda's answer", and
-not a whole conversation. It also lets a tap on the quote reopen the
-conversation the line came from, which is where the reader will want to go.
+Carried from the last session, and still true. WP-16 is built and tested, but
+three of its faults were only visible on a device. The voice choice is the one
+that still needs proof: the fix assumes the engine ignores a voice when no
+language is set.
 
-Unindexed, so no Dexie version bump.
+No files. This is a device check, not an edit.
 
-## Definition of done
+## Out of scope for both
 
-1. The reader selects words inside one of Veda's answers in the lamp. A small
-   card appears with **Save** and **Ask**.
-2. **Save** writes a note with `author: 'claude'`, the selected words, and
-   `fromThread`. It shows under Notes on a new **Veda quotes** chip, in Veda's
-   violet hand, drawn as a quotation and not as a slip. Tapping it reopens the
-   thread.
-
-   **"By chapter" leaves the chip row** and becomes a switch beside it, so
-   grouping applies to whichever chip is on. **Veda quotes** takes its place.
-   The switch is hidden on Words: a word has no anchor.
-3. **Ask** puts the words in the question box as a block quote, puts the cursor
-   after them, and raises the keyboard. It does not send.
-4. Selecting the reader's own question, or plain text outside a message, shows
-   no card.
-5. `npm run build` is green. New tests cover the popup and the saved quote.
-
-## Files in scope
-
-- `web/src/storage/db.ts` — the `fromThread` field and its note.
-- `web/src/storage/notes.ts` — carry the field through.
-- `web/src/reader/StudyLamp.tsx` — the selection watcher, the card, the two
-  actions. `setBox` is already there.
-- `web/src/reader/StudyLamp.module.css` — the card.
-- `web/src/pages/Reader.tsx` — save the note; keep quotes out of the thread
-  rows so a quote is not counted twice.
-- `web/src/reader/notes.ts` — the chips, and the switch's own rule.
-- `web/src/reader/NotesPanel.tsx` — the new chip, the switch, the quotation.
-- `web/src/reader/NotesPanel.module.css` — its rules.
-- `web/src/reader/StudyLamp.test.tsx`, `web/src/reader/NotesPanel.test.tsx`.
-
-## Out of scope
-
-- `api/tutor.ts` and every prompt. The model needs no instruction for this.
-- `web/src/reader/SelectionMenu.tsx` and `selection.ts` — the book's gesture
-  does not change.
-- `web/src/reader/markdown.tsx`. No parsing change.
+- `api/tutor.ts` and every prompt.
 - Any parsing file, and `PARSER_VERSION`.
 - Syncing notes to the cloud. Notes stay device-local.
 
@@ -85,5 +50,7 @@ Unindexed, so no Dexie version bump.
 
 ## Done, 2026-08-26
 
-Built and shipped. 2,088 tests pass, build green. The decisions are written up
-in `docs/decisions.md` under "keeping a line Veda said".
+**VEDA-QUOTES.** Shipped over five rounds, the last four of them fixes the
+reader had to report. 2,130 tests pass, build green. Written up in
+`docs/decisions.md` under the five headings from "keeping a line Veda said"
+to "a mended line must close the marks it opens".
