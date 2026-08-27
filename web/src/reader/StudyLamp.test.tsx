@@ -34,6 +34,15 @@ vi.mock('../storage/cloud/client.ts', () => ({
   accessToken: () => Promise.resolve('token'),
 }))
 
+/*
+ * Where the words are, as jsdom would say if jsdom laid anything out.
+ *
+ * Moving it is how a scroll is expressed here: a scroll does not change the
+ * range, it changes where that range is on screen, and re-measuring is exactly
+ * what the lamp has to do about it.
+ */
+let boxNow = { top: 100, bottom: 120, left: 40, right: 240, width: 200, height: 20 } as DOMRect
+
 afterEach(cleanup)
 
 const passage: PassageAnchor = {
@@ -489,9 +498,8 @@ function selectWordsIn(element: Element) {
    * which words were picked and what happens to them, not about where the card
    * lands.
    */
-  const box = { top: 100, bottom: 120, left: 40, right: 240, width: 200, height: 20 } as DOMRect
-  Range.prototype.getBoundingClientRect = () => box
-  Range.prototype.getClientRects = () => [box] as unknown as DOMRectList
+  Range.prototype.getBoundingClientRect = () => boxNow
+  Range.prototype.getClientRects = () => [boxNow] as unknown as DOMRectList
 
   const range = document.createRange()
   range.selectNodeContents(element)
@@ -549,6 +557,37 @@ describe('keeping a line Veda said', () => {
     expect(onKeep).not.toHaveBeenCalled()
     // Still two messages: the question and the answer. Nothing was asked.
     expect(screen.getAllByRole('button', { name: 'Copy this answer' })).toHaveLength(1)
+  })
+
+  it('moves what it draws with the words when the conversation scrolls', async () => {
+    /*
+     * The reader's report, with a screenshot: they picked several paragraphs,
+     * scrolled to read the rest, and the violet stayed exactly where it was
+     * while the words slid out from under it.
+     *
+     * Everything the picker draws is placed in viewport coordinates, which are
+     * true when they are taken and false as soon as anything moves. The range
+     * does not go stale — it is nodes and offsets — so it is measured again.
+     */
+    lamp(spoken, { onKeep: () => {} })
+    selectWordsIn(await screen.findByText('A symbol is a picture the mind can hold.'))
+
+    /*
+     * The card, because it is drawn in both modes. The violet wash and the two
+     * handles are only drawn when the app owns the selection, which is the
+     * touch path, and jsdom lays nothing out so there is no point to pick from.
+     * All three are placed from the same re-measured rectangle, so the card
+     * moving is the thing under test.
+     */
+    const card = () => screen.getByRole('group', { name: 'What to do with these words' })
+    expect(card().style.top).toBe('90px')
+
+    boxNow = { ...boxNow, top: 30, bottom: 50 } as DOMRect
+    act(() => {
+      window.dispatchEvent(new Event('scroll'))
+    })
+
+    await waitFor(() => expect(card().style.top).toBe('20px'))
   })
 
   it('copies the words without keeping them', async () => {

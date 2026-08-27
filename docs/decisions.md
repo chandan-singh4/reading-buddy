@@ -1471,3 +1471,22 @@ honours it. The mark is load-bearing, not decoration.
    inside from the same rectangles, so the reader sees the boundary move.
 
    It is a still copy, not live pixels. Close, not identical.
+
+### The wash stayed behind when the conversation scrolled — fixed 2026-08-26
+
+The reader picked several paragraphs, scrolled to read the rest, and the violet
+stayed where it was while the words slid out from under it.
+
+Everything the picker draws sits in **viewport coordinates**, because that is
+what `getClientRects` answers in. Those numbers are true when they are taken and
+false as soon as anything moves.
+
+The range does not go stale. It is a pair of nodes and offsets in a document
+that has not changed, so it is measured again on every scroll and resize — on an
+animation frame, and with `capture`, because the conversation is what scrolls and
+a scroll event does not bubble.
+
+**The listener depends on whether a pick exists, and on nothing about which one.**
+`describeSpan` clones the range, so both the selection and its range are a new
+object after every re-measure. Depending on either would tear the listener down
+and build it again on every frame it ran.

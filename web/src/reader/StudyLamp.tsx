@@ -770,6 +770,61 @@ export function StudyLamp({
     return () => document.removeEventListener('selectionchange', read)
   }, [onKeep, painted, answerAround])
 
+  /*
+   * The wash follows the words when the conversation scrolls.
+   *
+   * The reader's report, with a screenshot: they picked several paragraphs,
+   * scrolled to see the rest, and the violet stayed exactly where it had been
+   * while the words slid out from under it.
+   *
+   * Everything the picker draws is placed in viewport coordinates — the wash,
+   * the two handles, the card — because that is what `getClientRects` answers
+   * in. Those numbers are true at the moment they are taken and false as soon
+   * as anything moves. The range itself does not go stale: it is a pair of
+   * nodes and offsets in a document that has not changed, so it can simply be
+   * measured again.
+   *
+   * `capture`, because the conversation is what scrolls and a scroll event does
+   * not bubble. On an animation frame, because a scroll fires far faster than
+   * the screen redraws.
+   */
+  const holding = picked !== null
+
+  useEffect(() => {
+    if (!holding) return
+
+    let frame = 0
+    const remeasure = () => {
+      frame = 0
+      setPicked((held) => {
+        if (!held) return held
+        const root = answerAround(held.range.startContainer)
+        // Keep what we had if the answer has gone: the reader still has a
+        // selection, and dropping it because a measurement failed would be a
+        // worse answer than one stale frame.
+        return describeSpan(held.range, root) ?? held
+      })
+    }
+
+    const onScroll = () => {
+      if (frame === 0) frame = requestAnimationFrame(remeasure)
+    }
+
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
+    }
+    // Whether there is a pick at all, and nothing about which one.
+    //
+    // Not the selection and not its range: `describeSpan` clones the range, so
+    // both are a new object on every re-measure. Depending on either would tear
+    // this listener down and build it again on each frame it ran. The pick
+    // itself is reached through `setPicked`, which never goes stale.
+  }, [holding, answerAround])
+
   /** One end of the pick dragged to a point, by its handle. */
   const stretch = useCallback(
     (pivot: SelectionPivot, x: number, y: number) => {
