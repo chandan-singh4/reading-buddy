@@ -1573,3 +1573,33 @@ and landing on the wrong one is worse than not moving.
 
 A conversation row is never sent hunting. Its text is the excerpt and the answer
 glued together, which is in no answer on the page.
+
+### Why four fixes changed nothing on the phone — 2026-08-26
+
+The reader sent the same picture four times. Two reasons, and neither was in the
+saving path after the second fix.
+
+**1. A note already written cannot be fixed by fixing the writer.** The line was
+saved as plain prose, and every later change touched only how *new* lines are
+saved. The stored note is the note. This was said but not acted on, which is the
+same as not saying it.
+
+`recoverMarkdown` in `pickMarkdown.ts` now mends the old ones. A kept line names
+its thread, the thread holds what Veda actually wrote, and that is markdown — so
+the words are found in the answer and the marks are read off around them. Only
+when the stored line has no marks of its own; a line kept today is left exactly
+as it was saved.
+
+It compares with **every space removed from both sides**. The stored line came
+from `range.toString()`, which puts nothing between two blocks — "noticed."
+and "Unconscious" are one word to it — while the source has a line break, a list
+marker and asterisks. Taking the whitespace out is what makes the two meet.
+
+**2. The app on the phone was probably not the app that was built.** This is a
+PWA with `registerType: 'prompt'`. A new build waits for the reader to accept an
+update; until they do, the phone keeps running the old bundle from its precache.
+Four deploys can therefore change nothing at all on the device.
+
+**The lesson for verifying.** "Built and pushed" is not "running on the reader's
+phone", and a test that builds its own HTML is not a test of what the renderer
+draws. Both failures were failures of verification, not of the fix.

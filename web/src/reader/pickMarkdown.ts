@@ -232,3 +232,116 @@ function withoutMarks(text: string): string {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+/**
+ * A kept line's markdown, recovered from the answer it was cut out of.
+ *
+ * ## Why this is needed at all
+ *
+ * Lines kept before the marks were saved are stored as plain prose. Nothing
+ * done to the saving path can reach them: the note in the database is the note,
+ * and the reader is not going to save every one of them again.
+ *
+ * But the answer is still there. A kept line names its thread, the thread holds
+ * what Veda actually wrote, and that is markdown. So the words can be found in
+ * it and the marks read off around them.
+ *
+ * ## Why it compares with the whitespace taken out
+ *
+ * The two strings disagree about whitespace in ways neither side is wrong
+ * about. The stored line came from `range.toString()`, which puts *nothing*
+ * between two blocks — "noticed.Unconscious" is one word to it. The source has
+ * a line break there, and a list marker, and asterisks. Removing every space
+ * from both sides, and every mark from the source, is what makes them meet.
+ *
+ * This is a repair, not the way the feature works. `markdownOfRange` is the way
+ * it works, and it does not guess.
+ */
+export function recoverMarkdown(plain: string, source: string): string | null {
+  const want = plain.replace(/\s+/g, '')
+  if (want.length < ENOUGH) return null
+
+  const { tight, at } = bones(source)
+  const start = tight.indexOf(want)
+  if (start < 0) return null
+
+  const from = at[start]
+  const to = at[start + want.length - 1]
+  if (from === undefined || to === undefined) return null
+
+  return tidy(source.slice(openingOfLine(source, from), to + 1))
+}
+
+/**
+ * The source with its marks and its spaces gone, and a way back to it.
+ *
+ * `at[i]` is where character `i` of `tight` sits in `source`, which is what
+ * turns a match into a slice.
+ */
+function bones(source: string): { tight: string; at: number[] } {
+  let tight = ''
+  const at: number[] = []
+  let i = 0
+  let fresh = true
+
+  while (i < source.length) {
+    const rest = source.slice(i)
+
+    if (fresh) {
+      // A list marker, a heading's hashes, a quote's angle: syntax at the head
+      // of a line, and none of it is in the words the reader picked.
+      const head = /^[^\S\n]*(?:[-*+]|\d+\.|>|#{1,6})[^\S\n]+/.exec(rest)
+      if (head) {
+        i += head[0].length
+        continue
+      }
+    }
+
+    const here = source[i]!
+    if (/\s/.test(here)) {
+      fresh = here === '\n' || fresh
+      i += 1
+      continue
+    }
+    fresh = false
+
+    // Emphasis, code and strikethrough marks, in runs of any length.
+    const mark = /^[*_`~]+/.exec(rest)
+    if (mark) {
+      i += mark[0].length
+      continue
+    }
+
+    // A link keeps its words and loses its address.
+    const link = /^\[([^\]]*)\]\([^)]*\)/.exec(rest)
+    if (link) {
+      const words = link[1] ?? ''
+      const opens = i + 1
+      for (let k = 0; k < words.length; k += 1) {
+        if (/\s/.test(words[k]!)) continue
+        tight += words[k]
+        at.push(opens + k)
+      }
+      i += link[0].length
+      continue
+    }
+
+    tight += here
+    at.push(i)
+    i += 1
+  }
+
+  return { tight, at }
+}
+
+/**
+ * Where the line holding an offset begins, past whatever marker starts it.
+ *
+ * A match lands on the first *word*, which is after the "1. " that makes the
+ * item an item. Taking the marker back in is what keeps the number.
+ */
+function openingOfLine(source: string, offset: number): number {
+  const head = source.lastIndexOf('\n', offset - 1) + 1
+  const between = source.slice(head, offset)
+  return /^[^\S\n]*(?:[-*+]|\d+\.|>|#{1,6})?[^\S\n]*[*_`~]*$/.test(between) ? head : offset
+}

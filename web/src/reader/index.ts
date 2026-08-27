@@ -225,3 +225,6 @@ export { AloudBar, RATES, nextRate } from './AloudBar.tsx'
 export { useReadAloud } from './useReadAloud.ts'
 export type { AloudControls } from './useReadAloud.ts'
 export type { Utterance } from './readAloud.ts'
+
+// Kept lines: the marks written back on, and the words found again.
+export { markdownOfRange, wordsIn, recoverMarkdown } from './pickMarkdown.ts'

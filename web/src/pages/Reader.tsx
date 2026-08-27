@@ -90,6 +90,7 @@ import {
   writeFocusMode,
   DefinePanel,
   StudyLamp,
+  recoverMarkdown,
   TutorMarks,
   elide,
   passageKindOf,
@@ -2453,6 +2454,29 @@ export default function Reader() {
   const noteRows: NoteRow[] = useMemo(() => {
     if (frame.status !== 'ready') return []
 
+    /*
+     * A kept line that was saved before its marks were, put back together.
+     *
+     * Those notes hold plain prose, and nothing done to the saving path can
+     * reach them — the note in the database is the note. But the answer they
+     * were cut out of is still in its thread, and that is markdown. So the
+     * words are found in it and the marks are read off around them.
+     *
+     * Only when the stored line has no marks of its own. A line kept today
+     * already carries them and must be left exactly as it was saved.
+     */
+    const mended = (row: { text: string; fromThread?: string }): string => {
+      if (!row.fromThread || /[*_`#>]|^\s*\d+\.\s/m.test(row.text)) return row.text
+      const thread = threads.find((one) => one.id === row.fromThread)
+      if (!thread) return row.text
+      for (const message of [...thread.messages].reverse()) {
+        if (message.role !== 'claude') continue
+        const found = recoverMarkdown(row.text, message.text)
+        if (found) return found
+      }
+      return row.text
+    }
+
     const threadRows = threads.map((thread) => {
       const spoke = [...thread.messages].reverse().find((message) => message.role === 'claude')
       return {
@@ -2472,7 +2496,7 @@ export default function Reader() {
         id: row.id,
         anchor: row.anchor,
         author: row.author,
-        text: row.text,
+        text: 'fromThread' in row ? mended(row) : row.text,
         chapter,
         chapterTitle: chapterTitle(frame.manifest, chapter) ?? 'Elsewhere',
         page: pageOfAnchor(parts),

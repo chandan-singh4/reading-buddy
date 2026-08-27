@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { markdownOfRange, wordsIn } from './pickMarkdown.ts'
+import { markdownOfRange, recoverMarkdown, wordsIn } from './pickMarkdown.ts'
 
 /** An answer on the page, drawn the way `markdown.tsx` draws one. */
 function answer(html: string): HTMLElement {
@@ -181,5 +181,52 @@ describe('finding a line kept before it had plain words to search by', () => {
   it('will not match on a scrap too short to mean anything', () => {
     const root = answer('<p data-md="paragraph">A symbol is a picture.</p>')
     expect(wordsIn(root, 'A **s**')).toBeNull()
+  })
+})
+
+describe('mending a line kept before its marks were', () => {
+  /*
+   * The reader's report, four times over, with the same picture each time. The
+   * note reads as one run of prose — "never consciously noticed.Unconscious →"
+   * — because that is what `range.toString()` gives: nothing at all between two
+   * blocks. No change to the saving path can reach a note already written.
+   *
+   * The answer it came out of is still in its thread, and that is markdown. So
+   * the words are found in it and the marks are read off around them.
+   */
+  const said = [
+    '1. **Experiences → Unconscious:** Everything you perceive gets dumped into the storehouse. Most of it you never consciously noticed.',
+    '2. **Unconscious → Perception/Life:** Later, that stored material *reaches back up*.',
+    '',
+    "**So it's not A or B. It's A ⇄ B.**",
+    '',
+    '- You are not the sole author of your life.',
+    '- You are the editor.',
+  ].join('\n')
+
+  it('puts the numbers, the bullets and the bold back', () => {
+    // Exactly what the old note holds: no marks, and no gap at the joins.
+    const flat =
+      'Experiences → Unconscious: Everything you perceive gets dumped into the storehouse. ' +
+      'Most of it you never consciously noticed.Unconscious → Perception/Life: Later, that ' +
+      "stored material reaches back up.So it's not A or B. It's A ⇄ B.You are not the sole " +
+      'author of your life.You are the editor.'
+
+    expect(recoverMarkdown(flat, said)).toBe(said)
+  })
+
+  it('keeps the marker on a single item, not just the words', () => {
+    const one = 'Unconscious → Perception/Life: Later, that stored material reaches back up.'
+    expect(recoverMarkdown(one, said)).toBe(
+      '2. **Unconscious → Perception/Life:** Later, that stored material *reaches back up*.',
+    )
+  })
+
+  it('leaves a line alone when it is not in the answer', () => {
+    expect(recoverMarkdown('Words from another conversation entirely.', said)).toBeNull()
+  })
+
+  it('will not mend from a scrap', () => {
+    expect(recoverMarkdown('You are', said)).toBeNull()
   })
 })
