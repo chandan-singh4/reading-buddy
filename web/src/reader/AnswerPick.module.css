@@ -117,3 +117,53 @@
   width: 1px;
   background: rgb(255 255 255 / 14%);
 }
+
+/* --- The glass ------------------------------------------------------------ */
+
+/*
+ * The magnifier over the finger, while a boundary is being dragged.
+ *
+ * A fingertip is about nine millimetres across; the text under it is about two.
+ * The one thing the reader needs to see while they place a boundary is the one
+ * thing their own hand is covering. See the note in `AnswerPick.tsx` for how
+ * the enlargement is done, and what it cannot do.
+ */
+.glass {
+  position: fixed;
+  z-index: 44;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 12px;
+  /* The lamp's own paper, so the enlarged words sit on the colour they came
+     from rather than on a bright hole punched in the conversation. */
+  background: #2a2419;
+  box-shadow: 0 14px 30px -10px rgb(0 0 0 / 65%);
+  pointer-events: none;
+}
+
+.lens {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.glassMark {
+  position: absolute;
+  background: #7c6fca;
+  opacity: 0.42;
+  mix-blend-mode: screen;
+  border-radius: 2px;
+}
+
+/* The exact point under the finger. Without it the glass says which words are
+   there but not which side of which letter the boundary has reached. */
+.crosshair {
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  width: 1px;
+  height: 70%;
+  background: #a99bee;
+  opacity: 0.8;
+}

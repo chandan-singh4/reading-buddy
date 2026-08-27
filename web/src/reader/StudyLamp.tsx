@@ -86,6 +86,7 @@ import { Markdown, whileWriting } from './markdown.tsx'
 import { AnswerPick } from './AnswerPick.tsx'
 import {
   describeSpan,
+  pivotFor,
   spanBetween,
   wordAtIn,
   type SelectionPivot,
@@ -611,6 +612,34 @@ export function StudyLamp({
       from = null
     }
 
+    /*
+     * The same finger, still down, now growing what it picked.
+     *
+     * A phone's own long press works this way and readers do it without
+     * thinking: hold until the word lights up, then keep sliding to take the
+     * rest of the sentence. Lifting and finding a three-pixel handle is the
+     * slow way round, and it is the only way this had until now.
+     *
+     * The pivot is the start of the word that was picked, so sliding forward
+     * takes more and sliding back past the start swaps the ends — the same
+     * rule `spanBetween` follows for the handles.
+     */
+    let sliding: { pointerId: number; pivot: SelectionPivot; root: HTMLElement } | null = null
+    let queued: { x: number; y: number } | null = null
+    let frame = 0
+
+    // One range rebuilt per frame, not one per pointer event. A finger reports
+    // faster than the screen redraws, and the work between two frames is
+    // thrown away unseen — it only ever made the drag feel as if it caught.
+    const flush = () => {
+      frame = 0
+      const point = queued
+      queued = null
+      if (!point || !sliding) return
+      const grown = spanBetween(sliding.pivot, point.x, point.y, sliding.root)
+      if (grown) setPicked(grown)
+    }
+
     const onDown = (event: PointerEvent) => {
       if (event.pointerType === 'mouse') return
       const answer = event.target instanceof Node ? answerAround(event.target) : null
@@ -623,26 +652,54 @@ export function StudyLamp({
         if (!found) return
         setPicked(found)
         setPainted(true)
+        sliding = { pointerId: event.pointerId, pivot: pivotFor(found, 'end'), root: answer }
       }, HOLD)
     }
 
     const onMove = (event: PointerEvent) => {
+      if (sliding && sliding.pointerId === event.pointerId) {
+        queued = { x: event.clientX, y: event.clientY }
+        if (frame === 0) frame = requestAnimationFrame(flush)
+        return
+      }
       if (!from) return
       if (Math.abs(event.clientX - from.x) > WANDER || Math.abs(event.clientY - from.y) > WANDER) {
         stop()
       }
     }
 
+    const onUp = () => {
+      sliding = null
+      stop()
+    }
+
+    /*
+     * While the finger is growing a selection it is not scrolling.
+     *
+     * `touch-action` cannot say this. The browser reads it when the finger
+     * lands, and at that moment nobody knows yet whether this is a long press
+     * or a scroll — and declaring the answers unscrollable would take away the
+     * ordinary swipe that moves the conversation. Refusing the moves as they
+     * arrive is the only way to change our minds part way through a gesture,
+     * and it needs a listener that is allowed to refuse them.
+     */
+    const onTouchMove = (event: TouchEvent) => {
+      if (sliding) event.preventDefault()
+    }
+
     root.addEventListener('pointerdown', onDown)
     root.addEventListener('pointermove', onMove)
-    root.addEventListener('pointerup', stop)
-    root.addEventListener('pointercancel', stop)
+    root.addEventListener('pointerup', onUp)
+    root.addEventListener('pointercancel', onUp)
+    root.addEventListener('touchmove', onTouchMove, { passive: false })
     return () => {
       stop()
+      if (frame !== 0) cancelAnimationFrame(frame)
       root.removeEventListener('pointerdown', onDown)
       root.removeEventListener('pointermove', onMove)
-      root.removeEventListener('pointerup', stop)
-      root.removeEventListener('pointercancel', stop)
+      root.removeEventListener('pointerup', onUp)
+      root.removeEventListener('pointercancel', onUp)
+      root.removeEventListener('touchmove', onTouchMove)
     }
   }, [onKeep, answerAround])
 
@@ -656,7 +713,18 @@ export function StudyLamp({
     if (!painted) return
     const put = (event: PointerEvent) => {
       const target = event.target
-      if (target instanceof Node && answerAround(target)) return
+      if (!(target instanceof Node)) return clearPick()
+      // Inside the answer, or on the app's own furniture over it.
+      //
+      // The second half is what this got wrong at first. `AnswerPick` draws its
+      // handles and its card into `document.body`, so neither is inside the
+      // answer — and touching a handle came through here and threw the whole
+      // selection away before the drag could start. It looked exactly like a
+      // handle that would not move, and it meant nothing bigger than one word
+      // could ever be picked, because the handles are the only way to grow it.
+      const element = target instanceof Element ? target : target.parentElement
+      if (element?.closest('[data-pick]')) return
+      if (answerAround(target)) return
       clearPick()
     }
     // The capture phase, so a tap lands here before it reaches whatever it was
@@ -930,6 +998,7 @@ export function StudyLamp({
         <AnswerPick
           selection={picked}
           painted={painted}
+          source={answerAround(picked.range.startContainer)}
           onExtend={stretch}
           onCopy={copyPick}
           onSave={keep}

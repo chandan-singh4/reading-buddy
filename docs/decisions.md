@@ -1438,3 +1438,36 @@ no space — "did.And that". A Range's text is the characters it covers, and the
 is no character between `</p>` and `<p>`. The book's highlights have always read
 this way. Changing it means building the words some way other than from the
 range, in code the book shares.
+
+### Dragging a pick, and the glass over the finger — fixed 2026-08-26
+
+The reader's report: "I cannot drag my selection, and I cannot select more than
+a word."
+
+**Cause.** The listener that puts a pick down when a finger lands outside the
+answer counted the app's own handles as "outside". `AnswerPick` draws them into
+`document.body`, so they are outside every answer. Touching a handle destroyed
+the selection before the drag began. One word was the most anybody could take,
+because the handles are the only way to grow a pick.
+
+**Fix.** Everything `AnswerPick` draws now carries `data-pick`, and the listener
+honours it. The mark is load-bearing, not decoration.
+
+**Also added:**
+
+1. **Slide without lifting.** After the long press, keep sliding and the pick
+   grows. That is how a phone's own long press behaves. Finding a three-pixel
+   handle was the only way before.
+2. **One range per frame.** A finger reports faster than the screen redraws.
+   Moves are coalesced to animation frames, in the handles and in the slide.
+3. **`touchmove` is refused while a pick grows.** `touch-action` cannot do this:
+   the browser reads it when the finger lands, and at that moment nobody knows
+   whether this is a long press or a scroll. Declaring the answers unscrollable
+   would take away the ordinary swipe.
+4. **A magnifier.** A fingertip is nine millimetres across and the text under it
+   is two. Chrome draws its magnifier in the compositor, which no web page can
+   reach, so this scales a `cloneNode` copy of the answer, shifts it so the
+   finger's point sits in the middle, and clips it. The wash is drawn again
+   inside from the same rectangles, so the reader sees the boundary move.
+
+   It is a still copy, not live pixels. Close, not identical.
