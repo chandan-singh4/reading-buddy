@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ReadingPosition } from '../storage/db.ts'
 import type { Anchor, BookId, ChapterIndex } from '../structure/index.ts'
-import { booksByRecency, finishedChapters, plan, titledSections } from './queue.ts'
+import { booksByRecency, finishedChapters, plan, readSections, titledSections } from './queue.ts'
 
 /*
  * The rules the reader stated, in order:
@@ -155,5 +155,68 @@ describe('the sections inside a finished chapter', () => {
 
   it('has nothing to offer for a chapter that is not in the book', () => {
     expect(titledSections(undefined)).toEqual([])
+  })
+})
+
+describe('the named parts of the chapter still being read', () => {
+  /*
+   * The case the reader found, in their own book. Man and His Symbols: PART 1
+   * has six named parts, and they were four parts into it. The chapter is not
+   * finished, so nothing about it was offered — the one chapter they were
+   * actually working through was the one chapter with nothing to show.
+   */
+  const partOne: ChapterIndex = {
+    chapter: 6,
+    title: 'PART 1 APPROACHING THE UNCONSCIOUS',
+    path: 'ch06' as ChapterIndex['path'],
+    sections: [
+      'The importance of dreams',
+      'Past and future in the unconscious',
+      'The function of dreams',
+      'The analysis of dreams',
+      'The problem of types',
+      'The role of symbols',
+    ].map((title, index) => ({
+      section: index + 1,
+      title,
+      path: `ch06-s0${index + 1}` as ChapterIndex['sections'][number]['path'],
+    })),
+  }
+
+  it('offers the parts finished before the one in hand', () => {
+    // Reading inside part 4. Parts 1 to 3 are done; part 4 is not.
+    const found = readSections([partOne], at('b1' as BookId, '[ch06-s04-p012]', '2026-08-27T10:00:00.000Z'))
+    expect(found.map((part) => part.title)).toEqual([
+      'The importance of dreams',
+      'Past and future in the unconscious',
+      'The function of dreams',
+    ])
+  })
+
+  it('does not offer the part being read', () => {
+    // Being on the last page of a part is not having finished it, and a
+    // summary bought halfway through goes stale within the hour.
+    const found = readSections([partOne], at('b1' as BookId, '[ch06-s01-p003]', '2026-08-27T10:00:00.000Z'))
+    expect(found).toEqual([])
+  })
+
+  it('stays quiet for a finished book, where the chapter already covers them', () => {
+    const found = readSections([partOne], at('b1' as BookId, '[ch06-s06-p001]', '2026-08-27T10:00:00.000Z', 100))
+    expect(found).toEqual([])
+  })
+
+  it('offers nothing for a book that has never been opened', () => {
+    expect(readSections([partOne], undefined)).toEqual([])
+  })
+
+  it('puts them in the plan, without waiting for the chapter to end', () => {
+    const jobs = plan(
+      [at('b1' as BookId, '[ch06-s04-p012]', '2026-08-27T10:00:00.000Z')],
+      () => [partOne],
+      new Set<string>(),
+    )
+    // The chapter itself is not offered: it is not finished.
+    expect(jobs.some((job) => job.section === undefined)).toBe(false)
+    expect(jobs.map((job) => job.section)).toEqual([1, 2, 3])
   })
 })

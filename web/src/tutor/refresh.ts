@@ -18,7 +18,7 @@
  */
 
 import { chapterPath, parseAnchor } from '../structure/anchor.ts'
-import { repository } from '../storage/repository.ts'
+import { repository } from '../storage/index.ts'
 import { digestStore } from '../storage/digests.ts'
 import { tutorStore } from '../storage/tutor.ts'
 import {

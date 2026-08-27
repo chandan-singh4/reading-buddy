@@ -125,9 +125,58 @@ export function plan(
         })
       }
     }
+
+    /*
+     * The named parts the reader has finished inside the chapter they are still
+     * reading.
+     *
+     * A chapter is not summarised until it is finished, and that is right: its
+     * recap has to cover the whole of it. A named part is not the same thing. A
+     * reader four parts into a seven-part chapter has genuinely finished those
+     * four, and the reader asked for parts to be treated as chapters in their
+     * own right. Without this, the one chapter they are actually working
+     * through is the one chapter that offers them nothing.
+     */
+    for (const part of readSections(chaptersOf(bookId), position)) {
+      if (alreadyDone.has(`${bookId}:${part.chapter}:${part.section}`)) continue
+      jobs.push({
+        bookId,
+        chapter: part.chapter,
+        section: part.section,
+        sectionTitle: part.title,
+        automatic: index === 0,
+      })
+    }
   })
 
   return jobs
+}
+
+/**
+ * The named parts finished inside the chapter the reader is still in.
+ *
+ * Strictly before the part holding the anchor, for the reason `finishedChapters`
+ * gives: being on the last page of a part is not the same as having finished
+ * it, and a summary bought halfway through goes stale within the hour.
+ *
+ * Empty for a finished chapter — those parts come through the loop above, and
+ * offering them twice would be two lines and two calls for one summary.
+ */
+export function readSections(
+  chapters: ChapterIndex[],
+  position?: ReadingPosition,
+): { chapter: number; section: number; title: string }[] {
+  if (!position) return []
+  const parts = tryParseAnchor(position.anchor)
+  if (!parts) return []
+  // At 100 percent the chapter itself is finished, so its parts are already
+  // offered above.
+  if (position.percent === 100) return []
+
+  const entry = chapters.find((row) => row.chapter === parts.chapter)
+  return titledSections(entry)
+    .filter((part) => part.section < parts.section)
+    .map((part) => ({ chapter: parts.chapter, section: part.section, title: part.title }))
 }
 
 /**

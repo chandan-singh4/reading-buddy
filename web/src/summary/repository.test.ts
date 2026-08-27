@@ -1,7 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from "vitest";
 
 /*
  * Every screen must read the repository the reader chose.
@@ -21,25 +21,33 @@ import { describe, expect, it } from 'vitest'
  * ignore. So this reads the imports instead.
  */
 
-const HERE = import.meta.dirname
-const SRC = join(HERE, '..')
+const HERE = import.meta.dirname;
+const SRC = join(HERE, "..");
 
 /** The one export that ignores the reader's choice, and where it lives. */
-const DEVICE_ONLY = "from '../storage/repository.ts'"
+const DEVICE_ONLY = "from '../storage/repository.ts'";
 
 function filesIn(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
-    .filter((entry) => !entry.name.includes('.test.'))
-    .map((entry) => join(dir, entry.name))
+    .filter((entry) => !entry.name.includes(".test."))
+    .map((entry) => join(dir, entry.name));
 }
 
-describe('the summary feature', () => {
-  it('reads the library the reader chose, not always the device', () => {
-    const offenders = [...filesIn(HERE), ...filesIn(join(SRC, 'pages'))]
-      .filter((path) => readFileSync(path, 'utf8').includes(`import { repository } ${DEVICE_ONLY}`))
-      .map((path) => path.slice(SRC.length + 1))
+describe("the summary feature", () => {
+  it("reads the library the reader chose, not always the device", () => {
+    const offenders = [
+      ...filesIn(HERE),
+      ...filesIn(join(SRC, "pages")),
+      ...filesIn(join(SRC, "tutor")),
+    ]
+      .filter((path) =>
+        readFileSync(path, "utf8").includes(
+          `import { repository } ${DEVICE_ONLY}`,
+        ),
+      )
+      .map((path) => path.slice(SRC.length + 1));
 
-    expect(offenders).toEqual([])
-  })
-})
+    expect(offenders).toEqual([]);
+  });
+});
