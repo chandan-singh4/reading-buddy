@@ -1,7 +1,7 @@
 import { TUTOR_URL } from '../reader/tutor.ts'
 import { accessToken } from '../storage/cloud/client.ts'
 import type { StoredAlert, StoredChapterSummary, StoredTutorThread } from '../storage/db.ts'
-import { repository } from '../storage/repository.ts'
+import { repository } from '../storage/index.ts'
 import { alertStore, conceptStore, summaryStore } from '../storage/summaries.ts'
 import { tutorStore } from '../storage/tutor.ts'
 import {

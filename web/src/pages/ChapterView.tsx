@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
 
 import { modelLabel } from '../reader/tutor.ts'
-import { repository } from '../storage/repository.ts'
+import { repository } from '../storage/index.ts'
 import type { BookId } from '../structure/index.ts'
 import { backLabel, backTo } from '../summary/backTo.ts'
 import { summaryData } from '../summary/dataSource.ts'

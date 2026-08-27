@@ -1,4 +1,4 @@
-import { repository } from '../storage/repository.ts'
+import { repository } from '../storage/index.ts'
 import { summaryStore } from '../storage/summaries.ts'
 import type { BookId } from '../structure/index.ts'
 import type { SummaryDataSource } from './dataSource.ts'
