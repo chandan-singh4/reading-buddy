@@ -1,15 +1,19 @@
 /*
- * The notification bell on the Home screen.
+ * The notification bell, in the top bar beside the app's name.
  *
  * Unlike the chapter page it leads to, this *does* follow the reader's theme.
- * It is app furniture standing on the front door beside the greeting, not part
+ * It is app furniture standing in the top bar, not part
  * of the paper object — a fixed cream panel here would look like a sticker on
  * whichever of the ten themes is on.
  */
 
 .wrap {
   position: relative;
-  justify-self: end;
+  /* Exactly the hamburger's width on the other side, so the brand between
+     them stays centred. */
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
 }
 
 .bell {
@@ -17,8 +21,8 @@
   align-items: center;
   justify-content: center;
   /* 44px, the smallest thing a thumb reliably hits. */
-  width: 44px;
-  height: 44px;
+  width: 100%;
+  height: 100%;
   padding: 0;
   background: none;
   border: none;

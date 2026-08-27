@@ -74,12 +74,6 @@
 }
 
 .menuButton,
-.topBarSpacer {
-  width: 2.75rem;
-  height: 2.75rem;
-  flex: none;
-}
-
 .menuButton {
   display: flex;
   align-items: center;

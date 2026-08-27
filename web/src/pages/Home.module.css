@@ -459,17 +459,3 @@
     font-size: 2rem;
   }
 }
-
-/*
- * The greeting and the bell, on one line.
- *
- * The bell is pushed to the far edge rather than sitting after the words: the
- * greeting is a sentence addressed to a person, and a control tucked against
- * the end of it reads as punctuation.
- */
-.greetingRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}

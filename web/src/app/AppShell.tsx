@@ -7,6 +7,7 @@ import { ScreenActiveProvider } from './screenActive.tsx'
 import { recallScroll, rememberScroll } from './scrollMemory.ts'
 import { useTabHistory } from './tabHistory.ts'
 import { PAGE_ORDER, useSwipeNav } from './useSwipeNav.ts'
+import { Bell } from '../summary/Bell.tsx'
 import styles from './AppShell.module.css'
 
 /** Whether a path is one of the four screens this shell holds. */
@@ -393,8 +394,16 @@ export default function AppShell() {
 
           <span className={styles.brand}>Reading Buddy</span>
 
-          {/* Balances the hamburger so the brand sits truly centred. */}
-          <span className={styles.topBarSpacer} aria-hidden="true" />
+          {/*
+           * The bell takes the place the spacer held: the same 44px on the
+           * far side of the brand as the hamburger is on this one, so the
+           * name still sits centred.
+           *
+           * It lives here rather than on Home on purpose. A waiting update is
+           * the one thing the reader must not miss, and the old place could
+           * only be reached by walking back to the front door first.
+           */}
+          <Bell />
         </header>
 
         <main className={styles.content} ref={contentRef}>
