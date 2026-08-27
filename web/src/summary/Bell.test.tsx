@@ -61,6 +61,21 @@ function show() {
   )
 }
 
+/** One waiting question, of the kind the sweep raises for a book not in hand. */
+function approval(book: string, chapterId: string, chapter: number, title: string) {
+  return {
+    id: `${book}:${chapterId}`,
+    kind: 'approval' as const,
+    bookId: book as never,
+    bookTitle: 'The Beginning of Infinity',
+    chapterId,
+    chapter,
+    chapterTitle: title,
+    at: `2026-08-27T1${chapter}:00:00.000Z`,
+    seen: false,
+  }
+}
+
 describe('the bell', () => {
   it('says there is nothing before anything has happened', async () => {
     show()
@@ -122,23 +137,51 @@ describe('the bell', () => {
 
   it('asks before spending anything on a book the reader is not in', async () => {
     // The reader's own rule. Only the book they opened last runs unasked.
-    await alertStore.save({
-      id: 'b2:ch02',
-      kind: 'approval',
-      bookId: 'b2' as never,
-      bookTitle: 'The Beginning of Infinity',
-      chapterId: 'ch02',
-      chapter: 2,
-      chapterTitle: 'Closer to Reality',
-      at: '2026-08-27T14:00:00.000Z',
-      seen: false,
-    })
+    await alertStore.save(approval('b2', 'ch02', 2, 'Closer to Reality'))
 
     show()
     ;(await screen.findByRole('button', { name: /Notifications/ })).click()
 
-    expect(await screen.findByRole('button', { name: 'Summarise this chapter' })).toBeTruthy()
+    // One waiting chapter needs no picker. A "pick which" step in front of a
+    // single choice is a step for nothing.
+    expect(await screen.findByRole('button', { name: 'Summarise it' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Pick chapters' })).toBeNull()
     // Nothing was spent by merely showing it.
     expect(screen.queryByRole('link', { name: 'Read the summary' })).toBeNull()
+  })
+
+  it('asks once for a book, not once for every chapter of it', async () => {
+    /*
+     * The reason this grouping exists. Three finished chapters used to be three
+     * near-identical rows and three separate yeses.
+     */
+    await alertStore.save(approval('b2', 'ch02', 2, 'Closer to Reality'))
+    await alertStore.save(approval('b2', 'ch04', 4, 'Creation'))
+    await alertStore.save(approval('b2', 'ch05', 5, 'The Reality of Abstractions'))
+
+    show()
+    ;(await screen.findByRole('button', { name: /Notifications/ })).click()
+
+    expect(await screen.findByText('The Beginning of Infinity')).toBeTruthy()
+    expect(await screen.findByText(/3 finished chapters/)).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Summarise the book' })).toBeTruthy()
+  })
+
+  it('opens the chapters of a book, in reading order', async () => {
+    await alertStore.save(approval('b2', 'ch05', 5, 'The Reality of Abstractions'))
+    await alertStore.save(approval('b2', 'ch02', 2, 'Closer to Reality'))
+
+    show()
+    ;(await screen.findByRole('button', { name: /Notifications/ })).click()
+    ;(await screen.findByRole('button', { name: 'Pick chapters' })).click()
+
+    const rows = await screen.findAllByRole('button', { name: 'Summarise' })
+    expect(rows).toHaveLength(2)
+    // Chapter 2 was saved second and must still be listed first.
+    expect(screen.getByText('2 · Closer to Reality')).toBeTruthy()
+    const names = screen.getAllByText(/· /).map((node) => node.textContent)
+    expect(names.indexOf('2 · Closer to Reality')).toBeLessThan(
+      names.indexOf('5 · The Reality of Abstractions'),
+    )
   })
 })

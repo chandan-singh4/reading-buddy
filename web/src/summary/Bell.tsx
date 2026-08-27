@@ -3,7 +3,9 @@ import { Link } from 'react-router'
 
 import { applyUpdate, onUpdateReady } from '../app/updates.ts'
 import type { StoredAlert } from '../storage/db.ts'
+import type { BookId } from '../structure/index.ts'
 import { alertStore } from '../storage/summaries.ts'
+import { groupApprovals, readyAlerts, type BookGroup } from './bellGroups.ts'
 import { approve } from './engine.ts'
 import styles from './bell.module.css'
 
@@ -13,8 +15,11 @@ import styles from './bell.module.css'
  * Two things arrive here, and they are opposites:
  *
  * - **A summary is ready.** News. Tapping it opens the chapter.
- * - **A book is waiting to be asked about.** A question. The reader says yes,
- *   and only then is a call paid for.
+ * - **A book is waiting to be asked about.** A question, one line per *book*.
+ *   Opening it lists the finished chapters that have no summary yet. The reader
+ *   can take the whole book or pick chapters, and only then is a call paid for.
+ *   Unread chapters are never offered: a recap of a chapter you have not
+ *   reached is a spoiler, and this is a reading app.
  *
  * The second is the reader's own rule. The book they opened last summarises
  * itself; everything else queues here. Without that, a shelf of forty half-read
@@ -38,6 +43,9 @@ export function Bell() {
   const [alerts, setAlerts] = useState<StoredAlert[]>([])
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<string | undefined>()
+  /* Which book's chapter list is open. One at a time: the panel is 320px on a
+     phone, and two expanded books would push the rest off the bottom. */
+  const [picking, setPicking] = useState<BookId | undefined>()
   const [updateWaiting, setUpdateWaiting] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -90,6 +98,27 @@ export function Bell() {
     }
   }
 
+  /**
+   * Every waiting chapter of one book, in reading order.
+   *
+   * One at a time rather than all at once. Each chapter is a paid call, and a
+   * failure halfway through should leave the chapters before it done and the
+   * ones after it still on the list — which is what happens, because a finished
+   * chapter's line turns into a summary and stops being a question.
+   */
+  async function onApproveBook(group: BookGroup) {
+    for (const [index, alert] of group.chapters.entries()) {
+      setBusy(`${group.bookId}:${index + 1}/${group.chapters.length}`)
+      try {
+        await approve(alert.bookId, alert.chapter)
+      } catch {
+        // One chapter failing must not abandon the rest of the book.
+      }
+    }
+    setBusy(undefined)
+    await refresh()
+  }
+
   return (
     <div className={styles.wrap}>
       <button
@@ -131,33 +160,86 @@ export function Bell() {
             </p>
           ) : alerts.length === 0 ? null : (
             <ul className={styles.list}>
-              {alerts.map((alert) => (
+              {readyAlerts(alerts).map((alert) => (
                 <li key={alert.id} className={styles.item}>
                   <div className={styles.book}>{alert.bookTitle}</div>
                   <div className={styles.chapter}>
                     Chapter {alert.chapter} · {alert.chapterTitle}
                   </div>
-
-                  {alert.kind === 'ready' ? (
-                    <Link
-                      className={styles.action}
-                      to={`/book/${alert.bookId}/chapters?chapter=${alert.chapter}&from=${encodeURIComponent('/')}`}
-                      onClick={() => setOpen(false)}
-                    >
-                      Read the summary
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.approve}
-                      disabled={busy === alert.id}
-                      onClick={() => void onApprove(alert)}
-                    >
-                      {busy === alert.id ? 'Summarising…' : 'Summarise this chapter'}
-                    </button>
-                  )}
+                  <Link
+                    className={styles.action}
+                    to={`/book/${alert.bookId}/chapters?chapter=${alert.chapter}&from=${encodeURIComponent('/')}`}
+                    onClick={() => setOpen(false)}
+                  >
+                    Read the summary
+                  </Link>
                 </li>
               ))}
+
+              {groupApprovals(alerts).map((group) => {
+                const many = group.chapters.length > 1
+                const running = busy?.startsWith(`${group.bookId}:`) ?? false
+                return (
+                  <li key={group.bookId} className={styles.item}>
+                    <div className={styles.book}>{group.bookTitle}</div>
+                    <div className={styles.chapter}>
+                      {group.chapters.length} finished{' '}
+                      {many ? 'chapters' : 'chapter'} with no summary yet
+                    </div>
+
+                    <div className={styles.choices}>
+                      <button
+                        type="button"
+                        className={styles.approve}
+                        disabled={busy !== undefined}
+                        onClick={() => void onApproveBook(group)}
+                      >
+                        {running
+                          ? `Summarising ${busy?.split(':')[1]}…`
+                          : many
+                            ? 'Summarise the book'
+                            : 'Summarise it'}
+                      </button>
+
+                      {/* Only offered when there is a choice to make. One
+                          chapter behind a "pick which" step is a step for
+                          nothing. */}
+                      {many && (
+                        <button
+                          type="button"
+                          className={styles.pick}
+                          aria-expanded={picking === group.bookId}
+                          onClick={() =>
+                            setPicking(picking === group.bookId ? undefined : group.bookId)
+                          }
+                        >
+                          {picking === group.bookId ? 'Hide chapters' : 'Pick chapters'}
+                        </button>
+                      )}
+                    </div>
+
+                    {picking === group.bookId && (
+                      <ul className={styles.chapterList}>
+                        {group.chapters.map((alert) => (
+                          <li key={alert.id} className={styles.chapterRow}>
+                            <span className={styles.chapterName}>
+                              {alert.chapter} · {alert.chapterTitle}
+                            </span>
+                            <button
+                              type="button"
+                              className={styles.pick}
+                              disabled={busy !== undefined}
+                              onClick={() => void onApprove(alert)}
+                            >
+                              {busy === alert.id ? 'Summarising…' : 'Summarise'}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
