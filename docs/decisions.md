@@ -1614,16 +1614,41 @@ closed, so the renderer drew the marks themselves.
 The slice now takes the marks immediately after the last word, and only those:
 never across a line break, because the marks that open the following block
 belong to it.
+## Settled 2026-08-27 — the chapter summary page
 
-## Settled 2026-08-27 — the two summary views
+One read-only page. It shows a book by chapter. Each chapter has two sections:
 
-The Commonplace Book and the Chapter View. Two read-only pages. They show the
-same distilled notes with two different indexes. The Commonplace Book files a
-note by concept, across all books. The Chapter View files it by chapter, in one
-book. Built from `design-inspiration/build-prompt-summary-views.md` and its two
-reference HTML files.
+1. **The chapter, in plain words** — what the **Librarian** model wrote about
+   the chapter, and the tags it gave the chapter.
+2. **What we worked through** — what the **Scribe** model wrote about the
+   reader's questions to Veda about that chapter.
 
-The engine that makes the data is not built. See "the stubs" below.
+The two models are not built. See "the stubs" below.
+
+### The first build was larger, and the reader cut it back
+
+The build prompt asked for two pages: this one, and a **Commonplace Book** that
+filed each distilled claim under a concept heading. Both were built. The reader
+then removed the second one.
+
+**Why.** The concept index needed a lot of machinery to earn its place: a
+controlled vocabulary of concept names, a status for each name, a candidate
+state for a name the passes had not confirmed, a per-claim passage anchor, and
+two-way crossings between the pages. All of it existed to serve one index.
+
+The reader wanted something simpler: a chapter summary, and a summary of the
+conversation. Two models, two sections, nothing else. So the Commonplace Book,
+the concept type, the claim items, the anchors and the candidate state are all
+gone. The tags stayed, because the Librarian gives them anyway.
+
+It is all in git. `web/src/pages/Commonplace.tsx` and its test were deleted, not
+rewritten.
+
+### The tags are chips, and they are not links
+
+A tag says what the chapter is about. There is no page behind it to open. A
+tappable chip would promise one. So the tags render as a plain list, styled in
+the same violet the rest of the page uses.
 
 ### The fonts are self-hosted, not loaded from Google
 
@@ -1647,64 +1672,46 @@ One thing this fixed by accident: `Home.module.css` named Playfair for years
 without the font being in the bundle. That heading fell back to Merriweather.
 It now shows Playfair.
 
-### These two pages ignore the reader's theme
+### This page ignores the reader's theme
 
 Every other screen takes its colour from `theme.css` and follows one of the ten
-themes. These two do not. They use one fixed palette: paper `#F4EEDF`, page
+themes. This one does not. It uses one fixed palette: paper `#F4EEDF`, page
 `#EAE2CE`, ink `#302C24`, violet `#5D4F9E`, bronze `#A9814B`.
 
-The reason: the design is a paper object. It has a spine crease, a thumb index,
-a bronze manicule and a note in Veda's hand. Mapped onto `--color-bg` the page
-stops being that object and becomes one more screen.
+The reason: the design is a paper object. It has a spine crease and a thumb
+index. Mapped onto `--color-bg` the page stops being that object and becomes one
+more screen.
 
 **The known cost.** A reader in Dark who opens this at night gets a bright page.
 The reader chose this with the cost stated. If it turns out to be wrong, the fix
 is a dark set of these tokens only. Every rule already reads them through
 `var()`.
 
-### The pages sit outside `AppShell`
+### The page sits outside `AppShell`
 
-`/commonplace` and `/book/:bookId/chapters` are full-bleed, like Reader and
-BookInfo. The shell's top bar and drawer are in the app's own colours. Wrapped
-around a page that pretends to be paper, they undo the thing the design does.
-Each page carries its own way back instead.
+`/book/:bookId/chapters` is full-bleed, like Reader and BookInfo. The shell's
+top bar and drawer are in the app's own colours. Wrapped around a page that
+pretends to be paper, they undo the thing the design does. The page carries its
+own way back instead.
 
-`/commonplace` is not under a book. The point of that lens is that it gathers
-passages from every book. A book-scoped route would fight it.
+### The way in is one link on Book Details, not a drawer entry
 
-### The way in is one section on Book Details, not a drawer entry
+The page shows sample content. Neither model is built. A navigation entry would
+advertise a feature whose data is invented.
 
-Both pages show sample content. The engine is not built. A navigation entry
-would advertise a feature whose data is invented.
+So `BookInfo.tsx` has a section, "Chapter summaries", with one link. It is built
+like the "Coming back to it" section above it, so it looks native.
 
-So `BookInfo.tsx` has a section, "What we worked through", with two links. It is
-built like the "Coming back to it" section above it, so it looks native.
+### What a model wrote is parsed, never set as HTML
 
-### A candidate concept is held out of the Commonplace Book
+Both summaries carry a little inline markup: `<em>`. `summary/claimNodes.ts`
+turns that string into a list of pieces. The page renders real elements from
+them.
 
-An item whose concept has status `candidate` shows in the Chapter View with the
-dashed amber chip and the words "awaiting Librarian". It appears under no
-heading in the Commonplace Book.
-
-The reason: a candidate has no confirmed heading to live under. The Q&A pass met
-a name that is not on the running list. It refused to invent a node for it.
-
-The chip for a candidate is **not** a link. A link would promise a page that
-does not exist.
-
-This rule is applied in the data source, not in the view. Every future source
-must then do the same thing to work.
-
-### A claim is parsed, never set as HTML
-
-A claim carries a little inline markup: `<em>`, and `<a class="link">` for a
-concept named inside a sentence. `summary/claimNodes.ts` turns that string into
-a list of pieces. The views render real elements from them.
-
-`dangerouslySetInnerHTML` would be shorter. It is wrong here. Today a claim is
-hand-written and safe. Tomorrow a claim is what a model wrote about what a
-reader pasted into a book. A model asked for `<em>` will sometimes give more
-than `<em>`. By then the hole is in shipped code that nobody looks at.
+`dangerouslySetInnerHTML` would be shorter. It is wrong here. Today the text is
+hand-written and safe. Tomorrow it is what a model wrote about what a reader
+pasted into a book. A model asked for `<em>` will sometimes give more than
+`<em>`. By then the hole is in shipped code that nobody looks at.
 
 Two tags are understood. Everything else is text. A `<script>` renders as the
 characters `<script>`.
@@ -1714,81 +1721,44 @@ characters `<script>`.
 `summary/fixture.ts` gives its sample chapters for **every** book it is asked
 about, not only for *Memories, Dreams, Reflections*.
 
-This is a deliberate lie and it is marked as one in the file. The Chapter View
-is reached from a button on a book's own details page. A reader opens it on the
+This is a deliberate lie and it is marked as one in the file. The page is
+reached from a button on a book's own details page. A reader opens it on the
 book in front of them. Keyed strictly by title, the sample content would only
-appear for a book nobody owns. The page would be blank exactly when someone
-went to look at it. That defeats the reason for shipping the view early.
+appear for a book nobody owns. The page would be blank exactly when someone went
+to look at it. That defeats the reason for shipping the page early.
 
 A real data source keys by book, and this goes away with it. The page prints the
 reader's **own** book title above the sample chapter, so nothing claims to be
 Jung's book.
 
-### The Chapter View opens on the first chapter that has something in it
+### The page opens on the first chapter that has something in it
 
-Not on chapter 1. Most of a book is undistilled for most of its life. Opening on
+Not on chapter 1. Most of a book has no summary for most of its life. Opening on
 chapter 1 shows an empty page and reads as a feature that does not work.
 
-`ChapterListEntry.distilled` says which chapters have been through the passes.
-The rail still lists every chapter, done or not — a reader needs to see the
-whole book, not only the finished parts.
+`ChapterListEntry.distilled` says which chapters a model has been through. The
+rail still lists every chapter, done or not — a reader needs to see the whole
+book, not only the finished parts.
 
-### The stubs, and where the engine joins
+### An empty second section is normal, not a gap
+
+A reader can finish a chapter and ask nothing. The page then says so in its own
+italic ink. It does not treat silence as missing data.
+
+### The stubs, and where the two models join
 
 `summary/dataSource.ts` holds the one seam. It is an interface with a swap
 function. The fixture is the only implementation today.
 
-Not built, and marked `TODO: Scribe/Librarian engine`:
+Not built, and marked `TODO: the Librarian and the Scribe`:
 
-1. The **chapter pass** — reads one chapter, gives the plain-language recap and
-   the concepts it extracts. It runs first.
-2. The **concept-list store** — the running controlled vocabulary. The passes
-   read it and add to it. It is carried forward, so chapter 9 reuses chapter
-   4's canonical names.
-3. The **Q&A pass** — runs after the chapter pass, so the list is current. It
-   flags an off-list concept as a candidate.
-4. **Model routing** — best available model through OpenRouter, the chapter-end
-   trigger, the storage writes, and the Obsidian export.
-5. The **approval flow** — promoting a candidate, or merging it.
+1. The **Librarian** — reads one chapter and gives the plain-language summary
+   and the tags.
+2. The **Scribe** — reads the reader's conversation with Veda about that
+   chapter and gives the summary of it.
+3. **When they run** — at the end of a chapter, and after a conversation.
+4. **Where the output is kept** — the storage writes, and the Obsidian export.
+5. **Model routing** — best available model through OpenRouter, or the existing
+   `api/` endpoint.
 
-### One thing the two reference files disagree about
-
-The annex-dream passage is worded differently in each reference. The Commonplace
-Book's version is longer and has an inline concept link. The Chapter View's
-version is shorter.
-
-Both are in the fixture, as two items. The instruction was to match the
-references exactly, and picking one would have broken one of them. If the engine
-gives one item per passage, delete one of the two. Nothing depends on there
-being two.
-
-### The Commonplace Book has two scopes, set by the door — 2026-08-27
-
-The first build made the Commonplace Book library-wide, as the build prompt
-says. The reader then asked the right question: if the link is in Book Details,
-under a section for that book's Q&A, why does it show every book?
-
-The placement and the scope disagreed. One had to move.
-
-**What we did.** The page now reads `?book=` from the URL.
-
-- **With a book** it shows that book's passages only. The eyebrow names the
-  book. The count says "from this book". The rail lists only headings that hold
-  something, because a vocabulary of empty names is noise inside one book.
-- **Without a book** it is the whole shelf, as before. A heading can hold a
-  memoir and a neuroscience book together.
-
-The link on Book Details sets `book=`. The concept chip in the Chapter View
-carries it too: a reader thinking about one book stays inside it. Widening to
-the shelf on a tap is a change of subject they did not ask for.
-
-**Why keep both.** Gathering across books is the only thing this lens does that
-the Chapter View cannot. Scoped to one book, "by idea" and "by chapter" are two
-orderings of one short list. That is still useful, and it is what the reader
-wanted in Book Details. The library-wide door has no home in the UI yet. It
-belongs in the navigation drawer, and it can go there when the data is real.
-
-**The default heading differs by scope.** Unscoped, the page opens on the
-reference design's own heading. Scoped, it opens on the first heading this book
-has anything under. `openingConcept` is an idea out of Jung; defaulting to it
-inside somebody else's book would open on an empty page.
+The reader will supply both prompts. Nothing should be built until they land.

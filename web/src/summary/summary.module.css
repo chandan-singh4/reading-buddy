@@ -1,20 +1,17 @@
 /*
- * The two summary views, in one stylesheet.
+ * The chapter summary page.
  *
- * Ported value for value from `design-inspiration/commonplace-book.html` and
- * `chapter-view.html`. Where the two references share a rule — the bound book,
- * the rail, the page, the eyebrow, the flourish — it is written once here and
- * both pages use it. Nothing has been restyled or "improved"; if a number
- * looks arbitrary it is because the design says so.
+ * Ported value for value from `design-inspiration/chapter-view.html`. Nothing
+ * has been restyled or "improved"; if a number looks arbitrary it is because
+ * the design says so.
  *
- * ## These pages do not follow the app's theme, on purpose
+ * ## This page does not follow the app's theme, on purpose
  *
  * Everywhere else in Reading Buddy, colour comes from `theme.css` and follows
- * whichever of the ten themes the reader chose. Not here. A commonplace book
- * is a paper object, and the whole design — the spine crease, the thumb index,
- * the bronze manicule, the violet in Veda's hand — is one fixed palette
- * pretending to be a physical page. Mapped onto `--color-bg` and friends it
- * stops being that object and becomes another screen.
+ * whichever of the ten themes the reader chose. Not here. The design is a
+ * paper object — the spine crease, the thumb index, the bronze eyebrow — one
+ * fixed palette pretending to be a physical page. Mapped onto `--color-bg` and
+ * friends it stops being that object and becomes another screen.
  *
  * The cost is real and known: a reader in Dark who opens this at night gets a
  * bright page. That was a deliberate call, not an oversight. If it turns out
@@ -181,145 +178,6 @@
   overflow: visible;
 }
 
-/* ---- the Commonplace Book ------------------------------------------------ */
-
-.concept {
-  font-family: 'Playfair Display', serif;
-  font-weight: 600;
-  font-size: 38px;
-  line-height: 1.12;
-  color: var(--ink);
-  letter-spacing: -0.01em;
-  margin: 0;
-}
-
-.count {
-  font-style: italic;
-  font-size: 16px;
-  color: var(--ink-soft);
-  margin: 0 0 34px;
-}
-
-.count b {
-  font-style: normal;
-  font-weight: 500;
-  color: var(--veda);
-}
-
-.entry {
-  position: relative;
-  padding: 0 0 30px 40px;
-  margin-bottom: 30px;
-  border-bottom: 1px solid var(--rule-soft);
-}
-
-.entry:last-of-type {
-  border-bottom: none;
-}
-
-/* The manicule — the pointing hand a commonplace-keeper drew beside a passage
-   worth coming back to. `aria-hidden` in the markup: it is a mark, not a word. */
-.manicule {
-  position: absolute;
-  left: 0;
-  top: 2px;
-  font-size: 22px;
-  color: var(--bronze);
-  line-height: 1;
-  user-select: none;
-}
-
-.claim {
-  font-size: 20px;
-  line-height: 1.62;
-  color: var(--ink);
-  margin: 0;
-}
-
-.claim em {
-  font-style: italic;
-}
-
-.claimLink {
-  color: var(--veda);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(93, 79, 158, 0.35);
-  padding-bottom: 1px;
-  font: inherit;
-  background: none;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  cursor: pointer;
-}
-
-/* Provenance: which book this passage came out of. */
-.prov {
-  margin-top: 12px;
-  font-size: 14.5px;
-  font-style: italic;
-  color: var(--ink-soft);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.provTitle {
-  font-style: normal;
-  color: var(--ink);
-}
-
-.provDot {
-  color: var(--ink-faint);
-}
-
-.provDomain {
-  font-style: normal;
-  font-size: 11.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--bronze);
-  border: 1px solid rgba(169, 129, 75, 0.4);
-  border-radius: 20px;
-  padding: 2px 9px;
-}
-
-/* Veda's marginal hand. */
-.veda {
-  margin-top: 34px;
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.vedaRule {
-  flex: none;
-  width: 2px;
-  align-self: stretch;
-  background: var(--veda-soft);
-  opacity: 0.5;
-  border-radius: 2px;
-}
-
-.vedaNote {
-  font-family: 'Caveat', cursive;
-  font-size: 22px;
-  line-height: 1.35;
-  color: var(--veda);
-  margin: 0;
-}
-
-.vedaWho {
-  display: block;
-  font-family: 'EB Garamond', serif;
-  font-style: italic;
-  font-size: 13px;
-  color: var(--veda-soft);
-  margin-top: 4px;
-  letter-spacing: 0.02em;
-}
-
 /* ---- the Chapter View ---------------------------------------------------- */
 
 .chapterNo {
@@ -354,7 +212,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
+  /* Collapses with the flourish's own 30px above the first label, so only the
+     gap *between* the two sections is 34px. */
+  margin: 34px 0 16px;
 }
 
 .secLabel::after {
@@ -370,119 +230,32 @@
   color: var(--ink);
   padding-left: 16px;
   border-left: 2px solid var(--veda-soft);
-  margin: 0 0 40px;
-}
-
-.recapSig {
-  display: block;
-  font-style: italic;
-  font-size: 14px;
-  color: var(--veda-soft);
-  margin-top: 10px;
-  letter-spacing: 0.02em;
-}
-
-.item {
-  padding: 0 0 26px;
-  margin-bottom: 26px;
-  border-bottom: 1px solid var(--rule-soft);
-}
-
-.item:last-of-type {
-  border-bottom: none;
-  margin-bottom: 0;
-}
-
-.itemClaim {
-  font-size: 19px;
-  line-height: 1.6;
-  color: var(--ink);
   margin: 0;
 }
 
-.itemClaim em {
-  font-style: italic;
-}
-
-.foot {
-  margin-top: 14px;
+/*
+ * The tags the Librarian gave the chapter.
+ *
+ * A list, not a row of buttons: a tag says what the chapter is about, and
+ * there is no page behind it to open. Styled in the violet the concept layer
+ * uses everywhere else, so the two models' output reads as one system.
+ */
+.tags {
+  list-style: none;
+  margin: 14px 0 0 18px;
+  padding: 0;
   display: flex;
-  align-items: center;
-  gap: 14px;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
-/* The passage anchor — where in the chapter this came from, in words. */
-.anchor {
+.tag {
   font-size: 13.5px;
-  font-style: italic;
-  color: var(--ink-faint);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.anchor::before {
-  content: '¶';
-  font-style: normal;
-  color: var(--bronze);
-}
-
-/* "filed under <concept>" — the tap that crosses to the other lens. */
-.chip {
-  font-family: inherit;
-  font-size: 14px;
   color: var(--veda);
   background: rgba(93, 79, 158, 0.09);
   border: 1px solid rgba(93, 79, 158, 0.28);
   border-radius: 20px;
   padding: 3px 12px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
-.chip::before {
-  content: 'filed under';
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--veda-soft);
-}
-
-.chip:hover {
-  background: rgba(93, 79, 158, 0.15);
-}
-
-/*
- * A candidate concept: one the Q&A pass met that is not on the running list.
- * Dashed and amber because it is a proposal, not a heading — and not a link,
- * because there is nowhere for it to lead until the Librarian approves it.
- */
-.chip.pending {
-  color: var(--amber);
-  background: rgba(176, 123, 46, 0.07);
-  border: 1px dashed rgba(176, 123, 46, 0.5);
-  cursor: default;
-}
-
-.chip.pending::before {
-  content: 'candidate';
-  color: var(--amber);
-  opacity: 0.8;
-}
-
-.chip.pending:hover {
-  background: rgba(176, 123, 46, 0.07);
-}
-
-.pendingHint {
-  font-size: 13px;
-  font-style: italic;
-  color: var(--amber);
-  opacity: 0.85;
 }
 
 /* ---- when there is nothing yet ------------------------------------------- */
@@ -572,21 +345,11 @@
     padding: 28px 22px 34px;
   }
 
-  .concept,
   .chapterNo {
     font-size: 29px;
   }
 
-  .claim {
-    font-size: 18px;
-  }
-
-  .entry {
-    padding-left: 32px;
-  }
-
-  .recap,
-  .itemClaim {
+  .recap {
     font-size: 17px;
   }
 }

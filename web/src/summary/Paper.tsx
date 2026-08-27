@@ -5,12 +5,8 @@ import { claimNodes } from './claimNodes.ts'
 import styles from './summary.module.css'
 
 /**
- * The furniture both summary views share: the bound page, the thumb index,
- * the hand-drawn rule under the heading, and the claim renderer.
- *
- * Kept here rather than duplicated in each page because the two views are one
- * object seen twice — if the paper ever changes, it must change in both at
- * once or the illusion that they are two lenses on one book breaks.
+ * The furniture the chapter page is built from: the bound page, the thumb
+ * index, the hand-drawn rule under the heading, and the text renderer.
  */
 
 /**
@@ -38,13 +34,13 @@ export function Flourish({ wide = false }: { wide?: boolean }) {
 export interface RailItem {
   /** What the tab says. */
   label: string
-  /** What identifies it to the page — a concept name, or a chapter number. */
+  /** What identifies it to the page — the chapter number, as a string. */
   key: string
 }
 
 /**
- * The thumb index down the left edge — the headings of a commonplace book, or
- * the chapters of one book. Sideways-scrolling strip under 640px.
+ * The thumb index down the left edge. Becomes a sideways-scrolling strip under
+ * 640px, which is where a phone reads it.
  */
 export function Rail({
   label,
@@ -85,40 +81,17 @@ export function Rail({
 }
 
 /**
- * A claim, with its inline emphasis and its inline concept links rendered as
- * real elements. See `claimNodes.ts` for why this is parsed rather than set as
- * HTML.
+ * A model's paragraph, with its `<em>` rendered as emphasis.
  *
- * `onLink` is optional. Where it is missing — inside the Commonplace Book,
- * whose own heading a link might name — the concept still reads as a concept
- * but does nothing, rather than reloading the page you are already on.
+ * Parsed, never set as HTML — see `claimNodes.ts` for why that matters when
+ * the text is written by a model rather than by us.
  */
-export function Claim({
-  claim,
-  className,
-  onLink,
-}: {
-  claim: string
-  className: string
-  onLink?: (concept: string) => void
-}) {
+export function RichText({ text, className }: { text: string; className: string }) {
   return (
     <p className={className}>
-      {claimNodes(claim).map((node, index) => {
-        if (node.kind === 'text') return <span key={index}>{node.text}</span>
-        if (node.kind === 'em') return <em key={index}>{node.text}</em>
-        if (!onLink) return <span key={index}>{node.text}</span>
-        return (
-          <button
-            key={index}
-            type="button"
-            className={styles.claimLink}
-            onClick={() => onLink(node.text)}
-          >
-            {node.text}
-          </button>
-        )
-      })}
+      {claimNodes(text).map((node, index) =>
+        node.kind === 'em' ? <em key={index}>{node.text}</em> : <span key={index}>{node.text}</span>,
+      )}
     </p>
   )
 }

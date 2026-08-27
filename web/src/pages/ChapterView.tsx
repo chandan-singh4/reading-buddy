@@ -1,24 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router'
+import { useLocation, useParams, useSearchParams } from 'react-router'
 
 import { repository } from '../storage/repository.ts'
 import type { BookId } from '../structure/index.ts'
-import { backLabel, backTo, fromParam } from '../summary/backTo.ts'
-import { claimNodes } from '../summary/claimNodes.ts'
+import { backLabel, backTo } from '../summary/backTo.ts'
 import { summaryData } from '../summary/dataSource.ts'
-import { Claim, Flourish, Paper, Rail, type RailItem } from '../summary/Paper.tsx'
+import { Flourish, Paper, Rail, RichText, type RailItem } from '../summary/Paper.tsx'
 import styles from '../summary/summary.module.css'
-import type { ChapterListEntry, ChapterSummary, DistilledItem } from '../summary/types.ts'
+import type { ChapterListEntry, ChapterSummary } from '../summary/types.ts'
 
 /**
- * The Chapter View — the same passages as the Commonplace Book, filed by where
- * the reader met them instead of by what they are about.
+ * One chapter, in two sections.
  *
- * A chapter's recap sits on top, in plain words, and the distilled items follow
- * it, each footnoted with the concept it links to. Tapping that concept crosses
- * to the other lens.
+ * 1. **The chapter, in plain words** — the Librarian's summary, with the tags
+ *    it gave for the chapter underneath.
+ * 2. **What we worked through** — the Scribe's summary of the reader's
+ *    conversation with Veda about this chapter.
  *
- * Read-only. Nothing here approves a candidate or runs a pass.
+ * Read-only. Nothing here runs a model or edits what one wrote.
  */
 export default function ChapterView() {
   const { bookId } = useParams<{ bookId: string }>()
@@ -27,10 +26,9 @@ export default function ChapterView() {
   const location = useLocation()
 
   /*
-   * The summary source is keyed by the book's *title*, not by its id: a
-   * commonplace book gathers across shelves, and the same book imported twice
-   * is one book to a reader. So the title is looked up once, here, and every
-   * query below goes through it.
+   * The summary source is keyed by the book's *title*, not by its id — the
+   * same book imported twice is one book to a reader. So the title is looked
+   * up once, here, and every query below goes through it.
    */
   const [title, setTitle] = useState<string | undefined>()
   const [chapters, setChapters] = useState<ChapterListEntry[]>([])
@@ -38,10 +36,10 @@ export default function ChapterView() {
   const [loading, setLoading] = useState(true)
   /*
    * Whether the chapter list has come back — which is not the same question as
-   * whether it has anything in it. Without this, a book with no distilled
-   * chapters at all leaves `current` empty, the effect below has nothing to
-   * ask for, and the page waits for a load that will never be started: a
-   * permanently blank page rather than an honest "nothing here yet".
+   * whether it has anything in it. Without this, a book with nothing read at
+   * all leaves `current` empty, the effect below has nothing to ask for, and
+   * the page waits for a load that will never be started: a permanently blank
+   * page rather than an honest "nothing here yet".
    */
   const [listed, setListed] = useState(false)
 
@@ -73,11 +71,10 @@ export default function ChapterView() {
   /*
    * The chapter asked for; failing that, the first one with something in it.
    *
-   * Not simply the first chapter. A reader arrives here from a button on their
-   * book's details page, and most of a book is undistilled for most of its
-   * life — opening on chapter 1 would show them an empty page and read as a
-   * feature that does not work. Falls back to the first chapter of all only
-   * when none has been distilled, which is the state the empty message is for.
+   * Not simply the first chapter. A reader arrives from a button on their
+   * book's details page, and most of a book is unread for most of its life —
+   * opening on chapter 1 would show an empty page and read as a feature that
+   * does not work.
    */
   const asked = params.get('chapter')
   const opening = chapters.find((entry) => entry.distilled) ?? chapters[0]
@@ -86,8 +83,7 @@ export default function ChapterView() {
   useEffect(() => {
     if (title === undefined || !listed) return
     if (current === '') {
-      // The list came back empty: there is nothing to ask for, and nothing to
-      // wait for either.
+      // The list came back empty: nothing to ask for, nothing to wait for.
       setOpen(undefined)
       setLoading(false)
       return
@@ -111,16 +107,17 @@ export default function ChapterView() {
     label: `${entry.chapter} · ${entry.chapterTitle}`,
   }))
   const exit = backTo(location.search)
-  const crossing = `${location.pathname}?chapter=${encodeURIComponent(current)}`
 
   return (
     <Paper backTo={exit} backLabel={backLabel(exit)}>
       <Rail
         label="Chapters"
-        note="The same passages, filed by where you met them."
+        note="A chapter in plain words, and what you asked about it."
         items={tabs}
         current={current}
         onPick={(chapter) => {
+          /* `replace`, so flicking through chapters does not fill the back
+             stack with pages the reader never meant to keep. */
           const next = new URLSearchParams(params)
           next.set('chapter', chapter)
           setParams(next, { replace: true })
@@ -130,37 +127,29 @@ export default function ChapterView() {
       <main className={styles.page}>
         <div className={styles.eyebrow}>{title || 'This book'}</div>
         <h1 className={styles.chapterNo}>Chapter {current || '—'}</h1>
-        {open && <div className={styles.chapterTtl}>{open.recap.chapterTitle}</div>}
+        {open && <div className={styles.chapterTtl}>{open.chapterTitle}</div>}
         <Flourish wide />
 
         {loading ? null : open ? (
           <>
-            <div className={styles.secLabel}>In plain words</div>
-            {/* The signature sits inside the quoted block, under the violet
-                rule, rather than beside it — it is part of what she said. */}
-            <p className={styles.recap}>
-              {claimNodes(open.recap.recapText).map((node, index) =>
-                node.kind === 'em' ? (
-                  <em key={index}>{node.text}</em>
-                ) : (
-                  <span key={index}>{node.text}</span>
-                ),
-              )}
-              <span className={styles.recapSig}>— Veda, in her own words</span>
-            </p>
+            <div className={styles.secLabel}>The chapter, in plain words</div>
+            <RichText text={open.recapText} className={styles.recap} />
+            {open.tags.length > 0 && <Tags tags={open.tags} />}
 
-            <div className={styles.secLabel}>
-              Kept from our conversation · {open.items.length}{' '}
-              {open.items.length === 1 ? 'passage' : 'passages'}
-            </div>
-            {open.items.map((item) => (
-              <Item key={item.id} item={item} crossing={crossing} bookId={id} />
-            ))}
+            <div className={styles.secLabel}>What we worked through</div>
+            {open.qaText ? (
+              <RichText text={open.qaText} className={styles.recap} />
+            ) : (
+              /* A chapter read without a single question is normal, not a gap. */
+              <p className={styles.empty}>
+                You have not asked Veda about this chapter yet. What you talk about will be
+                summarised here.
+              </p>
+            )}
           </>
         ) : (
           <p className={styles.empty}>
-            Nothing has been distilled from this chapter yet. A recap and the passages you kept
-            appear here once you have worked through it.
+            This chapter has not been summarised yet. It appears here once you have read it.
           </p>
         )}
       </main>
@@ -168,46 +157,22 @@ export default function ChapterView() {
   )
 }
 
-/** One distilled item: the claim, its passage anchor, and its concept chip. */
-function Item({
-  item,
-  crossing,
-  bookId,
-}: {
-  item: DistilledItem
-  crossing: string
-  bookId: string
-}) {
-  const pending = item.concept.status === 'candidate'
+/**
+ * The Librarian's tags for the chapter.
+ *
+ * Plain chips, and deliberately not links. A tag says what the chapter is
+ * about; there is no page behind it to open, and making it tappable would
+ * promise one. An earlier build had a concept index they led to — the reader
+ * cut it, and the tags stayed.
+ */
+function Tags({ tags }: { tags: string[] }) {
   return (
-    <div className={styles.item}>
-      <Claim claim={item.claim} className={styles.itemClaim} />
-      <div className={styles.foot}>
-        <span className={styles.anchor}>{item.anchor}</span>
-        {pending ? (
-          <>
-            {/*
-             * Not a link, and that is the point. A candidate concept has no
-             * heading in the Commonplace Book to lead to — the Q&A pass met a
-             * name that is not on the running list and declined to invent a
-             * node for it. Making it tappable would promise a page that does
-             * not exist.
-             */}
-            <span className={`${styles.chip} ${styles.pending}`}>{item.concept.name}</span>
-            <span className={styles.pendingHint}>awaiting Librarian</span>
-          </>
-        ) : (
-          /* The crossing carries the book with it. A reader thinking about
-             one book stays inside it; widening to the whole shelf on a tap
-             would be a change of subject they did not ask for. */
-          <Link
-            className={styles.chip}
-            to={`/commonplace?concept=${encodeURIComponent(item.concept.name)}&book=${bookId}&${fromParam(crossing)}`}
-          >
-            {item.concept.name}
-          </Link>
-        )}
-      </div>
-    </div>
+    <ul className={styles.tags} aria-label="Tags for this chapter">
+      {tags.map((tag) => (
+        <li key={tag} className={styles.tag}>
+          {tag}
+        </li>
+      ))}
+    </ul>
   )
 }

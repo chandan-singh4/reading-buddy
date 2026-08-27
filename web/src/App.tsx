@@ -9,7 +9,6 @@ import { RouteTransition, useViewLocation } from './app/routeTransition.tsx'
 import { UpdatePrompt } from './app/UpdatePrompt.tsx'
 import BookInfo from './pages/BookInfo.tsx'
 import ChapterView from './pages/ChapterView.tsx'
-import Commonplace from './pages/Commonplace.tsx'
 import Home from './pages/Home.tsx'
 import LastTime from './pages/LastTime.tsx'
 import Library from './pages/Library.tsx'
@@ -41,19 +40,15 @@ export function AppRoutes() {
       <Route path="book/:bookId/info" element={<BookInfo />} />
       <Route path="book/:bookId/last-time" element={<LastTime />} />
       {/*
-       * The two summary views, both outside `AppShell` and both full-bleed.
+       * The chapter summaries, outside `AppShell` and full-bleed.
        *
-       * They are the one part of the app that does not follow the reader's
-       * theme — they are a paper object in one fixed palette (see
+       * This is the one part of the app that does not follow the reader's
+       * theme — it is a paper object in one fixed palette (see
        * `summary/summary.module.css`). The shell's top bar and drawer in the
        * app's own colours, wrapped around a page pretending to be paper, would
-       * undo exactly the thing the design is doing. Each page carries its own
+       * undo exactly the thing the design is doing. The page carries its own
        * way back instead.
-       *
-       * `commonplace` is not book-scoped on purpose: it gathers passages from
-       * every book, which is the whole difference between the two lenses.
        */}
-      <Route path="commonplace" element={<Commonplace />} />
       <Route path="book/:bookId/chapters" element={<ChapterView />} />
       <Route path="*" element={<Home />} />
     </Routes>

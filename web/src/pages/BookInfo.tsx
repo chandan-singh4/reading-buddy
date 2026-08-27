@@ -555,27 +555,17 @@ export default function BookInfo() {
        * is invented.
        */}
       <section className={styles.section}>
-        <h2 className={styles.sectionHeading}>What we worked through</h2>
+        <h2 className={styles.sectionHeading}>Chapter summaries</h2>
         <p className={styles.genreNote}>
-          Two ways to read this book&rsquo;s notes: by the chapter you met them in, or by the idea
-          they are about. Showing sample content for now.
+          Each chapter in plain words, and a summary of what you asked Veda about it. Showing
+          sample content for now.
         </p>
-        <div className={styles.summaryLinks}>
-          <Link
-            className={styles.returnLink}
-            to={`/book/${book.id}/chapters?from=${encodeURIComponent(`/book/${book.id}/info`)}`}
-          >
-            Chapter view
-          </Link>
-          {/* `book=` is what makes this door the scoped one: opened from here
-              the Commonplace Book shows this book's ideas, not the shelf's. */}
-          <Link
-            className={styles.returnLink}
-            to={`/commonplace?book=${book.id}&from=${encodeURIComponent(`/book/${book.id}/info`)}`}
-          >
-            Commonplace book
-          </Link>
-        </div>
+        <Link
+          className={styles.returnLink}
+          to={`/book/${book.id}/chapters?from=${encodeURIComponent(`/book/${book.id}/info`)}`}
+        >
+          Open chapter summaries
+        </Link>
       </section>
 
       <section className={styles.section}>

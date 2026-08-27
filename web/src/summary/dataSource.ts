@@ -1,76 +1,51 @@
 import { fixtureDataSource } from './fixture.ts'
-import type { ChapterListEntry, ChapterSummary, Concept, VedaNote } from './types.ts'
+import type { ChapterListEntry, ChapterSummary } from './types.ts'
 
 /**
- * The one seam between the summary views and whatever produces their data.
+ * The one seam between the chapter pages and whatever produces their content.
  *
  * Today the only implementation is `fixtureDataSource` — hand-written sample
- * content, so both pages render standalone. Tomorrow a second implementation
- * reads what the Scribe/Librarian engine wrote to storage. The views never
- * learn which one they got.
+ * text, so the page renders before either model exists. Tomorrow a second
+ * implementation reads what the Librarian and the Scribe wrote to storage. The
+ * page never learns which one it got.
  *
  * Every method is async even though the fixture answers instantly. A real
  * source reads IndexedDB, and changing a signature later would touch every
  * caller; paying the `await` now costs nothing and saves that.
  */
 export interface SummaryDataSource {
-  /**
-   * The headings of the Commonplace Book.
-   *
-   * `book` decides the scope, and the scope is decided by the door the reader
-   * came through. Opened from a book's own details page, the page is that
-   * book's ideas and `book` is its title. Opened library-wide, `book` is
-   * absent and a heading gathers passages from everything on the shelf —
-   * which is the one thing this lens can do that the Chapter View cannot.
-   *
-   * Scoped, the list holds only headings with something under them: a
-   * vocabulary of empty names is useful while reading one book and noise when
-   * looking at one. Unscoped, every known heading is listed, empty or not.
-   */
-  getConcepts(book?: string): Promise<Concept[]>
-  /** One heading and the passages filed under it. `undefined` if unknown. */
-  getConcept(name: string, book?: string): Promise<Concept | undefined>
-  /** The chapters of one book that have been distilled, in reading order. */
+  /** Every chapter of one book, in reading order, read or not. */
   getChapterList(book: string): Promise<ChapterListEntry[]>
-  /** One chapter's recap and items. `undefined` if that chapter has none. */
+  /** One chapter's two sections. `undefined` if it has not been read yet. */
   getChapter(book: string, chapter: string | number): Promise<ChapterSummary | undefined>
-  /**
-   * The running controlled vocabulary for one book — the names the chapter
-   * pass has extracted so far. The views do not draw this yet; it is here
-   * because the engine's passes read and append to it, and the interface is
-   * the place that contract belongs.
-   */
-  getConceptList(book: string): Promise<string[]>
-  /** Veda's marginal note for a heading, if she wrote one. */
-  getVedaNote(concept: string): Promise<VedaNote | undefined>
 }
 
 /*
- * TODO: Scribe/Librarian engine.
+ * TODO: the Librarian and the Scribe.
  *
- * Everything that *produces* the data above is separate work and deliberately
- * absent. When it lands, it replaces the fixture below with a storage-backed
- * source and adds, in this order:
+ * Two models, two prompts, both still to be written. Neither is started, and
+ * nothing below this line calls out to anything.
  *
- *   1. The **chapter pass** — reads one chapter, returns the plain-language
- *      recap and the concepts it extracts. Runs first.
- *   2. The **concept-list store** — the running controlled vocabulary the
- *      passes read and append to, carried forward across chapters so chapter 9
- *      reuses chapter 4's canonical names. `getConceptList` is its read side.
- *   3. The **Q&A pass** — runs after the chapter pass, so the list is current.
- *      Distils that chapter's Q&A into items and tags each against the list,
- *      flagging anything off-list as `candidate` rather than inventing a node.
- *   4. **Model routing and orchestration** — best-available model by preference
- *      order via OpenRouter, the chapter-end trigger, the storage writes, and
- *      the Obsidian markdown export.
- *   5. The **approval flow** — promoting a `candidate` concept to `linked`,
- *      or merging it into an existing heading. Until then a candidate item
- *      shows in the Chapter View and stays out of the Commonplace Book.
+ *   1. The **Librarian** runs on a chapter. In goes the chapter; out come the
+ *      plain-language summary and the tags for it. Fills `recapText` and
+ *      `tags`.
+ *   2. The **Scribe** runs on the reader's conversation with Veda about that
+ *      chapter. In go the questions and answers; out comes a summary of them.
+ *      Fills `qaText`.
+ *
+ * Also unbuilt, and needed before either can run for real:
+ *
+ *   - **When they run.** Most likely at the end of a chapter, but nothing
+ *     triggers them yet.
+ *   - **Where the output is kept.** A store keyed by book and chapter, so a
+ *     chapter is summarised once and not on every visit.
+ *   - **Which model, and through what.** OpenRouter, or the `api/` endpoint
+ *     that already holds the Claude key.
  */
 
 let current: SummaryDataSource = fixtureDataSource
 
-/** The source the views read. */
+/** The source the page reads. */
 export function summaryData(): SummaryDataSource {
   return current
 }

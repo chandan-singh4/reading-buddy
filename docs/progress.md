@@ -15,17 +15,17 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,174 tests across 120 files.
-- **Waiting on the phone: the two summary views.** They are built and shipped,
-  but they were judged on a desktop browser only. The reader has not seen them
-  on a device. Open a book, then **Book details → What we worked through**.
-  Judge the paper, the type sizes, and the sideways rail under the heading.
-  Opened from there, the Commonplace Book shows **that book only**. The
-  library-wide version exists at `/commonplace` with no `?book=`, and has no
-  link to it yet.
-- **A design question the views leave open.** These two pages do not follow the
-  reader's theme. A reader in Dark gets a bright page at night. This was chosen
-  with the cost known. Only a look on the phone can settle it.
+  2,156 tests across 119 files.
+- **Waiting on the reader: two prompts.** The chapter summary page shows sample
+  content. The two models behind it are not built and must not be started. The
+  reader will supply the **Librarian** prompt and the **Scribe** prompt.
+- **Waiting on the phone: the chapter summary page.** It is built and shipped,
+  but it was judged on a desktop browser only. Open a book, then **Book details
+  → Chapter summaries**. Judge the paper, the type sizes, and the sideways rail
+  under the heading.
+- **A design question the page leaves open.** It does not follow the reader's
+  theme. A reader in Dark gets a bright page at night. This was chosen with the
+  cost known. Only a look on the phone can settle it.
 - **Waiting on the phone: the mended notes.** The last fix went up as
   `bc15dc2`. The reader must accept the app's update prompt before any of it
   runs on the device — see the note under "Next up".
@@ -45,47 +45,43 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
-- **The two summary views** (2026-08-27). Not a waypoint — built from
-  `design-inspiration/build-prompt-summary-views.md`. Build green: 2,174 tests
-  across 120 files, up 44.
-  - **The Commonplace Book has two scopes, set by the door.** The first build
-    made it library-wide, as the build prompt says, but put the link inside a
-    book's details page. The reader caught the contradiction. It now reads
-    `?book=`: from Book Details it is that book's ideas; with no book it is the
-    whole shelf. The Chapter View's concept chip carries the book with it.
-    The library-wide door has no home in the UI yet — it belongs in the drawer,
-    once the data is real.
-  - **A flaky Reader test, diagnosed and fixed.** Adding five test files made
-    `Reader.test.tsx` fail about one run in three. The cause was in the test,
-    not the code: the neighbour section's text appearing and its pictures
-    having been asked for are two different moments, and it read the second
-    once instead of waiting for it. It waits now. Four full runs green.
-  - Two read-only pages over the same notes, with two indexes. The
-    **Commonplace Book** (`/commonplace`) files a passage by concept, across
-    every book. The **Chapter View** (`/book/:bookId/chapters`) files it by
-    chapter, with a plain-language recap on top.
-  - **The way in is one section on Book Details**, "What we worked through",
-    with two links. Not a drawer entry: the data is sample content, and the app
-    must not advertise a feature it cannot yet do.
-  - **The engine is not built and is not started.** `summary/dataSource.ts` is
-    the one seam — an interface, a swap function, and a labelled
-    `TODO: Scribe/Librarian engine` listing the five parts. A mock fixture
-    holds the exact content from the two reference designs.
+- **The chapter summary page, cut back to two sections** (2026-08-27). Not a
+  waypoint — built from `design-inspiration/build-prompt-summary-views.md`, then
+  simplified by the reader. Build green: 2,156 tests across 119 files.
+  - **One page now, not two.** `/book/:bookId/chapters` shows a book by
+    chapter. Each chapter has two sections: **The chapter, in plain words**
+    (the Librarian's summary, with its tags under it) and **What we worked
+    through** (the Scribe's summary of the reader's questions to Veda).
+  - **The Commonplace Book is gone.** The first build also made a concept index
+    across every book. The reader cut it. It needed a controlled vocabulary, a
+    candidate state, passage anchors and two-way crossings — all to serve one
+    index. Two models and two sections do the job the reader wanted. The page
+    and its test were deleted; it is all in git.
+  - **The tags are chips, and not links.** A tag says what the chapter is
+    about. There is no page behind it, so it must not look tappable.
+  - **The way in is one link on Book Details**, "Chapter summaries". Not a
+    drawer entry: the data is sample content, and the app must not advertise a
+    feature it cannot yet do.
+  - **Neither model is built and neither is started.** `summary/dataSource.ts`
+    is the one seam — an interface, a swap function, and a labelled
+    `TODO: the Librarian and the Scribe`. A mock fixture holds the sample text.
   - **Playfair Display is now self-hosted.** The build prompt asked for Google
     Fonts; `fonts.css` forbids a CDN. The reader kept the rule. This also fixed
     `Home.module.css`, which named Playfair for years without it in the bundle.
-  - **These two pages ignore the reader's theme** — one fixed paper palette, by
+  - **The page ignores the reader's theme** — one fixed paper palette, by
     choice, with the night-time cost stated in `decisions.md`.
-  - **A candidate concept is held out of the Commonplace Book**, and its chip is
-    not a link. It has no confirmed heading to lead to.
-  - **A claim is parsed, never set as HTML** — `summary/claimNodes.ts`. Two tags
-    are understood and everything else is text, because a claim will one day be
-    model-written.
-  - **Two faults the browser found, not the tests.** A book with no distilled
-    chapters waited forever on a load that was never started, and showed a
-    blank page. And the view opened on chapter 1, which is empty in most books,
-    so the reader would have met an empty page on the first tap. It now opens
-    on the first chapter that has something in it.
+  - **What a model wrote is parsed, never set as HTML** —
+    `summary/claimNodes.ts`. Two tags are understood and everything else is
+    text, because both summaries will one day be model-written.
+  - **A flaky Reader test, diagnosed and fixed.** Adding test files made
+    `Reader.test.tsx` fail about one run in three. The cause was in the test,
+    not the code: the neighbour section's text appearing and its pictures
+    having been asked for are two different moments, and it read the second
+    once instead of waiting for it. It waits now.
+  - **Two faults the browser found, not the tests.** A book with no summaries
+    waited forever on a load that was never started, and showed a blank page.
+    And the page opened on chapter 1, which is empty in most books. It now
+    opens on the first chapter that has something in it.
 
 - **Veda's Quotes: a kept line keeps its marks, and knows its way home**
   (2026-08-26). Not a waypoint — the reader asked for it. Build green: 2130

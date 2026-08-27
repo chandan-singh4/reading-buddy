@@ -5,22 +5,20 @@
 
 ## Task
 
-**Nothing is mid-edit.** The two summary views are built, tested and shipped.
+**Nothing is mid-edit.** The chapter summary page is built, tested and shipped.
 Pick the next task with `/plan-task`, or take one of the three below.
 
-## Option A — judge the two summary views on the phone
+## Option A — judge the chapter summary page on the phone
 
 The task this session earned. No code unless something is wrong.
 
-Open a book → **Book details** → **What we worked through** → both links.
-Everything you see is sample content. The engine that makes real notes is not
-built.
+Open a book → **Book details** → **Chapter summaries**. Everything you see is
+sample content. The two models that make real summaries are not built.
 
 ### Definition of done
 
-1. Look at both pages on the phone. Say whether the paper reads as paper.
-   Note that the Commonplace Book opened from a book shows **that book only**.
-2. Answer the one open question: these pages **do not** follow your theme. In
+1. Look at the page on the phone. Say whether the paper reads as paper.
+2. Answer the one open question: this page **does not** follow your theme. In
    Dark, at night, you get a bright page. Is that right or wrong?
 3. Check the rail. On a phone it lies down and scrolls sideways. Check that it
    works with a thumb.
@@ -30,25 +28,20 @@ built.
 
 None, unless a fault appears. Then:
 
-- `web/src/summary/summary.module.css` — every rule for both pages.
-- `web/src/pages/Commonplace.tsx`, `web/src/pages/ChapterView.tsx`.
+- `web/src/summary/summary.module.css` — every rule for the page.
+- `web/src/pages/ChapterView.tsx`.
 
-## Option B — the Scribe/Librarian engine
+## Option B — the Librarian and the Scribe
 
-The work the views were built to wait for. It is a large task and needs
-`/plan-task` of its own. The seam is ready:
-`web/src/summary/dataSource.ts` holds the interface and the labelled stubs.
+The work the page was built to wait for. **Do not start it yet.** The reader
+will supply both prompts. The seam is ready: `web/src/summary/dataSource.ts`
+holds the interface and the labelled stubs.
 
-Build it in this order, because each part needs the one before it:
-
-1. The **chapter pass** — one chapter in; a plain-language recap and a list of
-   concepts out.
-2. The **concept-list store** — the running controlled vocabulary. It grows
-   across chapters and goes into every later call.
-3. The **Q&A pass** — that chapter's Q&A into items, each tagged against the
-   current list. An off-list name becomes a `candidate`.
-4. **Model routing**, the chapter-end trigger, the storage writes, the export.
-5. The **approval flow** — promote a candidate, or merge it.
+1. The **Librarian** — one chapter in; a plain-language summary and its tags
+   out.
+2. The **Scribe** — that chapter's questions and answers in; one summary out.
+3. **When they run** — at the end of a chapter, and after a conversation.
+4. **Where the output is kept** — the storage writes, and the export.
 
 One decision to settle before any of it: which model, and through OpenRouter or
 through the `api/` endpoint that already holds the Claude key.
@@ -75,11 +68,12 @@ Files: `web/src/app/updates.ts`, `web/src/app/UpdatePrompt.tsx`,
 
 ## Done, 2026-08-27
 
-**The two summary views.** The Commonplace Book and the Chapter View, built to
-the two reference designs. The Commonplace Book was then given two scopes, set
-by the door the reader comes through. 2,174 tests pass, build green. The engine is stubbed
-and not started. Written up in `docs/decisions.md` under "the two summary
-views", in ten headings from the fonts to the stubs.
+**The chapter summary page.** Built to the reference design, then cut back by
+the reader to two sections: the Librarian's summary of the chapter with its
+tags, and the Scribe's summary of the conversation. The Commonplace Book was
+built and then deleted — it is in git. 2,156 tests pass, build green. Both
+models are stubbed and not started. Written up in `docs/decisions.md` under
+"the chapter summary page".
 
 ## Done, 2026-08-26
 
