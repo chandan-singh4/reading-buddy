@@ -61,6 +61,8 @@ export const config = { runtime: 'edge' }
  */
 type Provider = 'gemini' | 'openrouter' | 'groq'
 
+import { LIBRARIAN_PROMPT, SCRIBE_PROMPT } from './prompts/text.ts'
+
 const CHAT: Record<Provider, string> = {
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
   groq: 'https://api.groq.com/openai/v1/chat/completions',
@@ -349,6 +351,18 @@ interface Module {
    * around the text, and how much text is allowed through.
    */
   material?: boolean
+  /**
+   * Whether `prompt` is the whole system prompt, with nothing put in front of
+   * it.
+   *
+   * Only the Librarian and the Scribe set this. Both are complete system
+   * prompts written outside this repo, and both would be contradicted by the
+   * two bases here: `BASE_PROMPT` describes a tutor talking to a reader, and
+   * `RECORDER_PROMPT` forbids the analogies and the warm voice the Librarian
+   * is explicitly told to use. Prepending either would quietly argue with a
+   * file nobody is allowed to edit.
+   */
+  standalone?: boolean
 }
 
 /**
@@ -583,6 +597,30 @@ Prioritize the immediately relevant characters, ideas, events, arguments, and un
 Do not introduce new interpretation or outside information.
 
 Keep it concise enough to read in a few seconds. This is a refresher before continuing the book, not a replacement for reading the chapter.`,
+  },
+
+  /*
+   * The Librarian and the Scribe — the two summary jobs.
+   *
+   * `standalone`, so each golden prompt is the entire system prompt. Both were
+   * written outside this repo and are copied byte for byte in `prompts/`;
+   * `scripts/build-prompts.mjs` generates the module they come from.
+   *
+   * Both prompts end by saying they return "the exact schema requested by the
+   * application". The schema is not written here — it rides in the client's
+   * message, beside the material. That keeps this file free of a copy of the
+   * shape that would drift from the one the caller actually parses.
+   */
+  librarian: {
+    material: true,
+    standalone: true,
+    prompt: LIBRARIAN_PROMPT,
+  },
+
+  scribe: {
+    material: true,
+    standalone: true,
+    prompt: SCRIBE_PROMPT,
   },
 }
 
@@ -826,8 +864,15 @@ function assemble(body: Body, module: Module | undefined): Turn[] {
   const asked = text(body.userMessage, MAX_MESSAGE)
   const where = frame(body.context)
 
-  const turns: Turn[] = [{ role: 'system', content: digesting ? RECORDER_PROMPT : BASE_PROMPT }]
-  if (module) turns.push({ role: 'system', content: module.prompt })
+  /*
+   * A standalone module brings its own complete system prompt and gets no base
+   * in front of it. Everything else keeps the two-turn shape it always had: a
+   * base that says who is talking, then the job.
+   */
+  const turns: Turn[] = module?.standalone
+    ? [{ role: 'system', content: module.prompt }]
+    : [{ role: 'system', content: digesting ? RECORDER_PROMPT : BASE_PROMPT }]
+  if (module && !module.standalone) turns.push({ role: 'system', content: module.prompt })
   turns.push(...priorTurns(body.history))
 
   // The passage comes last of the three, closest to the question, because it

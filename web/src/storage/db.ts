@@ -378,6 +378,122 @@ export interface StoredDigest {
 }
 
 /**
+ * What the Librarian and the Scribe made of one chapter.
+ *
+ * Keyed `[bookId+chapterId]`, the same shape as `digests` beside it, and for
+ * the same reason: it is the exact address, and the loose `bookId` lets
+ * `deleteBook` drop a book's summaries without listing them first.
+ *
+ * ## Why this is not `digests`
+ *
+ * The two look alike and are aimed at different places. A digest is written for
+ * *this app* — it feeds "Last time", it is terse on purpose, and it exists so a
+ * reader coming back after a fortnight does not have to reread. A summary is
+ * written for *export*: the recap is meant to be read months later by someone
+ * who no longer remembers the book, and the concepts are meant to become links
+ * between notes in Obsidian.
+ *
+ * That is why the concepts are kept whole rather than flattened into the recap.
+ * A concept name is a filename in the reader's vault. `anchor` on an item is
+ * how they check the source. Neither is shown in the app today; both are the
+ * whole point of the export that comes later.
+ */
+export interface StoredChapterSummary {
+  bookId: BookId
+  /** The chapter's path — `ch02`. */
+  chapterId: string
+  chapter: number
+  chapterTitle: string
+  /** The Librarian's plain-language recap of the chapter. */
+  recap: string
+  /**
+   * The concepts the Librarian found, each marked as it marked them.
+   *
+   * `new-addition` means the name was not on the canonical list when the
+   * chapter ran, and has since been added to it. Kept per chapter as well as in
+   * the `concepts` table, because the export needs to know which chapter first
+   * raised an idea.
+   */
+  concepts: { name: string; status: 'existing-match' | 'new-addition' }[]
+  /**
+   * The Scribe's items, one per piece of knowledge worth keeping from the
+   * reader's conversation about this chapter.
+   *
+   * Absent when the reader asked nothing. That is not a gap and must not be
+   * treated as one — most chapters are read without a single question.
+   */
+  items?: {
+    claim: string
+    concept: string
+    /** `candidate` means the Scribe proposed a name that is not yet canonical. */
+    status: 'linked' | 'candidate'
+    anchor: string
+  }[]
+  /**
+   * How many tutor threads in this chapter the items above account for.
+   *
+   * The staleness test, exactly as `coversNConversations` is on a digest: the
+   * Scribe is a paid call, so it reruns when the chapter has gained threads and
+   * never otherwise.
+   */
+  coversNConversations: number
+  /** ISO 8601 — when the Librarian last ran. */
+  recapAt: string
+  /** ISO 8601 — when the Scribe last ran. Absent until it has. */
+  itemsAt?: string
+}
+
+/**
+ * The canonical concept list — the controlled vocabulary both prompts read.
+ *
+ * Library-wide, not per book, and that is the entire value. A concept met in a
+ * memoir and again in a neuroscience book must arrive at the same name both
+ * times, or the reader's vault grows two notes for one idea. Both golden
+ * prompts are built around this: the Librarian is told to reuse an existing
+ * name exactly rather than invent a better one, and the Scribe may not invent
+ * one at all.
+ *
+ * Not keyed by book and it does not cascade when a book is deleted. The
+ * vocabulary outlives any one book, the same way `vocabulary` does for words.
+ */
+export interface StoredConcept {
+  /** The canonical name, lowercase and singular. The primary key. */
+  name: string
+  /** ISO 8601 — when it entered the vocabulary. */
+  addedAt: string
+  /** The book whose chapter first raised it, for the export's provenance. */
+  firstBookId: BookId
+}
+
+/**
+ * One line in the bell on the Home screen.
+ *
+ * A table rather than component state, because the work that creates these runs
+ * in the background and may finish while the reader is on another screen, or
+ * not looking at all. An alert the app forgot because a page unmounted is an
+ * alert the reader never sees.
+ *
+ * Two kinds, and they are opposites. `ready` is news: a summary landed, go and
+ * look. `approval` is a question: this book is not the one you are reading, so
+ * say whether to spend a call on it. That split is the reader's own rule — the
+ * book they opened last runs on its own, everything else waits to be asked.
+ */
+export interface StoredAlert {
+  /** `${bookId}:${chapterId}` for a ready alert, so one chapter is one line. */
+  id: string
+  kind: 'ready' | 'approval'
+  bookId: BookId
+  bookTitle: string
+  chapterId: string
+  chapter: number
+  chapterTitle: string
+  /** ISO 8601 — the bell lists newest first. */
+  at: string
+  /** Whether the reader has seen it. The count on the bell is of unseen ones. */
+  seen: boolean
+}
+
+/**
  * A word the reader looked up, already parsed.
  *
  * The *parsed* entry, not MW's JSON. Parsing once and keeping the result is
@@ -456,6 +572,9 @@ export type ReadingBuddyDB = Dexie & {
   digests: Table<StoredDigest, [BookId, string]>
   definitions: Table<StoredDefinition, string>
   vocabulary: Table<StoredWord, string>
+  summaries: Table<StoredChapterSummary, [BookId, string]>
+  concepts: Table<StoredConcept, string>
+  alerts: Table<StoredAlert, string>
 }
 
 /**
@@ -626,6 +745,30 @@ function defineSchema(db: Dexie): void {
   db.version(15).stores({
     definitions: 'word',
     vocabulary: 'word, savedAt',
+  })
+
+  /*
+   * v16 — the Librarian and the Scribe.
+   *
+   * `summaries` is per chapter and cascades with its book, like `digests`.
+   *
+   * `concepts` does not. It is the controlled vocabulary the two prompts read,
+   * and it is library-wide on purpose: the same idea met in two books must come
+   * back with the same name, or the reader's vault grows a second note for it.
+   * Deleting a book must not take the vocabulary down with it.
+   *
+   * `alerts` is what the bell shows. Indexed on `at`, because the bell lists
+   * newest first. `seen` is deliberately not an index — Dexie cannot index a
+   * boolean, and the unseen count is a filter over a handful of rows, not a
+   * query worth an index anyway.
+   *
+   * No migration and nothing to backfill. A chapter with no summary has not
+   * been through the two models, which is true of every chapter today.
+   */
+  db.version(16).stores({
+    summaries: '[bookId+chapterId], bookId',
+    concepts: 'name, addedAt',
+    alerts: 'id, at, bookId',
   })
 }
 
