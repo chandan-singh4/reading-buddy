@@ -11,7 +11,7 @@ import { generate } from '../../../scripts/build-prompts.mjs'
  *
  * They were written outside this repo and copied in byte for byte. Nobody may
  * reword them here — not to fit a schema, not to shorten them, not to make a
- * sentence read better. `api/prompts/text.ts` is generated from the two `.md`
+ * sentence read better. `api/_prompts/text.ts` is generated from the two `.md`
  * files so the serverless functions can import them.
  *
  * This test is the guard. It regenerates from the `.md` files and compares. It
@@ -19,7 +19,7 @@ import { generate } from '../../../scripts/build-prompts.mjs'
  * forgets to run `node scripts/build-prompts.mjs`.
  */
 
-const DIR = join(import.meta.dirname, '..', '..', '..', 'api', 'prompts')
+const DIR = join(import.meta.dirname, '..', '..', '..', 'api', '_prompts')
 
 describe('the golden prompts', () => {
   it('has a generated module that matches the two source files', () => {

@@ -14,6 +14,10 @@ Ask → a streamed answer works end to end. WP-17, 19, 20, 25 and 29 are closed.
 Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
+- **Check the deploy, do not assume it.** A helper file under `api/` with no
+  default export failed the Vercel build and five commits sat on `main`
+  undeployed. To prove a deploy: fetch the live `index.html`, read the
+  `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
   2,185 tests across 122 files.
 - **Not proved yet: a real call to either model.** Every part around them is

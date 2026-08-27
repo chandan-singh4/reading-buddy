@@ -1934,3 +1934,25 @@ Two details are deliberate:
   marked seen the moment the reader looks. This one is not. The badge is the
   only thing between a missed panel and a phone that never updates again, so it
   clears when the update is taken and in no other way.
+
+
+### A helper in `api/` broke five deploys, silently — 2026-08-27
+
+The generated prompt module was first put at `api/prompts/text.ts`. Vercel
+treats every file under `api/` as a serverless function and wants a default
+export from each one. That file is two exported strings, so the build failed.
+
+**What made it bad was the silence.** Five commits went to `main`, each after a
+green local build and a green suite, and none of them deployed. The phone kept
+running the last good build, so the reader saw sample content and no bell, and
+reported it as a bug in the app. Nothing in this repo could tell the difference
+between "deployed" and "pushed".
+
+The folder is now `api/_prompts/`. A leading underscore is Vercel's documented
+way to mark a helper that is not a route.
+
+**The lesson, and it is the same one as the service worker.** "Pushed" is not
+"deployed", and "deployed" is not "running on the phone". Three states, and this
+project has now been bitten at both joins. Proving it took one command: fetch
+the live `index.html`, read the bundle hash, and compare it with `web/dist`.
+Do that before believing a deploy happened.

@@ -1,9 +1,17 @@
 /*
  * Turns the two golden prompt files into a TypeScript module.
  *
- * The `.md` files in `api/prompts/` are the source of truth. They were written
+ * ## Why the folder starts with an underscore
+ *
+ * Vercel treats every file under `api/` as a serverless function and requires a
+ * default export from each one. `text.ts` is a module of two strings, so the
+ * build failed — silently, as far as this repo could tell: five commits sat on
+ * `main` undeployed while the phone kept running the last good build. A leading
+ * underscore is Vercel's documented way to say "helper, not a route".
+ *
+ * The `.md` files in `api/_prompts/` are the source of truth. They were written
  * outside this repo and must never be edited here — not a word, not a line
- * break. `api/prompts/text.ts` is generated from them so the serverless
+ * break. `api/_prompts/text.ts` is generated from them so the serverless
  * functions can import the text without reading a file at runtime, which is
  * the part Vercel makes fragile.
  *
@@ -25,7 +33,7 @@ export const PROMPT_FILES = [
   ['SCRIBE_PROMPT', 'scribe.md'],
 ]
 
-export const PROMPT_DIR = join(import.meta.dirname, '..', 'api', 'prompts')
+export const PROMPT_DIR = join(import.meta.dirname, '..', 'api', '_prompts')
 
 const HEAD = `/*
  * GENERATED FILE — DO NOT EDIT.
@@ -52,5 +60,5 @@ export function generate(dir) {
 // Only write when run directly, so the test can import `generate` in peace.
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replaceAll('\\', '/'))) {
   writeFileSync(join(PROMPT_DIR, 'text.ts'), generate(PROMPT_DIR), 'utf8')
-  console.log('wrote api/prompts/text.ts')
+  console.log('wrote api/_prompts/text.ts')
 }

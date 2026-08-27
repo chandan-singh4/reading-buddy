@@ -7,7 +7,7 @@
 #
 # Pinned narrowly, on purpose. A repo-wide `* text=auto` would renormalise every
 # file here and bury real work in a whitespace diff.
-api/prompts/librarian.md text eol=lf
-api/prompts/scribe.md text eol=lf
-api/prompts/text.ts text eol=lf
+api/_prompts/librarian.md text eol=lf
+api/_prompts/scribe.md text eol=lf
+api/_prompts/text.ts text eol=lf
 scripts/build-prompts.mjs text eol=lf

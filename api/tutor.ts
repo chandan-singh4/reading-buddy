@@ -61,7 +61,7 @@ export const config = { runtime: 'edge' }
  */
 type Provider = 'gemini' | 'openrouter' | 'groq'
 
-import { LIBRARIAN_PROMPT, SCRIBE_PROMPT } from './prompts/text.ts'
+import { LIBRARIAN_PROMPT, SCRIBE_PROMPT } from './_prompts/text.ts'
 
 const CHAT: Record<Provider, string> = {
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
@@ -603,7 +603,8 @@ Keep it concise enough to read in a few seconds. This is a refresher before cont
    * The Librarian and the Scribe — the two summary jobs.
    *
    * `standalone`, so each golden prompt is the entire system prompt. Both were
-   * written outside this repo and are copied byte for byte in `prompts/`;
+   * written outside this repo and are copied byte for byte in `_prompts/` —
+   * underscored so Vercel does not try to build them as routes;
    * `scripts/build-prompts.mjs` generates the module they come from.
    *
    * Both prompts end by saying they return "the exact schema requested by the
