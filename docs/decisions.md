@@ -1762,3 +1762,153 @@ Not built, and marked `TODO: the Librarian and the Scribe`:
    `api/` endpoint.
 
 The reader will supply both prompts. Nothing should be built until they land.
+
+
+## Settled 2026-08-27 — the Librarian and the Scribe run
+
+The two models are wired in and they run. The reader supplied both prompts.
+
+### The prompts are golden, and this is enforced
+
+Both prompts came from outside this repo. The reader's instruction was plain:
+copy them, do not change a single word.
+
+`api/prompts/librarian.md` and `api/prompts/scribe.md` are the source. They were
+copied byte for byte and checked with `cmp`.
+
+`api/prompts/text.ts` is generated from them by `scripts/build-prompts.mjs`, so
+the serverless functions can import the text. Reading a file at runtime is the
+part Vercel makes fragile.
+
+Three things protect the bytes:
+
+1. The text is written with `JSON.stringify`, not a template literal. A template
+   literal needs the backticks inside these prompts escaped by hand, and a
+   hand-written escape is how a golden file quietly changes.
+2. `.gitattributes` pins all three files to LF. Both prompts arrived LF-only. On
+   Windows, git's default hands them back as CRLF at checkout, which changes the
+   text of a file nobody may change.
+3. `web/src/summary/prompts.test.ts` regenerates and compares. It fails if
+   anyone edits the generated file, or edits a `.md` and forgets the script.
+
+### Each golden prompt is the whole system prompt
+
+The relay puts a base prompt in front of every job: `BASE_PROMPT` for the tutor,
+`RECORDER_PROMPT` for the digest jobs. The Librarian and the Scribe get neither.
+
+They are marked `standalone` in `MODULES`. The reason is that a base would argue
+with them. `RECORDER_PROMPT` says "never editorialise"; the Librarian is told to
+use analogies and a warm voice. Sending both would have the relay contradict a
+file nobody is allowed to edit.
+
+### The schema is sent with the material, not written into the prompt
+
+Both prompts end by saying they return "the exact schema requested by the
+application". So the application requests it. The JSON shape rides in the user
+message beside the material and the concept list.
+
+This is what makes "do not change a word" and "return the shape we can parse"
+both true at once.
+
+### The prompts wanted the concept model that was deleted that morning
+
+This session deleted the Commonplace Book, the controlled vocabulary and the
+candidate state. Reading the prompts showed they specify all three. The Scribe
+does not return a paragraph; it returns a list of claims, each with a concept
+name and a source pointer.
+
+The reader then explained the destination: **Obsidian**. The concepts are meant
+to become links between notes in a vault. That resolved it.
+
+**The decision.** Store everything, show a little.
+
+- Every claim, concept name and anchor is stored in `summaries`.
+- The page shows the recap, the concept names as chips, and the claims one to a
+  line.
+- The concept names and anchors are not drawn. They are what the Obsidian export
+  will be built from.
+
+Nothing is wasted and nothing was rebuilt. The concept index is not coming back
+into the app: Obsidian is that view, and it is the tool the reader wants.
+
+### The claims are laid out one to a line, not welded into a paragraph
+
+The page has one section for what the Scribe returns, and the Scribe returns a
+list. Joining them into a single paragraph would need connective sentences, and
+nothing in this app may write words and present them as a model's.
+
+### Which chapters are finished is worked out, not recorded
+
+Nothing in the database records chapter completion. `percent` is a whole-book
+number.
+
+`summary/queue.ts` derives it from the stored anchor: the reader is inside a
+chapter, so every chapter before it is done. The chapter they are in is not —
+being on the last page of chapter four is not finishing it, and summarising a
+chapter in progress spends a call on a summary that is stale within the hour.
+
+One exception. At 100 percent the chapter holding the anchor counts too, because
+the anchor never moves past the last chapter of a finished book. Without it, the
+final chapter of every book the reader finishes would never be summarised.
+
+### One book runs on its own; every other book asks first
+
+The reader's rule. The book they opened last summarises its finished chapters
+automatically. Every other book raises a question in the bell and waits.
+
+The reason is money. A shelf of forty half-read books would otherwise fire off a
+hundred paid calls the first time the app came up.
+
+Chapters inside a book run in reading order. Both prompts match concepts against
+the vocabulary built so far, so running chapter nine before chapter four would
+hand the Librarian a list missing names it should have matched — and the vault
+would grow two notes for one idea.
+
+### The vocabulary is library-wide and survives a deleted book
+
+`concepts` is not keyed by book and does not cascade when one is deleted. A
+concept met in a memoir and again in a neuroscience book must come back with the
+same name, or the vault grows two notes for one idea. The vocabulary outlives
+any one book, the same way saved words do.
+
+### A model may not talk its way into the vocabulary
+
+`summary/parse.ts` enforces two rules that the prompts only ask for:
+
+- A concept whose status is missing is treated as `existing-match`. Guessing
+  "new" would add an unvetted name to the controlled vocabulary.
+- A Scribe item is only `linked` when its concept is actually on the supplied
+  list. The prompt forbids inventing an approved concept; this is where that is
+  enforced rather than trusted. A model that marks its own invention `linked`
+  must not be able to write a new note into the vault.
+
+### Nothing runs while the app is closed
+
+This is a PWA. There is no server-side job and no push subscription.
+
+`startSummaries()` sweeps at launch and again whenever the app returns to the
+front. That second trigger is the ordinary case: finish a chapter, lock the
+phone, come back later.
+
+So a summary appears the next time the reader opens Reading Buddy, not the
+moment they close the book. Anything better needs a server, and that is a
+separate decision.
+
+### The bell follows the theme; the chapter page still does not
+
+The bell sits on the front door beside the greeting. It is app furniture, so it
+takes its colour from `theme.css` like everything else there. A fixed cream
+panel would look like a sticker on whichever of the ten themes is on.
+
+The chapter page it leads to keeps its own paper palette, for the reasons under
+"the chapter summary page".
+
+### What is not built
+
+- **The Obsidian export.** Deliberately last. The reader is new to Obsidian, and
+  the export should be shaped by how they actually use it, not by a guess. The
+  data it needs is being stored from today.
+- **Promoting a candidate concept.** The Scribe raises candidates; nothing yet
+  approves one into the vocabulary.
+- **A cap on spending.** The queue skips work that is already done, and only one
+  book runs unasked. There is no ceiling beyond that.

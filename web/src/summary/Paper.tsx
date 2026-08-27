@@ -87,12 +87,28 @@ export function Rail({
  * the text is written by a model rather than by us.
  */
 export function RichText({ text, className }: { text: string; className: string }) {
+  /*
+   * Split on a blank line, because the Scribe returns a list rather than a
+   * paragraph and each of its claims stands on its own. Welding them into one
+   * block would need connective sentences, and nothing here may write words and
+   * present them as a model's.
+   */
+  const blocks = text.split(/\n\s*\n/).filter((block) => block.trim().length > 0)
+
   return (
-    <p className={className}>
-      {claimNodes(text).map((node, index) =>
-        node.kind === 'em' ? <em key={index}>{node.text}</em> : <span key={index}>{node.text}</span>,
-      )}
-    </p>
+    <>
+      {blocks.map((block, blockIndex) => (
+        <p key={blockIndex} className={className}>
+          {claimNodes(block).map((node, index) =>
+            node.kind === 'em' ? (
+              <em key={index}>{node.text}</em>
+            ) : (
+              <span key={index}>{node.text}</span>
+            ),
+          )}
+        </p>
+      ))}
+    </>
   )
 }
 

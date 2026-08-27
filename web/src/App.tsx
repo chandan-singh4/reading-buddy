@@ -7,6 +7,7 @@ import { tookConsent } from './app/bookUpdate.ts'
 import { AuthGate } from './auth/AuthGate.tsx'
 import { RouteTransition, useViewLocation } from './app/routeTransition.tsx'
 import { UpdatePrompt } from './app/UpdatePrompt.tsx'
+import { startSummaries } from './summary/engine.ts'
 import BookInfo from './pages/BookInfo.tsx'
 import ChapterView from './pages/ChapterView.tsx'
 import Home from './pages/Home.tsx'
@@ -65,6 +66,16 @@ export default function App() {
    * the one launch worth starting on without the usual opening pause.
    */
   useEffect(() => startCatchUp(tookConsent()), [])
+
+  /*
+   * The Librarian and the Scribe, for as long as the app is open.
+   *
+   * Started here rather than inside a screen, for the reason above it: this has
+   * to survive every navigation. The book the reader opened last summarises its
+   * finished chapters on its own; every other book raises a question in the
+   * bell and waits to be asked. See `summary/queue.ts`.
+   */
+  useEffect(() => startSummaries(), [])
 
   return (
     <BrowserRouter>

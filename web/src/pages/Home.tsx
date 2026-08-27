@@ -11,6 +11,7 @@ import { loadCovers, useCovers, warmCovers } from '../app/useCovers.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 import { repository, unavailableBooks } from '../storage/index.ts'
 import styles from './Home.module.css'
+import { Bell } from '../summary/Bell.tsx'
 
 type LoadState =
   | { status: 'loading' }
@@ -244,7 +245,12 @@ export default function Home() {
   return (
     <div className={styles.home}>
       <header className={styles.greeting}>
-        <h1 className={styles.greetingTitle}>{greeting}, {READER_NAME}.</h1>
+        {/* The bell rides in the greeting's own row, so the title and the
+            notifications share a baseline rather than stacking. */}
+        <div className={styles.greetingRow}>
+          <h1 className={styles.greetingTitle}>{greeting}, {READER_NAME}.</h1>
+          <Bell />
+        </div>
         {/* An open question, not a caption. The line that used to sit here
             ("Pick up where you left off") described the shelf underneath it,
             which the shelf was already doing for itself. This one asks the

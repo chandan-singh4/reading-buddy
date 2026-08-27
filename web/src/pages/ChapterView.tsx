@@ -26,9 +26,10 @@ export default function ChapterView() {
   const location = useLocation()
 
   /*
-   * The summary source is keyed by the book's *title*, not by its id — the
-   * same book imported twice is one book to a reader. So the title is looked
-   * up once, here, and every query below goes through it.
+   * The title is for the eyebrow only. Every query below goes through the
+   * book's id: that is the key the summaries are actually stored under, and
+   * looking one book up by two different keys is how a page ends up showing
+   * another book's chapters.
    */
   const [title, setTitle] = useState<string | undefined>()
   const [chapters, setChapters] = useState<ChapterListEntry[]>([])
@@ -57,7 +58,7 @@ export default function ChapterView() {
     if (title === undefined) return
     let cancelled = false
     summaryData()
-      .getChapterList(title)
+      .getChapterList(id)
       .then((list) => {
         if (cancelled) return
         setChapters(list)
@@ -91,7 +92,7 @@ export default function ChapterView() {
     let cancelled = false
     setLoading(true)
     summaryData()
-      .getChapter(title, current)
+      .getChapter(id, current)
       .then((summary) => {
         if (cancelled) return
         setOpen(summary)

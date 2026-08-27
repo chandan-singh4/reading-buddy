@@ -15,14 +15,17 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,156 tests across 119 files.
-- **Waiting on the reader: two prompts.** The chapter summary page shows sample
-  content. The two models behind it are not built and must not be started. The
-  reader will supply the **Librarian** prompt and the **Scribe** prompt.
-- **Waiting on the phone: the chapter summary page.** It is built and shipped,
-  but it was judged on a desktop browser only. Open a book, then **Book details
-  → Chapter summaries**. Judge the paper, the type sizes, and the sideways rail
-  under the heading.
+  2,185 tests across 122 files.
+- **Not proved yet: a real call to either model.** Every part around them is
+  tested — the queue, the parser, the stores, the bell. The models themselves
+  have never answered. The first real proof is the reader finishing a chapter
+  and seeing a summary appear. Watch for a wrong shape coming back.
+- **No ceiling on spending.** The queue skips finished work and only the most
+  recently opened book runs unasked. There is no cap beyond that.
+- **Waiting on the phone: the chapter summary page and the bell.** Both were
+  judged on a desktop browser only. Open a book, then **Book details → Chapter
+  summaries**. Judge the paper, the type sizes, and the sideways rail under the
+  heading. On Home, check the bell is easy to hit with a thumb.
 - **A design question the page leaves open.** It does not follow the reader's
   theme. A reader in Dark gets a bright page at night. This was chosen with the
   cost known. Only a look on the phone can settle it.
@@ -44,6 +47,37 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **The Librarian and the Scribe run** (2026-08-27). Not a waypoint — the
+  reader supplied both prompts. Build green: 2,185 tests across 122 files.
+  - **Both prompts are copied byte for byte** into `api/prompts/`. They are
+    golden: nobody may reword them. `scripts/build-prompts.mjs` generates the
+    module the relay imports, `.gitattributes` pins the files to LF so a Windows
+    checkout cannot rewrite them, and `prompts.test.ts` fails if the two ever
+    drift apart.
+  - **Each prompt is the whole system prompt.** The relay's two bases are not
+    put in front of them — `RECORDER_PROMPT` forbids the analogies and the warm
+    voice the Librarian is told to use.
+  - **The prompts wanted the concept model deleted that morning.** The Scribe
+    returns a list of claims, each with a concept and a source pointer, not a
+    paragraph. The reader then explained the destination: **Obsidian**, where a
+    concept name becomes a link between notes. The answer was to store
+    everything and show a little. Nothing was rebuilt.
+  - **Finished chapters are worked out, not recorded.** Nothing stores chapter
+    completion, so `summary/queue.ts` derives it from the anchor: chapters
+    before the one being read are done, plus the last chapter once the book hits
+    100 percent.
+  - **One book runs on its own.** The most recently opened. Every other book
+    raises a question in the bell and waits for a yes. The reason is money.
+  - **The vocabulary is library-wide** and survives a deleted book, so one idea
+    met in two books comes back with one name.
+  - **A model cannot talk its way into the vocabulary.** A Scribe item is only
+    `linked` when its concept is really on the supplied list, whatever the model
+    claimed.
+  - **The bell is on Home**, beside the greeting, and follows the reader's
+    theme. Both kinds of line were proved in the browser against seeded rows.
+  - **Nothing runs while the app is closed.** A PWA has no background job. The
+    sweep runs at launch and when the app returns to the front.
 
 - **The chapter summary page, cut back to two sections** (2026-08-27). Not a
   waypoint — built from `design-inspiration/build-prompt-summary-views.md`, then

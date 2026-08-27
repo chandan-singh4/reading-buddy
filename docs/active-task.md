@@ -8,16 +8,24 @@
 **Nothing is mid-edit.** The chapter summary page is built, tested and shipped.
 Pick the next task with `/plan-task`, or take one of the three below.
 
-## Option A — judge the chapter summary page on the phone
+## Option A — watch the two models run for real
 
 The task this session earned. No code unless something is wrong.
 
-Open a book → **Book details** → **Chapter summaries**. Everything you see is
-sample content. The two models that make real summaries are not built.
+Neither model has ever answered. Everything around them is tested; they are
+not. Finish a chapter, then open Home and wait for the bell.
+
+Watch for two things especially:
+
+- A reply in the wrong shape. `summary/parse.ts` is written to survive one, but
+  it has never met a real answer.
+- A summary that reads badly. That is a prompt question, and the prompts are
+  yours — I may not edit them.
 
 ### Definition of done
 
-1. Look at the page on the phone. Say whether the paper reads as paper.
+1. See a real summary appear in the bell, and read it on the chapter page.
+2. Look at the page on the phone. Say whether the paper reads as paper.
 2. Answer the one open question: this page **does not** follow your theme. In
    Dark, at night, you get a bright page. Is that right or wrong?
 3. Check the rail. On a phone it lies down and scrolls sideways. Check that it
@@ -30,21 +38,26 @@ None, unless a fault appears. Then:
 
 - `web/src/summary/summary.module.css` — every rule for the page.
 - `web/src/pages/ChapterView.tsx`.
+- `web/src/summary/Bell.tsx`, `web/src/summary/bell.module.css`.
 
-## Option B — the Librarian and the Scribe
+## Option B — the Obsidian export
 
-The work the page was built to wait for. **Do not start it yet.** The reader
-will supply both prompts. The seam is ready: `web/src/summary/dataSource.ts`
-holds the interface and the labelled stubs.
+**Do this after you have used Obsidian a little, not before.** The export should
+be shaped by how you actually work in a vault, not by a guess. Everything it
+needs is already stored from today: every claim, every concept name, every
+anchor.
 
-1. The **Librarian** — one chapter in; a plain-language summary and its tags
-   out.
-2. The **Scribe** — that chapter's questions and answers in; one summary out.
-3. **When they run** — at the end of a chapter, and after a conversation.
-4. **Where the output is kept** — the storage writes, and the export.
+1. Learn Obsidian by hand first. Make a few notes. See how links feel.
+2. Then decide the shape: one note per chapter, one per concept, or both.
+3. A concept name becomes a `[[wikilink]]`. That is the whole value.
+4. Frontmatter is written by this app, never by a model — both prompts say so.
 
-One decision to settle before any of it: which model, and through OpenRouter or
-through the `api/` endpoint that already holds the Claude key.
+Also unbuilt, and smaller:
+
+- **Promoting a candidate concept.** The Scribe raises candidates. Nothing
+  approves one into the vocabulary yet.
+- **A cap on spending.** Only the most recently opened book runs unasked, and
+  finished work is skipped. There is no ceiling beyond that.
 
 ## Option C — make the update prompt hard to miss
 
@@ -67,6 +80,13 @@ Files: `web/src/app/updates.ts`, `web/src/app/UpdatePrompt.tsx`,
 ---
 
 ## Done, 2026-08-27
+
+**The Librarian and the Scribe run.** Both prompts copied byte for byte, both
+models wired to the relay, the queue and the bell built. 2,185 tests pass, build
+green. Written up in `docs/decisions.md` under "the Librarian and the Scribe
+run". The Obsidian export is deliberately not built.
+
+## Done, earlier on 2026-08-27
 
 **The chapter summary page.** Built to the reference design, then cut back by
 the reader to two sections: the Librarian's summary of the chapter with its
