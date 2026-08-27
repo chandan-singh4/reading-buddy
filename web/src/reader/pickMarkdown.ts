@@ -77,36 +77,64 @@ function inlineOf(element: Element): { open: string; close: string } | null {
 /**
  * The markdown for a picked range.
  *
- * `range.cloneContents()` is what gets walked: a fragment holding copies of
- * exactly the nodes the pick covers, with the partly-picked ones already cut to
- * size by the browser. Working on the clone rather than on the page also means
- * nothing here can disturb what the reader is looking at.
+ * ## Why it walks the page and not a copy
  *
- * Blocks are separated by a blank line, which is what makes them blocks. A
- * heading with no blank line under it swallows the paragraph that follows.
+ * `range.cloneContents()` is the obvious way to get the picked nodes, and it is
+ * wrong here. The fragment it returns keeps everything *below* the range's
+ * common ancestor and nothing above it. Pick from inside the first item of a
+ * numbered list to inside the last, and the common ancestor is the `<ol>` — so
+ * the fragment holds bare `<li>` elements with no list above them. There is no
+ * way left to tell an ordered list from an unordered one, and every numbered
+ * step came out as a bullet.
+ *
+ * The reader hit this on the first real answer they tried to keep, because it
+ * is not an edge case: a finger picks *inside* text, never around it. So this
+ * walks the live page instead, where an element still knows its parents, and
+ * clips each text node to the part the range covers.
  */
 export function markdownOfRange(range: Range): string {
-  return tidy(write(range.cloneContents()))
+  const at = range.commonAncestorContainer
+  const from = at.nodeType === Node.ELEMENT_NODE ? at : (at.parentNode ?? at)
+  return tidy(write(from, range))
 }
 
 /** The same, for a fragment already in hand. Split out so it can be tested. */
 export function markdownOfFragment(fragment: DocumentFragment): string {
-  return tidy(write(fragment))
+  const whole = document.createRange()
+  whole.selectNodeContents(fragment)
+  return tidy(write(fragment, whole))
 }
 
-function write(node: Node): string {
+/** Whether any part of a node lies inside the range. */
+function touched(node: Node, range: Range): boolean {
+  if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) return true
+  try {
+    return range.intersectsNode(node)
+  } catch {
+    return true
+  }
+}
+
+function write(node: Node, range: Range): string {
   if (node.nodeType === Node.TEXT_NODE) {
+    if (!touched(node, range)) return ''
+    const raw = node.textContent ?? ''
+    // Clipped to the part the finger covered. The end nodes are the only ones
+    // the range cuts; everything between them is taken whole.
+    const start = node === range.startContainer ? range.startOffset : 0
+    const end = node === range.endContainer ? range.endOffset : raw.length
     // The renderer keeps the model's own line breaks inside a paragraph, and so
     // does this. Everything else is squeezed: the source file's indentation is
     // not something the reader picked.
-    return (node.textContent ?? '').replace(/[^\S\n]+/g, ' ')
+    return raw.slice(start, end).replace(/[^\S\n]+/g, ' ')
   }
 
   if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) {
     return ''
   }
+  if (!touched(node, range)) return ''
 
-  const inside = [...node.childNodes].map(write).join('')
+  const inside = [...node.childNodes].map((child) => write(child, range)).join('')
 
   if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) return inside
 
@@ -153,7 +181,54 @@ export function wordsIn(root: Element | null, words: string): Range | null {
   if (wanted.length === 0) return null
 
   const { flat, from } = flatten(root)
-  const at = flat.indexOf(wanted)
-  if (at < 0) return null
-  return rangeOfSpan(from, at, at + wanted.length)
+
+  /*
+   * Three tries, each one more forgiving than the last.
+   *
+   * The first is the plain words, which is what a line kept today stores. The
+   * second strips the marks off, because a line kept *before* this existed has
+   * only its markdown to search with — and `**not**` is not on the page, `not`
+   * is. The third takes the opening of the line, because an answer can be a
+   * little different from the note that came out of it, and landing on the
+   * first sentence is a great deal better than landing at the top.
+   */
+  const bare = withoutMarks(wanted)
+  for (const whole of [wanted, bare]) {
+    // A scrap this short is found by coincidence, not by meaning. "A s" is in
+    // half the sentences in the book, and landing on the wrong one is worse
+    // than not moving at all.
+    if (whole.length < ENOUGH) continue
+    const at = flat.indexOf(whole)
+    if (at >= 0) return rangeOfSpan(from, at, at + whole.length)
+  }
+
+  /*
+   * Nothing matched whole, so try the opening of the line.
+   *
+   * A word at a time, from the longest, because an answer can differ from the
+   * note that came out of it in small ways — a comma, a re-worded ending — and
+   * a fixed cut of so many characters lands in the middle of a word as often as
+   * not. The first prefix that is there is the longest one that is there.
+   */
+  const parts = bare.split(' ')
+  for (let take = parts.length - 1; take > 0; take -= 1) {
+    const opening = parts.slice(0, take).join(' ')
+    if (opening.length < ENOUGH) break
+    const at = flat.indexOf(opening)
+    if (at >= 0) return rangeOfSpan(from, at, at + opening.length)
+  }
+  return null
+}
+
+/** The shortest opening worth landing on. Less is a coincidence, not a match. */
+const ENOUGH = 12
+
+/** A line with its markdown taken off, as it reads on the page. */
+function withoutMarks(text: string): string {
+  return text
+    .replace(/^\s*(?:[-*+]|\d+\.|>|#{1,6})\s+/gm, '')
+    .replace(/[*_`~]/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
 }

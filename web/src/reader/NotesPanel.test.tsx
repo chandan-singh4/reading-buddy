@@ -219,6 +219,30 @@ describe('Veda quotes', () => {
     expect(screen.queryByText('Claude says 2')).toBeNull()
   })
 
+  it('sends an older kept line home by its own text', () => {
+    /*
+     * The reader's report, three times over: a tap opened the conversation but
+     * not the place. Every line kept before the plain words were stored has
+     * only its markdown, and without this fall-back those notes could never
+     * land anywhere — the ones the reader already had would stay broken.
+     */
+    const older = { ...kept('4'), quote: undefined }
+    const { onOpenThread } = draw([older])
+
+    fireEvent.click(screen.getByRole('button', { name: /A symbol is a picture/ }))
+    expect(onOpenThread).toHaveBeenCalledWith('thread-9', older.text)
+  })
+
+  it('does not send a whole conversation hunting for a line', () => {
+    // A conversation row's text is the excerpt and the answer glued together.
+    // It is not a line anybody picked, and it is in no answer on the page.
+    const talk = { ...note('2', 'claude'), threadId: 'thread-2' }
+    const { onOpenThread } = draw([talk])
+
+    fireEvent.click(screen.getByRole('button', { name: /Claude says 2/ }))
+    expect(onOpenThread).toHaveBeenCalledWith('thread-2', undefined)
+  })
+
   it('sends a tap on a kept line back to the conversation it came from', () => {
     // A line is worth keeping because of what it answered. A quote the reader
     // cannot get back behind is a fortune-cookie slip.

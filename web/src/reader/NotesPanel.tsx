@@ -206,8 +206,19 @@ export function NotesPanel({
 
   /** A tutor row reopens its conversation; every other note goes to its page. */
   function visit(note: NoteRow) {
-    if (note.threadId && onOpenThread) onOpenThread(note.threadId, note.quote)
-    else onJumpToNote(note.anchor)
+    if (note.threadId && onOpenThread) {
+      /*
+       * The plain words when the note has them, and the note's own text when it
+       * does not. Every line kept before `quote` existed has no plain copy, and
+       * without this fall-back a tap on one of them could never land anywhere
+       * but the top of the conversation — the notes the reader already had
+       * would stay broken for ever. `wordsIn` strips the marks off before it
+       * searches, so the older markdown still finds its way home.
+       */
+      onOpenThread(note.threadId, note.fromThread ? (note.quote ?? note.text) : undefined)
+      return
+    }
+    onJumpToNote(note.anchor)
   }
 
   /**

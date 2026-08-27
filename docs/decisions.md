@@ -1535,3 +1535,41 @@ by hand because `::marker` draws a dot too small to see; a number is large
 enough, and it is already violet because `.item::marker` reads `--md-mark`. What
 it needed was room — Kalam's digits are wide, and the shared indent was measured
 against a serif face.
+
+### The saved line was still flat, and the tap still missed — 2026-08-26
+
+Two real faults, both found by tests that go through the whole road rather than
+a part of it.
+
+**1. `cloneContents()` loses the ancestry.** The fragment it returns keeps
+everything *below* the range's common ancestor and nothing above it. Pick from
+inside the first item of a numbered list to inside the last, and the common
+ancestor is the `<ol>` — so the fragment holds bare `<li>` elements with no list
+above them. Nothing was left to tell an ordered list from an unordered one, and
+every numbered step came out as a bullet.
+
+This is not an edge case. A finger picks *inside* text, never around it, so it
+is what happens every time.
+
+`pickMarkdown.ts` now walks the **live page** and clips each text node to the
+part the range covers. An element there still knows its parents.
+
+**The lesson, and the reason the first fix looked right.** The tests built their
+HTML by hand and selected whole nodes. Both choices hid the fault. A test now
+renders a real answer with `Markdown` and builds the range the way a finger
+builds one — `flatten` plus `rangeOfSpan` — which is the only shape a phone ever
+produces.
+
+**2. A line kept before the plain words were stored could never be found.**
+`quote` is new, so every note the reader already had has only its markdown, and
+the marks are not on the page. The search matched nothing and the reader landed
+at the top of the conversation each time.
+
+`wordsIn` now tries three things, each more forgiving: the plain words, the same
+words with the marks stripped off, then the longest opening that is really
+there — a word at a time, because a note and an answer can differ by a comma. A
+scrap under 12 characters is refused: "A s" is in half the sentences in the book,
+and landing on the wrong one is worse than not moving.
+
+A conversation row is never sent hunting. Its text is the excerpt and the answer
+glued together, which is in no answer on the page.

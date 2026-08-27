@@ -143,3 +143,43 @@ describe('the answer from the reader’s screenshot', () => {
     )
   })
 })
+
+describe('finding a line kept before it had plain words to search by', () => {
+  /*
+   * The reader's report, three times: a tap on one of Veda's Quotes opened the
+   * conversation but not the place. Every line kept before `quote` existed has
+   * only its markdown, and the marks are not on the page — so the search could
+   * never match, and those notes would have stayed broken for ever.
+   */
+  it('finds a line by its markdown, marks and all', () => {
+    const root = answer('<p data-md="paragraph">You are <strong>already</strong> free.</p>')
+    expect(wordsIn(root, 'You are **already** free.')?.toString()).toBe('You are already free.')
+  })
+
+  it('finds a numbered item saved with its number', () => {
+    const root = answer('<ol><li data-md="item">Everything you perceive is stored.</li></ol>')
+    expect(wordsIn(root, '1. Everything you perceive is stored.')?.toString()).toBe(
+      'Everything you perceive is stored.',
+    )
+  })
+
+  it('lands on the opening when the answer has changed since', () => {
+    // Better the first sentence than the top of a five-screen answer.
+    const root = answer(
+      '<p data-md="paragraph">Everything you perceive gets dumped into the storehouse.</p>',
+    )
+    const range = wordsIn(
+      root,
+      'Everything you perceive gets dumped into the storehouse, and most of it you never noticed.',
+    )
+
+    // It stops at "the": the note reads "storehouse," and the page reads
+    // "storehouse." — the longest opening that is really there is the answer.
+    expect(range?.toString()).toBe('Everything you perceive gets dumped into the')
+  })
+
+  it('will not match on a scrap too short to mean anything', () => {
+    const root = answer('<p data-md="paragraph">A symbol is a picture.</p>')
+    expect(wordsIn(root, 'A **s**')).toBeNull()
+  })
+})
