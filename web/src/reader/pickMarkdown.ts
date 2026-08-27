@@ -269,7 +269,23 @@ export function recoverMarkdown(plain: string, source: string): string | null {
   const to = at[start + want.length - 1]
   if (from === undefined || to === undefined) return null
 
-  return tidy(source.slice(openingOfLine(source, from), to + 1))
+  return tidy(source.slice(openingOfLine(source, from), closingOfRun(source, to + 1)))
+}
+
+/**
+ * Past the marks that close the last word taken.
+ *
+ * A match ends on a character the reader can see, and the `**` that shuts a
+ * bold run is not one — it sits just beyond the full stop. Cutting there gave
+ * a line that opened bold and never closed, so the reader saw the asterisks
+ * themselves at the head of it and no bold at all.
+ *
+ * Only what is immediately next, and never across a line break: the marks that
+ * open the *following* block are somebody else's.
+ */
+function closingOfRun(source: string, end: number): number {
+  const run = /^[*_`~]+/.exec(source.slice(end))
+  return run ? end + run[0].length : end
 }
 
 /**

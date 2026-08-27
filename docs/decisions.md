@@ -1603,3 +1603,14 @@ Four deploys can therefore change nothing at all on the device.
 **The lesson for verifying.** "Built and pushed" is not "running on the reader's
 phone", and a test that builds its own HTML is not a test of what the renderer
 draws. Both failures were failures of verification, not of the fix.
+
+### A mended line must close the marks it opens — 2026-08-26
+
+The reader's last bullet showed its asterisks and no bold. A match ends on the
+last character the reader can *see* — the full stop — and the `**` that shuts a
+bold run sits just past it. Cutting there gave a line that opened bold and never
+closed, so the renderer drew the marks themselves.
+
+The slice now takes the marks immediately after the last word, and only those:
+never across a line break, because the marks that open the following block
+belong to it.

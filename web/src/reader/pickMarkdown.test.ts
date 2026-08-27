@@ -201,7 +201,7 @@ describe('mending a line kept before its marks were', () => {
     "**So it's not A or B. It's A ⇄ B.**",
     '',
     '- You are not the sole author of your life.',
-    '- You are the editor.',
+    '- **You are the editor.**',
   ].join('\n')
 
   it('puts the numbers, the bullets and the bold back', () => {
@@ -220,6 +220,17 @@ describe('mending a line kept before its marks were', () => {
     expect(recoverMarkdown(one, said)).toBe(
       '2. **Unconscious → Perception/Life:** Later, that stored material *reaches back up*.',
     )
+  })
+
+  it('closes a bold run that ends the line', () => {
+    /*
+     * The reader's report on the mended note: the last bullet showed its
+     * asterisks and no bold. A match ends on the last character the reader can
+     * see — the full stop — and the `**` that shuts the run sits just past it.
+     * Cutting there left a line that opened bold and never closed.
+     */
+    const last = 'You are the editor.'
+    expect(recoverMarkdown(last, said)).toBe('- **You are the editor.**')
   })
 
   it('leaves a line alone when it is not in the answer', () => {
