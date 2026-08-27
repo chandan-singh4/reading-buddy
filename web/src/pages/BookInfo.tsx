@@ -557,8 +557,8 @@ export default function BookInfo() {
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Chapter summaries</h2>
         <p className={styles.genreNote}>
-          Each chapter in plain words, and a summary of what you asked Veda about it. Showing
-          sample content for now.
+          Two things for each chapter you have finished: the chapter in plain words, and a
+          summary of what you asked Veda about it. Both are on the same page.
         </p>
         <Link
           className={styles.returnLink}
