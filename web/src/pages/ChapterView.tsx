@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
 
+import { modelLabel } from '../reader/tutor.ts'
 import { repository } from '../storage/repository.ts'
 import type { BookId } from '../structure/index.ts'
 import { backLabel, backTo } from '../summary/backTo.ts'
@@ -172,12 +173,16 @@ export default function ChapterView() {
         {loading ? null : open ? (
           <>
             <div className={styles.secLabel}>The chapter, in plain words</div>
+            <Byline model={open.recapModel} />
             <RichText text={open.recapText} className={styles.recap} />
             {open.tags.length > 0 && <Tags tags={open.tags} />}
 
             <div className={styles.secLabel}>What we worked through</div>
             {open.qaText ? (
-              <RichText text={open.qaText} className={styles.recap} />
+              <>
+                <Byline model={open.itemsModel} />
+                <RichText text={open.qaText} className={styles.recap} />
+              </>
             ) : (
               /* A chapter read without a single question is normal, not a gap. */
               <p className={styles.empty}>
@@ -196,11 +201,18 @@ export default function ChapterView() {
            * wherever the reader happens to be standing.
            */
           <>
+            {/*
+             * Three different facts used to share one sentence, and the reader
+             * could not tell them apart: a book with no chapters on this device
+             * read exactly like a chapter they had not finished. The empty rail
+             * was the only clue, and a clue is not an answer.
+             */}
             <p className={styles.empty}>
-              This chapter has no summary yet.{' '}
-              {finished
-                ? 'Ask for one and Veda will read the whole chapter.'
-                : 'It appears here once you have finished reading it.'}
+              {chapters.length === 0
+                ? 'This book has no chapters saved on this device, so there is nothing to summarise. Re-import it from Book details and it will appear here.'
+                : finished
+                  ? 'This chapter has no summary yet. Ask for one and Veda will read the whole chapter.'
+                  : 'This chapter has no summary yet. It appears here once you have finished reading it.'}
             </p>
             {finished && (
               <button
@@ -251,6 +263,7 @@ function Part({ part }: { part: SectionSummary }) {
   return (
     <section className={styles.part}>
       <h2 className={styles.partTtl}>{part.title}</h2>
+      <Byline model={part.recapModel} />
       <RichText text={part.recapText} className={styles.recap} />
       {part.tags.length > 0 && <Tags tags={part.tags} />}
       {/* No "nothing asked yet" line here. The chapter above already says it
@@ -259,9 +272,27 @@ function Part({ part }: { part: SectionSummary }) {
       {part.qaText && (
         <>
           <div className={styles.secLabel}>What we worked through</div>
+          <Byline model={part.itemsModel} />
           <RichText text={part.qaText} className={styles.recap} />
         </>
       )}
     </section>
   )
+}
+
+/**
+ * Who wrote the paragraph below.
+ *
+ * The relay walks a fallback chain, so the model that answered is often not the
+ * model that was asked for. A reader judging a summary should know whose words
+ * they are judging — the reading lamp has said so above every one of Veda's
+ * answers since v13, and a summary is no different.
+ *
+ * Nothing is drawn when the row recorded no model. Summaries written before
+ * this was kept have none, and a caption naming today's model over yesterday's
+ * words would be a plain lie.
+ */
+function Byline({ model }: { model?: string }) {
+  if (!model) return null
+  return <p className={styles.byline}>{modelLabel(model)}</p>
 }

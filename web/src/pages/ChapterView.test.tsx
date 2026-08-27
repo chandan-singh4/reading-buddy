@@ -106,9 +106,10 @@ describe('the chapter summary page', () => {
     /*
      * The fixture answers with its sample chapters for every book, so a source
      * that genuinely knows nothing has to be installed to reach this state.
-     * It is worth reaching: it is what every book looks like before either
-     * model has ever run, and a page that waits forever instead of saying so
-     * is the bug this case was written after finding.
+     * It is worth reaching, and it is a *different* fact from "not summarised
+     * yet": the book itself is not on this device. The two used to share one
+     * sentence, so a reader met "it appears here once you have read it" for a
+     * book they had finished, and the only clue was an empty chapter strip.
      */
     setSummaryData({
       ...fixtureDataSource,
@@ -121,7 +122,9 @@ describe('the chapter summary page', () => {
     })
 
     open(`/book/${OTHER}/chapters`)
-    expect(await screen.findByText(/has no summary yet/)).toBeTruthy()
+    expect(await screen.findByText(/no chapters saved on this device/)).toBeTruthy()
+    // And it must not blame the reader for not having finished it.
+    expect(screen.queryByText(/once you have finished reading it/)).toBeNull()
   })
 
   it('renders emphasis in a summary as emphasis', async () => {

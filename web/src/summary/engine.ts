@@ -57,11 +57,19 @@ async function askGolden(intent: 'librarian' | 'scribe', material: string, reque
   })
   if (!response.ok) throw new Error(`the relay answered ${response.status}`)
 
-  const data = (await response.json()) as { text?: unknown }
+  const data = (await response.json()) as { text?: unknown; model?: unknown }
   if (typeof data.text !== 'string' || data.text.trim().length === 0) {
     throw new Error('the relay sent no text')
   }
-  return data.text
+  /*
+   * The model comes back beside the answer and is kept.
+   *
+   * `model` is what actually answered, not what was asked for: the relay walks
+   * a fallback chain, so the fourth rung may well be what wrote this recap. A
+   * reader who is judging a summary should be told whose words they are
+   * judging, exactly as the reading lamp already tells them.
+   */
+  return { text: data.text, model: typeof data.model === 'string' ? data.model : undefined }
 }
 
 /** The prose of one chapter, in reading order. What the Librarian is given. */
@@ -171,6 +179,7 @@ export async function runChapter(
   const now = new Date().toISOString()
   let recap = existing?.recap ?? ''
   let concepts = existing?.concepts ?? []
+  let recapModel = existing?.recapModel
 
   if (!existing) {
     const sections = await repository.listSections(bookId)
@@ -185,9 +194,10 @@ export async function runChapter(
       material,
       `${vocabularyBlock(canonical)}\n\n${LIBRARIAN_SCHEMA}`,
     )
-    const result = librarianResult(reply)
+    const result = librarianResult(reply.text)
     recap = result.recap
     concepts = result.concepts
+    recapModel = reply.model
   }
 
   // The Librarian's new names join the vocabulary before the Scribe reads it.
@@ -199,6 +209,7 @@ export async function runChapter(
 
   let items = existing?.items
   let itemsAt = existing?.itemsAt
+  let itemsModel = existing?.itemsModel
   if (conversationsNow > 0) {
     const canonical = await conceptStore.names()
     const reply = await askGolden(
@@ -206,8 +217,9 @@ export async function runChapter(
       confusionMaterial(threads),
       `${vocabularyBlock(canonical)}\n\n${SCRIBE_SCHEMA}`,
     )
-    items = scribeResult(reply, canonical).items
+    items = scribeResult(reply.text, canonical).items
     itemsAt = now
+    itemsModel = reply.model
   }
 
   const summary: StoredChapterSummary = {
@@ -221,7 +233,9 @@ export async function runChapter(
     ...(items === undefined ? {} : { items }),
     coversNConversations: conversationsNow,
     recapAt: existing?.recapAt ?? now,
+    ...(recapModel === undefined ? {} : { recapModel }),
     ...(itemsAt === undefined ? {} : { itemsAt }),
+    ...(itemsModel === undefined ? {} : { itemsModel }),
   }
 
   await summaryStore.save(summary)

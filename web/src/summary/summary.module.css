@@ -405,3 +405,13 @@
   color: var(--ink-faint);
   cursor: default;
 }
+
+/* Who wrote the paragraph below. Quiet, but on the page — the reader asked to
+   be told which model answered. */
+.byline {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}

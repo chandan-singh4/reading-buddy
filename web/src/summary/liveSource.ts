@@ -63,6 +63,8 @@ export const liveDataSource: SummaryDataSource = {
         title: entry.sectionTitle ?? '',
         recapText: entry.recap,
         tags: entry.concepts.map((concept) => concept.name),
+        ...(entry.recapModel ? { recapModel: entry.recapModel } : {}),
+        ...(entry.itemsModel ? { itemsModel: entry.itemsModel } : {}),
         ...(entry.items && entry.items.length > 0
           ? { qaText: entry.items.map((item) => item.claim).join('\n\n') }
           : {}),
@@ -76,6 +78,8 @@ export const liveDataSource: SummaryDataSource = {
       chapterTitle: row.chapterTitle,
       recapText: row.recap,
       tags: row.concepts.map((concept) => concept.name),
+      ...(row.recapModel ? { recapModel: row.recapModel } : {}),
+      ...(row.itemsModel ? { itemsModel: row.itemsModel } : {}),
       ...(row.items && row.items.length > 0
         ? { qaText: row.items.map((item) => item.claim).join('\n\n') }
         : {}),

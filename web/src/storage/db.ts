@@ -460,8 +460,19 @@ export interface StoredChapterSummary {
   coversNConversations: number
   /** ISO 8601 — when the Librarian last ran. */
   recapAt: string
+  /**
+   * The model that actually wrote the recap, as the relay reported it.
+   *
+   * Kept for the same reason a tutor message keeps one: the relay walks a
+   * fallback chain, so the model that answered is often not the model that was
+   * asked. Absent on rows written before this was recorded — that is the
+   * correct state for them, not a gap to fill in with today's model.
+   */
+  recapModel?: string
   /** ISO 8601 — when the Scribe last ran. Absent until it has. */
   itemsAt?: string
+  /** The model that wrote the items. Absent for the same reasons. */
+  itemsModel?: string
 }
 
 /**

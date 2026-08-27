@@ -41,6 +41,14 @@ export interface ChapterSummary {
   /** The Librarian's tags for this chapter. Shown as chips under the summary. */
   tags: string[]
   /**
+   * The model that wrote the recap. Absent on summaries made before this was
+   * recorded, and then nothing is drawn — a caption naming today's model over
+   * yesterday's words would be a plain lie.
+   */
+  recapModel?: string
+  /** The model that wrote the Q&A summary. */
+  itemsModel?: string
+  /**
    * The Scribe's summary of what the reader and Veda worked through in this
    * chapter. Absent when they have not talked about it yet — a chapter can be
    * read without a single question, and that is not a gap.
@@ -64,4 +72,6 @@ export interface SectionSummary {
   recapText: string
   tags: string[]
   qaText?: string
+  recapModel?: string
+  itemsModel?: string
 }
