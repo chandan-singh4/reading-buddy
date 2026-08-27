@@ -61,7 +61,7 @@ describe('the notes tab', () => {
     const { onOpenThread } = draw([written])
 
     fireEvent.click(screen.getByRole('button', { name: /Bold and plain/ }))
-    expect(onOpenThread).toHaveBeenCalledWith('thread-2')
+    expect(onOpenThread).toHaveBeenCalledWith('thread-2', undefined)
   })
 
   it('gives Veda a hand of her own, apart from the reader’s', () => {
@@ -161,7 +161,7 @@ describe('the notes tab', () => {
 
     fireEvent.click(screen.getByText('Claude says 4'))
 
-    expect(onOpenThread).toHaveBeenCalledWith('thread-4')
+    expect(onOpenThread).toHaveBeenCalledWith('thread-4', undefined)
     expect(onJumpToNote).not.toHaveBeenCalled()
   })
 
@@ -179,6 +179,7 @@ describe('Veda quotes', () => {
     return {
       ...note(id, 'claude'),
       text: 'A symbol is a picture the mind can hold.',
+      quote: 'A symbol is a picture the mind can hold.',
       fromThread: 'thread-9',
       threadId: 'thread-9',
     }
@@ -207,7 +208,12 @@ describe('Veda quotes', () => {
     const { onOpenThread } = draw([kept('4')])
 
     fireEvent.click(screen.getByRole('button', { name: /A symbol is a picture/ }))
-    expect(onOpenThread).toHaveBeenCalledWith('thread-9')
+    // The words go with the id. The thread alone left the reader at the top of
+    // a long answer, hunting for the sentence they had saved.
+    expect(onOpenThread).toHaveBeenCalledWith(
+      'thread-9',
+      'A symbol is a picture the mind can hold.',
+    )
   })
 })
 

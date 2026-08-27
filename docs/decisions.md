@@ -1490,3 +1490,35 @@ a scroll event does not bubble.
 `describeSpan` clones the range, so both the selection and its range are a new
 object after every re-measure. Depending on either would tear the listener down
 and build it again on every frame it ran.
+
+### A kept line keeps its marks, and knows its way home — 2026-08-26
+
+The reader saved a line out of one of Veda's answers. Under Notes it arrived as
+flat prose: the bold, the bullets and the headings were gone. A tap on it opened
+the right conversation, but at the top, not at the line.
+
+**Two readings of the same words are stored.** `text` holds the markdown, and
+`quote` holds the plain words. Each does a job the other cannot:
+
+- The Notes tab draws `text`, so the line reads as the reader saw it.
+- The lamp searches its answers for `quote`. The marks are not on the page — the
+  page holds a `<strong>`, never two asterisks — so the markdown could not be
+  searched for.
+
+**The marks are written back from the drawn words, not cut out of the source.**
+The answer's markdown source is on the message, so cutting the picked piece out
+of it looks simpler. It does not work. Rendering is not reversible: a `#` becomes
+a heading with the hash gone, a table becomes a stack of terms and values in a
+different order, and a pick across two paragraphs is one run on screen and two
+blocks apart in the source. `reader/pickMarkdown.ts` walks `cloneContents()` and
+puts the marks back on, keyed on the `data-md` attributes the renderer writes.
+
+**Tables are not written back.** The renderer draws a table as a stack, because a
+grid on a phone is unreadable. Writing `|` rows back would invent a shape the
+reader never saw. The words are kept as the paragraphs they were drawn as.
+
+**Failing to find the line must not cost the reader the thread.** An answer can
+be edited away. When the words are not there, the conversation still opens.
+
+**The chapter now sits above a kept line**, as it does above a Quote. Where a
+line came from is how the reader finds it again.

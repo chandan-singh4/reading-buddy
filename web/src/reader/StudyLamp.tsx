@@ -84,6 +84,7 @@ import {
 } from './errand.ts'
 import { Markdown, whileWriting } from './markdown.tsx'
 import { AnswerPick } from './AnswerPick.tsx'
+import { markdownOfRange, wordsIn } from './pickMarkdown.ts'
 import {
   describeSpan,
   pivotFor,
@@ -126,7 +127,15 @@ export interface StudyLampProps {
    * already holds — asking the lamp to carry them would be copying state
    * downward so it could be handed straight back.
    */
-  onKeep?: (text: string) => void
+  onKeep?: (markdown: string, plain: string) => void
+  /**
+   * Words to go to when the lamp opens, from a kept line in the Notes tab.
+   *
+   * The plain words, not the markdown: the marks are not in the answer on
+   * screen, so nothing here could ever match them. `pickMarkdown.ts` explains
+   * why the two are stored side by side.
+   */
+  find?: string
   onClose: () => void
 }
 
@@ -137,6 +146,14 @@ export interface StudyLampProps {
  * The book's numbers, on purpose. A reader who has learned the gesture on the
  * page should not have to learn a second one inside the lamp.
  */
+/**
+ * How far above the top of the conversation a kept line comes to rest.
+ *
+ * Not zero. A sentence pinned to the very edge reads as the first line of the
+ * answer, and the reader loses the sentence before it that gives it its sense.
+ */
+const LANDING = 72
+
 const HOLD = 400
 const WANDER = 10
 
@@ -240,6 +257,7 @@ export function StudyLamp({
   saved,
   onSave,
   onKeep,
+  find,
   onClose,
 }: StudyLampProps) {
   const [messages, setMessages] = useState<TutorMessage[]>(saved ?? [])
@@ -589,6 +607,51 @@ export function StudyLamp({
   }, [])
 
   /*
+   * Land on the kept line, not merely in the conversation that holds it.
+   *
+   * The reader's report: tapping one of Veda's Quotes opened the right thread
+   * and left them at the top of it, hunting for the sentence they had saved. A
+   * long answer can be several screens, so "the right thread" is not the same
+   * as "the right place".
+   *
+   * The words are looked for in every answer, newest first, because a later
+   * answer is the more likely home of a line kept recently. When they are
+   * found the pick is put back exactly as the reader left it — the same wash,
+   * the same card — so the line is both visible and ready to be copied or
+   * asked about again.
+   *
+   * A layout effect, and a frame's wait: the answers must be laid out before
+   * they can be measured, and a scroll to an unlaid-out element goes nowhere.
+   */
+  useLayoutEffect(() => {
+    if (!find) return
+    let frame = requestAnimationFrame(() => {
+      frame = 0
+      const node = flow.current
+      if (!node) return
+
+      const answers = [...node.querySelectorAll(`.${styles.slip}`)].reverse()
+      for (const answer of answers) {
+        const range = wordsIn(answer, find)
+        if (!range) continue
+
+        const span = describeSpan(range, answer instanceof HTMLElement ? answer : null)
+        if (!span) continue
+
+        node.scrollTop += span.rect.top - node.getBoundingClientRect().top - LANDING
+        // Measured again after the scroll: everything the picker draws is in
+        // viewport coordinates, and the scroll just moved the words.
+        setPicked(describeSpan(range, answer instanceof HTMLElement ? answer : null) ?? span)
+        setPainted(true)
+        return
+      }
+    })
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame)
+    }
+  }, [find])
+
+  /*
    * The touch gesture: hold still on a word for a moment.
    *
    * The same shape as the book's, and the same two numbers, because a reader
@@ -845,7 +908,10 @@ export function StudyLamp({
 
   const keep = useCallback(() => {
     if (!picked) return
-    onKeep?.(picked.text)
+    // Two readings of the same words: the marks, so the Notes tab can draw the
+    // line the way the reader saw it, and the plain words, so tapping that note
+    // can find its way back to this spot. See `pickMarkdown.ts`.
+    onKeep?.(markdownOfRange(picked.range), picked.text)
     clearPick()
   }, [picked, onKeep, clearPick])
 

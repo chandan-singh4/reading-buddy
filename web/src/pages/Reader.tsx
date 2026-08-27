@@ -2492,6 +2492,7 @@ export default function Reader() {
               ? row.fromThread
               : undefined,
         fromThread: 'fromThread' in row ? row.fromThread : undefined,
+        quote: 'quote' in row ? row.quote : undefined,
       }
     })
   }, [notes, threads, frame, pageOfAnchor])
@@ -3401,6 +3402,8 @@ export default function Reader() {
      * caption — the same as any other reopened thread.
      */
     picture?: string
+    /** Words to go to on opening, when a kept line sent the reader here. */
+    find?: string
   } | null>(null)
 
   const lampRef = useRef(lamp)
@@ -3678,13 +3681,17 @@ export default function Reader() {
    * even when the panel has moved on.
    */
   const keepVedaLine = useCallback(
-    async (text: string) => {
+    async (text: string, plain: string) => {
       const open = saving.current
       if (!id || !open?.threadId) return
       const row = await noteStore.addNote(id, {
         anchor: open.passage.anchor,
         author: 'claude',
+        // The marks, so Notes draws the line the way the reader saw it, and the
+        // plain words beside them, so tapping that note can find its way back
+        // into the answer. `reader/pickMarkdown.ts` sets out why both are kept.
         text,
+        quote: plain,
         fromThread: open.threadId,
       })
       setNotes((rows) => [...rows, row])
@@ -3727,9 +3734,12 @@ export default function Reader() {
 
   /** From the notes panel back under the lamp: reopen the thread a row names. */
   const openThreadById = useCallback(
-    (threadId: string) => {
+    (threadId: string, find?: string) => {
       const thread = threads.find((row) => row.id === threadId)
-      if (thread) openThread(thread)
+      if (!thread) return
+      openThread(thread)
+      // A kept line asks for a place inside the thread, not just the thread.
+      if (find) setLamp((current) => (current ? { ...current, find } : current))
     },
     [threads, openThread],
   )
@@ -4557,6 +4567,7 @@ export default function Reader() {
               saved={lamp.saved}
               onSave={keepThread}
               onKeep={keepVedaLine}
+              find={lamp.find}
               onClose={() => setLamp(null)}
             />
           )}

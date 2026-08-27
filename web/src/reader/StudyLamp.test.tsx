@@ -533,13 +533,48 @@ describe('keeping a line Veda said', () => {
     expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
   })
 
+  it('lands on the kept line when a note sent the reader here', async () => {
+    /*
+     * The reader's report, 2026-08-26: tapping one of Veda's Quotes opened the
+     * right conversation and left them at the top of it, hunting for the
+     * sentence they had saved. A long answer is several screens, so the right
+     * thread is not the same place as the right line.
+     *
+     * The line comes back picked, not merely scrolled to: the reader can see
+     * which words the note holds, and copy or ask about them again at once.
+     */
+    Range.prototype.getBoundingClientRect = () => boxNow
+    Range.prototype.getClientRects = () => [boxNow] as unknown as DOMRectList
+
+    lamp(spoken, { onKeep: () => {}, find: 'a picture the mind can hold' })
+
+    const card = await screen.findByRole('group', { name: 'What to do with these words' })
+    expect(card).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy()
+  })
+
+  it('says nothing when the kept words are not in this conversation', async () => {
+    // An answer can be edited away, or the note can belong to a thread that no
+    // longer holds it. Opening the conversation is still the right answer —
+    // failing to find the line must not cost the reader the thread.
+    lamp(spoken, { onKeep: () => {}, find: 'words nobody ever said' })
+
+    expect(await screen.findByText('A symbol is a picture the mind can hold.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+  })
+
   it('hands the words up when they are saved', async () => {
     const onKeep = vi.fn()
     lamp(spoken, { onKeep })
     selectWordsIn(await screen.findByText('A symbol is a picture the mind can hold.'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(onKeep).toHaveBeenCalledWith('A symbol is a picture the mind can hold.')
+    // Twice over: the marks, for the Notes tab to draw, and the plain words,
+    // so a tap on that note can find this line again. See `pickMarkdown.ts`.
+    expect(onKeep).toHaveBeenCalledWith(
+      'A symbol is a picture the mind can hold.',
+      'A symbol is a picture the mind can hold.',
+    )
   })
 
   it('puts the words in the box as a quote, and does not send them', async () => {

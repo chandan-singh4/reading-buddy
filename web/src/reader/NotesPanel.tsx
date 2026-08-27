@@ -49,6 +49,10 @@ export interface NoteRow {
    *  the two are the same id doing two jobs. `threadId` says where a tap goes;
    *  this says what the row *is*, and it is what the Veda quotes chip reads. */
   fromThread?: string
+  /** The kept line's own words, without the markdown marks. What the lamp
+   *  searches its answers for, so a tap lands on the line and not merely in
+   *  the conversation around it. See `reader/pickMarkdown.ts`. */
+  quote?: string
 }
 
 /** A word the reader kept from the Define panel. */
@@ -65,7 +69,7 @@ export interface NotesPanelProps {
   /** Go to the paragraph a note is about. */
   onJumpToNote: (anchor: Anchor) => void
   /** Reopen a tutor conversation under the lamp. */
-  onOpenThread?: (threadId: string) => void
+  onOpenThread?: (threadId: string, find?: string) => void
   /** Every word the reader has kept, newest first. Not book-scoped: a word is
    *  learned once, and the reader who kept it wants it in the next book too. */
   words?: readonly WordRow[]
@@ -100,6 +104,11 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
      */
     return (
       <li className={styles.note}>
+        {/* The chapter first, as it is over a Quote. The reader asked for the
+            two to match: where a line came from is how they find it again. */}
+        <span className={styles.tagRow}>
+          <span className={styles.tag}>{whereItIs(note)}</span>
+        </span>
         <div
           role="button"
           tabIndex={0}
@@ -113,9 +122,6 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
         >
           <Markdown className={styles.txt} text={note.text} />
         </div>
-        <span className={styles.tagRow}>
-          <span className={styles.tag}>{whereItIs(note)}</span>
-        </span>
       </li>
     )
   }
@@ -198,7 +204,7 @@ export function NotesPanel({
 
   /** A tutor row reopens its conversation; every other note goes to its page. */
   function visit(note: NoteRow) {
-    if (note.threadId && onOpenThread) onOpenThread(note.threadId)
+    if (note.threadId && onOpenThread) onOpenThread(note.threadId, note.quote)
     else onJumpToNote(note.anchor)
   }
 

@@ -358,6 +358,16 @@
   --md-code: var(--veda-ink-strong);
   --md-edge: rgb(124 111 202 / 34%);
   --md-wash: rgb(124 111 202 / 12%);
+  /*
+   * Kalam has no 600, so the renderer's 600 would be synthesised, and a
+   * synthesised bold in a written hand looks like a smudge. 700 is a real cut.
+   *
+   * Tokens and not `h1..h6`: the renderer draws every heading level as a `p`.
+   * The note at the top of `markdown.tsx` says why — one size for all of them,
+   * in a chat bubble on a phone.
+   */
+  --md-head-size: 22px;
+  --md-head-weight: 700;
 
   display: block;
   color: var(--veda-ink);
@@ -380,20 +390,6 @@
  * Nothing here can reach any other caller of the renderer — the Ask-Veda chat
  * overlay keeps its typeset face — and `markdown.module.css` never changes.
  */
-
-/* Kalam has no 600, so the shared 600 would be synthesised. 700 is a real cut,
-   and it is the weight that makes `**bold**` read as bold in a hand. */
-.txt h1,
-.txt h2,
-.txt h3,
-.txt h4,
-.txt h5,
-.txt h6 {
-  color: var(--veda-ink-strong);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.2;
-}
 
 .txt strong {
   font-weight: 700;

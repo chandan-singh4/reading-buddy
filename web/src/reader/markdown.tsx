@@ -274,7 +274,7 @@ export function Markdown({ text, className }: { text: string; className?: string
       }
       at += 1 // The closing fence, or the end of the text.
       out.push(
-        <pre key={next()} className={styles.block}>
+        <pre key={next()} className={styles.block} data-md="block">
           <code>{body.join('\n')}</code>
         </pre>,
       )
@@ -309,7 +309,7 @@ export function Markdown({ text, className }: { text: string; className?: string
       // document: the answer needs a heading to read as a small title, and six
       // sizes of title inside one paragraph-long reply is a typographic joke.
       out.push(
-        <p key={next()} className={styles.heading}>
+        <p key={next()} className={styles.heading} data-md="heading">
           {inlineMarkdown(heading[2] ?? '')}
         </p>,
       )
@@ -324,7 +324,7 @@ export function Markdown({ text, className }: { text: string; className?: string
         at += 1
       }
       out.push(
-        <blockquote key={next()} className={styles.quote}>
+        <blockquote key={next()} className={styles.quote} data-md="quote">
           {inlineMarkdown(body.join('\n'))}
         </blockquote>,
       )
@@ -395,7 +395,7 @@ export function Markdown({ text, className }: { text: string; className?: string
         at += 1
       }
       const list = items.map((item, index) => (
-        <li key={index} className={styles.item}>
+        <li key={index} className={styles.item} data-md="item">
           {inlineMarkdown(item)}
         </li>
       ))
@@ -433,7 +433,7 @@ export function Markdown({ text, className }: { text: string; className?: string
       at += 1
     }
     out.push(
-      <p key={next()} className={styles.paragraph}>
+      <p key={next()} className={styles.paragraph} data-md="paragraph">
         {inlineMarkdown(paragraph.join('\n'))}
       </p>,
     )

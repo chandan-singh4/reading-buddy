@@ -22,10 +22,18 @@
   margin-bottom: 0;
 }
 
-/* Every heading level, one size. See the note in `markdown.tsx`. */
+/*
+ * Every heading level, one size. See the note in `markdown.tsx`.
+ *
+ * Weight and size are tokens because a caller may be setting the answer in a
+ * face that has no 600 — the Notes tab writes Veda's answers in a handwriting
+ * hand, whose only bold is 700, and a browser asked for 600 there synthesises
+ * one. A synthesised bold in a written face looks like a smudge.
+ */
 .heading {
   margin: 0.9em 0 0.35em;
-  font-weight: 600;
+  font-size: var(--md-head-size, 1em);
+  font-weight: var(--md-head-weight, 600);
   color: var(--md-strong, #f3e6c8);
 }
 
