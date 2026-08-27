@@ -1,0 +1,119 @@
+/*
+ * The picked words, and the card over them.
+ *
+ * Everything here is `position: fixed`, because everything here is placed from
+ * a viewport rectangle the browser measured. The conversation behind it
+ * scrolls; these are drawn again on every change of the selection.
+ *
+ * The violet is Veda's, the same ink her notes are written in. It says whose
+ * words are being held without a label.
+ */
+
+.mark {
+  position: fixed;
+  z-index: 41;
+  /* Under the words, never over them: `multiply` keeps the ink readable
+     through the wash, which is what a real highlighter does. */
+  background: #7c6fca;
+  opacity: 0.42;
+  mix-blend-mode: screen;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.handle {
+  position: fixed;
+  z-index: 42;
+  width: 3px;
+  margin-inline-start: -1px;
+  background: #a99bee;
+  touch-action: none;
+  cursor: ew-resize;
+}
+
+.handle::before {
+  /* The target: 44px wide and taller than the line, invisible. A 3px bar is
+     not something a finger can find. */
+  content: '';
+  position: absolute;
+  inset: -0.5rem -1.375rem;
+}
+
+.knob {
+  position: absolute;
+  inset-inline-start: 50%;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: #a99bee;
+}
+
+.handleStart .knob {
+  top: -0.6rem;
+  transform: translateX(-50%);
+}
+
+.handleEnd .knob {
+  bottom: -0.6rem;
+  transform: translateX(-50%);
+}
+
+/* --- The card ------------------------------------------------------------- */
+
+.card {
+  position: fixed;
+  z-index: 43;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 10px;
+  background: #2a2438;
+  box-shadow: 0 10px 24px -8px rgb(0 0 0 / 55%);
+  font-family: var(--font-ui);
+}
+
+/* Centred on the words, and clear of them by its own height. */
+.above {
+  transform: translate(-50%, -100%);
+}
+
+.below {
+  transform: translate(-50%, 0);
+}
+
+/*
+ * Out of the way while a handle is dragged, and still measured.
+ *
+ * `visibility` and not `display`, because a card that is not laid out has no
+ * width — and its width is what the placement above is centred on. It would be
+ * re-measured as zero the moment the drag ended, and jump.
+ */
+.hidden {
+  visibility: hidden;
+}
+
+.action {
+  padding: 9px 16px;
+  border: 0;
+  background: transparent;
+  color: #efe9ff;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:active {
+  background: rgb(255 255 255 / 10%);
+}
+
+.action:focus-visible {
+  outline: 2px solid #a99bee;
+  outline-offset: -2px;
+}
+
+.rule {
+  width: 1px;
+  background: rgb(255 255 255 / 14%);
+}

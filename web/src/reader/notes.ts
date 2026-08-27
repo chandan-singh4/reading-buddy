@@ -51,9 +51,9 @@ export type NoteFilter = 'all' | 'you' | 'claude' | 'vedaQuotes' | 'words'
  * wrote. The stored `author` is still `'you'`, because that is a fact about who
  * made the row and it stays right whatever the chip is called.
  *
- * **Veda quotes** is the same idea one voice over: lines the reader picked out
+ * **Veda's Quotes** is the same idea one voice over: lines the reader picked out
  * of what Veda said. The pair reads straight across — Quotes are the book's
- * best sentences, Veda quotes are hers — and it is why the new chip sits next
+ * best sentences, Veda's Quotes are hers — and it is why the new chip sits next
  * to the old one rather than at the end.
  *
  * See `docs/decisions.md` for what each of the five is for.
@@ -62,7 +62,7 @@ export const NOTE_FILTERS: { value: NoteFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'you', label: 'Quotes' },
   { value: 'claude', label: 'Veda' },
-  { value: 'vedaQuotes', label: 'Veda quotes' },
+  { value: 'vedaQuotes', label: 'Veda’s Quotes' },
   { value: 'words', label: 'Words' },
 ]
 

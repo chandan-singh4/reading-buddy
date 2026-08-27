@@ -83,6 +83,14 @@ import {
   type Errand,
 } from './errand.ts'
 import { Markdown, whileWriting } from './markdown.tsx'
+import { AnswerPick } from './AnswerPick.tsx'
+import {
+  describeSpan,
+  spanBetween,
+  wordAtIn,
+  type SelectionPivot,
+  type SpanSelection,
+} from './selection.ts'
 import {
   DEFAULT_EFFORT,
   effortLabel,
@@ -120,6 +128,16 @@ export interface StudyLampProps {
   onKeep?: (text: string) => void
   onClose: () => void
 }
+
+/**
+ * How long a finger must hold still before it has chosen a word, and how far it
+ * may wander first.
+ *
+ * The book's numbers, on purpose. A reader who has learned the gesture on the
+ * page should not have to learn a second one inside the lamp.
+ */
+const HOLD = 400
+const WANDER = 10
 
 /**
  * The chips, in the order they are offered.
@@ -528,75 +546,179 @@ export function StudyLamp({
    * ## Keeping a line Veda said
    *
    * Veda sometimes says one sentence worth more than the answer around it. The
-   * reader selects it and gets two things to do with it: keep it, or ask about
-   * it.
+   * reader picks it out and gets three things to do with it: copy it, keep it,
+   * or ask about it.
    *
-   * ### Why this is not `SelectionMenu`
+   * ### Why the app picks the words itself
    *
-   * The book's selection menu carries drag handles, sentence and paragraph
-   * snapping, and five highlight colours, and every one of them is filed
-   * against a paragraph's anchor. None of that exists here. An answer is
-   * markdown in a bubble: it has no anchor grammar, it is re-drawn whenever the
-   * thread changes, and there is nothing to highlight it *with*. Reusing that
-   * component would mean teaching it a second world it has no use for.
+   * The first build of this let the browser select, and put a card above the
+   * selection. On Android the phone's own Copy/Share bar goes in exactly that
+   * place, and it covered the card completely. No page can ask a phone not to
+   * raise that bar — the book learned this first, and the note at the foot of
+   * `Reader.module.css` says so in as many words.
    *
-   * ### What counts as a selection worth acting on
+   * So on a touch screen the answers are not selectable at all, and a long
+   * press picks the word under the finger with `wordAtIn`. The phone never
+   * holds a selection, so it never has anything to raise a bar over. A mouse
+   * keeps the browser's own selection, because there is no bar to hide on a
+   * desktop and dragging across words is how a desktop selects.
    *
-   * Both ends inside one of Veda's answers. Both, because a drag that starts in
-   * her answer and ends in the reader's question would keep words nobody said
-   * in one place. And her answers only — a reader's own question is already
-   * theirs, and keeping it would file their words under Veda's name.
+   * ### What counts as a pick worth acting on
+   *
+   * Words inside one of Veda's answers, and one answer only. Her answers,
+   * because a reader's own question is already theirs and keeping it would file
+   * their words under her name. One, because a drag from her answer into the
+   * next question would keep words nobody said in one place.
    */
-  const [picked, setPicked] = useState<{ text: string; top: number; left: number } | null>(null)
+  const [picked, setPicked] = useState<SpanSelection | null>(null)
+  /** True while the app owns the selection, which is when it must draw it. */
+  const [painted, setPainted] = useState(false)
 
-  useEffect(() => {
-    /*
-     * `selectionchange` rather than `pointerup`, because a selection is also
-     * made by dragging a phone's own handles, by a double-tap, and by the
-     * keyboard — and `pointerup` sees none of those. It fires on every
-     * character of a drag, so the work in here stays cheap and idempotent.
-     */
-    const read = () => {
-      const selection = document.getSelection()
-      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
-        setPicked(null)
-        return
-      }
-
-      const inAnswer = (node: Node | null) =>
-        (node instanceof Element ? node : node?.parentElement)?.closest(`.${styles.slip}`) ?? null
-
-      const from = inAnswer(selection.anchorNode)
-      const to = inAnswer(selection.focusNode)
-      if (!from || from !== to) {
-        setPicked(null)
-        return
-      }
-
-      const text = selection.toString().trim()
-      if (text.length === 0) {
-        setPicked(null)
-        return
-      }
-
-      /*
-       * The card goes above the selection, because on a phone the reader's own
-       * hand is below it. `getBoundingClientRect` on the range is the box
-       * around every line of it, so a selection spanning three lines puts the
-       * card above the first — which is where the reader's eye already is.
-       */
-      const box = selection.getRangeAt(0).getBoundingClientRect()
-      setPicked({ text, top: box.top, left: box.left + box.width / 2 })
-    }
-
-    document.addEventListener('selectionchange', read)
-    return () => document.removeEventListener('selectionchange', read)
+  /** The answer bubble holding a node, or `null` for anything else. */
+  const answerAround = useCallback((node: Node | null): HTMLElement | null => {
+    const element = node instanceof Element ? node : node?.parentElement
+    const found = element?.closest(`.${styles.slip}`) ?? null
+    return found instanceof HTMLElement ? found : null
   }, [])
 
   const clearPick = useCallback(() => {
     document.getSelection()?.removeAllRanges()
     setPicked(null)
+    setPainted(false)
   }, [])
+
+  /*
+   * The touch gesture: hold still on a word for a moment.
+   *
+   * The same shape as the book's, and the same two numbers, because a reader
+   * who has learned the gesture on the page should not have to learn a second
+   * one twelve millimetres away. A finger that wanders is scrolling the
+   * conversation and not choosing a word, so the wander cancels it.
+   */
+  useEffect(() => {
+    // The conversation itself, which already has a ref for scrolling. The
+    // gesture is listened for on the whole thread rather than on each bubble:
+    // bubbles come and go as answers arrive, and a listener per bubble would
+    // have to be added and taken away with them.
+    const root = flow.current
+    if (!root || !onKeep) return
+
+    let from: { x: number; y: number } | null = null
+    let timer = 0
+
+    const stop = () => {
+      window.clearTimeout(timer)
+      from = null
+    }
+
+    const onDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse') return
+      const answer = event.target instanceof Node ? answerAround(event.target) : null
+      if (!answer) return
+      from = { x: event.clientX, y: event.clientY }
+      timer = window.setTimeout(() => {
+        if (!from) return
+        const found = wordAtIn(from.x, from.y, answer)
+        stop()
+        if (!found) return
+        setPicked(found)
+        setPainted(true)
+      }, HOLD)
+    }
+
+    const onMove = (event: PointerEvent) => {
+      if (!from) return
+      if (Math.abs(event.clientX - from.x) > WANDER || Math.abs(event.clientY - from.y) > WANDER) {
+        stop()
+      }
+    }
+
+    root.addEventListener('pointerdown', onDown)
+    root.addEventListener('pointermove', onMove)
+    root.addEventListener('pointerup', stop)
+    root.addEventListener('pointercancel', stop)
+    return () => {
+      stop()
+      root.removeEventListener('pointerdown', onDown)
+      root.removeEventListener('pointermove', onMove)
+      root.removeEventListener('pointerup', stop)
+      root.removeEventListener('pointercancel', stop)
+    }
+  }, [onKeep, answerAround])
+
+  /*
+   * A tap outside the words puts them down again.
+   *
+   * Only when the app owns the selection. A browser selection clears itself,
+   * and the `selectionchange` below hears about it.
+   */
+  useEffect(() => {
+    if (!painted) return
+    const put = (event: PointerEvent) => {
+      const target = event.target
+      if (target instanceof Node && answerAround(target)) return
+      clearPick()
+    }
+    // The capture phase, so a tap lands here before it reaches whatever it was
+    // on: the reader is putting the words down, not pressing that thing.
+    document.addEventListener('pointerdown', put, true)
+    return () => document.removeEventListener('pointerdown', put, true)
+  }, [painted, clearPick, answerAround])
+
+  /*
+   * The mouse gesture: the browser's own selection, read once it settles.
+   *
+   * `selectionchange` rather than `pointerup`, because a selection is also made
+   * by double-click and by the keyboard, and `pointerup` sees neither.
+   */
+  useEffect(() => {
+    if (!onKeep) return
+
+    const read = () => {
+      const selection = document.getSelection()
+      const drop = () => setPicked((held) => (painted ? held : null))
+
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+        // Never over a painted pick: making one clears the browser's selection,
+        // and this would throw the pick away in the same breath.
+        drop()
+        return
+      }
+
+      const from = answerAround(selection.anchorNode)
+      const to = answerAround(selection.focusNode)
+      if (!from || from !== to) {
+        drop()
+        return
+      }
+
+      const found = describeSpan(selection.getRangeAt(0), from)
+      if (!found) return
+      setPicked(found)
+      setPainted(false)
+    }
+
+    document.addEventListener('selectionchange', read)
+    return () => document.removeEventListener('selectionchange', read)
+  }, [onKeep, painted, answerAround])
+
+  /** One end of the pick dragged to a point, by its handle. */
+  const stretch = useCallback(
+    (pivot: SelectionPivot, x: number, y: number) => {
+      setPicked((held) => {
+        if (!held) return held
+        const root = answerAround(held.range.startContainer)
+        return spanBetween(pivot, x, y, root) ?? held
+      })
+    },
+    [answerAround],
+  )
+
+  const copyPick = useCallback(() => {
+    if (!picked) return
+    void navigator.clipboard?.writeText(picked.text)
+    clearPick()
+  }, [picked, clearPick])
 
   const keep = useCallback(() => {
     if (!picked) return
@@ -805,31 +927,14 @@ export function StudyLamp({
       </button>
 
       {picked && onKeep && (
-        /*
-          Fixed, and placed from the selection's own box rather than laid out in
-          the flow. The conversation scrolls; a card in the flow would have to
-          be inserted between two messages, which reflows the thread under the
-          reader's finger at the exact moment they are aiming at it.
-
-          `onPointerDown` with `preventDefault` on the card itself: a tap
-          anywhere else clears the selection before the click lands, and the
-          button would fire with nothing selected.
-        */
-        <div
-          className={styles.pick}
-          style={{ top: `${picked.top}px`, left: `${picked.left}px` }}
-          role="group"
-          aria-label="What to do with these words"
-          onPointerDown={(event) => event.preventDefault()}
-        >
-          <button type="button" className={styles.pickAction} onClick={keep}>
-            Save
-          </button>
-          <span className={styles.pickRule} aria-hidden="true" />
-          <button type="button" className={styles.pickAction} onClick={askAbout}>
-            Ask
-          </button>
-        </div>
+        <AnswerPick
+          selection={picked}
+          painted={painted}
+          onExtend={stretch}
+          onCopy={copyPick}
+          onSave={keep}
+          onAsk={askAbout}
+        />
       )}
 
       <div className={styles.anchor}>

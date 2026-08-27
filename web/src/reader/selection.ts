@@ -11,32 +11,44 @@
 
 import type { Anchor } from '../structure/index.ts'
 
-/** A selection the reader made inside the page. */
-export interface ReaderSelection {
+/**
+ * A selection with no paragraph behind it.
+ *
+ * The tutor's answers need one of these. An answer is markdown in a bubble, not
+ * part of the book, so there is no anchor to file it against — and every other
+ * thing a selection carries is the same either way. `ReaderSelection` is this
+ * plus the anchor.
+ */
+export interface SpanSelection {
   /** The selected words, whitespace tidied. */
   text: string
-  /** The paragraph the selection starts in. */
-  anchor: Anchor
   /** Where it sits on screen, for placing the menu. Viewport coordinates. */
   rect: { top: number; bottom: number; left: number; right: number }
-  /**
-   * One box per line of the selection.
-   *
-   * Kept because the app paints the selection itself. The phone's own text menu
-   * appears the moment a native selection exists and cannot be turned off, so
-   * the selection is read, dropped, and drawn again by us — and these are what
-   * gets drawn. See `SelectionMenu.tsx`.
-   */
+  /** One box per line, for painting the selection ourselves. */
   rects: SelectionRect[]
-  /**
-   * The range itself, so the reader can stretch it.
-   *
-   * The phone's own drag handles went with the phone's own menu, and a reader
-   * who can only ever select one word has been given a worse deal than the
-   * browser offered. `selectionBetween` moves one end of this.
-   */
+  /** The range itself, so the reader can stretch it. */
   range: Range
 }
+
+/** A selection the reader made inside the page. */
+export interface ReaderSelection extends SpanSelection {
+  /** The paragraph the selection starts in. */
+  anchor: Anchor
+}
+
+/*
+ * Two notes that belong to `rects` and `range`, kept here now that both live on
+ * `SpanSelection` above.
+ *
+ * `rects` exist because the app paints the selection itself. The phone's own
+ * text menu appears the moment *it* holds a selection and cannot be turned off,
+ * so the app never lets it hold one — it finds the words and draws them.
+ *
+ * `range` exists because the phone's own drag handles went with the phone's own
+ * menu, and a reader who can only ever select one word has been given a worse
+ * deal than the browser offered. `selectionBetween` and `spanBetween` move one
+ * end of it.
+ */
 
 /** Which end of a selection a finger is dragging. */
 export type SelectionEdge = 'start' | 'end'
@@ -79,7 +91,7 @@ export interface SelectionPivot {
 }
 
 /** The end a drag leaves alone: grab the start, and the end is the pivot. */
-export function pivotFor(selection: ReaderSelection, edge: SelectionEdge): SelectionPivot {
+export function pivotFor(selection: SpanSelection, edge: SelectionEdge): SelectionPivot {
   const range = selection.range
   return edge === 'start'
     ? { node: range.endContainer, offset: range.endOffset }
@@ -295,10 +307,28 @@ export function wordAt(x: number, y: number, root: HTMLElement | null): ReaderSe
   const at = flatIndexOf(from, caret.node, caret.offset)
   if (at < 0) return null
 
+  const span = wordSpan(flat, at)
+  if (!span) return null
+  const range = rangeOfSpan(from, span.start, span.end)
+  return range ? describe(range, root) : null
+}
+
+/**
+ * Where the word holding `at` starts and ends in the squeezed text.
+ *
+ * Word boundaries come from `Intl.Segmenter`, the same source the sentence
+ * grain uses, so "don't" and "twenty-one" are one word and the rules change
+ * with the language rather than with our guesses.
+ *
+ * `null` when the point is on punctuation or on the space between two words —
+ * the reader touched between words, and there is no word to give.
+ */
+function wordSpan(flat: string, at: number): { start: number; end: number } | null {
   const segmenter =
     typeof Intl !== 'undefined' && 'Segmenter' in Intl
       ? new Intl.Segmenter(undefined, { granularity: 'word' })
       : null
+
   // No Segmenter: run out to the spaces on either side, which is the same
   // answer for English and a worse one for nothing.
   if (!segmenter) {
@@ -306,21 +336,76 @@ export function wordAt(x: number, y: number, root: HTMLElement | null): ReaderSe
     while (start > 0 && !/\s/.test(flat[start - 1] ?? ' ')) start -= 1
     let end = at
     while (end < flat.length && !/\s/.test(flat[end] ?? ' ')) end += 1
-    const plain = rangeOfSpan(from, start, end)
-    return plain ? describe(plain, root) : null
+    return start === end ? null : { start, end }
   }
 
   for (const piece of segmenter.segment(flat)) {
     const end = piece.index + piece.segment.length
     if (at >= end) continue
-    // Punctuation and the spaces between words are segments too. Landing on one
-    // means the reader touched between words, and there is no word to give.
     if (!piece.isWordLike) return null
-    const range = rangeOfSpan(from, piece.index, end)
-    return range ? describe(range, root) : null
+    return { start: piece.index, end }
   }
   return null
 }
+
+/**
+ * The word under a point, inside anything at all.
+ *
+ * `wordAt` finds the paragraph through the book's anchor grammar, which the
+ * tutor's answers do not have. This one takes the element to look inside and
+ * asks nothing else of it, so it works on an answer bubble — and on any other
+ * run of text the app grows later.
+ */
+export function wordAtIn(x: number, y: number, root: HTMLElement | null): SpanSelection | null {
+  if (!root) return null
+
+  const caret = caretAt(x, y)
+  if (!caret || !root.contains(caret.node)) return null
+
+  const { flat, from } = flatten(root)
+  if (from.length === 0) return null
+
+  const at = flatIndexOf(from, caret.node, caret.offset)
+  if (at < 0) return null
+
+  const span = wordSpan(flat, at)
+  if (!span) return null
+  const range = rangeOfSpan(from, span.start, span.end)
+  return range ? describeSpan(range, root) : null
+}
+
+/**
+ * `selectionBetween`, for text with no anchor behind it.
+ *
+ * Same rule about a crossing drag: the pivot stays put and the two boundaries
+ * are put back in document order, so whichever side the finger is on becomes
+ * that side of the selection.
+ */
+export function spanBetween(
+  pivot: SelectionPivot,
+  x: number,
+  y: number,
+  root: HTMLElement | null,
+): SpanSelection | null {
+  if (!root) return null
+
+  const caret = caretAt(x, y)
+  if (!caret || !root.contains(caret.node)) return null
+
+  const held = document.createRange()
+  held.setStart(pivot.node, pivot.offset)
+  const moved = document.createRange()
+  moved.setStart(caret.node, caret.offset)
+
+  const before = moved.compareBoundaryPoints(Range.START_TO_START, held) < 0
+  const range = document.createRange()
+  range.setStart(before ? caret.node : pivot.node, before ? caret.offset : pivot.offset)
+  range.setEnd(before ? pivot.node : caret.node, before ? pivot.offset : caret.offset)
+
+  if (range.collapsed) return null
+  return describeSpan(range, root)
+}
+
 
 /** The sentence holding the start of `selection`. */
 function sentenceIn(flat: string, from: Source[], selection: ReaderSelection): Range | null {
@@ -598,15 +683,20 @@ export function selectionInReader(root: HTMLElement | null): ReaderSelection | n
   return describe(selection.getRangeAt(0), root)
 }
 
-/** Everything the app keeps about a range. `null` if the range is no good. */
-function describe(range: Range, root: HTMLElement): ReaderSelection | null {
-  if (!root.contains(range.commonAncestorContainer)) return null
+/**
+ * Everything the app keeps about a range, except which paragraph it is in.
+ *
+ * The tutor's answers need this half and cannot have the other one. An answer
+ * is markdown in a bubble: it has no anchor, because it is not part of the
+ * book. Everything else a selection needs — the words, the box, the line boxes
+ * that get painted — is the same work either way, so it is done once here and
+ * `describe` adds the anchor on top.
+ */
+export function describeSpan(range: Range, root: HTMLElement | null): SpanSelection | null {
+  if (!root || !root.contains(range.commonAncestorContainer)) return null
 
   const text = range.toString().replace(/\s+/g, ' ').trim()
   if (!text) return null
-
-  const anchor = anchorOfNode(range.startContainer)
-  if (!anchor) return null
 
   // The union of the client rects rather than `getBoundingClientRect`: a
   // selection running over three lines has a bounding box as wide as the
@@ -616,7 +706,6 @@ function describe(range: Range, root: HTMLElement): ReaderSelection | null {
 
   return {
     text,
-    anchor,
     range: range.cloneRange(),
     rect: {
       top: Math.min(...box.map((rect) => rect.top)),
@@ -632,3 +721,15 @@ function describe(range: Range, root: HTMLElement): ReaderSelection | null {
     })),
   }
 }
+
+/** Everything the app keeps about a range. `null` if the range is no good. */
+function describe(range: Range, root: HTMLElement): ReaderSelection | null {
+  const span = describeSpan(range, root)
+  if (!span) return null
+
+  const anchor = anchorOfNode(range.startContainer)
+  if (!anchor) return null
+
+  return { ...span, anchor }
+}
+

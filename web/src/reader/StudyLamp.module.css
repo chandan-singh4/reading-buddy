@@ -802,56 +802,24 @@
   object-fit: contain;
 }
 
-/* --- Two things to do with a line she said -------------------------------- */
-
 /*
- * The card over a selection inside one of Veda's answers.
+ * On a touch screen, Veda's answers are not the phone's to select.
  *
- * Fixed and centred on the selection's own box, sitting above it, because on a
- * phone everything below the words is under the reader's hand. `translate` does
- * the centring rather than arithmetic in the component: the card's width
- * depends on the font, and the component would have to measure it.
+ * The phone raises its own Copy/Share bar the instant *it* holds a selection,
+ * it lands directly above the words, and no page can ask it not to. That bar
+ * covered the app's own card completely — see the note in `StudyLamp.tsx`. So
+ * the phone never gets to hold a selection here: a long press picks the word
+ * and the app paints it. `-webkit-touch-callout` covers the other menu, the one
+ * a long press on a link raises.
  *
- * Two words and a hairline between them. It is deliberately not the book's
- * selection menu — that one carries handles and five colours, and a card that
- * looked like it would promise all of them here.
+ * A mouse keeps the browser's selection. There is no bar to hide on a desktop,
+ * and dragging across words is how a desktop selects. Same rule as the book —
+ * see the foot of `Reader.module.css`.
  */
-.pick {
-  position: fixed;
-  z-index: 40;
-  display: flex;
-  align-items: stretch;
-  overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 14%);
-  border-radius: 10px;
-  background: #2a2438;
-  box-shadow: 0 10px 24px -8px rgb(0 0 0 / 55%);
-  font-family: var(--font-ui);
-  /* Above the selection, by its own height plus a thumb's clearance. */
-  transform: translate(-50%, calc(-100% - 10px));
-}
-
-.pickAction {
-  padding: 9px 16px;
-  border: 0;
-  background: transparent;
-  color: #efe9ff;
-  font: inherit;
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.pickAction:active {
-  background: rgb(255 255 255 / 10%);
-}
-
-.pickAction:focus-visible {
-  outline: 2px solid #a99bee;
-  outline-offset: -2px;
-}
-
-.pickRule {
-  width: 1px;
-  background: rgb(255 255 255 / 14%);
+@media (pointer: coarse) {
+  .slip {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }

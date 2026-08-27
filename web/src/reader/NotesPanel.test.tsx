@@ -196,7 +196,7 @@ describe('Veda quotes', () => {
     expect(screen.getByText('Claude says 2')).toBeTruthy()
     expect(screen.queryByText(/A symbol is a picture/)).toBeNull()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Veda quotes' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Veda’s Quotes' }))
     expect(screen.getByText(/A symbol is a picture/)).toBeTruthy()
     expect(screen.queryByText('Claude says 2')).toBeNull()
   })

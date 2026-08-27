@@ -489,8 +489,9 @@ function selectWordsIn(element: Element) {
    * which words were picked and what happens to them, not about where the card
    * lands.
    */
-  Range.prototype.getBoundingClientRect = () =>
-    ({ top: 100, left: 40, width: 200, height: 20 }) as DOMRect
+  const box = { top: 100, bottom: 120, left: 40, right: 240, width: 200, height: 20 } as DOMRect
+  Range.prototype.getBoundingClientRect = () => box
+  Range.prototype.getClientRects = () => [box] as unknown as DOMRectList
 
   const range = document.createRange()
   range.selectNodeContents(element)
@@ -519,6 +520,7 @@ describe('keeping a line Veda said', () => {
     lamp(spoken, { onKeep: () => {} })
     selectWordsIn(await screen.findByText('A symbol is a picture the mind can hold.'))
 
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Ask' })).toBeTruthy()
   })
@@ -549,12 +551,33 @@ describe('keeping a line Veda said', () => {
     expect(screen.getAllByRole('button', { name: 'Copy this answer' })).toHaveLength(1)
   })
 
+  it('copies the words without keeping them', async () => {
+    const written: string[] = []
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (text: string) => {
+          written.push(text)
+          return Promise.resolve()
+        },
+      },
+    })
+    const onKeep = vi.fn()
+    lamp(spoken, { onKeep })
+    selectWordsIn(await screen.findByText('A symbol is a picture the mind can hold.'))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+
+    expect(written).toEqual(['A symbol is a picture the mind can hold.'])
+    expect(onKeep).not.toHaveBeenCalled()
+  })
+
   it('offers nothing on the reader’s own question', async () => {
     // Keeping the reader's words under Veda's name would put a sentence in her
     // mouth that she never said.
     lamp(spoken, { onKeep: () => {} })
     selectWordsIn(await screen.findByText('What is a symbol?'))
 
+    expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Ask' })).toBeNull()
   })

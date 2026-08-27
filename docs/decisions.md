@@ -1410,3 +1410,31 @@ Veda quotes · Words. Quotes are the book's best sentences; Veda quotes are hers
 
 The switch is hidden on **Words**. A word has no anchor, so it belongs to no
 chapter.
+
+### The phone's own selection bar — fixed 2026-08-26
+
+The first build let the browser select the words and put a card above them. On
+Android the phone's own Copy/Share bar goes in exactly that place and covered
+the card. **No page can ask a phone not to raise that bar.** The book met this
+first; the note at the foot of `Reader.module.css` says so.
+
+So Veda's answers are **not selectable on a touch screen**. A long press picks
+the word under the finger, and the app paints it. The phone never holds a
+selection, so it has nothing to raise a bar over. A mouse keeps the browser's
+selection: there is no bar to hide on a desktop.
+
+The card carries three actions now: **Copy · Save · Ask**.
+
+`selection.ts` grew an anchor-free half — `describeSpan`, `wordAtIn`,
+`spanBetween` — because every step except the anchor is the same work. An answer
+has no anchor: it is markdown in a bubble, not part of the book.
+
+`AnswerPick.tsx` draws it. It is not `SelectionMenu`, which carries five
+highlight colours, sentence and paragraph snapping, and a Define that only means
+something on a word in a book.
+
+**Known, and left alone:** a pick that runs across two paragraphs joins them with
+no space — "did.And that". A Range's text is the characters it covers, and there
+is no character between `</p>` and `<p>`. The book's highlights have always read
+this way. Changing it means building the words some way other than from the
+range, in code the book shares.

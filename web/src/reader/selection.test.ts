@@ -4,11 +4,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   describeRange,
+  describeSpan,
   selectAround,
   pivotFor,
   selectionBetween,
+  spanBetween,
   rangeAtOffset,
   rangeOfQuote,
+  wordAtIn,
   type ReaderSelection,
 } from './selection.ts'
 import type { Anchor } from '../structure/index.ts'
@@ -50,6 +53,84 @@ function caretAt(node: Node, offset: number): void {
     return range
   }
 }
+
+describe('text with no paragraph behind it', () => {
+  /*
+   * The tutor's answers. An answer is markdown in a bubble — it is not part of
+   * the book, so it has no anchor, and the book's own `wordAt` and
+   * `selectionBetween` both refuse anything they cannot anchor. These are the
+   * same work with that one requirement lifted, so that a reader can keep a
+   * line Veda said the same way they keep a line the book said.
+   */
+  function answer(): HTMLElement {
+    document.body.innerHTML = `<div id="slip"><p>${TEXT}</p><p>And that was that.</p></div>`
+    return document.getElementById('slip') as HTMLElement
+  }
+
+  function words(): Text {
+    return document.querySelector('#slip p')!.firstChild as Text
+  }
+
+  it('picks the whole word under the finger', () => {
+    const root = answer()
+    // Inside "laughed", not at either end of it.
+    caretAt(words(), 29)
+
+    expect(wordAtIn(0, 0, root)?.text).toBe('laughed')
+  })
+
+  it('gives nothing for a finger between two words', () => {
+    const root = answer()
+    // The space after "dog".
+    caretAt(words(), 7)
+
+    expect(wordAtIn(0, 0, root)).toBeNull()
+  })
+
+  it('gives nothing for a point outside the answer', () => {
+    const root = answer()
+    document.body.insertAdjacentHTML('beforeend', '<p id="elsewhere">Somewhere else.</p>')
+    caretAt(document.getElementById('elsewhere')!.firstChild!, 3)
+
+    expect(wordAtIn(0, 0, root)).toBeNull()
+  })
+
+  it('stretches one end of a pick, and lets it cross the other', () => {
+    const root = answer()
+    const range = document.createRange()
+    range.setStart(words(), 18)
+    range.setEnd(words(), 21)
+    const held = describeSpan(range, root)!
+    expect(held.text).toBe('The')
+
+    // Drag the start backwards, well before the pivot.
+    caretAt(words(), 4)
+    expect(spanBetween(pivotFor(held, 'start'), 0, 0, root)?.text).toBe('dog sat down. The')
+
+    // And past the pivot, which swaps the ends rather than jamming.
+    caretAt(words(), 33)
+    expect(spanBetween(pivotFor(held, 'start'), 0, 0, root)?.text).toBe('cat laughed')
+  })
+
+  it('reaches across the paragraphs inside one answer', () => {
+    /*
+     * An answer is markdown: headings, paragraphs and lists, not one text node.
+     * A pick that runs from one into the next is an ordinary thing to want.
+     *
+     * The two paragraphs join with no space between them, because a Range's
+     * text is the characters it covers and there is no character between
+     * `</p>` and `<p>`. The book's highlights have always read this way. It is
+     * recorded here rather than worked around: changing it means building the
+     * words some way other than from the range, in code the book shares.
+     */
+    const root = answer()
+    const range = document.createRange()
+    range.setStart(words(), 50)
+    range.setEnd(document.querySelectorAll('#slip p')[1]!.firstChild!, 8)
+
+    expect(describeSpan(range, root)?.text).toBe('Nobody else did.And that')
+  })
+})
 
 describe('growing a selection', () => {
   it('takes the sentence around a word', () => {
