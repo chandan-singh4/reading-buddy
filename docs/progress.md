@@ -15,11 +15,14 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,169 tests across 120 files.
+  2,174 tests across 120 files.
 - **Waiting on the phone: the two summary views.** They are built and shipped,
   but they were judged on a desktop browser only. The reader has not seen them
   on a device. Open a book, then **Book details → What we worked through**.
   Judge the paper, the type sizes, and the sideways rail under the heading.
+  Opened from there, the Commonplace Book shows **that book only**. The
+  library-wide version exists at `/commonplace` with no `?book=`, and has no
+  link to it yet.
 - **A design question the views leave open.** These two pages do not follow the
   reader's theme. A reader in Dark gets a bright page at night. This was chosen
   with the cost known. Only a look on the phone can settle it.
@@ -43,8 +46,20 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 ### Recently done
 
 - **The two summary views** (2026-08-27). Not a waypoint — built from
-  `design-inspiration/build-prompt-summary-views.md`. Build green: 2,169 tests
-  across 120 files, up 39.
+  `design-inspiration/build-prompt-summary-views.md`. Build green: 2,174 tests
+  across 120 files, up 44.
+  - **The Commonplace Book has two scopes, set by the door.** The first build
+    made it library-wide, as the build prompt says, but put the link inside a
+    book's details page. The reader caught the contradiction. It now reads
+    `?book=`: from Book Details it is that book's ideas; with no book it is the
+    whole shelf. The Chapter View's concept chip carries the book with it.
+    The library-wide door has no home in the UI yet — it belongs in the drawer,
+    once the data is real.
+  - **A flaky Reader test, diagnosed and fixed.** Adding five test files made
+    `Reader.test.tsx` fail about one run in three. The cause was in the test,
+    not the code: the neighbour section's text appearing and its pictures
+    having been asked for are two different moments, and it read the second
+    once instead of waiting for it. It waits now. Four full runs green.
   - Two read-only pages over the same notes, with two indexes. The
     **Commonplace Book** (`/commonplace`) files a passage by concept, across
     every book. The **Chapter View** (`/book/:bookId/chapters`) files it by

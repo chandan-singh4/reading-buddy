@@ -1761,3 +1761,34 @@ Both are in the fixture, as two items. The instruction was to match the
 references exactly, and picking one would have broken one of them. If the engine
 gives one item per passage, delete one of the two. Nothing depends on there
 being two.
+
+### The Commonplace Book has two scopes, set by the door — 2026-08-27
+
+The first build made the Commonplace Book library-wide, as the build prompt
+says. The reader then asked the right question: if the link is in Book Details,
+under a section for that book's Q&A, why does it show every book?
+
+The placement and the scope disagreed. One had to move.
+
+**What we did.** The page now reads `?book=` from the URL.
+
+- **With a book** it shows that book's passages only. The eyebrow names the
+  book. The count says "from this book". The rail lists only headings that hold
+  something, because a vocabulary of empty names is noise inside one book.
+- **Without a book** it is the whole shelf, as before. A heading can hold a
+  memoir and a neuroscience book together.
+
+The link on Book Details sets `book=`. The concept chip in the Chapter View
+carries it too: a reader thinking about one book stays inside it. Widening to
+the shelf on a tap is a change of subject they did not ask for.
+
+**Why keep both.** Gathering across books is the only thing this lens does that
+the Chapter View cannot. Scoped to one book, "by idea" and "by chapter" are two
+orderings of one short list. That is still useful, and it is what the reader
+wanted in Book Details. The library-wide door has no home in the UI yet. It
+belongs in the navigation drawer, and it can go there when the data is real.
+
+**The default heading differs by scope.** Unscoped, the page opens on the
+reference design's own heading. Scoped, it opens on the first heading this book
+has anything under. `openingConcept` is an idea out of Jung; defaulting to it
+inside somebody else's book would open on an empty page.

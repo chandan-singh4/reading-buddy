@@ -557,8 +557,8 @@ export default function BookInfo() {
       <section className={styles.section}>
         <h2 className={styles.sectionHeading}>What we worked through</h2>
         <p className={styles.genreNote}>
-          Two ways to read the same notes: by the chapter you met them in, or by the idea they are
-          about. Showing sample content for now.
+          Two ways to read this book&rsquo;s notes: by the chapter you met them in, or by the idea
+          they are about. Showing sample content for now.
         </p>
         <div className={styles.summaryLinks}>
           <Link
@@ -567,9 +567,11 @@ export default function BookInfo() {
           >
             Chapter view
           </Link>
+          {/* `book=` is what makes this door the scoped one: opened from here
+              the Commonplace Book shows this book's ideas, not the shelf's. */}
           <Link
             className={styles.returnLink}
-            to={`/commonplace?from=${encodeURIComponent(`/book/${book.id}/info`)}`}
+            to={`/commonplace?book=${book.id}&from=${encodeURIComponent(`/book/${book.id}/info`)}`}
           >
             Commonplace book
           </Link>

@@ -154,7 +154,7 @@ export default function ChapterView() {
               {open.items.length === 1 ? 'passage' : 'passages'}
             </div>
             {open.items.map((item) => (
-              <Item key={item.id} item={item} crossing={crossing} />
+              <Item key={item.id} item={item} crossing={crossing} bookId={id} />
             ))}
           </>
         ) : (
@@ -169,7 +169,15 @@ export default function ChapterView() {
 }
 
 /** One distilled item: the claim, its passage anchor, and its concept chip. */
-function Item({ item, crossing }: { item: DistilledItem; crossing: string }) {
+function Item({
+  item,
+  crossing,
+  bookId,
+}: {
+  item: DistilledItem
+  crossing: string
+  bookId: string
+}) {
   const pending = item.concept.status === 'candidate'
   return (
     <div className={styles.item}>
@@ -189,9 +197,12 @@ function Item({ item, crossing }: { item: DistilledItem; crossing: string }) {
             <span className={styles.pendingHint}>awaiting Librarian</span>
           </>
         ) : (
+          /* The crossing carries the book with it. A reader thinking about
+             one book stays inside it; widening to the whole shelf on a tap
+             would be a change of subject they did not ask for. */
           <Link
             className={styles.chip}
-            to={`/commonplace?concept=${encodeURIComponent(item.concept.name)}&${fromParam(crossing)}`}
+            to={`/commonplace?concept=${encodeURIComponent(item.concept.name)}&book=${bookId}&${fromParam(crossing)}`}
           >
             {item.concept.name}
           </Link>

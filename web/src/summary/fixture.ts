@@ -170,12 +170,30 @@ const vedaNotes: VedaNote[] = [
 ]
 
 /**
+ * The passages in scope.
+ *
+ * Unscoped, that is everything — a heading gathers Jung and *Why We Sleep*
+ * together, which is the whole point of the library-wide lens.
+ *
+ * Scoped to one book, it is the sample book's passages wearing the reader's
+ * book's name. The same deliberate lie as `sampleChapters`, and for the same
+ * reason: the scoped view is reached from a button on a book's own details
+ * page, so a reader opens it on the book in front of them. Keyed strictly by
+ * title it would be blank for everyone. A real source filters honestly and
+ * this goes away with it.
+ */
+function inScope(book: string | undefined): DistilledItem[] {
+  if (book === undefined) return items
+  return items.filter((item) => item.book === MDR).map((item) => ({ ...item, book }))
+}
+
+/**
  * The one rule the Commonplace Book cannot break: a `candidate` concept is not
  * a heading. Applied here, at the source, rather than in the view — so every
  * future source inherits it by having to do the same thing.
  */
-function filedUnder(name: string): DistilledItem[] {
-  return items.filter(
+function filedUnder(name: string, book?: string): DistilledItem[] {
+  return inScope(book).filter(
     (item) =>
       item.concept.status === 'linked' &&
       item.concept.name === name &&
@@ -184,13 +202,15 @@ function filedUnder(name: string): DistilledItem[] {
 }
 
 export const fixtureDataSource: SummaryDataSource = {
-  async getConcepts(): Promise<Concept[]> {
-    return conceptNames.map((name) => ({ name, items: filedUnder(name) }))
+  async getConcepts(book): Promise<Concept[]> {
+    const all = conceptNames.map((name) => ({ name, items: filedUnder(name, book) }))
+    // Scoped, an empty heading is noise; unscoped, it is the vocabulary.
+    return book === undefined ? all : all.filter((concept) => concept.items.length > 0)
   },
 
-  async getConcept(name) {
+  async getConcept(name, book) {
     if (!conceptNames.includes(name)) return undefined
-    return { name, items: filedUnder(name) }
+    return { name, items: filedUnder(name, book) }
   },
 
   async getChapterList() {

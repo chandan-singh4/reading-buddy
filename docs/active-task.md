@@ -19,6 +19,7 @@ built.
 ### Definition of done
 
 1. Look at both pages on the phone. Say whether the paper reads as paper.
+   Note that the Commonplace Book opened from a book shows **that book only**.
 2. Answer the one open question: these pages **do not** follow your theme. In
    Dark, at night, you get a bright page. Is that right or wrong?
 3. Check the rail. On a phone it lies down and scrolls sideways. Check that it
@@ -75,7 +76,8 @@ Files: `web/src/app/updates.ts`, `web/src/app/UpdatePrompt.tsx`,
 ## Done, 2026-08-27
 
 **The two summary views.** The Commonplace Book and the Chapter View, built to
-the two reference designs. 2,169 tests pass, build green. The engine is stubbed
+the two reference designs. The Commonplace Book was then given two scopes, set
+by the door the reader comes through. 2,174 tests pass, build green. The engine is stubbed
 and not started. Written up in `docs/decisions.md` under "the two summary
 views", in ten headings from the fonts to the stubs.
 

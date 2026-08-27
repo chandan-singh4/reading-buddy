@@ -14,10 +14,22 @@ import type { ChapterListEntry, ChapterSummary, Concept, VedaNote } from './type
  * caller; paying the `await` now costs nothing and saves that.
  */
 export interface SummaryDataSource {
-  /** Every heading in the Commonplace Book, across all books. */
-  getConcepts(): Promise<Concept[]>
+  /**
+   * The headings of the Commonplace Book.
+   *
+   * `book` decides the scope, and the scope is decided by the door the reader
+   * came through. Opened from a book's own details page, the page is that
+   * book's ideas and `book` is its title. Opened library-wide, `book` is
+   * absent and a heading gathers passages from everything on the shelf —
+   * which is the one thing this lens can do that the Chapter View cannot.
+   *
+   * Scoped, the list holds only headings with something under them: a
+   * vocabulary of empty names is useful while reading one book and noise when
+   * looking at one. Unscoped, every known heading is listed, empty or not.
+   */
+  getConcepts(book?: string): Promise<Concept[]>
   /** One heading and the passages filed under it. `undefined` if unknown. */
-  getConcept(name: string): Promise<Concept | undefined>
+  getConcept(name: string, book?: string): Promise<Concept | undefined>
   /** The chapters of one book that have been distilled, in reading order. */
   getChapterList(book: string): Promise<ChapterListEntry[]>
   /** One chapter's recap and items. `undefined` if that chapter has none. */

@@ -5,7 +5,7 @@
 // must load first — Reader goes through the app-wide repository.
 import 'fake-indexeddb/auto'
 
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -285,8 +285,15 @@ describe('moving through the book', () => {
     // The reader is on section 1. The plate is in section 2, which is mounted
     // behind it. Its bytes have to be asked for now, not when the turn lands:
     // a figure with no picture yet is a figure with no height.
-    const asked = assets.mock.calls.flatMap(([, paths]) => [...paths])
-    expect(asked).toContain(NEIGHBOUR_FIGURE)
+    //
+    // Waited for, not read once. The neighbour's text being on the page and
+    // its pictures having been asked for are two different moments, and under
+    // a loaded test run the second can land a tick after the first — which
+    // read as this test failing perhaps one run in three.
+    await waitFor(() => {
+      const asked = assets.mock.calls.flatMap(([, paths]) => [...paths])
+      expect(asked).toContain(NEIGHBOUR_FIGURE)
+    })
     assets.mockRestore()
   })
 

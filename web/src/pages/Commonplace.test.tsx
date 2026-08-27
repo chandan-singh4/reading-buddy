@@ -3,9 +3,30 @@ import 'fake-indexeddb/auto'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
+import { repository } from '../storage/index.ts'
+import type { BookId, BookMeta } from '../structure/index.ts'
+
+/** The book the scoped cases open through. Its title is what the page prints. */
+const SCOPED = 'scoped-book' as BookId
+
+function bookOf(id: BookId, title: string): BookMeta {
+  return {
+    id,
+    title,
+    author: 'Kenneth Grahame',
+    source: 'epub',
+    type: 'dense-technical',
+    shelf: 'book',
+    importedAt: '2026-08-27T00:00:00.000Z',
+  }
+}
+
+beforeEach(async () => {
+  await repository.saveBook(bookOf(SCOPED, 'The Wind in the Willows'))
+})
 
 afterEach(cleanup)
 
@@ -82,6 +103,53 @@ describe('the Commonplace Book', () => {
     open('/commonplace?concept=the%20unconscious')
     await screen.findByRole('heading', { name: 'the unconscious' })
     expect(screen.queryByText(/circling the same idea/)).toBeNull()
+  })
+
+  it('narrows to one book when opened through that book’s door', async () => {
+    /*
+     * The scope is set by how the reader arrived. From a book's details page
+     * the heading holds that book's passages only — the other book's passage
+     * under the same heading must not appear.
+     */
+    open(`/commonplace?book=${SCOPED}&concept=prospective%20function%20of%20dreams`)
+
+    await screen.findByRole('heading', { name: 'prospective function of dreams' })
+    expect(await screen.findByText(/from this book/)).toBeTruthy()
+    expect(screen.queryByText('Why We Sleep')).toBeNull()
+    expect(screen.queryByText(/gathered from 2 books/)).toBeNull()
+  })
+
+  it('names the book it is scoped to', async () => {
+    // Otherwise the two scopes are the same page and look identical.
+    open(`/commonplace?book=${SCOPED}`)
+    expect(await screen.findByText(/The Commonplace Book · The Wind in the Willows/)).toBeTruthy()
+  })
+
+  it('keeps the whole shelf when opened with no book', async () => {
+    open('/commonplace')
+    expect(await screen.findByText(/gathered from 2 books/)).toBeTruthy()
+    expect(screen.getByText('Why We Sleep')).toBeTruthy()
+  })
+
+  it('does not offer empty headings inside one book', async () => {
+    // A vocabulary of names with nothing under them is useful across a shelf
+    // and noise inside a single book.
+    open(`/commonplace?book=${SCOPED}`)
+    await screen.findByRole('button', { name: 'the unconscious' })
+    expect(screen.queryByRole('button', { name: 'individuation' })).toBeNull()
+
+    cleanup()
+    open('/commonplace')
+    expect(await screen.findByRole('button', { name: 'individuation' })).toBeTruthy()
+  })
+
+  it('keeps the scope when another heading is chosen', async () => {
+    // Switching headings must not quietly widen the page back to the shelf.
+    open(`/commonplace?book=${SCOPED}`)
+    fireEvent.click(await screen.findByRole('button', { name: 'the unconscious' }))
+
+    expect(await screen.findByRole('heading', { name: 'the unconscious' })).toBeTruthy()
+    expect(await screen.findByText(/from this book/)).toBeTruthy()
   })
 
   it('offers a way back to wherever the reader came from', async () => {
