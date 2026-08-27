@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 
+import { applyUpdate, onUpdateReady } from '../app/updates.ts'
 import type { StoredAlert } from '../storage/db.ts'
 import { alertStore } from '../storage/summaries.ts'
 import { approve } from './engine.ts'
@@ -19,14 +20,25 @@ import styles from './bell.module.css'
  * itself; everything else queues here. Without that, a shelf of forty half-read
  * books would spend a hundred calls the first time the app came up.
  *
+ * - **A new build is waiting.** The reason the bell exists at all. Reading
+ *   Buddy asks before it updates itself, and a reader who misses that one panel
+ *   has no other way to take the update — four fixes once sat on the server for
+ *   days because the prompt was dismissed. This is the second door.
+ *
  * Reads straight from the table rather than from a parent's state. The work
  * that fills it runs in the background and finishes whenever it finishes — very
  * often while the reader is on another screen entirely.
+ *
+ * The update line is the exception: it is live state, never a stored row. A
+ * stored "an update is waiting" would survive the update that answered it and
+ * sit there lying. `onUpdateReady` tells a late subscriber immediately, so the
+ * bell learns about a build that was found before it mounted.
  */
 export function Bell() {
   const [alerts, setAlerts] = useState<StoredAlert[]>([])
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<string | undefined>()
+  const [updateWaiting, setUpdateWaiting] = useState(false)
 
   const refresh = useCallback(async () => {
     setAlerts(await alertStore.list())
@@ -44,7 +56,17 @@ export function Bell() {
     return () => clearInterval(timer)
   }, [refresh])
 
-  const unseen = alerts.filter((alert) => !alert.seen).length
+  useEffect(() => onUpdateReady(() => setUpdateWaiting(true)), [])
+
+  /*
+   * A waiting build always counts, even after the bell has been opened.
+   *
+   * Every other line is marked seen the moment the reader looks. This one is
+   * not: the badge is the only thing standing between a missed panel and a
+   * phone that never updates again. It clears when the update is taken, and in
+   * no other way.
+   */
+  const unseen = alerts.filter((alert) => !alert.seen).length + (updateWaiting ? 1 : 0)
 
   async function onToggle() {
     const next = !open
@@ -91,11 +113,23 @@ export function Bell() {
 
       {open && (
         <div className={styles.panel}>
-          {alerts.length === 0 ? (
+          {updateWaiting && (
+            <div className={styles.update}>
+              <div className={styles.updateTitle}>A new version is ready</div>
+              <p className={styles.updateNote}>
+                Reading Buddy will reload and put you back on the same page.
+              </p>
+              <button type="button" className={styles.updateAction} onClick={() => applyUpdate()}>
+                Update now
+              </button>
+            </div>
+          )}
+
+          {alerts.length === 0 && !updateWaiting ? (
             <p className={styles.empty}>
               Nothing yet. Summaries appear here as you finish chapters.
             </p>
-          ) : (
+          ) : alerts.length === 0 ? null : (
             <ul className={styles.list}>
               {alerts.map((alert) => (
                 <li key={alert.id} className={styles.item}>

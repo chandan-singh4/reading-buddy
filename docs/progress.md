@@ -29,9 +29,10 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 - **A design question the page leaves open.** It does not follow the reader's
   theme. A reader in Dark gets a bright page at night. This was chosen with the
   cost known. Only a look on the phone can settle it.
-- **Waiting on the phone: the mended notes.** The last fix went up as
-  `bc15dc2`. The reader must accept the app's update prompt before any of it
-  runs on the device — see the note under "Next up".
+- **The update prompt now has a second door.** The reader reported that the
+  prompt did not appear one time, which left the phone on old code with no way
+  to move it. A waiting build is now the top line in the bell, and it keeps
+  counting until the update is taken.
 - **A flaky test teardown, not ours to blame on WP-16.** `vitest run` reports one
   unhandled error from `HandDrawn.tsx` — a coalesced measure fires after jsdom
   has been torn down and the stored range can no longer be measured. Every test

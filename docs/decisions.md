@@ -1912,3 +1912,25 @@ The chapter page it leads to keeps its own paper palette, for the reasons under
   approves one into the vocabulary.
 - **A cap on spending.** The queue skips work that is already done, and only one
   book runs unasked. There is no ceiling beyond that.
+
+
+### The bell is the second door to an update — 2026-08-27
+
+Reading Buddy asks before it updates itself. The reader reported the failure
+this causes: they take the update whenever they are offered it, but one time the
+prompt did not appear, and then there was no other way to get the new build.
+Their phone kept running old code however many times `main` was pushed.
+
+The bell now carries a waiting build as its top line, with an "Update now"
+button that runs the same `applyUpdate()` the panel does.
+
+Two details are deliberate:
+
+- **It is live state, never a stored row.** A stored "an update is waiting"
+  would outlive the update that answered it and sit there lying.
+  `onUpdateReady` already tells a late subscriber immediately, so the bell
+  learns about a build that was found before it mounted.
+- **It stays in the unseen count after the bell is opened.** Every other line is
+  marked seen the moment the reader looks. This one is not. The badge is the
+  only thing between a missed panel and a phone that never updates again, so it
+  clears when the update is taken and in no other way.
