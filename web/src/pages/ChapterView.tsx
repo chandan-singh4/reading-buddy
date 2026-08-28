@@ -172,22 +172,36 @@ export default function ChapterView() {
 
         {loading ? null : open ? (
           <>
+            {/*
+             * The chapter recap waits for the whole chapter, so the ordinary
+             * state of the chapter in hand is parts but no recap yet. Saying
+             * that plainly is better than an empty heading over nothing.
+             */}
             <div className={styles.secLabel}>The chapter, in plain words</div>
-            <Byline model={open.recapModel} />
-            <RichText text={open.recapText} className={styles.recap} />
-            {open.tags.length > 0 && <Tags tags={open.tags} />}
-
-            <div className={styles.secLabel}>What we worked through</div>
-            {open.qaText ? (
+            {open.recapText ? (
               <>
-                <Byline model={open.itemsModel} />
-                <RichText text={open.qaText} className={styles.recap} />
+                <Byline model={open.recapModel} />
+                <RichText text={open.recapText} className={styles.recap} />
+                {open.tags.length > 0 && <Tags tags={open.tags} />}
+
+                <div className={styles.secLabel}>What we worked through</div>
+                {open.qaText ? (
+                  <>
+                    <Byline model={open.itemsModel} />
+                    <RichText text={open.qaText} className={styles.recap} />
+                  </>
+                ) : (
+                  /* A chapter read without a question is normal, not a gap. */
+                  <p className={styles.empty}>
+                    You have not asked Veda about this chapter yet. What you talk about will be
+                    summarised here.
+                  </p>
+                )}
               </>
             ) : (
-              /* A chapter read without a single question is normal, not a gap. */
               <p className={styles.empty}>
-                You have not asked Veda about this chapter yet. What you talk about will be
-                summarised here.
+                The recap of the whole chapter comes when you finish it. The parts you have
+                already read are below.
               </p>
             )}
 

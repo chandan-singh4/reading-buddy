@@ -30,12 +30,16 @@ export const liveDataSource: SummaryDataSource = {
     const bookId = book as BookId
     const spine = await repository.listChapterIndexes(bookId)
     const summaries = await summaryStore.list(bookId)
-    // Only chapter-wide rows mark a chapter as distilled. A chapter with one
-    // section summarised and no recap has not been done, and the rail must not
-    // claim that it has.
-    const done = new Set(
-      summaries.filter((row) => row.section === undefined).map((row) => row.chapter),
-    )
+    /*
+     * A chapter counts once it has anything to show — a recap, or one named
+     * part, or both.
+     *
+     * `distilled` is what the page uses to choose which chapter to open on, so
+     * it has to mean "there is something here", not "this is complete". Reading
+     * it the strict way sent the reader to a blank chapter while the chapter
+     * they were actually in had three parts summarised.
+     */
+    const done = new Set(summaries.map((row) => row.chapter))
 
     return spine
       .sort((a, b) => a.chapter - b.chapter)
@@ -53,7 +57,6 @@ export const liveDataSource: SummaryDataSource = {
 
     const rows = await summaryStore.list(bookId)
     const row = rows.find((entry) => entry.chapter === wanted && entry.section === undefined)
-    if (!row) return undefined
 
     const sections: SectionSummary[] = rows
       .filter((entry) => entry.chapter === wanted && entry.section !== undefined)
@@ -70,7 +73,34 @@ export const liveDataSource: SummaryDataSource = {
           : {}),
       }))
 
+    // Nothing at either level: the page has an empty state for that.
+    if (!row && sections.length === 0) return undefined
+
     const meta = await repository.getBook(bookId)
+
+    /*
+     * The parts can arrive long before the chapter does, and they must show.
+     *
+     * A chapter is only summarised once it is finished, but its named parts are
+     * offered as the reader passes each one. So the normal state of the chapter
+     * in hand is: several parts summarised, no chapter recap yet. Requiring the
+     * chapter row here meant that reader saw "no summary yet" on a chapter that
+     * had three — the bug the reader hit on PART 1 of Man and His Symbols.
+     *
+     * An empty `recapText` is the signal, and the page draws the reason rather
+     * than an empty paragraph.
+     */
+    if (!row) {
+      const spine = await repository.listChapterIndexes(bookId)
+      return {
+        book: meta?.title ?? '',
+        chapter: wanted,
+        chapterTitle: spine.find((entry) => entry.chapter === wanted)?.title ?? '',
+        recapText: '',
+        tags: [],
+        sections,
+      }
+    }
 
     return {
       book: meta?.title ?? '',
