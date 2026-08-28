@@ -62,11 +62,12 @@ async function askGolden(
   /**
    * Somebody is watching this one being written.
    *
-   * Hand a watcher in and the relay is asked to stream, exactly as the lamp
-   * asks. Leave it out and the exchange is what it always was — one request,
-   * one JSON reply — which is the path the background sweep stays on. Nobody
-   * is looking at a sweep, and a stream nobody watches is a slower way to
-   * receive the same words.
+   * Only the page uses it. Every golden call streams either way, watched or
+   * not: the host gives an edge function about twenty-five seconds to send its
+   * first byte, and a whole chapter recap written before a single byte leaves
+   * runs past that. The host then answers 504 and the finished words are lost
+   * with the connection. A stream sends its first byte immediately and holds
+   * the line open for as long as the model needs.
    */
   onWriting?: (soFar: string) => void,
 ) {
@@ -84,15 +85,14 @@ async function askGolden(
       history: [],
       userMessage: request,
       ...(chain.length > 0 ? { models: chain } : {}),
-      ...(onWriting ? { stream: true } : {}),
+      stream: true,
     }),
   })
   if (!response.ok) throw new Error(`the relay answered ${response.status}`)
 
-  const data =
-    onWriting && response.body
-      ? await watched(response.body, onWriting)
-      : ((await response.json()) as { text?: unknown; model?: unknown })
+  const data = response.body
+    ? await watched(response.body, onWriting ?? (() => {}))
+    : ((await response.json()) as { text?: unknown; model?: unknown })
   if (typeof data.text !== 'string' || data.text.trim().length === 0) {
     throw new Error('the relay sent no text')
   }
