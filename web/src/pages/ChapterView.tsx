@@ -112,7 +112,19 @@ export default function ChapterView() {
    * opens the picker and the picker starts the work. `'chapter'` for the whole
    * chapter, the part itself for a part.
    */
-  const [choosing, setChoosing] = useState<'chapter' | { section: number; title: string } | undefined>()
+  const [choosing, setChoosing] = useState<
+    { part?: { section: number; title: string }; force: boolean } | undefined
+  >()
+  /**
+   * The recap as the model writes it, or an empty string before its first word.
+   *
+   * Undefined means nothing is being written. The distinction matters: an empty
+   * string is a model that has taken the job and not spoken yet, which is what
+   * the three dots are for.
+   */
+  const [live, setLive] = useState<string | undefined>()
+  /** Set when a run ended with nothing. Cleared the moment another starts. */
+  const [failed, setFailed] = useState(false)
   /*
    * The picker's own columns, held here so a drag inside the sheet survives
    * until it is saved. The roster is the one the app last saw: this page must
@@ -207,24 +219,37 @@ export default function ChapterView() {
    * has never opened the lamp has no roster, and an empty sheet would be a
    * button that appears to do nothing. Then the relay picks, as it always did.
    */
-  function onWant(part?: { section: number; title: string }) {
+  function onWant(part?: { section: number; title: string }, force = false) {
     if (columns.length === 0) {
-      void onAsk(part)
+      void onAsk(part, force)
       return
     }
-    setChoosing(part ?? 'chapter')
+    setChoosing({ ...(part ? { part } : {}), force })
   }
 
-  /** Ask for one thing — the whole chapter, or one named part of it. */
-  async function onAsk(part?: { section: number; title: string }) {
+  /**
+   * Ask for one thing — the whole chapter, or one named part of it.
+   *
+   * The words are watched on their way in, so the reader sees the paragraph
+   * being written rather than a button that goes quiet for half a minute.
+   *
+   * Nothing is written to the store until the whole answer is in, so a run that
+   * fails leaves the summary that was already there. That is what makes Redo
+   * safe to press: the worst case is a wasted call, never a lost summary.
+   */
+  async function onAsk(part?: { section: number; title: string }, force = false) {
     setAsking(part ? part.section : 'chapter')
+    setFailed(false)
+    setLive('')
     try {
-      await approve(id, Number(current), part)
+      await approve(id, Number(current), part, { force, onWriting: setLive })
       setOpen(await summaryData().getChapter(id, current))
     } catch {
-      // Nothing was stored, so the page is unchanged and the button comes back.
+      // The model did not answer. The page still holds what it held before.
+      setFailed(true)
     } finally {
       setAsking(undefined)
+      setLive(undefined)
     }
   }
 
@@ -302,6 +327,17 @@ export default function ChapterView() {
   /* Its summary, when there is one. */
   const openPart =
     partOnScreen && open?.sections?.find((part) => part.section === partOnScreen.section)
+  /*
+   * Whether the thing on screen is the thing being written.
+   *
+   * Asked once, because three different branches need the same answer: a part
+   * open in the rail, a chapter recap, and a page with nothing on it yet. A
+   * reader who starts a part and flicks to another must not see that part's
+   * words appearing under this part's heading.
+   */
+  const writingHere =
+    asking !== undefined && (partOnScreen ? asking === partOnScreen.section : asking === 'chapter')
+
   const exit = backTo(location.search)
 
   return (
@@ -350,20 +386,30 @@ export default function ChapterView() {
            * offers the call when the reader has earned it.
            */
           <>
-            <p className={styles.empty}>
-              {eligible.includes(partOnScreen.section)
-                ? 'You have finished this part. Ask for a summary and Veda will read it.'
-                : 'The summary of this part comes when you finish reading it.'}
-            </p>
-            {eligible.includes(partOnScreen.section) && (
-              <button
-                type="button"
-                className={styles.ask}
-                disabled={asking !== undefined}
-                onClick={() => onWant(partOnScreen)}
-              >
-                {asking === partOnScreen.section ? 'Summarising…' : 'Summarise this part'}
-              </button>
+            {writingHere ? (
+              <>
+                <div className={styles.secLabel}>This part, in plain words</div>
+                <Writing text={live ?? ''} />
+              </>
+            ) : (
+              <>
+                {failed && <Failure />}
+                <p className={styles.empty}>
+                  {eligible.includes(partOnScreen.section)
+                    ? 'You have finished this part. Ask for a summary and Veda will read it.'
+                    : 'The summary of this part comes when you finish reading it.'}
+                </p>
+                {eligible.includes(partOnScreen.section) && (
+                  <button
+                    type="button"
+                    className={styles.ask}
+                    disabled={asking !== undefined}
+                    onClick={() => onWant(partOnScreen)}
+                  >
+                    Summarise this part
+                  </button>
+                )}
+              </>
             )}
           </>
         ) : openPart ? (
@@ -371,9 +417,23 @@ export default function ChapterView() {
              the same job one level down. */
           <>
             <div className={styles.secLabel}>This part, in plain words</div>
-            <Byline model={openPart.recapModel} />
-            <RichText text={openPart.recapText} className={styles.recap} />
-            {openPart.tags.length > 0 && <Tags tags={openPart.tags} />}
+            {writingHere ? (
+              /* The old recap stands aside while the new one is written, and
+                 comes back untouched if the model never answers. */
+              <Writing text={live ?? ''} />
+            ) : (
+              <>
+                {failed && <Failure />}
+                <Byline model={openPart.recapModel} />
+                <RichText text={openPart.recapText} className={styles.recap} />
+                {openPart.tags.length > 0 && <Tags tags={openPart.tags} />}
+                <Actions
+                  text={openPart.recapText}
+                  busy={asking !== undefined}
+                  onRedo={() => onWant(partOnScreen, true)}
+                />
+              </>
+            )}
 
             <div className={styles.secLabel}>What we worked through</div>
             {openPart.qaText ? (
@@ -396,11 +456,19 @@ export default function ChapterView() {
              * that plainly is better than an empty heading over nothing.
              */}
             <div className={styles.secLabel}>The chapter, in plain words</div>
-            {open.recapText ? (
+            {writingHere ? (
+              <Writing text={live ?? ''} />
+            ) : open.recapText ? (
               <>
+                {failed && <Failure />}
                 <Byline model={open.recapModel} />
                 <RichText text={open.recapText} className={styles.recap} />
                 {open.tags.length > 0 && <Tags tags={open.tags} />}
+                <Actions
+                  text={open.recapText}
+                  busy={asking !== undefined}
+                  onRedo={() => onWant(undefined, true)}
+                />
 
                 <div className={styles.secLabel}>What we worked through</div>
                 {open.qaText ? (
@@ -423,6 +491,11 @@ export default function ChapterView() {
               </p>
             )}
           </>
+        ) : writingHere ? (
+          <>
+            <div className={styles.secLabel}>The chapter, in plain words</div>
+            <Writing text={live ?? ''} />
+          </>
         ) : (
           /*
            * An empty page used to be a dead end: it said "not yet" and gave the
@@ -437,6 +510,7 @@ export default function ChapterView() {
              * read exactly like a chapter they had not finished. The empty rail
              * was the only clue, and a clue is not an answer.
              */}
+            {failed && <Failure />}
             <p className={styles.empty}>
               {chapters.length === 0
                 ? 'This book has no chapters saved on this device, so there is nothing to summarise. Re-import it from Book details and it will appear here.'
@@ -453,7 +527,7 @@ export default function ChapterView() {
                 disabled={asking !== undefined}
                 onClick={() => onWant()}
               >
-                {asking === 'chapter' ? 'Reading the chapter…' : 'Summarise this chapter'}
+                Summarise this chapter
               </button>
             )}
           </>
@@ -477,7 +551,7 @@ export default function ChapterView() {
             rememberSummaryPick(model)
             const want = choosing
             setChoosing(undefined)
-            void onAsk(want === 'chapter' ? undefined : want)
+            void onAsk(want?.part, want?.force === true)
           }}
           onArrange={(next) => {
             // Saved as it is dragged. The sheet can be dismissed three ways,
@@ -527,4 +601,97 @@ function Tags({ tags }: { tags: string[] }) {
 function Byline({ model }: { model?: string }) {
   if (!model) return null
   return <p className={styles.byline}>{modelLabel(model)}</p>
+}
+
+/**
+ * The summary as it is being written.
+ *
+ * Three dots until the first word, then the words themselves. The dots are not
+ * decoration: a model may think for ten seconds before it says anything, and
+ * being shown that it has started is the difference between a slow answer and
+ * an app that looks broken. The reading lamp has worked this way since v13 and
+ * this is the same furniture, so a reader has nothing new to learn.
+ *
+ * The caret is what makes it read as *being written* rather than as a summary
+ * that stopped short. It goes when the words do.
+ */
+function Writing({ text }: { text: string }) {
+  if (text.trim().length === 0) {
+    return (
+      <div className={styles.recap} aria-label="Veda is reading the chapter">
+        <span className={styles.thinking} aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+      </div>
+    )
+  }
+  return (
+    <div aria-live="polite">
+      <RichText text={text} className={styles.recap} />
+      <span className={styles.caret} aria-hidden="true" />
+    </div>
+  )
+}
+
+/**
+ * What the reader can do with a summary once it is written.
+ *
+ * **Copy** because a summary is the one thing on this page worth taking
+ * somewhere else — a note, a message, the vault the export will one day write.
+ * The text is selectable too; the button is for a thumb, which is bad at
+ * selecting three paragraphs.
+ *
+ * **Redo** because a summary is one model's reading of a chapter, and the
+ * reader may want another's. It opens the picker first, exactly as the first
+ * call did, so choosing a different model *is* the redo rather than a setting
+ * to change beforehand.
+ *
+ * Both wait while any call is running. Two summaries of one chapter at once
+ * would be two bills for one answer.
+ */
+function Actions({ text, busy, onRedo }: { text: string; busy: boolean; onRedo: () => void }) {
+  const [copied, setCopied] = useState(false)
+
+  return (
+    <div className={styles.actions}>
+      <button
+        type="button"
+        className={styles.action}
+        onClick={() => {
+          void navigator.clipboard
+            ?.writeText(text)
+            .then(() => {
+              setCopied(true)
+              window.setTimeout(() => setCopied(false), 1600)
+            })
+            .catch(() => {
+              /* No clipboard permission. The text is still selectable. */
+            })
+        }}
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+      <button type="button" className={styles.action} disabled={busy} onClick={onRedo}>
+        Redo the summary
+      </button>
+    </div>
+  )
+}
+
+/**
+ * The model did not answer.
+ *
+ * Said plainly, and said next to the summary that is still there, because the
+ * reader has just watched a Redo produce nothing and needs to know that what
+ * they are looking at is their old summary rather than a bad new one. Nothing
+ * was written and nothing was lost — only a call was spent.
+ */
+function Failure() {
+  return (
+    <p className={styles.failure} role="status">
+      The model did not answer. Nothing was changed — what you had is still here.
+    </p>
+  )
 }

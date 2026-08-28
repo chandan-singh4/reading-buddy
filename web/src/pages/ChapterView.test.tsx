@@ -1,11 +1,25 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto'
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { BrowserRouter, MemoryRouter } from 'react-router'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
+import { approve } from '../summary/engine.ts'
+
+/*
+ * The engine is mocked for the watching tests below, and only there.
+ *
+ * Everything it does — the relay, the two prompts, the stores — is tested in
+ * `engine.test.ts` against its own fakes. What this file has to prove is what
+ * the reader sees while it runs, and that needs a call whose timing the test
+ * controls rather than a real one.
+ */
+vi.mock('../summary/engine.ts', async (real) => ({
+  ...(await real<typeof import('../summary/engine.ts')>()),
+  approve: vi.fn(),
+}))
 import { repository } from '../storage/index.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 import { forgetModels, rememberRoster, storedSummaryPick } from '../reader/models.ts'
@@ -210,12 +224,14 @@ describe('a chapter the reader is still inside', () => {
     expect(screen.queryByRole('button', { name: 'Summarise this part' })).toBeNull()
   })
 
-  it('busies only the part that was pressed', async () => {
+  it('shows the model working, on the part that was pressed', async () => {
+    // The reader watched a button go quiet for half a minute and could not
+    // tell a slow model from a broken app. The dots are the answer.
     open(`/book/${PART1}/chapters?chapter=6`)
     fireEvent.click(await screen.findByRole('button', { name: 'The importance of dreams' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Summarise this part' }))
 
-    expect(await screen.findByRole('button', { name: 'Summarising…' })).toBeTruthy()
+    expect(await screen.findByLabelText('Veda is reading the chapter')).toBeTruthy()
   })
 
   it('does not blame the reader for a chapter they are working through', async () => {
@@ -349,7 +365,7 @@ describe('choosing the model that writes a summary', () => {
 
     expect(storedSummaryPick()).toBe('x/big')
     // And the call starts on the way out of the sheet.
-    expect(await screen.findByRole('button', { name: 'Summarising…' })).toBeTruthy()
+    expect(await screen.findByLabelText('Veda is reading the chapter')).toBeTruthy()
   })
 
   it('spends the call straight away when there is no roster to pick from', async () => {
@@ -359,7 +375,7 @@ describe('choosing the model that writes a summary', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'The importance of dreams' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Summarise this part' }))
 
-    expect(await screen.findByRole('button', { name: 'Summarising…' })).toBeTruthy()
+    expect(await screen.findByLabelText('Veda is reading the chapter')).toBeTruthy()
     expect(screen.queryByText('Which model answers')).toBeNull()
   })
 })
@@ -397,5 +413,100 @@ describe('leaving the chapter page', () => {
     await waitFor(() => expect(window.location.pathname).toBe(exit))
     // The chapter page stood aside rather than stacking on top of the exit.
     expect(window.history.length).toBe(depth)
+  })
+})
+
+describe('watching a summary being written', () => {
+  const WATCHED = 'watched-book' as BookId
+
+  /** A summary that already exists, so Redo has something to protect. */
+  const written = {
+    book: 'A Watched Book',
+    chapter: 1,
+    chapterTitle: 'First',
+    recapText: 'The summary you already had.',
+    tags: [],
+  }
+
+  beforeEach(async () => {
+    vi.mocked(approve).mockReset()
+    await repository.saveBook(bookOf(WATCHED, 'A Watched Book'))
+    setSummaryData({
+      ...fixtureDataSource,
+      async getChapterList() {
+        return [{ chapter: 1, chapterTitle: 'First', distilled: true }]
+      },
+      async getChapter() {
+        return written
+      },
+    })
+  })
+
+  it('shows the dots first, then the words as they arrive', async () => {
+    let write: ((soFar: string) => void) | undefined
+    vi.mocked(approve).mockImplementation(async (_book, _chapter, _part, watch) => {
+      write = watch?.onWriting
+      // Never settles: the point of this case is the middle of the call.
+      await new Promise(() => {})
+    })
+
+    open(`/book/${WATCHED}/chapters?chapter=1`)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redo the summary' }))
+
+    // A model may think for ten seconds before its first word.
+    expect(await screen.findByLabelText('Veda is reading the chapter')).toBeTruthy()
+
+    act(() => write?.('Jung reads'))
+    expect(await screen.findByText(/Jung reads/)).toBeTruthy()
+    act(() => write?.('Jung reads a dream as a letter.'))
+    expect(await screen.findByText(/a letter/)).toBeTruthy()
+  })
+
+  it('asks which model, then rewrites', async () => {
+    rememberRoster([
+      {
+        id: 'x/big',
+        name: 'Big Model',
+        description: '',
+        contextLength: 128_000,
+        source: 'openrouter' as const,
+      },
+    ])
+    vi.mocked(approve).mockResolvedValue(undefined)
+
+    open(`/book/${WATCHED}/chapters?chapter=1`)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redo the summary' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Big Model/ }))
+
+    await waitFor(() => expect(vi.mocked(approve)).toHaveBeenCalled())
+    // `force`, or the engine would answer "nothing has changed" and do nothing.
+    const [, , , watch] = vi.mocked(approve).mock.calls[0]
+    expect(watch?.force).toBe(true)
+  })
+
+  it('keeps the summary the reader had when the model does not answer', async () => {
+    vi.mocked(approve).mockRejectedValue(new Error('the relay answered 429'))
+
+    open(`/book/${WATCHED}/chapters?chapter=1`)
+    expect(await screen.findByText('The summary you already had.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Redo the summary' }))
+
+    expect(await screen.findByText(/The model did not answer/)).toBeTruthy()
+    // The words the reader had are still the words on the page.
+    expect(screen.getByText('The summary you already had.')).toBeTruthy()
+  })
+
+  it('copies the summary', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+
+    open(`/book/${WATCHED}/chapters?chapter=1`)
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy' }))
+
+    expect(writeText).toHaveBeenCalledWith('The summary you already had.')
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
   })
 })

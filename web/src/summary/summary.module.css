@@ -498,3 +498,120 @@
   padding-top: 26px;
   border-top: 1px solid var(--rule);
 }
+
+/* ---- a summary being written -------------------------------------------- */
+
+/*
+ * The three dots, while a model reads the chapter and says nothing.
+ *
+ * Copied in behaviour, not in code, from the reading lamp: a reader who has
+ * watched Veda think has already learnt what these mean. The colour is the
+ * page's own bronze rather than the lamp's, because this is paper.
+ */
+.thinking {
+  display: inline-flex;
+  gap: 5px;
+  padding: 6px 0;
+}
+
+.thinking i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--bronze);
+  animation: breathe 1.2s ease-in-out infinite;
+}
+
+.thinking i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* The pen at the end of the last word. It is what says "still writing" rather
+   than "stopped here". */
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--veda);
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking i,
+  .caret {
+    animation: none;
+    opacity: 0.7;
+  }
+}
+
+/* ---- what you can do with a finished summary ---------------------------- */
+
+/*
+ * Under the summary, not over it. These are things to do *with* what you have
+ * read, so they come after reading it — and quieter than the Summarise button,
+ * which is the one control on this page that spends money unasked.
+ */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 6px;
+}
+
+.action {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-soft);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  /* Smaller than `.ask` on purpose, and still a thumb's worth of height. */
+  min-height: 40px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.action:hover {
+  color: var(--ink);
+}
+
+.action:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+/* A run that produced nothing. Said next to the summary it did not replace. */
+.failure {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--bronze);
+  margin: 0 0 14px;
+}

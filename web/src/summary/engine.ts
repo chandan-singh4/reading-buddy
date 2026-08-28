@@ -7,12 +7,13 @@ import {
   storedSummaryPick,
   type Provider,
 } from '../reader/models.ts'
-import { TUTOR_URL } from '../reader/tutor.ts'
+import { readEvents, TUTOR_URL } from '../reader/tutor.ts'
 import { accessToken } from '../storage/cloud/client.ts'
 import type { StoredAlert, StoredChapterSummary, StoredTutorThread } from '../storage/db.ts'
 import { repository } from '../storage/index.ts'
 import { alertStore, conceptStore, summaryStore } from '../storage/summaries.ts'
 import { tutorStore } from '../storage/tutor.ts'
+import { recapSoFar } from './streaming.ts'
 import {
   chapterPath,
   sectionPath,
@@ -54,7 +55,21 @@ const SCRIBE_SCHEMA = `Return only a JSON object, with no prose around it and no
  * the reason `askMemory` gives — storing a canned apology as the recap of
  * chapter four is worse than having no recap at all.
  */
-async function askGolden(intent: 'librarian' | 'scribe', material: string, request: string) {
+async function askGolden(
+  intent: 'librarian' | 'scribe',
+  material: string,
+  request: string,
+  /**
+   * Somebody is watching this one being written.
+   *
+   * Hand a watcher in and the relay is asked to stream, exactly as the lamp
+   * asks. Leave it out and the exchange is what it always was — one request,
+   * one JSON reply — which is the path the background sweep stays on. Nobody
+   * is looking at a sweep, and a stream nobody watches is a slower way to
+   * receive the same words.
+   */
+  onWriting?: (soFar: string) => void,
+) {
   const token = await accessToken()
   const chain = summaryChain()
   const response = await fetch(TUTOR_URL, {
@@ -69,11 +84,15 @@ async function askGolden(intent: 'librarian' | 'scribe', material: string, reque
       history: [],
       userMessage: request,
       ...(chain.length > 0 ? { models: chain } : {}),
+      ...(onWriting ? { stream: true } : {}),
     }),
   })
   if (!response.ok) throw new Error(`the relay answered ${response.status}`)
 
-  const data = (await response.json()) as { text?: unknown; model?: unknown }
+  const data =
+    onWriting && response.body
+      ? await watched(response.body, onWriting)
+      : ((await response.json()) as { text?: unknown; model?: unknown })
   if (typeof data.text !== 'string' || data.text.trim().length === 0) {
     throw new Error('the relay sent no text')
   }
@@ -86,6 +105,52 @@ async function askGolden(intent: 'librarian' | 'scribe', material: string, reque
    * judging, exactly as the reading lamp already tells them.
    */
   return { text: data.text, model: typeof data.model === 'string' ? data.model : undefined }
+}
+
+/**
+ * Read a streamed answer, telling the watcher what it says as it grows.
+ *
+ * The watcher is given the recap, not the raw deltas: the answer is a JSON
+ * object and `recapSoFar` is what turns a half-written one into the paragraph
+ * the reader is waiting for. See `streaming.ts`.
+ *
+ * A stream that ends without a `done` line still returns whatever text
+ * arrived. The caller decides whether that is enough — this one throws on an
+ * empty answer, and half a recap is not empty. It is also not stored: the
+ * material it was built from is still there, and a rerun costs the reader
+ * nothing but a tap.
+ */
+async function watched(
+  body: ReadableStream<Uint8Array>,
+  onWriting: (soFar: string) => void,
+): Promise<{ text?: unknown; model?: unknown }> {
+  let text = ''
+  let model: string | undefined
+  let finished: { text?: unknown; model?: unknown } | undefined
+
+  await readEvents(body, (piece) => {
+    switch (piece.t) {
+      case 'open':
+        if (typeof piece.model === 'string') model = piece.model
+        break
+      case 'text':
+        if (typeof piece.d === 'string') {
+          text += piece.d
+          onWriting(recapSoFar(text))
+        }
+        break
+      case 'done':
+        finished = (piece.reply ?? {}) as { text?: unknown; model?: unknown }
+        break
+      default:
+        break
+    }
+  })
+
+  if (finished && typeof finished.text === 'string' && finished.text.trim().length > 0) {
+    return { text: finished.text, model: finished.model ?? model }
+  }
+  return { text, model }
 }
 
 /**
@@ -164,6 +229,34 @@ function vocabularyBlock(names: readonly string[]): string {
   return `THE CANONICAL CONCEPT LIST:\n${names.map((name) => `- ${name}`).join('\n')}`
 }
 
+/**
+ * Somebody is watching this run, and may be asking for a rewrite.
+ *
+ * Absent for the background sweep, which is the ordinary case: nobody is on
+ * the page, nothing is on screen to protect, and a chapter that already has a
+ * summary is left alone.
+ */
+export interface RunWatch {
+  /**
+   * The recap as it is written, one call per delta.
+   *
+   * The reader watching a summary appear is the whole reason this exists. A
+   * model may think for ten seconds before its first word, and the difference
+   * between a slow answer and a frozen app is being shown that it started.
+   */
+  onWriting?: (soFar: string) => void
+  /**
+   * Write it again even though there is already a summary.
+   *
+   * The Redo button. Nothing is deleted first, and nothing is written until
+   * the new answer is whole: if the model is busy or the stream dies, the run
+   * throws, the store is never touched, and the reader keeps the summary they
+   * already had. A redo can cost money and produce nothing; it can never cost
+   * the reader words they had.
+   */
+  force?: boolean
+}
+
 /** What one chapter's run produced, for the caller to report. */
 export interface RunResult {
   summary: StoredChapterSummary
@@ -196,6 +289,7 @@ export async function runChapter(
   bookId: BookId,
   chapter: number,
   part?: Part,
+  watch?: RunWatch,
 ): Promise<RunResult | undefined> {
   const book = await repository.getBook(bookId)
   if (!book) return undefined
@@ -212,15 +306,24 @@ export async function runChapter(
   const threads = threadsInChapter(await tutorStore.listThreads(bookId), chapter, part?.section)
   const conversationsNow = threads.length
 
-  // Nothing has changed since the last run: same recap, same conversations.
-  if (existing && existing.coversNConversations === conversationsNow) return undefined
+  /*
+   * Nothing has changed since the last run: same recap, same conversations.
+   *
+   * `force` is the reader pressing Redo. They are looking at the summary and
+   * asking for a different one, usually from a different model, so "nothing
+   * changed" is exactly the case they mean — and refusing them would make the
+   * button do nothing at all.
+   */
+  if (!watch?.force && existing && existing.coversNConversations === conversationsNow) {
+    return undefined
+  }
 
   const now = new Date().toISOString()
   let recap = existing?.recap ?? ''
   let concepts = existing?.concepts ?? []
   let recapModel = existing?.recapModel
 
-  if (!existing) {
+  if (!existing || watch?.force) {
     const sections = await repository.listSections(bookId)
     const material = part
       ? sectionMaterial(sections, chapter, part.section)
@@ -232,6 +335,7 @@ export async function runChapter(
       'librarian',
       material,
       `${vocabularyBlock(canonical)}\n\n${LIBRARIAN_SCHEMA}`,
+      watch?.onWriting,
     )
     const result = librarianResult(reply.text)
     recap = result.recap
@@ -271,7 +375,7 @@ export async function runChapter(
     concepts,
     ...(items === undefined ? {} : { items }),
     coversNConversations: conversationsNow,
-    recapAt: existing?.recapAt ?? now,
+    recapAt: watch?.force ? now : (existing?.recapAt ?? now),
     ...(recapModel === undefined ? {} : { recapModel }),
     ...(itemsAt === undefined ? {} : { itemsAt }),
     ...(itemsModel === undefined ? {} : { itemsModel }),
@@ -401,9 +505,20 @@ async function proposeChapter(bookId: BookId, chapter: number, part?: Part): Pro
   )
 }
 
-/** The reader said yes in the bell. Run it now. */
-export async function approve(bookId: BookId, chapter: number, part?: Part): Promise<void> {
-  await runChapter(bookId, chapter, part)
+/**
+ * The reader said yes — in the bell, or on the chapter page. Run it now.
+ *
+ * `watch` is what makes the chapter page different from the bell: somebody is
+ * looking at this one, so it streams, and they may be asking for a rewrite of
+ * words that are already on the screen.
+ */
+export async function approve(
+  bookId: BookId,
+  chapter: number,
+  part?: Part,
+  watch?: RunWatch,
+): Promise<void> {
+  await runChapter(bookId, chapter, part, watch)
 }
 
 /**

@@ -429,6 +429,58 @@ function replyOf(data: Wire): AskTutorReply | undefined {
   }
 }
 
+/** One line of the relay's stream, before anything has been made of it. */
+export interface StreamPiece {
+  t?: unknown
+  d?: unknown
+  v?: unknown
+  model?: unknown
+  reply?: unknown
+  message?: unknown
+  status?: unknown
+}
+
+/**
+ * Read a relay stream to the end, handing over one parsed line at a time.
+ *
+ * One JSON object per line. A line may arrive split across two network reads,
+ * so the tail of the buffer is held back until a newline finishes it, and a
+ * line that will not parse is skipped rather than thrown — a relay that learns
+ * to say something new must not break an old client.
+ *
+ * Exported because the summaries stream down the same wire as the lamp. They
+ * make something different of the lines, but the protocol is one protocol and
+ * two copies of it would drift.
+ */
+export async function readEvents(
+  body: ReadableStream<Uint8Array>,
+  onPiece: (piece: StreamPiece) => void,
+): Promise<void> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let piece: StreamPiece
+      try {
+        piece = JSON.parse(line) as StreamPiece
+      } catch {
+        continue
+      }
+      onPiece(piece)
+    }
+  }
+}
+
 /**
  * Read the relay's stream to the end, reporting as it goes.
  *
@@ -444,9 +496,6 @@ async function follow(
   body: ReadableStream<Uint8Array>,
   onProgress: (progress: TutorProgress) => void,
 ): Promise<AskTutorReply> {
-  const reader = body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
   let text = ''
   let reasoning = ''
   let model: string | undefined
@@ -462,23 +511,7 @@ async function follow(
       ...(sources ? { sources } : {}),
     })
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-
-    for (const line of lines) {
-      if (!line.trim()) continue
-      let piece: { t?: unknown; d?: unknown; v?: unknown; model?: unknown; reply?: unknown; message?: unknown; status?: unknown }
-      try {
-        piece = JSON.parse(line)
-      } catch {
-        continue
-      }
-
+  await readEvents(body, (piece) => {
       switch (piece.t) {
         case 'open':
           if (typeof piece.model === 'string') model = piece.model
@@ -514,8 +547,7 @@ async function follow(
         default:
           break
       }
-    }
-  }
+  })
 
   if (finished) return finished
 
