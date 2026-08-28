@@ -173,36 +173,49 @@ describe('a chapter the reader is still inside', () => {
     })
   })
 
-  it('offers the parts already read, and not the one in hand', async () => {
+  it('puts every named part in the rail, read or not', async () => {
     open(`/book/${PART1}/chapters?chapter=6`)
 
-    expect(await screen.findByText('Parts you have finished')).toBeTruthy()
-    expect(screen.getByText('The importance of dreams')).toBeTruthy()
-    expect(screen.getByText('The function of dreams')).toBeTruthy()
-    // Being on the last page of a part is not having finished it.
-    expect(screen.queryByText('The analysis of dreams')).toBeNull()
+    // The row is built from the chapter's own parts, so it is filled from the
+    // first moment — not only after a part has been summarised.
+    expect(await screen.findByRole('button', { name: 'The importance of dreams' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'The function of dreams' })).toBeTruthy()
+    // Including the part still in hand. It gets a tab that says to come back.
+    expect(screen.getByRole('button', { name: 'The analysis of dreams' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'The whole chapter' })).toBeTruthy()
   })
 
-  it('busies only the button that was pressed', async () => {
-    /*
-     * The reader pressed one part and watched all three go grey. One shared
-     * boolean drove every row's disabled state, so the page could not say which
-     * of three paid calls was actually running.
-     */
+  it('offers the call on a part the reader has finished', async () => {
     open(`/book/${PART1}/chapters?chapter=6`)
-    await screen.findByText('Parts you have finished')
+    fireEvent.click(await screen.findByRole('button', { name: 'The importance of dreams' }))
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Summarise' })[0])
+    expect(await screen.findByText(/You have finished this part/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Summarise this part' })).toBeTruthy()
+  })
 
-    // The one pressed says so. The others stay silent, whatever their state.
+  it('says why a part the reader is still inside is empty, and offers nothing', async () => {
+    // Being on the last page of a part is not having finished it. The tab is
+    // still there — a reader has to see the shape of the chapter — but the
+    // page under it explains itself rather than selling a call.
+    open(`/book/${PART1}/chapters?chapter=6`)
+    fireEvent.click(await screen.findByRole('button', { name: 'The analysis of dreams' }))
+
+    expect(await screen.findByText(/comes when you finish reading it/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Summarise this part' })).toBeNull()
+  })
+
+  it('busies only the part that was pressed', async () => {
+    open(`/book/${PART1}/chapters?chapter=6`)
+    fireEvent.click(await screen.findByRole('button', { name: 'The importance of dreams' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Summarise this part' }))
+
     expect(await screen.findByRole('button', { name: 'Summarising…' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'Summarise' }).length).toBe(2)
   })
 
   it('does not blame the reader for a chapter they are working through', async () => {
     open(`/book/${PART1}/chapters?chapter=6`)
 
-    await screen.findByText('Parts you have finished')
+    await screen.findByRole('button', { name: 'The importance of dreams' })
     expect(screen.queryByText(/once you have finished reading it/)).toBeNull()
   })
 })

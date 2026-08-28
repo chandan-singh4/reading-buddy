@@ -79,6 +79,19 @@ export default function ChapterView() {
    * on this one chapter's page.
    */
   const [waiting, setWaiting] = useState<{ section: number; title: string }[]>([])
+  /**
+   * Every named part of this chapter, read or not.
+   *
+   * The rail is built from this and not from the summaries. A rail that only
+   * listed parts already summarised was empty exactly when the reader most
+   * wanted it — on a chapter they are still working through — and pushed the
+   * parts back into a list below the text, which is the one shape the reader
+   * has now rejected five times. A part with nothing behind it yet still gets
+   * a tab; the tab says why.
+   */
+  const [allParts, setAllParts] = useState<{ section: number; title: string }[]>([])
+  /** The parts the reader has read far enough to summarise, by section number. */
+  const [eligible, setEligible] = useState<number[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -135,10 +148,22 @@ export default function ChapterView() {
        * the page and the bell can never disagree about what is on offer.
        */
       const entry = spine.find((row) => row.chapter === here)
-      const eligible = whole
-        ? titledSections(entry)
+      const named = titledSections(entry)
+      setAllParts(named)
+
+      const offered = whole
+        ? named
         : readSections(spine, position ?? undefined).filter((row) => row.chapter === here)
-      setWaiting(eligible.map((row) => ({ section: row.section, title: row.title })))
+      setEligible(offered.map((row) => row.section))
+      /* Only the parts with nothing behind them yet. A part that already has a
+         summary is one tap away in the rail, and offering it a second time in a
+         list below the text is the duplicate the reader keeps seeing. */
+      const haveSummary = new Set((open?.sections ?? []).map((part) => part.section))
+      setWaiting(
+        offered
+          .filter((row) => !haveSummary.has(row.section))
+          .map((row) => ({ section: row.section, title: row.title })),
+      )
       setChecked(true)
     })
     return () => {
@@ -193,15 +218,27 @@ export default function ChapterView() {
    * reader has to be able to get back to the chapter recap after opening a
    * part, and a rail with no way back to where it started is a trap.
    *
-   * Built from the summaries, not from the spine: a part with no summary yet
-   * has nothing to show, and it is already offered under "Parts you have
-   * finished" below.
+   * Built from the spine, not from the summaries. Every part the author named
+   * gets a tab from the first moment the chapter is opened, whether it has a
+   * summary, is waiting for one, or is still unread. The tab's own page says
+   * which of the three it is.
    */
+  const named = [...allParts]
+  /* A part that has a summary but is not in the spine still belongs in the row.
+     The spine is re-read on import and a summary outlives it, so the two can
+     disagree; the reader must not lose a part they have already paid for. */
+  for (const part of open?.sections ?? []) {
+    if (!named.some((row) => row.section === part.section)) {
+      named.push({ section: part.section, title: part.title })
+    }
+  }
+  named.sort((a, b) => a.section - b.section)
+
   const parts: RailItem[] =
-    open && open.sections && open.sections.length > 0
+    named.length > 0
       ? [
           { key: 'all', label: 'The whole chapter' },
-          ...open.sections.map((part) => ({
+          ...named.map((part) => ({
             key: String(part.section),
             label: part.title,
           })),
@@ -212,10 +249,15 @@ export default function ChapterView() {
   /* A part named in the URL that this chapter does not have — a stale link, or
      a chapter switched underneath the parameter. Fall back to the chapter. */
   const currentPart = parts.some((part) => part.key === askedPart) ? askedPart : 'all'
-  const openPart =
+  /* The part the rail is standing on, from the spine. It exists even when no
+     model has written a word about it — that is the whole point of the rail. */
+  const partOnScreen =
     currentPart === 'all'
       ? undefined
-      : open?.sections?.find((part) => String(part.section) === currentPart)
+      : named.find((part) => String(part.section) === currentPart)
+  /* Its summary, when there is one. */
+  const openPart =
+    partOnScreen && open?.sections?.find((part) => part.section === partOnScreen.section)
   const exit = backTo(location.search)
 
   return (
@@ -250,14 +292,37 @@ export default function ChapterView() {
         <h1 className={styles.chapterNo}>Chapter {current || '—'}</h1>
         {/* The part's own name takes the subtitle when a part is open, so the
             reader can see at a glance which of the two they are reading. */}
-        {openPart ? (
-          <div className={styles.chapterTtl}>{openPart.title}</div>
+        {partOnScreen ? (
+          <div className={styles.chapterTtl}>{partOnScreen.title}</div>
         ) : (
           open && <div className={styles.chapterTtl}>{open.chapterTitle}</div>
         )}
         <Flourish wide />
 
-        {loading || !checked ? null : openPart ? (
+        {loading || !checked ? null : partOnScreen && !openPart ? (
+          /*
+           * A part with no summary yet. It still has a tab, so it still needs a
+           * page: one that says which of the two reasons it is empty for, and
+           * offers the call when the reader has earned it.
+           */
+          <>
+            <p className={styles.empty}>
+              {eligible.includes(partOnScreen.section)
+                ? 'You have finished this part. Ask for a summary and Veda will read it.'
+                : 'The summary of this part comes when you finish reading it.'}
+            </p>
+            {eligible.includes(partOnScreen.section) && (
+              <button
+                type="button"
+                className={styles.ask}
+                disabled={asking !== undefined}
+                onClick={() => void onAsk(partOnScreen)}
+              >
+                {asking === partOnScreen.section ? 'Summarising…' : 'Summarise this part'}
+              </button>
+            )}
+          </>
+        ) : openPart ? (
           /* One part, alone. The same two labels as the chapter, because it is
              the same job one level down. */
           <>
@@ -309,15 +374,10 @@ export default function ChapterView() {
               </>
             ) : (
               <p className={styles.empty}>
-                The recap of the whole chapter comes when you finish it. The parts you have
-                already read are below.
+                The recap of the whole chapter comes when you finish it. Open a part in the
+                strip above to read that part on its own.
               </p>
             )}
-
-            {/* The parts are in the rail above, one tap away. Printing every
-                one of them here as well made the chapter page a scroll of six
-                summaries and buried the recap that ties them together. */}
-            <Waiting parts={waiting} asking={asking} onAsk={onAsk} />
           </>
         ) : (
           /*
@@ -339,7 +399,7 @@ export default function ChapterView() {
                 : finished
                   ? 'This chapter has no summary yet. Ask for one and Veda will read the whole chapter.'
                   : waiting.length > 0
-                  ? 'The recap of the whole chapter comes when you finish it. These are the parts you have already read.'
+                  ? 'The recap of the whole chapter comes when you finish it. Open a part in the strip above to read that part on its own.'
                   : 'This chapter has no summary yet. It appears here once you have finished reading it.'}
             </p>
             {finished && (
@@ -352,7 +412,6 @@ export default function ChapterView() {
                 {asking === 'chapter' ? 'Reading the chapter…' : 'Summarise this chapter'}
               </button>
             )}
-            <Waiting parts={waiting} asking={asking} onAsk={onAsk} />
           </>
         )}
       </main>
@@ -395,49 +454,4 @@ function Tags({ tags }: { tags: string[] }) {
 function Byline({ model }: { model?: string }) {
   if (!model) return null
   return <p className={styles.byline}>{modelLabel(model)}</p>
-}
-
-/**
- * The named parts on offer, each with its own button.
- *
- * Drawn wherever the reader is: under a chapter that already has summaries, and
- * on a chapter that has none at all. The bell offers the same parts, but the
- * bell is not where a reader is standing when they wonder where a summary went.
- *
- * Each button is a paid call, so each is asked for on its own. There is no
- * "all of them" here on purpose — the bell has that, next to the book it
- * belongs to, where the reader can see the whole bill at once.
- */
-function Waiting({
-  parts,
-  asking,
-  onAsk,
-}: {
-  parts: { section: number; title: string }[]
-  asking: 'chapter' | number | undefined
-  onAsk: (part: { section: number; title: string }) => void
-}) {
-  if (parts.length === 0) return null
-  return (
-    <section className={styles.part}>
-      <div className={styles.secLabel}>Parts you have finished</div>
-      <ul className={styles.waiting}>
-        {parts.map((part) => (
-          <li key={part.section} className={styles.waitingRow}>
-            <span>{part.title}</span>
-            <button
-              type="button"
-              className={styles.ask}
-              /* Every button waits while one runs — they are paid calls and
-                 they share a vocabulary — but only the one pressed says so. */
-              disabled={asking !== undefined}
-              onClick={() => onAsk(part)}
-            >
-              {asking === part.section ? 'Summarising…' : 'Summarise'}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
 }
