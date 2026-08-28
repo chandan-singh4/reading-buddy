@@ -74,7 +74,15 @@
     0 1px 0 #fff inset,
     0 18px 40px -20px rgba(48, 44, 36, 0.4);
   display: grid;
-  grid-template-columns: 118px 1fr;
+  /*
+   * `minmax(0, 1fr)`, not `1fr`.
+   *
+   * A grid track's default minimum is its content's own width, so one wide
+   * child — a strip of chapter names that is meant to scroll — makes the track
+   * wider than the card, the card wider than the screen, and every paragraph on
+   * the page run off the right edge with nothing to scroll it back.
+   */
+  grid-template-columns: 118px minmax(0, 1fr);
   overflow: hidden;
   position: relative;
 }
@@ -330,7 +338,7 @@
 
 @media (max-width: 640px) {
   .book {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .book::before {
@@ -351,6 +359,10 @@
     flex-direction: column;
     gap: 6px;
     padding: 12px 10px;
+    /* The rail is a grid item holding two strips that are wider than the
+       screen on purpose. Without this it reports their full width as its own
+       minimum and pushes the whole card sideways. */
+    min-width: 0;
   }
 
   /* Each strip scrolls by itself, so swiping the parts never drags the
@@ -360,6 +372,9 @@
     gap: 2px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    /* Same reason as the rail above: a flex item will not shrink below its
+       content unless told, and then it never scrolls — it just grows. */
+    min-width: 0;
   }
 
   .parts {
@@ -369,6 +384,7 @@
     padding-top: 8px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    min-width: 0;
   }
 
   .railLabel,
@@ -378,6 +394,9 @@
 
   .tab {
     width: auto;
+    /* Hold the label's own width. A flex item shrinks by default, so without
+       this the labels squeeze together and the strip never scrolls. */
+    flex: 0 0 auto;
     white-space: nowrap;
     border-left: none;
     border-bottom: 2px solid transparent;
