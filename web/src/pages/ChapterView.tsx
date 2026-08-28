@@ -18,7 +18,7 @@ import { repository } from '../storage/index.ts'
 import type { BookId } from '../structure/index.ts'
 import { backLabel, backTo } from '../summary/backTo.ts'
 import { summaryData } from '../summary/dataSource.ts'
-import { approve } from '../summary/engine.ts'
+import { approve, Refusal } from '../summary/engine.ts'
 import { finishedChapters, readSections, titledSections } from '../summary/queue.ts'
 import { Flourish, Paper, Rail, RichText, type RailItem } from '../summary/Paper.tsx'
 import styles from '../summary/summary.module.css'
@@ -84,6 +84,14 @@ export default function ChapterView() {
    */
   const [asking, setAsking] = useState<'chapter' | number | undefined>()
   /**
+   * Which of the two models is running, when one is.
+   *
+   * The reader asked for the recap and the conversation summary to be two
+   * things they can rewrite on their own. So the page has to know which of them
+   * is being written, or a redo of one would blank the other.
+   */
+  const [askingOnly, setAskingOnly] = useState<'recap' | 'items'>('recap')
+  /**
    * The named parts of this chapter the reader has finished and not summarised.
    *
    * The bell offers these too, but the bell is not where a reader is standing
@@ -113,7 +121,11 @@ export default function ChapterView() {
    * chapter, the part itself for a part.
    */
   const [choosing, setChoosing] = useState<
-    { part?: { section: number; title: string }; force: boolean } | undefined
+    {
+      part?: { section: number; title: string }
+      force: boolean
+      only?: 'recap' | 'items'
+    } | undefined
   >()
   /**
    * The recap as the model writes it, or an empty string before its first word.
@@ -131,7 +143,7 @@ export default function ChapterView() {
    * about *this* summary, so carrying it to the next chapter accuses a model
    * that was never asked. See the effect below.
    */
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState<string | undefined>()
   /*
    * The picker's own columns, held here so a drag inside the sheet survives
    * until it is saved. The roster is the one the app last saw: this page must
@@ -226,12 +238,16 @@ export default function ChapterView() {
    * has never opened the lamp has no roster, and an empty sheet would be a
    * button that appears to do nothing. Then the relay picks, as it always did.
    */
-  function onWant(part?: { section: number; title: string }, force = false) {
+  function onWant(
+    part?: { section: number; title: string },
+    force = false,
+    only?: 'recap' | 'items',
+  ) {
     if (columns.length === 0) {
-      void onAsk(part, force)
+      void onAsk(part, force, only)
       return
     }
-    setChoosing({ ...(part ? { part } : {}), force })
+    setChoosing({ ...(part ? { part } : {}), force, ...(only ? { only } : {}) })
   }
 
   /**
@@ -244,16 +260,27 @@ export default function ChapterView() {
    * fails leaves the summary that was already there. That is what makes Redo
    * safe to press: the worst case is a wasted call, never a lost summary.
    */
-  async function onAsk(part?: { section: number; title: string }, force = false) {
+  async function onAsk(
+    part?: { section: number; title: string },
+    force = false,
+    only?: 'recap' | 'items',
+  ) {
     setAsking(part ? part.section : 'chapter')
-    setFailed(false)
+    setAskingOnly(only ?? 'recap')
+    setFailed(undefined)
     setLive('')
     try {
-      await approve(id, Number(current), part, { force, onWriting: setLive })
+      await approve(id, Number(current), part, {
+        force,
+        onWriting: setLive,
+        ...(only ? { only } : {}),
+      })
       setOpen(await summaryData().getChapter(id, current))
-    } catch {
-      // The model did not answer. The page still holds what it held before.
-      setFailed(true)
+    } catch (error) {
+      /* The model did not answer. The page still holds what it held before.
+         When the relay worded the refusal for the reader, that is what they
+         are told: "the free model is busy" says what to do next. */
+      setFailed(error instanceof Refusal ? error.message : '')
     } finally {
       setAsking(undefined)
       setLive(undefined)
@@ -344,6 +371,14 @@ export default function ChapterView() {
    */
   const writingHere =
     asking !== undefined && (partOnScreen ? asking === partOnScreen.section : asking === 'chapter')
+  /*
+   * The recap takes the whole page while it is written, because everything
+   * under it is about the words being replaced. The conversation summary does
+   * not: it is one section, the recap above it is still true, and blanking the
+   * page to rewrite the smaller half would be theatre.
+   */
+  const writingRecap = writingHere && askingOnly === 'recap'
+  const writingItems = writingHere && askingOnly === 'items'
 
   /*
    * A failure belongs to the summary it happened to, so it is dropped the
@@ -352,7 +387,7 @@ export default function ChapterView() {
    * never been asked anything.
    */
   useEffect(() => {
-    setFailed(false)
+    setFailed(undefined)
   }, [current, currentPart])
 
   const exit = backTo(location.search)
@@ -396,7 +431,7 @@ export default function ChapterView() {
         )}
         <Flourish wide />
 
-        {loading || !checked ? null : writingHere ? (
+        {loading || !checked ? null : writingRecap ? (
           /*
            * While the model writes, the page is the model writing.
            *
@@ -418,7 +453,7 @@ export default function ChapterView() {
            * offers the call when the reader has earned it.
            */
           <>
-            {failed && <Failure />}
+            {failed !== undefined && <Failure said={failed} />}
             <p className={styles.empty}>
               {eligible.includes(partOnScreen.section)
                 ? 'You have finished this part. Ask for a summary and Veda will read it.'
@@ -441,17 +476,26 @@ export default function ChapterView() {
           <>
             <SectionHead
               label="This part, in plain words"
+              of="this part's summary"
               text={openPart.recapText}
               busy={asking !== undefined}
-              onRedo={() => onWant(partOnScreen, true)}
+              onRedo={() => onWant(partOnScreen, true, 'recap')}
             />
-            {failed && <Failure />}
+            {failed !== undefined && <Failure said={failed} />}
             <Byline model={openPart.recapModel} />
             <RichText text={openPart.recapText} className={styles.recap} />
             {openPart.tags.length > 0 && <Tags tags={openPart.tags} />}
 
-            <div className={styles.secLabel}>What we worked through</div>
-            {openPart.qaText ? (
+            <SectionHead
+              label="What we worked through"
+              of="the conversation summary"
+              text={openPart.qaText}
+              busy={asking !== undefined}
+              onRedo={openPart.qaText ? () => onWant(partOnScreen, true, 'items') : undefined}
+            />
+            {writingItems ? (
+              <Writing text="" />
+            ) : openPart.qaText ? (
               <>
                 <Byline model={openPart.itemsModel} />
                 <RichText text={openPart.qaText} className={styles.recap} />
@@ -474,17 +518,26 @@ export default function ChapterView() {
               <>
                 <SectionHead
                   label="The chapter, in plain words"
+                  of="the chapter summary"
                   text={open.recapText}
                   busy={asking !== undefined}
-                  onRedo={() => onWant(undefined, true)}
+                  onRedo={() => onWant(undefined, true, 'recap')}
                 />
-                {failed && <Failure />}
+                {failed !== undefined && <Failure said={failed} />}
                 <Byline model={open.recapModel} />
                 <RichText text={open.recapText} className={styles.recap} />
                 {open.tags.length > 0 && <Tags tags={open.tags} />}
 
-                <div className={styles.secLabel}>What we worked through</div>
-                {open.qaText ? (
+                <SectionHead
+                  label="What we worked through"
+                  of="the conversation summary"
+                  text={open.qaText}
+                  busy={asking !== undefined}
+                  onRedo={open.qaText ? () => onWant(undefined, true, 'items') : undefined}
+                />
+                {writingItems ? (
+                  <Writing text="" />
+                ) : open.qaText ? (
                   <>
                     <Byline model={open.itemsModel} />
                     <RichText text={open.qaText} className={styles.recap} />
@@ -523,7 +576,7 @@ export default function ChapterView() {
              * read exactly like a chapter they had not finished. The empty rail
              * was the only clue, and a clue is not an answer.
              */}
-            {failed && <Failure />}
+            {failed !== undefined && <Failure said={failed} />}
             <p className={styles.empty}>
               {chapters.length === 0
                 ? 'This book has no chapters saved on this device, so there is nothing to summarise. Re-import it from Book details and it will appear here.'
@@ -564,7 +617,7 @@ export default function ChapterView() {
             rememberSummaryPick(model)
             const want = choosing
             setChoosing(undefined)
-            void onAsk(want?.part, want?.force === true)
+            void onAsk(want?.part, want?.force === true, want?.only)
           }}
           onArrange={(next) => {
             // Saved as it is dragged. The sheet can be dismissed three ways,
@@ -671,14 +724,25 @@ function Writing({ text }: { text: string }) {
  */
 function SectionHead({
   label,
+  of,
   text,
   busy,
   onRedo,
 }: {
   label: string
-  text: string
+  /**
+   * What these two controls act on, said as a noun phrase.
+   *
+   * There are two of each on a page now, so "Copy" alone names neither. A
+   * screen reader reads "Copy the conversation summary" and knows which of the
+   * two headings it has landed on.
+   */
+  of: string
+  /** The words under this heading. No words, no Copy: there is nothing to take. */
+  text?: string
   busy: boolean
-  onRedo: () => void
+  /** Absent where a rewrite makes no sense — nothing has been written yet. */
+  onRedo?: () => void
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -686,35 +750,39 @@ function SectionHead({
     <div className={styles.secHead}>
       <div className={styles.secLabel}>{label}</div>
       <div className={styles.secTools}>
-        <button
-          type="button"
-          className={styles.tool}
-          aria-label={copied ? 'Copied' : 'Copy'}
-          title={copied ? 'Copied' : 'Copy the summary'}
-          onClick={() => {
-            void navigator.clipboard
-              ?.writeText(text)
-              .then(() => {
-                setCopied(true)
-                window.setTimeout(() => setCopied(false), 1600)
-              })
-              .catch(() => {
-                /* No clipboard permission. The text is still selectable. */
-              })
-          }}
-        >
-          {copied ? <TickIcon /> : <CopyIcon />}
-        </button>
-        <button
-          type="button"
-          className={styles.tool}
-          disabled={busy}
-          aria-label="Redo the summary"
-          title="Redo the summary"
-          onClick={onRedo}
-        >
-          <RedoIcon />
-        </button>
+        {text ? (
+          <button
+            type="button"
+            className={styles.tool}
+            aria-label={copied ? 'Copied' : `Copy ${of}`}
+            title={copied ? 'Copied' : `Copy ${of}`}
+            onClick={() => {
+              void navigator.clipboard
+                ?.writeText(text)
+                .then(() => {
+                  setCopied(true)
+                  window.setTimeout(() => setCopied(false), 1600)
+                })
+                .catch(() => {
+                  /* No clipboard permission. The text is still selectable. */
+                })
+            }}
+          >
+            {copied ? <TickIcon /> : <CopyIcon />}
+          </button>
+        ) : null}
+        {onRedo ? (
+          <button
+            type="button"
+            className={styles.tool}
+            disabled={busy}
+            aria-label={`Redo ${of}`}
+            title={`Redo ${of}`}
+            onClick={onRedo}
+          >
+            <RedoIcon />
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -778,10 +846,10 @@ function RedoIcon() {
  * they are looking at is their old summary rather than a bad new one. Nothing
  * was written and nothing was lost — only a call was spent.
  */
-function Failure() {
+function Failure({ said }: { said: string }) {
   return (
     <p className={styles.failure} role="status">
-      The model did not answer. Nothing was changed — what you had is still here.
+      {said || 'The model did not answer.'} Nothing was changed — what you had is still here.
     </p>
   )
 }

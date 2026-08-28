@@ -1536,7 +1536,22 @@ export default async function handler(request: Request): Promise<Response> {
        * bars the retry as soon as the first one goes out. Thinking is not
        * words: it is working-out, the client replaces it when a new rung opens,
        * and nobody reads a paragraph of it as the answer.
+       *
+       * ## Except for a summary, which may be started again
+       *
+       * A free rung often hits its rate limit *while it is generating* and puts
+       * the refusal inside the stream. `wrote` was already true, so the ask
+       * ended there: the reader watched half a recap appear and then a message
+       * saying the model was busy, with four rungs below it untried.
+       *
+       * A summary is not a conversation. Nobody is reading it as it lands —
+       * they are waiting for a document, and a half-written one is thrown away
+       * rather than kept. So a material job may start again on the next rung,
+       * and the client is told to clear what it has by the `open` line that
+       * every rung sends. The panel keeps the old rule exactly: `restartable`
+       * is false for every conversational ask.
        */
+      const restartable = Boolean(module?.material)
       let rung = served
       let response = opened
       let rest = models.slice(models.indexOf(served) + 1)
@@ -1558,7 +1573,7 @@ export default async function handler(request: Request): Promise<Response> {
             send({ t: 'done', reply: replyOf(answer, rung) })
             break
           } catch (error) {
-            if (wrote || rest.length === 0) {
+            if ((wrote && !restartable) || rest.length === 0) {
               send({ t: 'error', message: reasonFrom(error), status: statusFrom(error) })
               break
             }

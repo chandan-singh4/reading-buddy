@@ -455,7 +455,7 @@ describe('watching a summary being written', () => {
     })
 
     open(`/book/${WATCHED}/chapters?chapter=1`)
-    fireEvent.click(await screen.findByRole('button', { name: 'Redo the summary' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Redo the chapter summary' }))
 
     // A model may think for ten seconds before its first word.
     expect(await screen.findByLabelText('Veda is reading the chapter')).toBeTruthy()
@@ -479,7 +479,7 @@ describe('watching a summary being written', () => {
     vi.mocked(approve).mockResolvedValue(undefined)
 
     open(`/book/${WATCHED}/chapters?chapter=1`)
-    fireEvent.click(await screen.findByRole('button', { name: 'Redo the summary' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Redo the chapter summary' }))
     fireEvent.click(await screen.findByRole('button', { name: /Big Model/ }))
 
     await waitFor(() => expect(vi.mocked(approve)).toHaveBeenCalled())
@@ -493,7 +493,7 @@ describe('watching a summary being written', () => {
 
     open(`/book/${WATCHED}/chapters?chapter=1`)
     expect(await screen.findByText('The summary you already had.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Redo the summary' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Redo the chapter summary' }))
 
     expect(await screen.findByText(/The model did not answer/)).toBeTruthy()
     // The words the reader had are still the words on the page.
@@ -508,7 +508,7 @@ describe('watching a summary being written', () => {
     })
 
     open(`/book/${WATCHED}/chapters?chapter=1`)
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy the chapter summary' }))
 
     expect(writeText).toHaveBeenCalledWith('The summary you already had.')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
@@ -523,11 +523,34 @@ describe('watching a summary being written', () => {
 
     open(`/book/${WATCHED}/chapters?chapter=1`)
     expect(await screen.findByText('What you and Veda worked through.')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Redo the summary' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Redo the chapter summary' }))
 
     await screen.findByLabelText('Veda is reading the chapter')
     expect(screen.queryByText('What we worked through')).toBeNull()
     expect(screen.queryByText('What you and Veda worked through.')).toBeNull()
+  })
+
+  it('rewrites the conversation summary on its own, keeping the recap', async () => {
+    /*
+     * Two prompts, two jobs, two buttons. The Librarian reads the chapter and
+     * the Scribe reads the conversation about it; wanting one written again is
+     * not wanting both, and paying for both to get one is money for an answer
+     * nobody asked for.
+     */
+    vi.mocked(approve).mockImplementation(async () => {
+      await new Promise(() => {})
+    })
+
+    open(`/book/${WATCHED}/chapters?chapter=1`)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redo the conversation summary' }))
+
+    await waitFor(() => expect(vi.mocked(approve)).toHaveBeenCalled())
+    const [, , , watch] = vi.mocked(approve).mock.calls[0]
+    expect(watch?.only).toBe('items')
+
+    // The recap above is still true, so it stays on the page.
+    expect(screen.getByText('The summary you already had.')).toBeTruthy()
+    expect(screen.getByLabelText('Veda is reading the chapter')).toBeTruthy()
   })
 
   it('leaves the failure behind when the reader moves on', async () => {
@@ -535,7 +558,7 @@ describe('watching a summary being written', () => {
     vi.mocked(approve).mockRejectedValue(new Error('the relay answered 429'))
 
     open(`/book/${WATCHED}/chapters?chapter=1`)
-    fireEvent.click(await screen.findByRole('button', { name: 'Redo the summary' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Redo the chapter summary' }))
     expect(await screen.findByText(/The model did not answer/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /Second/ }))

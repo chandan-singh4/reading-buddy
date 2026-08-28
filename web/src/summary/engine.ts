@@ -119,19 +119,32 @@ async function askGolden(
  * empty answer, and half a recap is not empty. It is also not stored: the
  * material it was built from is still there, and a rerun costs the reader
  * nothing but a tap.
+ *
+ * Exported for its tests, and read once per streamed call.
  */
-async function watched(
+export async function watched(
   body: ReadableStream<Uint8Array>,
   onWriting: (soFar: string) => void,
 ): Promise<{ text?: unknown; model?: unknown }> {
   let text = ''
   let model: string | undefined
   let finished: { text?: unknown; model?: unknown } | undefined
+  let refused: string | undefined
 
   await readEvents(body, (piece) => {
     switch (piece.t) {
       case 'open':
         if (typeof piece.model === 'string') model = piece.model
+        /*
+         * A second `open` means the first rung died part-way and the relay has
+         * started again on the next one. Its half of the answer goes with it:
+         * two halves of two JSON objects welded together is not an answer, and
+         * the reader must see the new model's recap from its first word rather
+         * than the old one's stump with new text growing out of it.
+         */
+        text = ''
+        refused = undefined
+        onWriting('')
         break
       case 'text':
         if (typeof piece.d === 'string') {
@@ -142,6 +155,15 @@ async function watched(
       case 'done':
         finished = (piece.reply ?? {}) as { text?: unknown; model?: unknown }
         break
+      case 'error':
+        /*
+         * Every rung has now refused — the relay only sends this once it has
+         * run out of them. Its words are kept and thrown to the page, because
+         * "the free model is busy" tells the reader what to do next and "the
+         * model did not answer" does not.
+         */
+        if (typeof piece.message === 'string') refused = piece.message
+        break
       default:
         break
     }
@@ -150,8 +172,20 @@ async function watched(
   if (finished && typeof finished.text === 'string' && finished.text.trim().length > 0) {
     return { text: finished.text, model: finished.model ?? model }
   }
+  if (refused) throw new Refusal(refused)
   return { text, model }
 }
+
+/**
+ * A refusal the relay worded for the reader, rather than a fault of ours.
+ *
+ * Kept apart from every other error on purpose. "The free model is busy right
+ * now" is a sentence a reader can act on; "the relay answered 429" is one they
+ * cannot, and showing the second in place of the first would be an app talking
+ * to itself. Only a message that came down the wire as a refusal wears this
+ * type, so a page can print it and nothing else.
+ */
+export class Refusal extends Error {}
 
 /**
  * The fallback chain a summary is sent down, strongest choice first.
@@ -255,6 +289,22 @@ export interface RunWatch {
    * the reader words they had.
    */
   force?: boolean
+  /**
+   * Run one of the two models, not both.
+   *
+   * The reader asked for this. The two prompts do two unrelated jobs: the
+   * Librarian reads the chapter, the Scribe reads the conversation about it.
+   * Wanting the recap written again is not wanting the conversation summary
+   * written again, and paying for both to get one is money for an answer
+   * nobody asked for.
+   *
+   * Absent means both, in the fixed order, which is what the sweep does and
+   * what a first run must do. That order is not a tidiness rule: the Librarian
+   * grows the canonical vocabulary and the Scribe matches against it, and its
+   * own prompt says "The Librarian has already processed the chapter". A
+   * Scribe-only run is therefore only offered where a recap already exists.
+   */
+  only?: 'recap' | 'items'
 }
 
 /** What one chapter's run produced, for the caller to report. */
@@ -318,12 +368,16 @@ export async function runChapter(
     return undefined
   }
 
+  /* One half at a time, when the reader asked for one half. */
+  const wantsRecap = watch?.only !== 'items'
+  const wantsItems = watch?.only !== 'recap'
+
   const now = new Date().toISOString()
   let recap = existing?.recap ?? ''
   let concepts = existing?.concepts ?? []
   let recapModel = existing?.recapModel
 
-  if (!existing || watch?.force) {
+  if (wantsRecap && (!existing || watch?.force)) {
     const sections = await repository.listSections(bookId)
     const material = part
       ? sectionMaterial(sections, chapter, part.section)
@@ -353,7 +407,7 @@ export async function runChapter(
   let items = existing?.items
   let itemsAt = existing?.itemsAt
   let itemsModel = existing?.itemsModel
-  if (conversationsNow > 0) {
+  if (wantsItems && conversationsNow > 0) {
     const canonical = await conceptStore.names()
     const reply = await askGolden(
       'scribe',
@@ -374,8 +428,15 @@ export async function runChapter(
     recap,
     concepts,
     ...(items === undefined ? {} : { items }),
-    coversNConversations: conversationsNow,
-    recapAt: watch?.force ? now : (existing?.recapAt ?? now),
+    /*
+     * How many conversations the *Scribe's* half covers.
+     *
+     * A recap-only run must not claim the conversations it did not read. If it
+     * did, the sweep would see a summary that is up to date and never send the
+     * Scribe, and a reader's questions would go unsummarised for ever.
+     */
+    coversNConversations: wantsItems ? conversationsNow : (existing?.coversNConversations ?? 0),
+    recapAt: watch?.force && wantsRecap ? now : (existing?.recapAt ?? now),
     ...(recapModel === undefined ? {} : { recapModel }),
     ...(itemsAt === undefined ? {} : { itemsAt }),
     ...(itemsModel === undefined ? {} : { itemsModel }),
