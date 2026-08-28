@@ -109,14 +109,19 @@
 }
 
 /*
- * 152px wide, and the picture in it is the largest Google Books offered.
+ * The picture in it is the largest Google Books offered.
  *
  * `coverUrlOf` already prefers `extraLarge` over `large` over `thumbnail` when
  * a book is matched, and what it picked is what was saved into the book's
  * assets — so this needs no second fetch, only the room to show it.
+ *
+ * Wider than the 152px of the reference. The reference had a four-word title
+ * under it; a real shelf is full of books whose full title runs to four lines,
+ * and beside that much Playfair a 152px cover stops being the subject of the
+ * screen. `min()` keeps it off the edges of a 360px phone.
  */
 .coverMedia {
-  width: 152px;
+  width: min(200px, 58%);
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 8px 20px rgb(0 0 0 / 30%);
@@ -131,8 +136,8 @@
   bottom: -6px;
   left: 50%;
   transform: translateX(-50%);
-  width: 184px;
-  height: 28px;
+  width: min(240px, 70%);
+  height: 34px;
   background: radial-gradient(ellipse at center, rgb(50 35 15 / 24%), transparent 70%);
   z-index: 0;
 }
@@ -140,12 +145,21 @@
 .title {
   font-family: 'Playfair Display', Georgia, serif;
   font-size: 30px;
+  /* A four-line title at 30px outshouts the cover it belongs to. See
+     `titleLong` for where the step down happens. */
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.2px;
   margin: 26px 0 8px;
   /* A long title is the one string on this page that is meant to wrap. */
   overflow-wrap: anywhere;
+}
+
+/* A long title — a full title with its subtitle welded on — steps down a size
+   so the cover stays the loudest thing on the screen. */
+.titleLong {
+  font-size: 25px;
+  line-height: 1.1;
 }
 
 .author {

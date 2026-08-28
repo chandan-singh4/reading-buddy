@@ -177,7 +177,18 @@ function reasonFrom(error: unknown): string {
  */
 function yearOf(published: string | undefined): string | undefined {
   if (!published) return undefined
-  return /^\d{4}-/.test(published) ? published.slice(0, 4) : published
+  const year = /^\d{4}-/.test(published) ? published.slice(0, 4) : published
+  /*
+   * A year nobody could have published in is dropped, not shown.
+   *
+   * An EPUB carries whatever its packager typed, and one on this shelf says
+   * `0101`. Printed on the line beside the page count it reads as a fact about
+   * the book. Anything outside 1400 to next year is a typing accident, so the
+   * line simply goes one fact shorter.
+   */
+  if (!/^\d{4}$/.test(year)) return undefined
+  const value = Number(year)
+  return value >= 1400 && value <= new Date().getFullYear() + 1 ? year : undefined
 }
 
 /**
@@ -332,6 +343,17 @@ export default function BookInfo() {
   // Cut and deduplicated here, so the row is hidden when nothing survives the
   // cut — a book whose only heading was `General` has no subjects to show.
   const tags = subjectTags(book.subjects ?? [])
+  const shown = fullTitle(book.title, book.subtitle)
+  /*
+   * Forty characters, past which the title steps down a size.
+   *
+   * A full title carries its subtitle — "Braiding Sweetgrass: Indigenous
+   * Wisdom, Scientific Knowledge and the Teachings of Plants" — and at 30px
+   * that is four lines of Playfair standing over the cover it belongs to. The
+   * cover is meant to be the subject of this screen. Forty is where a title
+   * stops fitting on two lines on a 360px phone.
+   */
+  const long = shown.length > 40
   const summariesHref = `/book/${book.id}/chapters?from=${encodeURIComponent(`/book/${book.id}/info`)}`
   // Only the facts this book actually has. A missing page count must not leave
   // " · pp · " sitting in the line.
@@ -352,7 +374,7 @@ export default function BookInfo() {
         <div className={styles.shelf} aria-hidden="true" />
       </div>
 
-      <h1 className={styles.title}>{fullTitle(book.title, book.subtitle)}</h1>
+      <h1 className={long ? `${styles.title} ${styles.titleLong}` : styles.title}>{shown}</h1>
       {book.author && <p className={styles.author}>{book.author}</p>}
 
       <p className={styles.metaline}>
