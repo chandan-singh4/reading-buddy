@@ -2029,3 +2029,46 @@ who does not care.
 
 Every summary also records which model wrote it, and the page prints it. The
 relay already returned the name; the client was throwing it away.
+
+### A summary is written in two halves that run on their own — 2026-08-28
+
+The Librarian writes the chapter recap; the Scribe writes the notes from the
+reader's questions. They were always two calls, but one button ran both. Each
+half now has its own Copy and its own Redo, and a redo of one shows its dots in
+its own place. The other half stays on screen, because nothing is rewriting it.
+
+### Every relay call streams, watched or not — 2026-08-28
+
+The host gives an edge function about twenty-five seconds to send its first
+byte. A recap of 800 to 1,200 words written whole before a byte leaves runs past
+that, the host answers 504, and the finished words die with the connection. A
+stream sends its first byte at once and holds the line open. This is why the
+Scribe and the four memory jobs stream although nobody watches them write.
+
+### Three failures, three different causes — 2026-08-28
+
+Worth keeping apart, because each says something different about what to do
+next. **413** is Groq refusing before it starts: a whole chapter is larger than
+a free key may spend in a minute, so that rung is skipped. **429** is a model
+that is busy. **504** was ours, and is fixed. A fourth, which looked like all of
+them: a cut-off answer whose JSON would not parse. `JSON.parse` refuses the
+whole string over one missing brace, so a recap the reader had watched appear
+was thrown away. The live view's own walk now recovers it.
+
+### The staleness test counts questions, not passages — 2026-08-28
+
+A thread is one passage. A reader who asks three follow-up questions about the
+same paragraph adds three exchanges to one thread, so a count of threads did not
+move and the follow-ups were never summarised.
+
+### The book screen is a paper object, like the summary page — 2026-08-28
+
+Rebuilt from `design-inspiration/reading-desk-v2.html`. It does not follow the
+reader's theme, for the reason the summary page gives: mapped onto `--color-bg`
+it stops being a desk. **Violet is Veda's alone** — her block and the action
+that opens what she wrote, never a generic control. The chapter summaries are
+one door, so a finished book moves them into the violet slot and folds Veda's
+block away rather than showing both.
+
+The notes field and the quotes list left the screen. Both tables and every
+repository method stay; only the UI is gone.

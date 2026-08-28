@@ -243,7 +243,9 @@
   genre/subject tag, date-range read, **one overall rating** — the
   "single overall book rating prompted at Finished" already agreed as a
   future milestone. Foundation the next two waypoints hang their UI off of ·
-  *after 46*
+  *after 46* — **rebuilt 2026-08-28** as the reading desk, from
+  `design-inspiration/reading-desk-v2.html`. Two states driven by whether the
+  book is finished; violet is Veda's alone.
 - [x] **WP-48 Favorite quotes on the detail page** — shipped 2026-08-03 as a
   typed-in MVP rather than waiting on WP-17/25: a `quotes` table (schema v7,
   `[bookId+id]`, cascades on delete) plus `addQuote`/`listQuotes`/
@@ -251,7 +253,9 @@
   *from the reading screen itself* is still real, unbuilt work — that needs a
   character range within an anchor (WP-17's job) — so this table just gains a
   second way to be filled once WP-17/25 land, nothing about its shape changes
-  · *after 47*
+  · *after 47* — **the field was removed from the book screen 2026-08-28.**
+  Quotes belong under the book's notes. The `quotes` table and every
+  repository method are untouched; only the form and the list are gone.
 - [x] **WP-49 Notes/reflections** — shipped 2026-08-03. `BookMeta.notes`
   (free text, saved on blur). Originally also shipped `.moods` (toggle
   chips) and `.secondaryRatings` (writing style / pacing / emotional
@@ -259,7 +263,9 @@
   specific axes) — the reader saw the page live the same session and asked
   for both removed as clutter, so they're gone: UI, repository methods
   (`setMoods`/`rateBookAxis`) and the `BookMeta` fields/type all pulled
-  rather than left dead · *after 47*
+  rather than left dead · *after 47* — **the field was removed from the book
+  screen 2026-08-28.** Veda's summaries cover the reflections. `BookMeta.notes`
+  and `setNotes` are untouched; only the textarea is gone.
 - [x] **WP-50 The update panel** — added and shipped 2026-08-05, asked for by
   the reader in the same breath as "I want to focus on giving character to my
   app". The app used to reload underneath whoever was reading with no

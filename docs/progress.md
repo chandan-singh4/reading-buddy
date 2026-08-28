@@ -19,7 +19,16 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,221 tests across 127 files.
+  2,254 tests across 131 files.
+- **Waiting on the phone: the reading desk.** The book screen was rebuilt this
+  session and judged in a desktop browser against a seeded book. Both states
+  need a look on a device — an unfinished book and a finished one.
+- **`api/tutor.ts` has no tests.** The mid-stream failover added this session is
+  proved by reasoning only. There is no test harness under `api/`, and the
+  client half is covered instead (`watched.test.ts`, `askMemory.test.ts`).
+- **Every already-summarised chapter will re-run the Scribe once.** The
+  staleness test now counts the reader's questions rather than the passages, so
+  every stored summary looks stale one time. It settles after that.
 - **A screen must import `repository` from `storage/index.ts`.** Four screens
   imported `storage/repository.ts`, which is the device store only. The reader's
   library is in the cloud, so every summary page read an empty database and
@@ -62,6 +71,36 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **Two halves that write on their own, and a book screen made of paper**
+  (2026-08-28). Not a waypoint — every item came from the reader. Build green:
+  2,254 tests across 131 files.
+  - **The Librarian and the Scribe are two calls now, not one.** Each half of
+    the chapter page redoes itself alone. Only the half being written shows the
+    three dots; the other half stays on screen and stays readable.
+  - **Every relay call streams**, including the memory digest. The Vercel edge
+    function must send a first byte in about 25 seconds. A long non-streaming
+    answer went past that and the relay answered 504. Streaming starts the
+    clock at the first word instead.
+  - **Three failures, three causes, three messages.** 413 is Groq refusing the
+    size before it starts. 429 is the free model busy. 504 was our own relay.
+    The page prints the real reason now, not one blank sentence for all three.
+  - **A finished answer is no longer thrown away.** The model wrote the whole
+    recap but did not close the JSON, so `JSON.parse` refused it and the reader
+    saw "the model did not answer". The parser now falls back to the recap it
+    can already see.
+  - **The staleness test counts the reader's questions, not the passages.**
+    Three follow-ups on one paragraph are one thread, so they never moved the
+    count and never triggered a new summary. Known cost: every stored summary
+    looks stale one time and re-runs the Scribe once.
+  - **The chapter rail holds the chapter you are on in the middle**, for both
+    rows, and only moves when you move it.
+  - **The book screen is a paper object**, rebuilt from
+    `design-inspiration/reading-desk-v2.html`. Two states: reading, or finished.
+    Violet belongs to Veda alone. The notes field and the quotes field left the
+    screen; both tables and every repository method stay.
+  - **The cover is the subject, not the title.** The reader asked for it after
+    seeing the first build on the phone. The cover grew and the title shrank.
 
 - **Summaries by part, by book, and by a model you choose** (2026-08-27). Not
   a waypoint — every item came from the reader. Build green: 2,221 tests across
@@ -189,68 +228,6 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     search strips the marks off and falls back to the longest opening really
     there, so notes saved before the plain words existed still land.
 
-- **The book reads itself out loud** (2026-08-25). WP-16 is closed. Build green:
-  2053 tests across 112 files.
-  - Read aloud was one sentence, said once, with no way to stop it. It is now a
-    voice that keeps going: from the selection, through the section, into the
-    next one, until the reader stops it.
-  - **The engine is a plain object, not a hook** — `reader/readAloud.ts`. What
-    plays next, what a pause means and which endings are real are rules worth
-    testing without a renderer. 22 tests drive it through a fake engine.
-  - **The rule the module is built around:** `cancel()` fires `onend`. Every
-    utterance carries its generation, and an ending from an old one is ignored.
-  - The sentence being said is washed in the app's own blue, painted by the same
-    machinery as a highlight, so it survives a page turn for free.
-  - The page follows the voice by the *sentence's* rectangle, not the
-    paragraph's: a long paragraph crosses a column, and the voice crosses with
-    it.
-  - The transport is at the foot of the page: back, play or pause, next, the
-    speed, stop. The voice itself is chosen in the Aa tab, where it is decided
-    once.
-  - **The defect it fixes:** nothing silenced the speech when the reader left
-    the book. The hook's cleanup does.
-  - `aloudRate` and `aloudVoice` joined the reader's settings, so both survive a
-    reload.
-  - **Fixed after a third phone report:** the page still turned a sentence late.
-    Both earlier attempts depended on knowing where the voice was inside a
-    sentence — first from an event many engines never send, then from an
-    estimate of how fast prose is spoken. Neither is needed. A sentence that
-    runs off the page is now said as two utterances, cut at the page break, and
-    the engine's own "this utterance ended" turns the page at the exact moment.
-  - **Fixed after the same report:** choosing a reading voice changed nothing.
-    An utterance now carries the language as well as the voice, because several
-    engines ignore the voice when the language is unset. Picking a voice also
-    says one short line in it.
-  - **Fixed after a phone report:** a reader who selected the fourth sentence of
-    a paragraph was read the first. An anchor names a paragraph; the selected
-    words now say which sentence.
-  - **Fixed after a phone report:** the page turned a sentence late. A long
-    sentence that began at the foot of a page was read to its end while the
-    reader looked at the page above it. One page forward is also a real turn
-    with its sheet now, rather than a silent jump.
-  - **Fixed after a phone report:** stop moved the reader to the next chapter
-    and started reading it, and a second stop moved them on again. "Stopped" and
-    "read to the end" were the same event. They are two callbacks now, and only
-    the second one turns the page.
-
-- **A PDF's pictures, found without recognising them** (2026-08-25). WP-39 is
-  closed. Build green: 2006 tests across 110 files.
-  - The PDF parser read text and nothing else, so a book of plates imported as
-    a book of captions. It now finds any band of a page taller than a fifth of
-    it with no text in it, draws that strip, and keeps it as an ordinary figure.
-  - **Nothing is classified.** `pdf-layout.ts` declined to recognise figures,
-    and that stands. A gap is a fact about a page. A band that renders blank is
-    discarded after the render, when the pixels can be counted.
-  - It catches vector diagrams, which reading the embedded images would miss —
-    a chart has no picture inside the file to find.
-  - The margins stay out of it without measuring them: only the space between a
-    page's own topmost and bottommost text counts. The cost is a figure with no
-    text on one side of it, which cannot be told from a margin.
-  - `PARSER_VERSION` 29, so PDFs already on the shelf re-parse and gain their
-    pictures.
-  - Two Library tests were racing and failed under the extra load of two new
-    test files. Both asserted before a second read had landed; they now wait.
-
 > **Older entries are deleted, not archived.** Only the five newest survive —
 > see this file's own header. Git holds every earlier version of this file, so
 > nothing is lost: `git log -p docs/progress.md` brings back any entry ever
@@ -266,6 +243,11 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   worker problem. Don't raise it again.
 
 ### Next up
+**Judge this session's work on the phone.** Nothing built on 2026-08-28 has been
+seen on a device: the rebuilt book screen in both states, the two summary halves
+redoing themselves alone, and the real failure messages. `active-task.md` lists
+the checks.
+
 **The update prompt is worth a look of its own.** A prompt-to-update PWA cost
 the reader four rounds of "still broken" on work that was already shipped. The
 prompt may be too quiet on a phone. Deciding this is a small task, not a bug.
