@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Link } from 'react-router'
 
 import { claimNodes } from './claimNodes.ts'
@@ -73,7 +73,7 @@ export function Rail({
       <div className={styles.railLabel}>{label}</div>
       {/* Wrapped, so the chapters are one scrolling row on a phone rather than
           one row each once the rail becomes a column of strips. */}
-      <div className={styles.chapters}>
+      <Strip className={styles.chapters}>
         {items.map((item) => {
           const on = item.key === current
           return (
@@ -91,9 +91,9 @@ export function Rail({
             </button>
           )
         })}
-      </div>
+      </Strip>
       {parts && parts.length > 0 && onPickPart && (
-        <div className={styles.parts} role="group" aria-label="Parts of this chapter">
+        <Strip className={styles.parts} role="group" label="Parts of this chapter">
           {parts.map((part) => {
             const on = part.key === currentPart
             return (
@@ -108,11 +108,51 @@ export function Rail({
               </button>
             )
           })}
-        </div>
+        </Strip>
       )}
 
       <p className={styles.railNote}>{note}</p>
     </nav>
+  )
+}
+
+/**
+ * One scrolling row of tabs, with the tab you are on held in the middle.
+ *
+ * The row only moves when the tab you are on changes. It never corrects a
+ * scroll you made yourself, so a rail you pushed with your thumb stays where
+ * you left it until you open something else.
+ */
+function Strip({
+  className,
+  role,
+  label,
+  children,
+}: {
+  className: string
+  role?: string
+  label?: string
+  children: ReactNode
+}) {
+  const strip = useRef<HTMLDivElement>(null)
+  const settled = useRef(false)
+  useEffect(() => {
+    const row = strip.current
+    const tab = row?.querySelector<HTMLElement>('[aria-current="true"]')
+    if (!row || !tab) return
+    const want = tab.offsetLeft - (row.clientWidth - tab.offsetWidth) / 2
+    const most = row.scrollWidth - row.clientWidth
+    const to = Math.max(0, Math.min(want, most))
+    if (Math.abs(to - row.scrollLeft) < 1) return
+    /* The first paint jumps; every move after it slides, because a slide is
+       what tells you the row moved rather than the labels changing under you. */
+    row.scrollTo?.({ left: to, behavior: settled.current ? 'smooth' : 'auto' })
+    settled.current = true
+  })
+  return (
+    <div ref={strip} className={className} role={role} aria-label={label}>
+      {children}
+    </div>
   )
 }
 
