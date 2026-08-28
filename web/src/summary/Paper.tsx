@@ -161,7 +161,18 @@ export function Paper({
   return (
     <div className={styles.shell}>
       <div className={styles.topBar}>
-        <Link to={backTo} className={styles.back}>
+        {/*
+         * `replace`, and this is the whole of the fix for a back button that
+         * would not let the reader go.
+         *
+         * The way out goes to the page the reader came from. Pushed, that page
+         * is now in the history twice with this one between them, so a back
+         * swipe returned here, and the next one returned to the page they had
+         * just left: a loop with no end. Replacing drops this page as the
+         * reader leaves it, which is what the rest of the app does and what a
+         * back swipe expects — one step out, and out.
+         */}
+        <Link to={backTo} replace className={styles.back}>
           ← {backLabel}
         </Link>
       </div>

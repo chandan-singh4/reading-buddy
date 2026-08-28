@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto'
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { BrowserRouter, MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { AppRoutes } from '../App.tsx'
@@ -361,5 +361,41 @@ describe('choosing the model that writes a summary', () => {
 
     expect(await screen.findByRole('button', { name: 'Summarising…' })).toBeTruthy()
     expect(screen.queryByText('Which model answers')).toBeNull()
+  })
+})
+
+describe('leaving the chapter page', () => {
+  /*
+   * The back gesture would not let the reader go.
+   *
+   * The way out was a pushed link, so the page they came from sat in the
+   * history twice with the chapter page between them. One back swipe returned
+   * to the chapters, the next returned to the page they had just left, and
+   * round again. Leaving now replaces, so there is one step out and it is out.
+   *
+   * Measured in real history entries rather than in rendered pages, because
+   * the fault was never visible on screen — both routes rendered correctly.
+   */
+  it('does not leave itself in the history behind the reader', async () => {
+    const exit = `/book/${JUNG}/info`
+    window.history.pushState({}, '', '/library')
+    window.history.pushState({}, '', exit)
+    window.history.pushState(
+      {},
+      '',
+      `/book/${JUNG}/chapters?chapter=4&from=${encodeURIComponent(exit)}`,
+    )
+    const depth = window.history.length
+
+    render(
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>,
+    )
+    fireEvent.click(await screen.findByRole('link', { name: /Book details/ }))
+
+    await waitFor(() => expect(window.location.pathname).toBe(exit))
+    // The chapter page stood aside rather than stacking on top of the exit.
+    expect(window.history.length).toBe(depth)
   })
 })
