@@ -588,6 +588,50 @@ export interface StoredWord {
   savedAt: string
 }
 
+/**
+ * One stretch of *active* reading, on this device.
+ *
+ * The source of truth for nearly everything on the Stats screen, and the reason
+ * it can exist at all: nothing before this recorded that reading happened, only
+ * where it stopped.
+ *
+ * `activeMs` is the time the book was open: the session starts when the book
+ * opens and stops when it closes. There is no idle detector, on the reader's
+ * instruction — a half-hour spent arguing with Veda about one paragraph is
+ * reading, and an idle rule would have discarded it for looking like an idle
+ * phone. The one guard is a per-session cap (`stats/clock.ts`), so a book left
+ * open overnight is credited with a long sitting rather than a whole night.
+ *
+ * `day` is the local calendar day the session *started*, as `YYYY-MM-DD`. A
+ * session that crosses midnight is filed under the day it began. That is one
+ * row on one side of a boundary rather than two rows split by arithmetic
+ * nobody can verify, and the streak reads better for it: you read on Tuesday
+ * night, so Tuesday is lit.
+ *
+ * Stored as a string rather than a Date because it is an *index* the heatmap
+ * and the streak both range over, and a local calendar day is not a moment —
+ * deriving it from an epoch at read time would silently move a session when
+ * the reader flies somewhere.
+ *
+ * Device-local, like `tutor` and `notes`, and for the reason written at the top
+ * of `storage/notes.ts`: the cloud backend has no such table, and adding one is
+ * a Supabase table, a cached read and an outbox entry, not one method. The cost
+ * is real and accepted — these numbers do not follow the reader to a second
+ * device.
+ */
+export interface StoredSession {
+  id: string
+  bookId: BookId
+  /** Local calendar day the session started, `YYYY-MM-DD`. */
+  day: string
+  /** Epoch milliseconds. */
+  startedAt: number
+  /** Epoch milliseconds — when the book was closed, not when reading stopped. */
+  endedAt: number
+  /** Milliseconds of reading, capped. See `stats/clock.ts`. */
+  activeMs: number
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -615,6 +659,7 @@ export type ReadingBuddyDB = Dexie & {
   summaries: Table<StoredChapterSummary, [BookId, string]>
   concepts: Table<StoredConcept, string>
   alerts: Table<StoredAlert, string>
+  sessions: Table<StoredSession, string>
 }
 
 /**
@@ -809,6 +854,22 @@ function defineSchema(db: Dexie): void {
     summaries: '[bookId+chapterId], bookId',
     concepts: 'name, addedAt',
     alerts: 'id, at, bookId',
+  })
+
+  /*
+   * `sessions` — every stretch of active reading (WP: the Stats screen).
+   *
+   * Indexed on `day` because that is what the heatmap, the streak and every
+   * period on the Stats screen range over; on `startedAt` because the chart's
+   * Day scope buckets by hour and needs the moment, not the day; and on
+   * `bookId` so deleting a book can take its sessions with it.
+   *
+   * No migration and nothing to backfill. Reading before this existed left no
+   * record anywhere, so there is nothing to derive a session from. The
+   * heatmap is empty before the first session and fills forward.
+   */
+  db.version(17).stores({
+    sessions: 'id, day, startedAt, bookId',
   })
 }
 

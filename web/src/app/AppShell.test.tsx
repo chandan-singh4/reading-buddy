@@ -202,7 +202,7 @@ describe('app shell', () => {
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
     swipe(-150)
-    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Statistics' })).toBeDefined()
 
     // One: the tab actually visited before this one.
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
@@ -227,7 +227,7 @@ describe('app shell', () => {
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
     swipe(150)
-    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Statistics' })).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
@@ -264,7 +264,7 @@ describe('app shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     fireEvent.click(screen.getByRole('link', { name: /Stats/ }))
-    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Statistics' })).toBeDefined()
 
     // Back to Settings — the screen before this one — not to Home.
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
@@ -280,13 +280,13 @@ describe('app shell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     fireEvent.click(screen.getByRole('link', { name: /Stats/ }))
-    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Statistics' })).toBeDefined()
 
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Statistics' })).toBeDefined()
   })
 
 
@@ -365,7 +365,7 @@ describe('app shell', () => {
   it('renders Stats on its route', () => {
     renderAt('/stats')
 
-    expect(screen.getByRole('heading', { name: 'Stats' })).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Statistics' })).toBeDefined()
   })
 
   it('renders the Reader full-bleed, outside the shell', async () => {

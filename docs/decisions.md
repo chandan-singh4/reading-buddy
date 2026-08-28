@@ -2072,3 +2072,63 @@ block away rather than showing both.
 
 The notes field and the quotes list left the screen. Both tables and every
 repository method stay; only the UI is gone.
+
+### Settled 2026-08-28 (the Statistics screen)
+
+- **A reading session is one visit to a book.** It starts when the book opens
+  and stops when it closes. The first build paused after two minutes with no
+  page turn, scroll or tap; the reader removed it mid-build. A half-hour spent
+  arguing with Veda about one paragraph is reading, and an idle detector cannot
+  tell that apart from a phone on a table. The known cost is stated in
+  `stats/clock.ts`: a book left open counts. The one guard is a six-hour cap on
+  a single session, which catches a night on the nightstand and no honest
+  sitting.
+- **The session row is written every 30 seconds, not once at the end.** A phone
+  can kill a suspended tab without running any teardown. Written only on close,
+  every session ended by the operating system would vanish — and those are the
+  long night-time ones. The id never changes, so this is one row that grows.
+- **Sessions are device-local, and they do not follow the reader.** A new Dexie
+  table outside `Repository`, the rule `tutor` and `notes` already follow: the
+  cloud backend has no such table, and adding one is a Supabase table, a cached
+  read and an outbox entry, not one method. The cost is accepted.
+- **Deleting a book does not delete its sessions.** Every other per-book table
+  cascades. This one follows `vocabulary`: you did read on those days, and a
+  streak is a fact about the reader, not about a book still on the shelf.
+- **"Tracking start" is derived, never stored.** It is the earliest session's
+  day, one indexed lookup. A stored copy is a second version of a fact the rows
+  already hold, and a second version is a thing that can disagree.
+- **The delta compares equal *elapsed* lengths, not equal calendars.** On a
+  Friday, five days of this week are compared with last Monday to last Friday.
+  Comparing a part-week against a whole one is not a reading of "up 22%", it is
+  an arithmetic guarantee of "down".
+- **A delta against zero is not shown.** "Up 100% from nothing" looks measured
+  and is not. The line says "nothing read last week" instead.
+- **The scope toggle drives three cards and no others.** The period summary, the
+  Veda card and the chart. Not the streak, not the heatmap, not the genres —
+  those three answer questions about a habit and a shelf, and "this week" is not
+  a sensible slice of either.
+- **The fourth Veda tile is "tags created", not "revision flags cleared".** The
+  design reference asks for the latter and nothing in the app sets or clears a
+  revision flag. The tile counts the distinct concept names Veda wrote when it
+  summarised a chapter in the period — the tags the reader takes to Obsidian.
+- **One book counts under one genre.** Bars that sum to more than the library
+  cannot be read: "3 Philosophy" has to mean three books. The top-level BISAC
+  segment is matched first, across every heading, before any qualifier — without
+  that pass "Business & Economics / Economic History" lands on History, a
+  trailing qualifier outranking the shelf the book is filed on. A unit test
+  found this, not a reading of the code.
+- **A book with no usable heading is said out loud, never folded into "Other".**
+  An unmatched book is a gap in the catalogue, not a reading habit.
+- **The screen does not follow the reader's theme.** The same call the chapter
+  summary page made, at the same known cost. Here the argument is sharper: the
+  whole screen is a colour system — the warm ink ramp, the violet that means
+  Veda alone, forest green for a primary action, amber for time. Remapped onto
+  ten themes they stop being a key and become decoration.
+- **The old Stats screen said "no streaks, no pressure". That was reversed on
+  purpose.** Product Principle 4 declined streaks outright; the reader asked for
+  one by name and it is now the first card.
+- **A CSS lesson worth keeping.** `.seg button` is a class-plus-element selector
+  and out-specifies a bare `.segOn`, so the selected pill rendered the same
+  colour as the unselected ones. The same fault hit the chart legend and the
+  calendar's Apply button. Every modifier in `stats.module.css` is now scoped to
+  its parent. The browser found this; the code read as correct.

@@ -168,7 +168,7 @@ describe('Back, against the real history', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/settings'))
 
     await pressBack('/stats')
-    expect(await screen.findByRole('heading', { name: 'Stats' })).toBeDefined()
+    expect(await screen.findByRole('heading', { name: 'Statistics' })).toBeDefined()
   })
 
   it('records the tab being left from the address bar, not from a captured render', async () => {

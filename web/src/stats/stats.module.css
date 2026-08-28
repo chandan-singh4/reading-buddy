@@ -1,0 +1,884 @@
+/*
+ * The Statistics screen.
+ *
+ * Ported value for value from `design-inspiration/reading-buddy-stats.html`.
+ * Nothing has been restyled or "improved"; if a number looks arbitrary it is
+ * because the design says so.
+ *
+ * ## This screen does not follow the app's theme, on purpose
+ *
+ * The same call the chapter summary page made, for the same reason and at the
+ * same known cost — see the header of `summary/summary.module.css`. Here the
+ * argument is sharper still: the whole screen is a colour system. The warm ink
+ * ramp on the heatmap, the violet that means Veda and nothing else, the forest
+ * green of a primary action and the amber of a time series all have to hold
+ * their meaning against one another. Remapped onto ten themes they stop being a
+ * key and become decoration.
+ *
+ * The cost: a reader in Dark who opens this at night gets a bright screen.
+ * Every rule below reads its colour through `var()`, so a dark palette for
+ * these tokens alone is the fix if it turns out to be wrong.
+ *
+ * The reference is a whole page and pads the body. This sits inside `AppShell`,
+ * which has already padded `.content` — so `.shell` bleeds back out to the
+ * screen edges and re-pads to the reference's 20px.
+ */
+
+.shell {
+  /* Paper */
+  --paper: #efe8d9;
+  --card: #fbf7ed;
+  --card-edge: #e4d8bf;
+  /* Ink */
+  --ink: #33302a;
+  --ink-soft: #6b6459;
+  --ink-faint: #9a9184;
+  --rule: #e2d6bd;
+  /* A primary action is forest green, everywhere in this app */
+  --accent: #3f5a38;
+  --accent-tint: #e6eadd;
+  /* Amber is time. It is never a second accent. */
+  --amber: #c77d3a;
+  /* The warm ink ramp: how much you read that day, and nothing else */
+  --h0: #e8ddc8;
+  --h1: #e3c58f;
+  --h2: #d19a4e;
+  --h3: #a9662b;
+  --h4: #6e3e17;
+  /* Violet belongs to Veda alone */
+  --veda: #6c5ce0;
+  --veda-lite: #b7adf0;
+  --veda-soft: #8e82e8;
+  --veda-wash: #efebfb;
+  --veda-edge: #dbd3f4;
+  /* A delta reads up or down before it reads as a number */
+  --up: #4e6b45;
+  --down: #a6673a;
+  /* The genre bars. Five hues, none of them load-bearing. */
+  --g1: #c67b4e;
+  --g2: #6e7b94;
+  --g3: #5e7d74;
+  --g4: #7e8c4e;
+  --g5: #8b7690;
+
+  /* Out of `.content`'s padding, back to the screen edge, then in again at the
+     reference's own 20px. `--space-5`/`--space-4` are what `AppShell` used. */
+  margin: calc(var(--space-5) * -1) calc(var(--space-4) * -1);
+  padding: 22px 20px 56px;
+  background: radial-gradient(120% 80% at 50% -10%, #f6efdf 0%, var(--paper) 55%);
+  color: var(--ink);
+  font-family: 'EB Garamond', Georgia, serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100%;
+}
+
+.header {
+  margin: 6px 0 18px;
+}
+
+.kicker {
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+
+.h1 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+  font-size: 34px;
+  line-height: 1.05;
+  margin-top: 4px;
+  color: var(--ink);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow:
+    0 1px 0 #fff inset,
+    0 6px 16px -12px rgb(60 45 20 / 40%);
+}
+
+.cardLabel {
+  font-size: 11.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The rule that runs off the end of a label. Decorative, so it is a
+   pseudo-element rather than an element a screen reader has to skip. */
+.cardLabel::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+.cap {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+  margin-top: 10px;
+}
+
+/* --- Streak ---------------------------------------------------------------- */
+
+.streak {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.flame {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.streakN {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.streakT {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+/* --- Heatmap --------------------------------------------------------------- */
+
+.hmScroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -4px;
+  padding: 0 4px 2px;
+}
+
+.hmScroll::-webkit-scrollbar {
+  height: 0;
+}
+
+.hmGrid {
+  display: inline-block;
+}
+
+.hmMonths {
+  display: flex;
+  margin-left: 26px;
+  margin-bottom: 6px;
+}
+
+.hmMonths span {
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.hmBody {
+  display: flex;
+}
+
+.hmDays {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-right: 6px;
+  padding: 1px 0;
+}
+
+.hmDays span {
+  font-size: 10px;
+  color: var(--ink-faint);
+  height: 13px;
+  line-height: 13px;
+}
+
+.hmWeeks {
+  display: flex;
+  gap: 3px;
+}
+
+.hmWeek {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cell {
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--h0);
+  box-shadow: inset 0 0 0 1px rgb(90 70 35 / 6%);
+  cursor: pointer;
+  display: block;
+}
+
+.l1 {
+  background: var(--h1);
+}
+
+.l2 {
+  background: var(--h2);
+}
+
+.l3 {
+  background: var(--h3);
+}
+
+.l4 {
+  background: var(--h4);
+}
+
+/* A day after today. Kept in the flow so the week columns stay square. */
+.ahead {
+  visibility: hidden;
+}
+
+/* A day before the first session ever recorded: there is nothing to say about
+   it, so it must not look like a day you failed to read. */
+.untracked {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgb(90 70 35 / 4%);
+  cursor: default;
+}
+
+.hmLegend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 12px;
+}
+
+.hmLegend .cell {
+  width: 11px;
+  height: 11px;
+  cursor: default;
+}
+
+.hmTip {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 10px;
+  min-height: 19px;
+  font-style: italic;
+}
+
+.hmTip b {
+  font-style: normal;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* --- Scope ----------------------------------------------------------------- */
+
+.divide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 26px 2px 16px;
+}
+
+.divide span {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+.divide::before,
+.divide::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+.scope {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.seg {
+  display: flex;
+  /* `min-width: 0` because a flex child reports its content width as its
+     smallest size, which is what pushed the chapter rail off the screen. */
+  min-width: 0;
+  flex: 1;
+  background: #ede4d2;
+  border: 1px solid var(--card-edge);
+  border-radius: 11px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.seg button {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 15px;
+  color: var(--ink-soft);
+  padding: 8px 2px;
+  border-radius: 8px;
+  transition: 0.18s;
+}
+
+/* Each of the three modifiers below is scoped to its parent on purpose.
+   `.seg button`, `.legend button` and `.calActions button` are class-plus-element
+   selectors, so a bare `.segOn` loses to them and the selected pill came out
+   the same colour as the unselected ones. */
+.seg button.segOn {
+  background: var(--accent);
+  color: #f6f2e6;
+  box-shadow: 0 2px 6px -2px rgb(40 55 35 / 50%);
+}
+
+.calBtn {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  border: 1px solid var(--card-edge);
+  background: #ede4d2;
+  color: var(--ink-soft);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.18s;
+}
+
+.calBtnOn {
+  background: var(--accent);
+  color: #f6f2e6;
+  border-color: var(--accent);
+}
+
+.rangeLine {
+  font-size: 14px;
+  color: var(--ink-soft);
+  font-style: italic;
+  margin: 2px 2px 18px;
+}
+
+.rangeLine b {
+  font-style: normal;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* --- Period summary -------------------------------------------------------- */
+
+.hero {
+  text-align: center;
+  padding: 22px 20px 18px;
+}
+
+.big {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+  font-size: 50px;
+  line-height: 1;
+}
+
+.unit {
+  font-size: 24px;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.sub {
+  font-size: 14.5px;
+  color: var(--ink-soft);
+  margin-top: 8px;
+}
+
+.delta {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.up {
+  color: var(--up);
+}
+
+.down {
+  color: var(--down);
+}
+
+.trio {
+  display: flex;
+  border-top: 1px solid var(--rule);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.trioCell {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.trioN {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.trioT {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+
+/* --- Veda ------------------------------------------------------------------ */
+
+.veda {
+  background: linear-gradient(180deg, #fcfaff 0%, var(--veda-wash) 100%);
+  border-color: var(--veda-edge);
+}
+
+.veda .cardLabel {
+  color: var(--veda-soft);
+}
+
+.veda .cardLabel::after {
+  background: var(--veda-edge);
+}
+
+.qa {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.qaCell {
+  flex: 1;
+  min-width: 0;
+}
+
+.qaN {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--veda);
+  line-height: 1;
+}
+
+.qaT {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 5px;
+}
+
+.depthLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-bottom: 7px;
+}
+
+.depthBar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  gap: 2px;
+  background: var(--veda-edge);
+}
+
+.depthBar i {
+  display: block;
+}
+
+.depthSingle {
+  background: var(--veda-lite);
+}
+
+.depthDeep {
+  background: var(--veda);
+}
+
+.depthKey {
+  display: flex;
+  gap: 18px;
+  margin-top: 9px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.depthKey b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.vedaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 14px;
+  border-top: 1px solid var(--veda-edge);
+  margin-top: 18px;
+  padding-top: 18px;
+}
+
+.vstatN {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--veda);
+  line-height: 1;
+}
+
+.vstatT {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 5px;
+}
+
+/* --- Books & time ---------------------------------------------------------- */
+
+.legend {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.legend button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  transition: 0.15s;
+}
+
+.legend button.legendOff {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+
+.legend i {
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-right: 7px;
+  vertical-align: middle;
+  transition: 0.15s;
+}
+
+.legend button.legendOff i {
+  opacity: 0.3;
+}
+
+.chartSub {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin-bottom: 12px;
+}
+
+.chartSub b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* --- Genres ---------------------------------------------------------------- */
+
+.split {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  background: #efe6d3;
+}
+
+.splitNf {
+  background: var(--g2);
+}
+
+.splitFi {
+  background: var(--g1);
+}
+
+.splitKey {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+}
+
+.gbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 11px;
+  cursor: pointer;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+}
+
+.gbarLab {
+  width: 88px;
+  font-size: 13.5px;
+  text-align: right;
+  color: var(--ink);
+  flex: none;
+}
+
+.gbarTrack {
+  flex: 1;
+  min-width: 0;
+  background: #efe6d3;
+  border-radius: 5px;
+  height: 16px;
+  overflow: hidden;
+}
+
+.gbarFill {
+  height: 100%;
+  border-radius: 5px;
+  display: block;
+}
+
+.gbarVal {
+  width: 16px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  flex: none;
+}
+
+/* The book list a tapped bar opens. Not in the reference — the reference only
+   promises the tap, so this is the plainest thing that keeps the promise. */
+.gbarBooks {
+  margin: -4px 0 14px 98px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.gbarBooks li {
+  list-style: none;
+  padding: 3px 0;
+}
+
+.gbarBooks em {
+  font-style: italic;
+  color: var(--ink);
+}
+
+/* --- Calendar -------------------------------------------------------------- */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(45 38 25 / 42%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  /* Below the drawer's scrim and panel at 8 and 9 — see `app/Portal.tsx`.
+     Opening the drawer must cover this, not leave it floating on the glass. */
+  z-index: 7;
+}
+
+.cal {
+  width: 100%;
+  max-width: 340px;
+  background: var(--card);
+  border: 1px solid var(--card-edge);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 20px 50px -18px rgb(40 30 10 / 60%);
+  font-family: 'EB Garamond', Georgia, serif;
+  color: var(--ink);
+}
+
+.calHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.calMonth {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.nav {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--card-edge);
+  background: #ede4d2;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 16px;
+}
+
+.nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.calHint {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+  margin-bottom: 10px;
+}
+
+.dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.dow span {
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.calGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--ink);
+  user-select: none;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  padding: 0;
+}
+
+.dayEmpty {
+  cursor: default;
+}
+
+.day:hover:not(:disabled) {
+  background: var(--accent-tint);
+}
+
+.inRange {
+  background: var(--accent-tint);
+  border-radius: 0;
+}
+
+.dayEnd {
+  background: var(--accent);
+  color: #f6f2e6;
+  border-radius: 8px;
+}
+
+.day:disabled {
+  color: var(--ink-faint);
+  opacity: 0.35;
+  cursor: default;
+}
+
+.calActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.calActions button {
+  flex: 1;
+  min-width: 0;
+  padding: 11px;
+  border-radius: 10px;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 15px;
+  cursor: pointer;
+  border: 1px solid var(--card-edge);
+}
+
+.calActions button.calCancel {
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.calActions button.calApply {
+  background: var(--accent);
+  color: #f6f2e6;
+  border-color: var(--accent);
+}
+
+.calActions button.calApply:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* --- States ---------------------------------------------------------------- */
+
+/* The screen before any reading has ever been recorded. The cards above still
+   render at zero — an empty heatmap is a true statement about a new library,
+   and hiding it would make the screen look broken rather than new. */
+.empty {
+  font-size: 14px;
+  color: var(--ink-soft);
+  font-style: italic;
+}

@@ -3,45 +3,104 @@
 > **What's in here:** the one task in flight, what "done" means, and the exact
 > files to open. Read this first. Do not read the codebase around it.
 
-## Task: judge the 2026-08-28 work on the phone
+## Task: the Statistics screen
 
-Nothing from that session has been seen on a device. Everything is built,
-tested, merged and deployed. This task needs no code unless a check fails.
+Build the Stats tab from `design-inspiration/reading-buddy-stats.html`. The
+reference is the visual specification. Copy its order, spacing, type, colours,
+radii and shadows. Every number in it is sample data and must be replaced.
 
-### Checks, in order
+The previous task, "judge the 2026-08-28 work on the phone", is parked. It needs
+a device and no code. See `progress.md`.
 
-1. **A book you are still reading.** Open Book Details. The cover is the first
-   thing your eye lands on, not the title. The two actions are **Continue
-   reading** and the violet **Coming back to it**. Veda's study block is there.
-2. **A book you finished** (100 percent). The two actions become **Start again**
-   and the violet **Read chapter summaries**. The study block is gone.
-3. **Narrow screens.** Nothing overflows sideways at about 360 px. A long title
-   drops to the smaller size and still fits.
-4. **The description clamp.** Four lines, then "More". It must clamp on lines,
-   not cut a line in half.
-5. **A chapter summary, redone.** Press Redo on one half only. That half shows
-   the three dots. The other half stays on screen and stays readable.
-6. **A failure message.** If a call fails, the page must name the reason: the
-   model is busy, the request is too large, or the relay was too slow. It must
-   not say "the model did not answer" for all three.
-7. **The chapter rail.** The chapter you are on sits in the middle of the row,
-   and both rows behave the same. It only moves when you move it.
-8. **The one-time re-run.** Every chapter that already had a summary will look
-   stale once and write itself again. This is expected. It must settle after
-   one pass.
+### What the screen shows, top to bottom
+
+1. Streak
+2. Heatmap of the days you read
+3. Scope toggle (Day / Week / Month / Year / Custom) and a range line
+4. Period summary
+5. Veda
+6. Books and time
+7. Genres
+
+The reference's last card, the handwritten insight, is **not** built. It needs a
+rule nobody has written yet.
+
+### The three decisions taken at the start
+
+0. **A reading session is one visit to a book.** It starts when the book opens
+   and stops when it closes. There is no idle rule. The reader removed it
+   mid-build: a half-hour spent arguing with Veda about one paragraph is
+   reading, and a pause detector would have discarded it. The one guard is a
+   six-hour cap per session, so a book left open overnight is credited with a
+   long sitting and not a whole night.
+1. **Reading sessions are device-local.** A new Dexie table, outside
+   `Repository`. This is the rule `tutor` and `notes` already follow: the cloud
+   backend has no such table, and adding one is a Supabase table, a cached read
+   and an outbox entry, not one method. The cost is stated: the numbers do not
+   follow the reader between devices.
+2. **The fourth Veda tile is "tags created".** The reference asks for "revision
+   flags cleared". Nothing in the app sets or clears a revision flag. The tile
+   counts the distinct concept names Veda wrote when it summarised a chapter in
+   the period — the tags the reader takes to Obsidian.
+3. **The insight card is left out.** See above.
+
+### Reading time
+
+- The timer starts when a book opens.
+- It stops when the book closes.
+- One session is never credited with more than 6 hours.
+- The row is written every 30 seconds while the book is open. A phone that
+  kills the tab therefore loses at most 30 seconds, not the whole session.
+- "Tracking start" is the first day any reading was recorded. It is derived
+  from the session rows, not stored a second time.
+
+### What the scope toggle drives
+
+It drives the period summary, the Veda card and the books-and-time chart. It
+does **not** touch the streak, the heatmap or the genres.
 
 ### Done when
 
-Each check above is a yes, or it is written down as a fault with what you saw.
+1. The screen matches the reference at 430 px and does not overflow at 360 px.
+2. Opening a book, reading, and closing it records one session of about the
+   right length. A book left open overnight records 6 hours, not 9.
+3. Every number comes from stored data. No sample data is left.
+4. The calendar cannot select a day before tracking start or after today. The
+   month arrows stop at the same two walls.
+5. A legend tap hides its line. The last visible line cannot be hidden.
+6. `npm run build` is green.
+
+### Status: built, tested, and seen in a browser
+
+Every check above is met except the two that need a device. The screen was
+proved against 122 seeded sessions in a desktop browser: all four scopes, the
+legend toggles, the calendar's two walls, a custom range, and the heatmap tap.
+The seeded rows were deleted afterwards.
+
+**Not yet seen on a phone.** The whole screen, and the timer especially — no
+real session has ever been recorded by a real reader closing a real book.
 
 ### Files in scope
 
-Open these only if a check fails.
+New:
 
-- `web/src/pages/BookInfo.tsx` and `BookInfo.module.css` — checks 1 to 4.
-- `web/src/pages/ChapterView.tsx` — checks 5 and 6.
-- `web/src/summary/parse.ts` — check 6 (a recap the model did not close).
-- `web/src/summary/engine.ts` — checks 6 and 8 (streaming, and the staleness
-  count).
-- `web/src/summary/Paper.tsx` — check 7 (the rail).
-- `api/tutor.ts` — only if the relay itself is at fault.
+- `web/src/stats/sessions.ts` — the session table and its store.
+- `web/src/stats/timer.ts` — the active-session timer.
+- `web/src/stats/period.ts` — a scope to a date range, its previous range, its
+  buckets.
+- `web/src/stats/gather.ts` — reads every source, returns the screen's numbers.
+- `web/src/stats/genres.ts` — publisher subject headings to a top-level genre.
+- `web/src/stats/Heatmap.tsx`, `ScopeBar.tsx`, `RangeCalendar.tsx`,
+  `BooksTimeChart.tsx`, `GenreBars.tsx`, `stats.module.css`.
+
+Changed:
+
+- `web/src/storage/db.ts` — schema version 17, the `sessions` table.
+- `web/src/pages/Stats.tsx` — replaced.
+- `web/src/pages/Reader.tsx` — starts and feeds the timer.
+
+Read only:
+
+- `web/src/structure/types.ts` — `BookMeta.subjects`, `genre`, `finishedAt`.
+- `web/src/storage/db.ts` — `StoredTutorThread`, `StoredChapterSummary`,
+  `StoredConcept`.

@@ -49,6 +49,18 @@ export function createSummaryStore(database: ReadingBuddyDB = defaultDb) {
     async remove(bookId: BookId, chapterId: string): Promise<void> {
       await database.summaries.delete([bookId, chapterId])
     },
+
+    /**
+     * Every summary in the library. Only the Stats screen asks for this, and
+     * only for the tags Veda wrote inside a period.
+     *
+     * A whole-table read, which this file otherwise avoids — but there is one
+     * summary row per chapter the reader has actually finished, not one per
+     * chapter in the library, and the Stats screen loads once.
+     */
+    async all(): Promise<StoredChapterSummary[]> {
+      return database.summaries.toArray()
+    },
   }
 }
 
@@ -87,6 +99,17 @@ export function createConceptStore(database: ReadingBuddyDB = defaultDb) {
       }
       if (fresh.length > 0) await database.concepts.bulkPut(fresh)
       return fresh.map((row) => row.name)
+    },
+
+    /**
+     * Every concept with the day it was first met — what the Stats screen
+     * counts as "concepts explored" inside a period.
+     *
+     * `names()` above deliberately drops `addedAt`, because a prompt has no use
+     * for it. This returns the rows instead of widening that one.
+     */
+    async rows(): Promise<StoredConcept[]> {
+      return database.concepts.orderBy('addedAt').toArray()
     },
   }
 }

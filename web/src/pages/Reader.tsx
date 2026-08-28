@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
+import { startSession } from '../stats/timer.ts'
+
 import {
   Block,
   ChapterOpening,
@@ -487,6 +489,26 @@ export default function Reader() {
    * an effect. An effect runs after paint, which is one frame too late to stop
    * the wrong thing being painted — and that frame is the whole bug.
    */
+  /*
+   * The reading clock (`stats/timer.ts`).
+   *
+   * One session per visit to a book: it starts when this screen mounts with a
+   * book id and stops when the screen goes away. The cleanup is what stops it,
+   * so a back-swipe, a route change and an unmount all end the session by the
+   * same path — and following one book with another ends the first and starts
+   * the second, because `id` is the dependency.
+   *
+   * There is no idle detector, on the reader's instruction. Half an hour spent
+   * arguing with Veda about one paragraph is reading, and a pause rule would
+   * have thrown it away for looking like an idle phone. The one guard is a cap
+   * on a single session — see `stats/clock.ts`.
+   */
+  useEffect(() => {
+    if (id === undefined) return
+    const session = startSession(id)
+    return () => session.stop()
+  }, [id])
+
   const [describing, setDescribing] = useState(id)
   if (describing !== id) {
     setDescribing(id)

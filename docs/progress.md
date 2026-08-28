@@ -14,6 +14,16 @@ Ask → a streamed answer works end to end. WP-17, 19, 20, 25 and 29 are closed.
 Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
+- **Nothing on this screen has been seen on a phone.** The Statistics screen was
+  built and proved in a desktop browser against 122 seeded sessions. The timer
+  is the part that needs a device: no real session has ever been recorded by a
+  real reader closing a real book.
+- **A book left open counts.** The idle rule was removed on the reader's
+  instruction, so the only guard is a six-hour cap per session. If a forgotten
+  book starts inflating the numbers, the fix is a smaller cap, not a new pause
+  rule.
+- **The Stats numbers do not follow the reader to a second device.** Sessions,
+  threads and summaries are all device-local; only the shelf is in the cloud.
 - **Check the deploy, do not assume it.** A helper file under `api/` with no
   default export failed the Vercel build and five commits sat on `main`
   undeployed. To prove a deploy: fetch the live `index.html`, read the
@@ -71,6 +81,40 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **The Statistics screen** (2026-08-28). Built from
+  `design-inspiration/reading-buddy-stats.html`. Build green: 2,312 tests
+  across 135 files.
+  - **The app can tell the time now.** Nothing recorded that reading *happened*
+    — only where it stopped. A new device-local `sessions` table (schema 17)
+    and a clock in `stats/timer.ts` are the foundation the whole screen stands
+    on. The Reader starts a session on mount and stops it on unmount, so a
+    back-swipe, a route change and following one book with another all end it
+    by the same path.
+  - **There is no idle rule, by the reader's instruction.** The first build
+    paused after two minutes without a page turn. A half-hour spent arguing
+    with Veda about one paragraph is reading, and a pause detector cannot tell
+    that from an idle phone. The cost — a book left open counts — is bounded by
+    a six-hour cap per session.
+  - **The row is written every 30 seconds.** A phone kills a suspended tab
+    without running teardown, and written only on close, every long night-time
+    session would have vanished.
+  - **The scope toggle drives three cards and no others.** Period summary, Veda
+    and the chart. The streak, the heatmap and the genres ignore it — they
+    answer questions about a habit and a shelf.
+  - **The delta compares equal elapsed lengths.** Five days of this week against
+    last Monday to last Friday, never against a whole week.
+  - **The fourth Veda tile is "tags created".** The reference asked for
+    "revision flags cleared" and nothing in the app sets or clears one.
+  - **A unit test found a genre bug the code read past.** "Business & Economics
+    / Economic History" landed on History, because a trailing qualifier
+    outranked the leading BISAC heading. The top-level segment is matched first
+    now.
+  - **The browser found a bug the code also read past.** `.seg button`
+    out-specifies `.segOn`, so the selected pill was the same colour as the
+    unselected ones. The same fault hit the legend and the calendar's Apply.
+  - **The handwritten insight card was left out.** It needs a rule nobody has
+    written. Everything else in the reference is built.
 
 - **Two halves that write on their own, and a book screen made of paper**
   (2026-08-28). Not a waypoint — every item came from the reader. Build green:

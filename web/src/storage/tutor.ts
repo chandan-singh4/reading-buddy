@@ -57,6 +57,18 @@ export function createTutorStore(database: ReadingBuddyDB = defaultDb) {
       return database.tutor.where('bookId').equals(bookId).toArray()
     },
 
+    /**
+     * Every thread in the library. Only the Stats screen asks for this — it
+     * counts questions across all books, not inside one.
+     *
+     * A whole-table read, unlike everything else here. The messages are the
+     * bulk of the row and the Stats screen loads once, so it is a page of text
+     * per thread, not a book.
+     */
+    async allThreads(): Promise<StoredTutorThread[]> {
+      return database.tutor.toArray()
+    },
+
     async deleteThread(bookId: BookId, id: string): Promise<void> {
       await database.tutor.delete([bookId, id])
     },

@@ -1,0 +1,31 @@
+/**
+ * The one place the Stats screen touches storage.
+ *
+ * Kept apart from `gather.ts` so the arithmetic stays pure and testable, and so
+ * the screen has a single `await` rather than five.
+ *
+ * The books come from `repository` — the reader's library, which may be in the
+ * cloud. Everything else comes from a device-local store, because sessions,
+ * threads, summaries and the concept vocabulary all live on the device (see the
+ * headers on `stats/sessions.ts` and `storage/notes.ts`). That mixture is
+ * deliberate and it is the reason a reader who switches to a second device sees
+ * their whole shelf and none of their history.
+ */
+
+import { repository } from '../storage/index.ts'
+import { tutorStore } from '../storage/tutor.ts'
+import { conceptStore, summaryStore } from '../storage/summaries.ts'
+import { sessionStore } from './sessions.ts'
+import type { StatsSources } from './gather.ts'
+
+export async function loadStats(): Promise<StatsSources> {
+  const [books, sessions, threads, summaries, concepts] = await Promise.all([
+    repository.listBooks(),
+    sessionStore.all(),
+    tutorStore.allThreads(),
+    summaryStore.all(),
+    conceptStore.rows(),
+  ])
+
+  return { books, sessions, threads, summaries, concepts }
+}
