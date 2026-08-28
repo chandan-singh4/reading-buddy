@@ -372,13 +372,17 @@ export default function ChapterView() {
   const writingHere =
     asking !== undefined && (partOnScreen ? asking === partOnScreen.section : asking === 'chapter')
   /*
-   * The recap takes the whole page while it is written, because everything
-   * under it is about the words being replaced. The conversation summary does
-   * not: it is one section, the recap above it is still true, and blanking the
-   * page to rewrite the smaller half would be theatre.
+   * Each half is written in its own place. The recap area shows the dots while
+   * the recap is written; the conversation summary below it stays where it is,
+   * because a redo of one half does not touch the other half.
    */
   const writingRecap = writingHere && askingOnly === 'recap'
   const writingItems = writingHere && askingOnly === 'items'
+  /*
+   * The one time writing does take the page: the very first summary. There is
+   * no heading to write under yet, so there is nothing for the dots to sit in.
+   */
+  const firstEver = writingRecap && !(partOnScreen ? openPart?.recapText : open?.recapText)
 
   /*
    * A failure belongs to the summary it happened to, so it is dropped the
@@ -431,15 +435,8 @@ export default function ChapterView() {
         )}
         <Flourish wide />
 
-        {loading || !checked ? null : writingRecap ? (
-          /*
-           * While the model writes, the page is the model writing.
-           *
-           * Not the recap area alone. The reader pressed Redo and watched the
-           * dots appear above a summary of a conversation that belongs to the
-           * words being replaced — half the old page under a heading for the
-           * new one. Everything below stands aside and comes back together.
-           */
+        {loading || !checked ? null : firstEver ? (
+          /* The first summary of all: no page yet, so the writing is the page. */
           <>
             <div className={styles.secLabel}>
               {partOnScreen ? 'This part, in plain words' : 'The chapter, in plain words'}
@@ -482,9 +479,15 @@ export default function ChapterView() {
               onRedo={() => onWant(partOnScreen, true, 'recap')}
             />
             {failed !== undefined && <Failure said={failed} />}
-            <Byline model={openPart.recapModel} />
-            <RichText text={openPart.recapText} className={styles.recap} />
-            {openPart.tags.length > 0 && <Tags tags={openPart.tags} />}
+            {writingRecap ? (
+              <Writing text={live ?? ''} />
+            ) : (
+              <>
+                <Byline model={openPart.recapModel} />
+                <RichText text={openPart.recapText} className={styles.recap} />
+                {openPart.tags.length > 0 && <Tags tags={openPart.tags} />}
+              </>
+            )}
 
             <SectionHead
               label="What we worked through"
@@ -524,9 +527,15 @@ export default function ChapterView() {
                   onRedo={() => onWant(undefined, true, 'recap')}
                 />
                 {failed !== undefined && <Failure said={failed} />}
-                <Byline model={open.recapModel} />
-                <RichText text={open.recapText} className={styles.recap} />
-                {open.tags.length > 0 && <Tags tags={open.tags} />}
+                {writingRecap ? (
+                  <Writing text={live ?? ''} />
+                ) : (
+                  <>
+                    <Byline model={open.recapModel} />
+                    <RichText text={open.recapText} className={styles.recap} />
+                    {open.tags.length > 0 && <Tags tags={open.tags} />}
+                  </>
+                )}
 
                 <SectionHead
                   label="What we worked through"

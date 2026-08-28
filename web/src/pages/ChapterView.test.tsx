@@ -514,9 +514,9 @@ describe('watching a summary being written', () => {
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
   })
 
-  it('takes the whole page away while it writes, not the recap alone', async () => {
-    // The dots appeared above a summary of a conversation that belongs to the
-    // words being replaced: half the old page under a heading for the new one.
+  it('writes the recap in its own place and leaves the other half standing', async () => {
+    // The two halves are two jobs. A redo of the chapter recap must not blank
+    // the conversation summary, which nothing is rewriting.
     vi.mocked(approve).mockImplementation(async () => {
       await new Promise(() => {})
     })
@@ -526,8 +526,10 @@ describe('watching a summary being written', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Redo the chapter summary' }))
 
     await screen.findByLabelText('Veda is reading the chapter')
-    expect(screen.queryByText('What we worked through')).toBeNull()
-    expect(screen.queryByText('What you and Veda worked through.')).toBeNull()
+    // The old recap is gone; the conversation summary below it stays.
+    expect(screen.queryByText('The summary you already had.')).toBeNull()
+    expect(screen.getByText('What we worked through')).toBeTruthy()
+    expect(screen.getByText('What you and Veda worked through.')).toBeTruthy()
   })
 
   it('rewrites the conversation summary on its own, keeping the recap', async () => {
