@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AppRoutes } from '../App.tsx'
 import { repository } from '../storage/index.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
+import { forgetModels, rememberRoster, storedSummaryPick } from '../reader/models.ts'
 import { setSummaryData } from '../summary/dataSource.ts'
 import { fixtureDataSource } from '../summary/fixture.ts'
 
@@ -42,7 +43,12 @@ beforeEach(async () => {
   await repository.saveBook(bookOf(OTHER, 'A Book Nobody Summarised'))
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  // The roster and the picks live in localStorage, which outlives a render.
+  forgetModels()
+  localStorage.clear()
+})
 
 function open(at: string) {
   return render(
@@ -278,5 +284,82 @@ describe('the second row of the rail', () => {
     fireEvent.click(screen.getByRole('button', { name: '2 · Second' }))
 
     expect(await screen.findByText('The whole chapter, in one paragraph.')).toBeTruthy()
+  })
+})
+
+describe('choosing the model that writes a summary', () => {
+  /*
+   * A summary is a paid call, and the reader asked to say who writes it where
+   * they spend it — not in a screen two taps away. The button opens the lamp's
+   * own picker, and the picker starts the work.
+   */
+  const PART1 = 'part-one' as BookId
+
+  function roster() {
+    return [
+      { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', description: '', contextLength: 128_000, source: 'gemini' as const },
+      { id: 'x/big', name: 'Big Model', description: '', contextLength: 128_000, source: 'openrouter' as const },
+    ]
+  }
+
+  beforeEach(async () => {
+    await repository.saveBook(bookOf(PART1, 'Man and His Symbols'))
+    await repository.saveChapterIndex(PART1, {
+      chapter: 6,
+      title: 'PART 1 APPROACHING THE UNCONSCIOUS',
+      path: 'ch06' as never,
+      sections: ['The importance of dreams', 'Past and future in the unconscious'].map(
+        (title, index) => ({
+          section: index + 1,
+          title,
+          path: `ch06-s0${index + 1}` as never,
+        }),
+      ),
+    })
+    await repository.savePosition(PART1, '[ch06-s02-p012]' as never)
+    setSummaryData({
+      ...fixtureDataSource,
+      async getChapterList() {
+        return [{ chapter: 6, chapterTitle: 'PART 1', distilled: false }]
+      },
+      async getChapter() {
+        return undefined
+      },
+    })
+  })
+
+  it('opens the picker before it spends the call', async () => {
+    rememberRoster(roster())
+    open(`/book/${PART1}/chapters?chapter=6`)
+    fireEvent.click(await screen.findByRole('button', { name: 'The importance of dreams' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Summarise this part' }))
+
+    // The lamp's own picker, so the three columns are already familiar.
+    expect(await screen.findByText('Which model answers')).toBeTruthy()
+    expect(screen.getByText('Google')).toBeTruthy()
+    expect(screen.getByText('OpenRouter')).toBeTruthy()
+  })
+
+  it('remembers the pick, so Settings and the sheet agree', async () => {
+    rememberRoster(roster())
+    open(`/book/${PART1}/chapters?chapter=6`)
+    fireEvent.click(await screen.findByRole('button', { name: 'The importance of dreams' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Summarise this part' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Big Model/ }))
+
+    expect(storedSummaryPick()).toBe('x/big')
+    // And the call starts on the way out of the sheet.
+    expect(await screen.findByRole('button', { name: 'Summarising…' })).toBeTruthy()
+  })
+
+  it('spends the call straight away when there is no roster to pick from', async () => {
+    // A reader who has never opened the lamp has no models. An empty sheet
+    // would be a button that appears to do nothing.
+    open(`/book/${PART1}/chapters?chapter=6`)
+    fireEvent.click(await screen.findByRole('button', { name: 'The importance of dreams' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Summarise this part' }))
+
+    expect(await screen.findByRole('button', { name: 'Summarising…' })).toBeTruthy()
+    expect(screen.queryByText('Which model answers')).toBeNull()
   })
 })

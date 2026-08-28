@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
 
+import {
+  arrange,
+  arrangementOf,
+  lastRoster,
+  rememberArrangement,
+  rememberSummaryPick,
+  storedArrangement,
+  storedPick,
+  storedSummaryPick,
+  type Column,
+} from '../reader/models.ts'
+import { ModelSheet } from '../reader/ModelSheet.tsx'
 import { modelLabel } from '../reader/tutor.ts'
 import { repository } from '../storage/index.ts'
 import type { BookId } from '../structure/index.ts'
@@ -92,6 +104,23 @@ export default function ChapterView() {
   const [allParts, setAllParts] = useState<{ section: number; title: string }[]>([])
   /** The parts the reader has read far enough to summarise, by section number. */
   const [eligible, setEligible] = useState<number[]>([])
+  /**
+   * What the reader has asked for but not yet chosen a model for.
+   *
+   * A summary is a paid call, and the reader asked to say who writes it at the
+   * moment they spend it rather than in a screen two taps away. So the button
+   * opens the picker and the picker starts the work. `'chapter'` for the whole
+   * chapter, the part itself for a part.
+   */
+  const [choosing, setChoosing] = useState<'chapter' | { section: number; title: string } | undefined>()
+  /*
+   * The picker's own columns, held here so a drag inside the sheet survives
+   * until it is saved. The roster is the one the app last saw: this page must
+   * not open a network call to draw a menu.
+   */
+  const [columns, setColumns] = useState<readonly Column[]>(() =>
+    arrange(lastRoster(), storedArrangement()),
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -170,6 +199,21 @@ export default function ChapterView() {
       cancelled = true
     }
   }, [id, current, open])
+
+  /**
+   * The reader pressed a Summarise button.
+   *
+   * The picker comes first, unless there is nothing to pick from — a reader who
+   * has never opened the lamp has no roster, and an empty sheet would be a
+   * button that appears to do nothing. Then the relay picks, as it always did.
+   */
+  function onWant(part?: { section: number; title: string }) {
+    if (columns.length === 0) {
+      void onAsk(part)
+      return
+    }
+    setChoosing(part ?? 'chapter')
+  }
 
   /** Ask for one thing — the whole chapter, or one named part of it. */
   async function onAsk(part?: { section: number; title: string }) {
@@ -316,7 +360,7 @@ export default function ChapterView() {
                 type="button"
                 className={styles.ask}
                 disabled={asking !== undefined}
-                onClick={() => void onAsk(partOnScreen)}
+                onClick={() => onWant(partOnScreen)}
               >
                 {asking === partOnScreen.section ? 'Summarising…' : 'Summarise this part'}
               </button>
@@ -407,7 +451,7 @@ export default function ChapterView() {
                 type="button"
                 className={styles.ask}
                 disabled={asking !== undefined}
-                onClick={() => void onAsk()}
+                onClick={() => onWant()}
               >
                 {asking === 'chapter' ? 'Reading the chapter…' : 'Summarise this chapter'}
               </button>
@@ -415,6 +459,35 @@ export default function ChapterView() {
           </>
         )}
       </main>
+
+      {choosing !== undefined && (
+        /*
+         * The same picker the lamp uses, doing the same job. A reader who has
+         * learnt the three columns under Veda has already learnt this one, and
+         * a second picker of our own would be a second thing to learn and a
+         * second place for the fallback chain to disagree with itself.
+         */
+        <ModelSheet
+          columns={columns}
+          pick={storedSummaryPick() ?? storedPick() ?? undefined}
+          onPick={(model) => {
+            /* Saved, not held for this one call. The reader asked for the pick
+               to stick, so Settings and this sheet always say the same thing —
+               and `summaryChain` reads it back on the way to the relay. */
+            rememberSummaryPick(model)
+            const want = choosing
+            setChoosing(undefined)
+            void onAsk(want === 'chapter' ? undefined : want)
+          }}
+          onArrange={(next) => {
+            // Saved as it is dragged. The sheet can be dismissed three ways,
+            // and an arrangement lost to one would look like the drag failed.
+            setColumns(next)
+            rememberArrangement(arrangementOf(next))
+          }}
+          onClose={() => setChoosing(undefined)}
+        />
+      )}
     </Paper>
   )
 }
