@@ -252,6 +252,23 @@ export function threadsInChapter(
 }
 
 /**
+ * How much talking a summary has to cover, counted in the reader's questions.
+ *
+ * Not in threads. A thread is one passage, and a reader who asks three follow-up
+ * questions about the same paragraph adds three exchanges to the one thread the
+ * passage already had. Counted by thread, that reader had "one conversation"
+ * before and after, the summary looked finished, and the Scribe was never sent
+ * the follow-ups.
+ */
+export function exchangesIn(threads: readonly StoredTutorThread[]): number {
+  return threads.reduce(
+    (running, thread) =>
+      running + thread.messages.filter((message) => message.role === 'you').length,
+    0,
+  )
+}
+
+/**
  * The canonical list, as it goes into a prompt.
  *
  * Named rather than inlined because both calls must send the *same* list, and
@@ -354,7 +371,7 @@ export async function runChapter(
   const existing = await summaryStore.get(bookId, chapterId)
 
   const threads = threadsInChapter(await tutorStore.listThreads(bookId), chapter, part?.section)
-  const conversationsNow = threads.length
+  const conversationsNow = exchangesIn(threads)
 
   /*
    * Nothing has changed since the last run: same recap, same conversations.
@@ -500,8 +517,8 @@ export async function sweep(): Promise<void> {
     const threadsOf = await tutorStore.listThreads(position.bookId)
     for (const row of await summaryStore.list(position.bookId)) {
       // A summary whose chapter has gained conversations since is not done.
-      const threads = threadsInChapter(threadsOf, row.chapter, row.section).length
-      if (threads !== row.coversNConversations) continue
+      const asked = exchangesIn(threadsInChapter(threadsOf, row.chapter, row.section))
+      if (asked !== row.coversNConversations) continue
       // Two key shapes, so a chapter and a section of it can never collide.
       done.add(
         row.section === undefined
