@@ -45,7 +45,7 @@
  */
 
 import { accessToken } from '../storage/cloud/client.ts'
-import { TUTOR_URL } from '../reader/tutor.ts'
+import { readEvents, TUTOR_URL } from '../reader/tutor.ts'
 import type { ChapterIndexEntry, Section, SectionPath } from '../structure/index.ts'
 
 /**
@@ -204,15 +204,66 @@ export async function askMemory(module: MemoryModule, material: string): Promise
       intent: module,
       history: [],
       userMessage: 'Write the record.',
+      /*
+       * Streamed although nobody watches it write.
+       *
+       * The host gives an edge function about twenty-five seconds to send its
+       * first byte. A chapter recap of 800 to 1,200 words, written whole before
+       * a single byte leaves, runs past that: the host answers 504 and the
+       * finished record dies with the connection. A stream sends its first byte
+       * at once and holds the line open for as long as the model needs.
+       */
+      stream: true,
     }),
   })
   if (!response.ok) throw new Error(`the tutor relay answered ${response.status}`)
 
-  const data = (await response.json()) as { text?: unknown }
-  if (typeof data.text !== 'string' || data.text.trim().length === 0) {
+  const text = response.body
+    ? await collected(response.body)
+    : ((await response.json()) as { text?: unknown }).text
+  if (typeof text !== 'string' || text.trim().length === 0) {
     throw new Error('the tutor relay sent no text')
   }
-  return data.text.trim()
+  return text.trim()
+}
+
+/**
+ * The whole record, read off the stream.
+ *
+ * The deltas are added up as they arrive, and the closing frame wins when it
+ * comes: the relay sends the finished text there, and a rung that died part-way
+ * leaves a stump in the running total that must not be kept. A second `open` is
+ * the relay starting again on the next model, so the stump goes then too.
+ */
+async function collected(body: ReadableStream<Uint8Array>): Promise<string> {
+  let running = ''
+  let finished: string | undefined
+  let refused: string | undefined
+
+  await readEvents(body, (piece) => {
+    switch (piece.t) {
+      case 'open':
+        running = ''
+        refused = undefined
+        break
+      case 'text':
+        if (typeof piece.d === 'string') running += piece.d
+        break
+      case 'done': {
+        const reply = (piece.reply ?? {}) as { text?: unknown }
+        if (typeof reply.text === 'string') finished = reply.text
+        break
+      }
+      case 'error':
+        if (typeof piece.message === 'string') refused = piece.message
+        break
+      default:
+        break
+    }
+  })
+
+  if (refused) throw new Error(refused)
+  return finished ?? running
 }
 
 /** What a build produced. The caller stores it against the chapter. */
