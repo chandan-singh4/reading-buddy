@@ -144,6 +144,32 @@
   font-weight: 500;
 }
 
+/* The chapters. A plain column in the wide layout — the tabs style themselves. */
+.chapters {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * The second strip: the parts of the chapter in hand.
+ *
+ * A row of its own rather than parts folded into the chapter list. Two levels
+ * in one strip would make the reader read every label to find out which level
+ * they were on; two rows say it before a single word is read.
+ */
+.parts {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+
+.partTab {
+  font-size: 13.5px;
+  font-style: italic;
+}
+
 .railNote {
   font-size: 12.5px;
   font-style: italic;
@@ -311,14 +337,37 @@
     display: none;
   }
 
-  /* The rail lies down and becomes a strip you scroll sideways. */
+  /*
+   * The rail lies down and becomes strips you scroll sideways.
+   *
+   * A column of rows, not one row: the chapters scroll on their own line and
+   * the parts on theirs. Each row scrolls by itself, so swiping the parts never
+   * moves the chapters out from under the reader.
+   */
   .rail {
     border-right: none;
     border-bottom: 1px solid var(--rule);
     display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 10px;
+  }
+
+  /* Each strip scrolls by itself, so swiping the parts never drags the
+     chapters out from under the reader. */
+  .chapters {
+    flex-direction: row;
     gap: 2px;
     overflow-x: auto;
-    padding: 14px 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .parts {
+    flex-direction: row;
+    gap: 2px;
+    margin-top: 0;
+    padding-top: 8px;
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -358,27 +407,6 @@
   .tab {
     transition: none;
   }
-}
-
-/*
- * A titled section, under the chapter it belongs to.
- *
- * The rule above it is what says "this is part of what you just read", not a
- * new page. Indented a little for the same reason.
- */
-.part {
-  margin-top: 34px;
-  padding-top: 26px;
-  border-top: 1px solid var(--rule);
-}
-
-.partTtl {
-  font-family: 'EB Garamond', serif;
-  font-size: 19px;
-  font-weight: 600;
-  font-style: italic;
-  color: var(--ink);
-  margin: 0 0 14px;
 }
 
 /*
@@ -439,4 +467,15 @@
   font-size: 13px;
   min-height: 38px;
   padding: 0 12px;
+}
+
+/*
+ * A block set off from the summary above it — today, the list of parts on
+ * offer. The rule is what says "this is a different kind of thing", not a
+ * second page.
+ */
+.part {
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 1px solid var(--rule);
 }

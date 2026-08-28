@@ -183,10 +183,87 @@ describe('a chapter the reader is still inside', () => {
     expect(screen.queryByText('The analysis of dreams')).toBeNull()
   })
 
+  it('busies only the button that was pressed', async () => {
+    /*
+     * The reader pressed one part and watched all three go grey. One shared
+     * boolean drove every row's disabled state, so the page could not say which
+     * of three paid calls was actually running.
+     */
+    open(`/book/${PART1}/chapters?chapter=6`)
+    await screen.findByText('Parts you have finished')
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Summarise' })[0])
+
+    // The one pressed says so. The others stay silent, whatever their state.
+    expect(await screen.findByRole('button', { name: 'Summarising…' })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'Summarise' }).length).toBe(2)
+  })
+
   it('does not blame the reader for a chapter they are working through', async () => {
     open(`/book/${PART1}/chapters?chapter=6`)
 
     await screen.findByText('Parts you have finished')
     expect(screen.queryByText(/once you have finished reading it/)).toBeNull()
+  })
+})
+
+describe('the second row of the rail', () => {
+  const WITH_PARTS = 'with-parts' as BookId
+
+  beforeEach(async () => {
+    await repository.saveBook(bookOf(WITH_PARTS, 'A Book With Parts'))
+    setSummaryData({
+      ...fixtureDataSource,
+      async getChapterList() {
+        return [
+          { chapter: 1, chapterTitle: 'First', distilled: true },
+          { chapter: 2, chapterTitle: 'Second', distilled: false },
+        ]
+      },
+      async getChapter() {
+        return {
+          book: 'A Book With Parts',
+          chapter: 1,
+          chapterTitle: 'First',
+          recapText: 'The whole chapter, in one paragraph.',
+          tags: [],
+          sections: [
+            { section: 1, title: 'The importance of dreams', recapText: 'Part one.', tags: [] },
+            { section: 2, title: 'The function of dreams', recapText: 'Part two.', tags: [] },
+          ],
+        }
+      },
+    })
+  })
+
+  it('lists the parts, with a way back to the whole chapter', async () => {
+    open(`/book/${WITH_PARTS}/chapters?chapter=1`)
+
+    expect(await screen.findByRole('button', { name: 'The importance of dreams' })).toBeTruthy()
+    // Without this row a reader who opens a part has no way back to the recap.
+    expect(screen.getByRole('button', { name: 'The whole chapter' })).toBeTruthy()
+    // The chapter recap is what shows until a part is picked.
+    expect(screen.getByText('The whole chapter, in one paragraph.')).toBeTruthy()
+  })
+
+  it('opens one part on its own when it is picked', async () => {
+    open(`/book/${WITH_PARTS}/chapters?chapter=1`)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'The function of dreams' }))
+
+    expect(await screen.findByText('Part two.')).toBeTruthy()
+    // One part at a time, exactly as one chapter at a time.
+    expect(screen.queryByText('Part one.')).toBeNull()
+    expect(screen.queryByText('The whole chapter, in one paragraph.')).toBeNull()
+  })
+
+  it('drops the part when the reader moves to another chapter', async () => {
+    // Part 2 of chapter 1 means nothing in chapter 2. Carrying the number over
+    // would land the reader on a stranger's third part.
+    open(`/book/${WITH_PARTS}/chapters?chapter=1`)
+    fireEvent.click(await screen.findByRole('button', { name: 'The function of dreams' }))
+    fireEvent.click(screen.getByRole('button', { name: '2 · Second' }))
+
+    expect(await screen.findByText('The whole chapter, in one paragraph.')).toBeTruthy()
   })
 })

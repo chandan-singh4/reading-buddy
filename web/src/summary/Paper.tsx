@@ -41,6 +41,13 @@ export interface RailItem {
 /**
  * The thumb index down the left edge. Becomes a sideways-scrolling strip under
  * 640px, which is where a phone reads it.
+ *
+ * `parts` is an optional second strip, for a chapter the author divided into
+ * named sections. It swipes exactly as the chapter strip does, because it is
+ * the same control doing the same job one level down — a reader who has learnt
+ * the first row has already learnt the second. Drawn only when there is
+ * something in it: an empty second strip is a rule across the page promising a
+ * choice that is not there.
  */
 export function Rail({
   label,
@@ -48,33 +55,62 @@ export function Rail({
   items,
   current,
   onPick,
+  parts,
+  currentPart,
+  onPickPart,
 }: {
   label: string
   note: string
   items: RailItem[]
   current: string
   onPick: (key: string) => void
+  parts?: RailItem[]
+  currentPart?: string
+  onPickPart?: (key: string) => void
 }) {
   return (
     <nav className={styles.rail} aria-label={label}>
       <div className={styles.railLabel}>{label}</div>
-      {items.map((item) => {
-        const on = item.key === current
-        return (
-          <button
-            key={item.key}
-            type="button"
-            className={on ? `${styles.tab} ${styles.on}` : styles.tab}
-            /* Not `aria-selected`: these are buttons, not tabs in the ARIA
-               sense — there is no tabpanel and no roving focus. `current`
-               says the same thing in a way a screen reader will read here. */
-            aria-current={on ? 'true' : undefined}
-            onClick={() => onPick(item.key)}
-          >
-            {item.label}
-          </button>
-        )
-      })}
+      {/* Wrapped, so the chapters are one scrolling row on a phone rather than
+          one row each once the rail becomes a column of strips. */}
+      <div className={styles.chapters}>
+        {items.map((item) => {
+          const on = item.key === current
+          return (
+            <button
+              key={item.key}
+              type="button"
+              className={on ? `${styles.tab} ${styles.on}` : styles.tab}
+              /* Not `aria-selected`: these are buttons, not tabs in the ARIA
+                 sense — there is no tabpanel and no roving focus. `current`
+                 says the same thing in a way a screen reader will read here. */
+              aria-current={on ? 'true' : undefined}
+              onClick={() => onPick(item.key)}
+            >
+              {item.label}
+            </button>
+          )
+        })}
+      </div>
+      {parts && parts.length > 0 && onPickPart && (
+        <div className={styles.parts} role="group" aria-label="Parts of this chapter">
+          {parts.map((part) => {
+            const on = part.key === currentPart
+            return (
+              <button
+                key={part.key}
+                type="button"
+                className={on ? `${styles.tab} ${styles.partTab} ${styles.on}` : `${styles.tab} ${styles.partTab}`}
+                aria-current={on ? 'true' : undefined}
+                onClick={() => onPickPart(part.key)}
+              >
+                {part.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       <p className={styles.railNote}>{note}</p>
     </nav>
   )

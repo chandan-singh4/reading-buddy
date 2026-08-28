@@ -106,6 +106,16 @@ const MODELS_URL: string =
 export const PREFERRED_MODEL = 'gemini-3.7-flash'
 
 const PICK_KEY = 'reading-buddy:tutor-model'
+/*
+ * The model the summaries use, kept apart from the lamp's.
+ *
+ * They are different jobs with different needs. The lamp answers a reader mid
+ * paragraph and speed is most of the experience; a summary runs in the
+ * background, once per chapter, and nobody is waiting on it — so the reader
+ * should be free to spend the slower, stronger model there and a quick one in
+ * the lamp. One shared setting would force one compromise on both.
+ */
+const SUMMARY_PICK_KEY = 'reading-buddy:summary-model'
 const ORDER_KEY = 'reading-buddy:tutor-order'
 const ROSTER_KEY = 'reading-buddy:tutor-roster'
 
@@ -425,6 +435,25 @@ export function chosenFrom(columns: readonly Column[], stored: string | null): s
   if (stored && all.some((row) => row.id === stored)) return stored
   if (all.some((row) => row.id === PREFERRED_MODEL)) return PREFERRED_MODEL
   return columns[0]?.models[0]?.id
+}
+
+/** The model the reader chose for summaries, or nothing for "same as Veda". */
+export function storedSummaryPick(): string | null {
+  try {
+    return localStorage.getItem(SUMMARY_PICK_KEY)
+  } catch {
+    return null
+  }
+}
+
+/** Remember it, or forget it — `undefined` goes back to following the lamp. */
+export function rememberSummaryPick(id: string | undefined): void {
+  try {
+    if (id === undefined) localStorage.removeItem(SUMMARY_PICK_KEY)
+    else localStorage.setItem(SUMMARY_PICK_KEY, id)
+  } catch {
+    // Private mode. A forgotten preference is smaller than a broken screen.
+  }
 }
 
 /** What the reader last picked, or nothing. */

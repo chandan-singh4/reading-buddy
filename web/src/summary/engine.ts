@@ -1,3 +1,12 @@
+import {
+  arrange,
+  lastRoster,
+  stepsFrom,
+  storedArrangement,
+  storedPick,
+  storedSummaryPick,
+  type Provider,
+} from '../reader/models.ts'
 import { TUTOR_URL } from '../reader/tutor.ts'
 import { accessToken } from '../storage/cloud/client.ts'
 import type { StoredAlert, StoredChapterSummary, StoredTutorThread } from '../storage/db.ts'
@@ -47,13 +56,20 @@ const SCRIBE_SCHEMA = `Return only a JSON object, with no prose around it and no
  */
 async function askGolden(intent: 'librarian' | 'scribe', material: string, request: string) {
   const token = await accessToken()
+  const chain = summaryChain()
   const response = await fetch(TUTOR_URL, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ excerpt: material, intent, history: [], userMessage: request }),
+    body: JSON.stringify({
+      excerpt: material,
+      intent,
+      history: [],
+      userMessage: request,
+      ...(chain.length > 0 ? { models: chain } : {}),
+    }),
   })
   if (!response.ok) throw new Error(`the relay answered ${response.status}`)
 
@@ -70,6 +86,29 @@ async function askGolden(intent: 'librarian' | 'scribe', material: string, reque
    * judging, exactly as the reading lamp already tells them.
    */
   return { text: data.text, model: typeof data.model === 'string' ? data.model : undefined }
+}
+
+/**
+ * The fallback chain a summary is sent down, strongest choice first.
+ *
+ * Built from the roster the app last saw, because a summary runs in the
+ * background and must not wait on a roster fetch. With no remembered roster
+ * this is empty and the relay walks its own default chain, which is what
+ * happened for every summary written before the setting existed.
+ *
+ * The reader's summary model, or failing that the one the lamp uses. A reader
+ * who has never opened the setting gets the model they already chose for Veda,
+ * which is a better default than a stranger.
+ */
+function summaryChain(): { id: string; source: Provider }[] {
+  try {
+    const columns = arrange(lastRoster(), storedArrangement())
+    if (columns.length === 0) return []
+    return stepsFrom(columns, storedSummaryPick() ?? storedPick() ?? undefined)
+  } catch {
+    // Storage off, or a roster we cannot read. The relay's own chain is fine.
+    return []
+  }
 }
 
 /** The prose of one chapter, in reading order. What the Librarian is given. */

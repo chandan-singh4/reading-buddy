@@ -85,3 +85,25 @@
   margin-bottom: var(--space-3);
   line-height: var(--leading-ui);
 }
+
+/* The summary-model row: a label and its menu, on one line where there is room. */
+.modelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.modelRow select {
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  /* 44px, so the one control on this row is a comfortable thumb target. */
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  max-width: 100%;
+}

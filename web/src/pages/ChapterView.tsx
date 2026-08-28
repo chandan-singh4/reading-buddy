@@ -10,7 +10,7 @@ import { approve } from '../summary/engine.ts'
 import { finishedChapters, readSections, titledSections } from '../summary/queue.ts'
 import { Flourish, Paper, Rail, RichText, type RailItem } from '../summary/Paper.tsx'
 import styles from '../summary/summary.module.css'
-import type { ChapterListEntry, ChapterSummary, SectionSummary } from '../summary/types.ts'
+import type { ChapterListEntry, ChapterSummary } from '../summary/types.ts'
 
 /**
  * One chapter, in two sections.
@@ -63,7 +63,14 @@ export default function ChapterView() {
    * chapter 5 to 6.
    */
   const [checked, setChecked] = useState(false)
-  const [asking, setAsking] = useState(false)
+  /*
+   * Which one thing is running, not whether anything is.
+   *
+   * A single boolean disabled every button on the page at once, so pressing one
+   * part made all three read as busy. `'chapter'` for the whole chapter, the
+   * section number for a part.
+   */
+  const [asking, setAsking] = useState<'chapter' | number | undefined>()
   /**
    * The named parts of this chapter the reader has finished and not summarised.
    *
@@ -141,14 +148,14 @@ export default function ChapterView() {
 
   /** Ask for one thing — the whole chapter, or one named part of it. */
   async function onAsk(part?: { section: number; title: string }) {
-    setAsking(true)
+    setAsking(part ? part.section : 'chapter')
     try {
       await approve(id, Number(current), part)
       setOpen(await summaryData().getChapter(id, current))
     } catch {
       // Nothing was stored, so the page is unchanged and the button comes back.
     } finally {
-      setAsking(false)
+      setAsking(undefined)
     }
   }
 
@@ -178,6 +185,37 @@ export default function ChapterView() {
     key: String(entry.chapter),
     label: `${entry.chapter} · ${entry.chapterTitle}`,
   }))
+
+  /*
+   * The second strip: the whole chapter, then each named part of it.
+   *
+   * "The whole chapter" is a row rather than an unmarked default, because the
+   * reader has to be able to get back to the chapter recap after opening a
+   * part, and a rail with no way back to where it started is a trap.
+   *
+   * Built from the summaries, not from the spine: a part with no summary yet
+   * has nothing to show, and it is already offered under "Parts you have
+   * finished" below.
+   */
+  const parts: RailItem[] =
+    open && open.sections && open.sections.length > 0
+      ? [
+          { key: 'all', label: 'The whole chapter' },
+          ...open.sections.map((part) => ({
+            key: String(part.section),
+            label: part.title,
+          })),
+        ]
+      : []
+
+  const askedPart = params.get('part') ?? 'all'
+  /* A part named in the URL that this chapter does not have — a stale link, or
+     a chapter switched underneath the parameter. Fall back to the chapter. */
+  const currentPart = parts.some((part) => part.key === askedPart) ? askedPart : 'all'
+  const openPart =
+    currentPart === 'all'
+      ? undefined
+      : open?.sections?.find((part) => String(part.section) === currentPart)
   const exit = backTo(location.search)
 
   return (
@@ -192,6 +230,17 @@ export default function ChapterView() {
              stack with pages the reader never meant to keep. */
           const next = new URLSearchParams(params)
           next.set('chapter', chapter)
+          // A part number means nothing in the next chapter. Dropped, so the
+          // reader lands on that chapter whole rather than on its third part.
+          next.delete('part')
+          setParams(next, { replace: true })
+        }}
+        parts={parts}
+        currentPart={currentPart}
+        onPickPart={(part) => {
+          const next = new URLSearchParams(params)
+          if (part === 'all') next.delete('part')
+          else next.set('part', part)
           setParams(next, { replace: true })
         }}
       />
@@ -199,10 +248,38 @@ export default function ChapterView() {
       <main className={styles.page}>
         <div className={styles.eyebrow}>{title || 'This book'}</div>
         <h1 className={styles.chapterNo}>Chapter {current || '—'}</h1>
-        {open && <div className={styles.chapterTtl}>{open.chapterTitle}</div>}
+        {/* The part's own name takes the subtitle when a part is open, so the
+            reader can see at a glance which of the two they are reading. */}
+        {openPart ? (
+          <div className={styles.chapterTtl}>{openPart.title}</div>
+        ) : (
+          open && <div className={styles.chapterTtl}>{open.chapterTitle}</div>
+        )}
         <Flourish wide />
 
-        {loading || !checked ? null : open ? (
+        {loading || !checked ? null : openPart ? (
+          /* One part, alone. The same two labels as the chapter, because it is
+             the same job one level down. */
+          <>
+            <div className={styles.secLabel}>This part, in plain words</div>
+            <Byline model={openPart.recapModel} />
+            <RichText text={openPart.recapText} className={styles.recap} />
+            {openPart.tags.length > 0 && <Tags tags={openPart.tags} />}
+
+            <div className={styles.secLabel}>What we worked through</div>
+            {openPart.qaText ? (
+              <>
+                <Byline model={openPart.itemsModel} />
+                <RichText text={openPart.qaText} className={styles.recap} />
+              </>
+            ) : (
+              <p className={styles.empty}>
+                You have not asked Veda about this part yet. What you talk about will be
+                summarised here.
+              </p>
+            )}
+          </>
+        ) : open ? (
           <>
             {/*
              * The chapter recap waits for the whole chapter, so the ordinary
@@ -237,7 +314,9 @@ export default function ChapterView() {
               </p>
             )}
 
-            {open.sections?.map((part) => <Part key={part.section} part={part} />)}
+            {/* The parts are in the rail above, one tap away. Printing every
+                one of them here as well made the chapter page a scroll of six
+                summaries and buried the recap that ties them together. */}
             <Waiting parts={waiting} asking={asking} onAsk={onAsk} />
           </>
         ) : (
@@ -267,10 +346,10 @@ export default function ChapterView() {
               <button
                 type="button"
                 className={styles.ask}
-                disabled={asking}
+                disabled={asking !== undefined}
                 onClick={() => void onAsk()}
               >
-                {asking ? 'Reading the chapter…' : 'Summarise this chapter'}
+                {asking === 'chapter' ? 'Reading the chapter…' : 'Summarise this chapter'}
               </button>
             )}
             <Waiting parts={waiting} asking={asking} onAsk={onAsk} />
@@ -298,35 +377,6 @@ function Tags({ tags }: { tags: string[] }) {
         </li>
       ))}
     </ul>
-  )
-}
-
-/**
- * One titled section of the chapter, under the chapter's own summary.
- *
- * Deliberately quieter than the chapter above it. The heading carries the
- * author's own name for the part, so the reader recognises it from the contents
- * page, and the two labels are the same two as above — the same job at a
- * smaller scale should not need a second vocabulary.
- */
-function Part({ part }: { part: SectionSummary }) {
-  return (
-    <section className={styles.part}>
-      <h2 className={styles.partTtl}>{part.title}</h2>
-      <Byline model={part.recapModel} />
-      <RichText text={part.recapText} className={styles.recap} />
-      {part.tags.length > 0 && <Tags tags={part.tags} />}
-      {/* No "nothing asked yet" line here. The chapter above already says it
-          once, and saying it again under every section would bury the summaries
-          in apologies for conversations that never happened. */}
-      {part.qaText && (
-        <>
-          <div className={styles.secLabel}>What we worked through</div>
-          <Byline model={part.itemsModel} />
-          <RichText text={part.qaText} className={styles.recap} />
-        </>
-      )}
-    </section>
   )
 }
 
@@ -364,7 +414,7 @@ function Waiting({
   onAsk,
 }: {
   parts: { section: number; title: string }[]
-  asking: boolean
+  asking: 'chapter' | number | undefined
   onAsk: (part: { section: number; title: string }) => void
 }) {
   if (parts.length === 0) return null
@@ -378,10 +428,12 @@ function Waiting({
             <button
               type="button"
               className={styles.ask}
-              disabled={asking}
+              /* Every button waits while one runs — they are paid calls and
+                 they share a vocabulary — but only the one pressed says so. */
+              disabled={asking !== undefined}
               onClick={() => onAsk(part)}
             >
-              Summarise
+              {asking === part.section ? 'Summarising…' : 'Summarise'}
             </button>
           </li>
         ))}

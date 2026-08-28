@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
 
 import { useSession } from '../auth/useSession.ts'
+import {
+  arrange,
+  lastRoster,
+  rememberSummaryPick,
+  storedArrangement,
+  storedSummaryPick,
+} from '../reader/models.ts'
+import { modelLabel } from '../reader/tutor.ts'
 import { isCloudConfigured, signOut } from '../storage/cloud/index.ts'
 import {
   activeBackend,
@@ -94,6 +102,8 @@ export default function Settings() {
         </section>
       ) : null}
 
+      <SummaryModel />
+
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Coming</h2>
         <div className={styles.card}>
@@ -172,4 +182,57 @@ function useDeviceBookCount(): number | undefined {
   }, [])
 
   return count
+}
+
+/**
+ * Which model writes the chapter summaries.
+ *
+ * Kept apart from the lamp's model on purpose. They are different jobs: the
+ * lamp answers a reader mid-paragraph and speed is most of the experience,
+ * while a summary runs in the background, once per chapter, with nobody waiting
+ * on it. A reader should be free to spend the slower, stronger model here and a
+ * quick one there.
+ *
+ * The roster is the one the app last saw rather than a fresh fetch. This screen
+ * has no lamp open and should not open a network call to draw a menu; the list
+ * is refreshed every time the reader uses Veda.
+ */
+function SummaryModel() {
+  const columns = arrange(lastRoster(), storedArrangement())
+  const models = columns.flatMap((column) => column.models)
+  const [pick, setPick] = useState<string>(() => storedSummaryPick() ?? '')
+
+  // Nothing to choose from until the reader has opened the lamp once. Drawing
+  // an empty menu would be worse than drawing nothing.
+  if (models.length === 0) return null
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>The model that writes your summaries</h2>
+      <div className={styles.card}>
+        <p>
+          Summaries run in the background, so a slower and stronger model costs you no waiting.
+          Veda keeps its own model, which you pick under the lamp.
+        </p>
+        <label className={local.modelRow}>
+          <span>Summary model</span>
+          <select
+            value={pick}
+            onChange={(event) => {
+              const next = event.target.value
+              setPick(next)
+              rememberSummaryPick(next === '' ? undefined : next)
+            }}
+          >
+            <option value="">Same as Veda</option>
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name || modelLabel(model.id)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </section>
+  )
 }
