@@ -1,697 +1,620 @@
-/* A book's own screen — reached from a shelf tile's "ⓘ", full-bleed like the
-   reader rather than nested in the tab bar shell (see `App.tsx`). */
+/*
+ * A book's own screen — the reading desk.
+ *
+ * Ported value for value from `design-inspiration/reading-desk-v2.html`.
+ * Nothing has been restyled or "improved"; if a number looks arbitrary it is
+ * because the design says so.
+ *
+ * ## This page does not follow the app's theme, on purpose
+ *
+ * The same call `summary/summary.module.css` documents at length, and for the
+ * same reason: this is a paper object — a desk with a book standing on it, a
+ * shelf shadow under the cover, a violet block that belongs to Veda. Mapped
+ * onto `--color-bg` and friends it stops being that object and becomes another
+ * screen. The cost is known: a reader in Dark gets a light desk at night.
+ *
+ * ## Violet is Veda's, and nothing else's
+ *
+ * Every violet token below is spent on something Veda owns — her block, and
+ * the recap action that opens what she wrote. Generic controls take brown or
+ * ink. This is the one rule in this file that is not about looks.
+ */
 
 .page {
+  /* Paper */
+  --paper: #e7dfd1;
+  --paper-3: #f4efe4;
+  --paper-4: #faf6ec;
+  --line: #d7cdbb;
+  --line-soft: #e0d7c7;
+  /* Ink */
+  --ink: #2e2820;
+  --ink-soft: #6d6153;
+  --ink-faint: #978a77;
+  /* Brown, which every ordinary action takes */
+  --brown: #8a6d47;
+  --brown-deep: #6d5430;
+  /* Violet, which only Veda takes */
+  --violet: #655a92;
+  --violet-ink: #544a7e;
+  --violet-soft: #e9e4f1;
+  --violet-line: #d3c9e6;
+  --star: #a98d5f;
+
   min-height: 100dvh;
-  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
-    calc(var(--safe-bottom) + var(--space-6));
-  display: grid;
-  gap: var(--space-4);
-  align-content: start;
-  /* A book's own metadata is never fully trustworthy — a stray unbroken
-     string (a hash, an ISBN run) must never be able to force this page
-     wider than the screen and drag `.facts` off the edge with it. */
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* The reference pads the phone body. Here it pads the screen, plus the safe
+     areas — this app runs full-bleed under a notch. */
+  padding:
+    calc(14px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right))
+    calc(40px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
+  /* A desk is one column even on a tablet. The mock is 392px wide including
+     its 18px padding; this holds that measure and centres it on anything
+     wider. */
+  max-width: 428px;
+  margin-inline: auto;
+  text-align: center;
+  /* A book's own metadata is never trustworthy — a stray unbroken string (an
+     ISBN run, a hash) must never force this page wider than the screen. */
   overflow-x: hidden;
+}
+
+.page :focus-visible {
+  outline: 2px solid var(--brown-deep);
+  outline-offset: 2px;
 }
 
 /*
  * Home, as a house rather than the word.
  *
- * A round chip rather than a bare glyph, for two reasons: the icon alone is
- * about 20 px of ink and this is the only way off the page, so it needs a
- * target a thumb can find; and a circle at the top-left of a full-bleed screen
- * is the shape every phone already uses for "back", so it needs no label to be
- * understood. The name is still there for a screen reader, on `aria-label`.
+ * A round chip rather than a bare glyph: the icon alone is about 20px of ink
+ * and this is the only way off the page, so it needs a target a thumb finds.
  */
 .back {
-  justify-self: start;
-  display: grid;
-  place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 999px;
-  color: var(--color-text);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--paper-3);
+  border: 1px solid var(--line-soft);
+  color: var(--ink-soft);
+  margin-bottom: 2px;
 }
 
 .back .icon {
-  width: 1.25rem;
-  height: 1.25rem;
-  margin: 0;
+  width: 19px;
+  height: 19px;
   color: inherit;
 }
 
 .pending {
-  color: var(--color-text-muted);
+  color: var(--ink-soft);
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
-.hero {
+/* --- The cover, standing on the desk ------------------------------------- */
+
+.coverStage {
   display: flex;
-  gap: var(--space-4);
-  align-items: flex-start;
-  margin-top: var(--space-2);
-}
-
-/* Lifted off the page rather than sitting flat on it. A cover is the one
-   picture on this screen, and a shelf tile already gives it a shadow — this is
-   the same object, larger. */
-.coverMedia {
-  width: 8.5rem;
-  flex: none;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: 0 10px 28px -12px rgb(0 0 0 / 45%);
-}
-
-.heroInfo {
-  display: grid;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.titleRow {
-  display: flex;
-  align-items: start;
-  gap: var(--space-2);
-}
-
-.title {
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.titleEdit {
-  flex: none;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  background: none;
-  border: none;
-  padding: var(--space-1);
-}
-
-.titleEditForm {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.titleInput {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  font-weight: 700;
-  color: inherit;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
-}
-
-.titleSave {
-  flex: none;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-accent);
-  background: none;
-  border: none;
-  padding: var(--space-1) var(--space-2);
-}
-
-.author {
-  font-size: var(--text-base);
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
-}
-
-/* The one pill under the author, where a shop would put "Pre-order". A genre
-   is the fastest answer to "what kind of book is this", so it gets the accent
-   and the shape rather than sitting in a row of grey tags. */
-.genre {
-  justify-self: start;
-  margin-top: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-accent);
-  background: var(--color-accent-wash);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
-  border-radius: 999px;
-}
-
-/*
- * Format · Pages · Published, in one card with hairline dividers. Equal
- * thirds so the three read as one object rather than three floating facts —
- * the strip is a single glance, not a list to work through.
- */
-.spec {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  overflow: hidden;
-}
-
-.specCell {
-  display: grid;
-  gap: var(--space-1);
-  justify-items: center;
-  padding: var(--space-3) var(--space-2);
-  min-width: 0;
-}
-
-.specCell + .specCell {
-  border-left: 1px solid var(--color-border);
-}
-
-.specValue {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-  text-align: center;
-}
-
-.specLabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-/* Under the button, not above it: the button is the decision, this is the
-   footnote confirming where pressing it lands. Pulled tight to the button so
-   the two read as one control rather than two stacked things. */
-.progressBlock {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: center;
-  margin-top: calc(-1 * var(--space-2));
-}
-
-.progress {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-/**
- * The details card: paired facts on a tinted panel.
- *
- * Tinted from `--color-accent` rather than filled with it. A solid accent slab
- * with reversed text is the obvious build and it breaks in half the themes —
- * white on the dark theme's gold is unreadable. Mixing the accent *into* the
- * surface keeps the card unmistakably part of the book's own colour while the
- * text stays plain `--color-text` on a near-surface background, which is
- * legible in every theme by construction.
- */
-.details {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-4);
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
-}
-
-.detail {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  min-width: 0;
-}
-
-/* A publisher's name or an ISBN does not survive being cut to half a phone. */
-.detailWide {
-  grid-column: 1 / -1;
-}
-
-.detailBody {
-  min-width: 0;
-}
-
-.detailLabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-.detailValue {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.icon {
-  flex: none;
-  width: 1.15rem;
-  height: 1.15rem;
-  margin-top: 0.1rem;
-  color: var(--color-accent);
-}
-
-/* Google's subject headings. Chips rather than a comma list, because they are
-   a set of separate things — and a BISAC heading is long enough that a run of
-   them reads as one sentence when it isn't. */
-.subjects {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  margin-top: var(--space-1);
-}
-
-.subject {
-  font-size: var(--text-xs);
-  padding: 0.15rem var(--space-2);
-  border-radius: 999px;
-  color: var(--color-text-muted);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-}
-
-/**
- * The publisher's blurb. Set in the reading face, because it is the one block
- * of prose on this page and the app already has a face for prose — but muted,
- * because it is somebody else's marketing copy sitting on the reader's own
- * page rather than the book itself.
- */
-.blurbBox {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.blurb,
-.blurbOpen {
-  font-family: var(--font-reading);
-  font-size: var(--text-base);
-  line-height: 1.65;
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
-}
-
-/* Five lines, then a chevron. `line-clamp` rather than a fixed height so the
-   fold lands on a line break at any text size the reader has chosen. */
-.blurb {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
-  line-clamp: 5;
-  overflow: hidden;
-}
-
-.blurbToggle {
-  justify-self: center;
-  padding: var(--space-2) var(--space-4);
-  background: none;
-  border: none;
-}
-
-/* Drawn from two borders rather than a glyph, for the same reason the half
-   star is: a chevron character is missing from enough system fonts to render
-   as a box on somebody's phone, silently. */
-.chevron,
-.chevronUp {
-  display: block;
-  width: 0.6rem;
-  height: 0.6rem;
-  border-right: 2px solid var(--color-text-muted);
-  border-bottom: 2px solid var(--color-text-muted);
-  transform: rotate(45deg);
-  transition: transform 150ms ease;
-}
-
-.chevronUp {
-  transform: rotate(225deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chevron,
-  .chevronUp {
-    transition: none;
-  }
-}
-
-.section {
-  display: grid;
-  gap: var(--space-2);
-}
-
-/*
- * "About this book", "Book details", "Your rating".
- *
- * Full-strength text at 700 rather than muted at 600. Muted small caps read as
- * a caption on the block below them; these are the divisions of the page, and
- * on a screen this long they are what the eye scans for. The colour does more
- * of that work than the weight does.
- */
-.sectionHeading {
-  font-size: var(--text-sm);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-text);
-}
-
-.stars {
-  display: flex;
-  /*
-   * Wider than it was, and load-bearing rather than cosmetic: the hit areas
-   * below bleed half of this gap outwards on each side, so the space between
-   * stars is target area rather than dead pixels. Splitting a star in two
-   * halved the width of a tap; this is part of buying it back.
-   */
-  gap: var(--space-3);
-}
-
-/*
- * One star: an outline with a filled copy clipped over it, and two invisible
- * halves on top to tap. See `StarRow` in `BookInfo.tsx` for why it is built
- * this way rather than with a half-star character.
- *
- * `relative`, so the fill and the two hit areas position against this star and
- * not against the row.
- */
-.star {
+  justify-content: center;
+  padding: 10px 0 4px;
   position: relative;
-  display: inline-block;
-  /*
-   * Bigger than the row used to be, because the stars now have to be *aimed
-   * at* rather than merely counted. Derived from the type scale rather than
-   * written as a raw size so it still follows the token; `--text-2xl` is the
-   * top of that scale, and this row is the one place that wants more.
-   */
-  font-size: calc(var(--text-2xl) * 1.3);
-  line-height: 1;
-  color: var(--color-accent);
 }
 
 /*
- * The outline sets the size of the whole thing — it is the only part in normal
- * flow, so the star is exactly as wide as the glyph. Everything else is
- * absolutely positioned over it and contributes no width.
- */
-.starEmpty {
-  display: block;
-}
-
-/*
- * The filled star, clipped from the left to 0%, 50% or 100% by an inline
- * `width` from the component.
+ * 152px wide, and the picture in it is the largest Google Books offered.
  *
- * `overflow: hidden` is what does the clipping, so the glyph inside must keep
- * its natural width — hence the `width: auto` on the pseudo-free inner text
- * via `max-width: none` and no wrapping. A `★` allowed to reflow at 50% would
- * disappear onto a second line instead of being cut in half.
+ * `coverUrlOf` already prefers `extraLarge` over `large` over `thumbnail` when
+ * a book is matched, and what it picked is what was saved into the book's
+ * assets — so this needs no second fetch, only the room to show it.
  */
-.starFill {
-  position: absolute;
-  inset: 0 auto 0 0;
+.coverMedia {
+  width: 152px;
+  border-radius: 6px;
   overflow: hidden;
-  white-space: nowrap;
-  /* Vertically identical to the outline underneath: any difference in line
-     box would show as the fill sitting a pixel high inside its own outline. */
-  line-height: 1;
-}
-
-/*
- * The tap targets. Transparent, and deliberately taller than the star: half a
- * star is around 20 px across, which is under any reasonable thumb guideline,
- * so the height is stretched to claw back some of the target area the split
- * costs. `--space-2` top and bottom matches the row's own gap, so the targets
- * meet without overlapping the row above or below.
- */
-.starHit {
-  position: absolute;
-  top: calc(-1 * var(--space-2));
-  bottom: calc(-1 * var(--space-2));
-  /*
-   * Half the star, plus half the gap to its neighbour — the outer edges bleed
-   * into the space between stars, which belongs to nobody and is otherwise
-   * wasted. The two halves of one star meet exactly in the middle of the glyph
-   * and never overlap the star next door.
-   */
-  width: calc(50% + var(--space-3) / 2);
-  padding: 0;
-  border: none;
-  background: none;
-  /* Above both glyphs, which are in the same stacking context. */
+  box-shadow: 0 8px 20px rgb(0 0 0 / 30%);
+  position: relative;
   z-index: 1;
 }
 
-.starHitHalf {
-  left: calc(-1 * var(--space-3) / 2);
+/* Not a border and not a drop shadow: the pool of shade a standing object
+   casts on the surface under it. That is what makes the cover an object. */
+.shelf {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 184px;
+  height: 28px;
+  background: radial-gradient(ellipse at center, rgb(50 35 15 / 24%), transparent 70%);
+  z-index: 0;
 }
 
-.starHitWhole {
-  right: calc(-1 * var(--space-3) / 2);
+.title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.2px;
+  margin: 26px 0 8px;
+  /* A long title is the one string on this page that is meant to wrap. */
+  overflow-wrap: anywhere;
 }
 
-.ratingRow {
+.author {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--ink-soft);
+  margin-bottom: 14px;
+}
+
+.metaline {
+  font-size: 12px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  margin-bottom: 22px;
+}
+
+/* The genre leads the line, so it takes the darker ink. */
+.metaGenre {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+/* --- The pair of actions -------------------------------------------------- */
+
+.actionPair {
   display: flex;
-  justify-content: center;
-  padding: var(--space-2) 0;
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 14px;
 }
 
-/* Slim, and inset from the button above it — a hairline under the label rather
-   than a second slab competing with the one thing this page is for. */
+.primary,
+.recap {
+  border: none;
+  cursor: pointer;
+  border-radius: 15px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  padding: 15px 12px;
+  line-height: 1.2;
+  transition: transform 0.12s;
+  text-decoration: none;
+}
+
+.primary:active,
+.recap:active {
+  transform: translateY(1px);
+}
+
+.primary {
+  flex: 1.5;
+  background: var(--brown);
+  color: #f7f1e5;
+  font-size: 15.5px;
+  box-shadow: 0 4px 14px rgb(138 109 71 / 32%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Violet, because this button opens what Veda wrote — see the file header. */
+.recap {
+  flex: 1;
+  background: var(--violet-soft);
+  color: var(--violet-ink);
+  border: 1px solid var(--violet-line);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.recap .icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.85;
+}
+
+/* --- How far through ------------------------------------------------------ */
+
+.progressBlock {
+  margin: 0 0 28px;
+}
+
+.progress {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
 .progressTrack {
-  width: calc(100% - 2 * var(--space-5));
-  height: 0.3rem;
-  border-radius: 999px;
-  background: var(--color-surface-raised);
+  height: 5px;
+  border-radius: 4px;
+  background: #d8cfbd;
   overflow: hidden;
+  margin-top: 8px;
 }
 
 .progressFill {
   height: 100%;
-  border-radius: 999px;
-  background: var(--color-accent);
+  background: linear-gradient(90deg, var(--brown-deep), var(--brown));
+  border-radius: 4px;
+  transition: width 0.3s;
 }
 
-.notesInput {
-  font: inherit;
-  color: inherit;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  resize: vertical;
-}
+/* --- On this book --------------------------------------------------------- */
 
-.notesInput:focus-visible,
-.quoteInput:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
-
-.quoteList {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.quote {
+.rule {
   display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  padding: var(--space-3);
-  background: var(--color-surface-raised);
-  border-radius: var(--radius-md);
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  color: var(--ink-faint);
 }
 
-.quoteText {
+.rule::before,
+.rule::after {
+  content: '';
   flex: 1;
-  min-width: 0;
-  font-family: var(--font-reading);
+  height: 1px;
+  background: var(--line);
+}
+
+.rule span {
+  font-family: 'EB Garamond', Georgia, serif;
   font-style: italic;
-  line-height: var(--leading-reading);
-  overflow-wrap: anywhere;
+  font-size: 14px;
 }
 
-.quoteRemove {
-  flex: none;
-  font-size: var(--text-lg);
-  line-height: 1;
-  color: var(--color-text-muted);
+.blurb {
+  text-align: left;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #453c2f;
+  margin-bottom: 4px;
+}
+
+/* A real line clamp, not a pixel height: a clamp cuts at the fourth *line*
+   whatever text size the reader's phone gives it. */
+.blurbClamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.more {
   background: none;
   border: none;
-  padding: var(--space-1);
+  color: var(--brown-deep);
+  font-family: 'EB Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 6px 0 28px;
+  display: block;
 }
 
-.quoteForm {
-  display: grid;
-  gap: var(--space-2);
+/* --- Veda's block --------------------------------------------------------- */
+
+.study {
+  display: block;
+  text-align: left;
+  border-top: 1px solid var(--violet-line);
+  border-bottom: 1px solid var(--violet-line);
+  background: linear-gradient(180deg, rgb(233 228 241 / 55%), rgb(233 228 241 / 12%));
+  border-radius: 5px;
+  padding: 18px 18px 20px;
+  margin-bottom: 30px;
+  text-decoration: none;
 }
 
-.quoteInput {
-  font: inherit;
-  color: inherit;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  resize: vertical;
+.studyEyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-bottom: 14px;
 }
 
-/* A real button now rather than a bare accent word — it sits under a field
-   the reader has just typed into, and a link-shaped thing there reads as an
-   afterthought instead of the way to keep what they wrote. */
-.quoteSave {
-  justify-self: center;
-  padding: var(--space-2) var(--space-5);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-accent-contrast);
-  background: var(--color-accent);
-  border: none;
-  border-radius: 999px;
-}
-
-.quoteSave:disabled {
-  color: var(--color-text-muted);
-  background: var(--color-surface-raised);
-}
-
-/* Outlined rather than filled: "Start reading" below is the one thing this
-   page is for, and a second solid accent block would compete with it. */
-.updateButton {
-  justify-self: start;
-  padding: var(--space-2) var(--space-4);
-  background: none;
-  color: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
+.vedaSig {
+  font-family: 'Caveat', cursive;
+  color: var(--violet);
+  font-size: 23px;
   font-weight: 600;
 }
 
-.updateButton:disabled {
-  color: var(--color-text-muted);
-  border-color: var(--color-border);
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--violet);
+  opacity: 0.7;
 }
 
-/**
- * Refresh from Google Books — filled and full width, unlike `.updateButton`.
- *
- * It sits directly under the card it fills in, and it is the action of this
- * section rather than a footnote to it. `--color-accent-contrast` is defined
- * against `--color-accent` in every theme, so the pair is legible by
- * construction and never needs a per-theme override.
- */
-.refreshButton {
+.studyItem > span:nth-child(2) {
+  min-width: 0;
+}
+
+.studyItem {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.studyMark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--violet-line);
+  color: var(--violet);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-3);
-  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+.studyMark .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.studyTitle {
+  display: block;
+  font-size: 15.5px;
   font-weight: 600;
-  color: var(--color-accent-contrast);
-  background: var(--color-accent);
-  border: none;
-  border-radius: 999px;
+  color: var(--violet-ink);
+  margin: 0 0 3px;
 }
 
-/* The icon inside is `currentColor`, so it would otherwise stay accent-coloured
-   on an accent fill and vanish. */
-.refreshButton .icon {
-  color: inherit;
-}
-
-.refreshButton:disabled {
-  color: var(--color-text-muted);
-  background: var(--color-surface-raised);
-}
-
-/* The same wash the error boxes elsewhere use — noticing without shouting.
-   There is no red in this palette on purpose: a book that failed to update is
-   still a book that reads perfectly well. */
-.updateFailed {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  background: var(--color-accent-wash);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-}
-
-/**
- * The one thing this page is for: open the book.
- *
- * Glass rather than a flat accent slab — a lit rim along the top edge, a
- * gradient that falls away underneath, and a soft drop shadow, so it reads as
- * a raised piece of the page rather than a rectangle painted on it. Every
- * colour is mixed from `--color-accent` and `--color-text`, so the same rule
- * produces a warm brown-on-cream button in the light themes and a gold-on-ink
- * one in the dark, without a per-theme override anywhere.
- */
-.readButton {
-  justify-self: stretch;
-  text-align: center;
-  padding: var(--space-4);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--color-text);
-  text-decoration: none;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-accent) 24%, transparent),
-      color-mix(in srgb, var(--color-accent) 8%, transparent)
-    ),
-    var(--color-surface);
-  /* The rim light. Inset at the top only — a highlight all the way round reads
-     as a glow, and one along the top edge reads as a curved surface. */
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--color-text) 22%, transparent),
-    0 10px 24px -14px rgb(0 0 0 / 55%);
-}
-
-.readButton:active {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-accent) 32%, transparent),
-      color-mix(in srgb, var(--color-accent) 14%, transparent)
-    ),
-    var(--color-surface);
-}
-
-/* The sentence under a section heading that says what the section is for.
-   Named for the row of book-kind chips it was written for; that row is gone,
-   and the style outlived it. */
-.genreNote {
+.studyNote {
+  display: block;
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 14.5px;
+  color: #867ba1;
+  line-height: 1.4;
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
 
-/* One small pressable label. */
-.genrePick {
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--text-sm);
+.studyChev {
+  margin-left: auto;
+  color: var(--violet);
+  opacity: 0.5;
+  display: flex;
+}
+
+.studyChev .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* --- Your rating ---------------------------------------------------------- */
+
+.ratingStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  padding: 2px 2px 22px;
+}
+
+.ratingLabel {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+
+.stars {
+  display: flex;
+  gap: 7px;
+  color: var(--star);
+  font-size: 22px;
+  line-height: 1;
+}
+
+/*
+ * One star: an outline glyph with a filled one laid over it and clipped.
+ *
+ * Not a half-star character — the half-star glyphs are missing from enough
+ * system fonts to render as an empty box on somebody's phone, and it fails
+ * silently. Two hit targets per star, so the row reads 0.5 to 5 in halves.
+ */
+.star {
+  position: relative;
+  display: inline-block;
+  width: 1em;
+  height: 1.15em;
+}
+
+.starEmpty,
+.starFill {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.starFill {
+  width: 0;
+}
+
+.starHit {
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  width: 50%;
+  padding: 0;
+  border: none;
+  background: none;
   cursor: pointer;
 }
 
-/* The way in to the return screen. Shaped like the pick above because it is the
-   same kind of thing to a thumb — one small pressable label — but it is a link,
-   so it needs the two properties an anchor does not inherit from a button. */
-.returnLink {
-  composes: genrePick;
-  display: inline-block;
-  text-decoration: none;
+.starHitHalf {
+  left: 0;
 }
 
-/* The pair of links into the summary views. Two links, one row on any phone
-   wide enough; they wrap rather than shrink, because a truncated label on a
-   pill reads as a bug. */
-.summaryLinks {
+.starHitWhole {
+  right: 0;
+}
+
+/* --- Book details --------------------------------------------------------- */
+
+.details {
+  text-align: left;
+  background: rgb(215 205 187 / 26%);
+  border-radius: 14px;
+  padding: 6px 16px 8px;
+}
+
+.detailsTitle {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 14px 0 6px;
+}
+
+.detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 2px;
+  border-top: 1px solid var(--line-soft);
+  margin: 0;
+}
+
+.detail .icon {
+  width: 19px;
+  height: 19px;
+  color: var(--brown);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.detailBody {
+  min-width: 0;
+  width: 100%;
+}
+
+.detailLabel {
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+}
+
+.detailValue {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 14.5px;
+  color: var(--ink);
+  font-weight: 500;
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.subjects {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 7px;
+  margin: 6px 0 0;
+}
+
+.subject {
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line-soft);
+  padding: 5px 11px;
+  border-radius: 14px;
+}
+
+/* A quiet line, not a button. Asking Google again is a repair, and a repair
+   should not out-shout the book it sits under. */
+.refresh {
+  width: 100%;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line-soft);
+  color: var(--ink-faint);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  padding: 15px 0 8px;
+  margin-top: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.refresh .icon {
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
+.said {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  text-align: left;
+  padding: 10px 2px 0;
+}
+
+/* --- A book an older parser made ------------------------------------------ */
+
+.repair {
+  text-align: left;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.repairTitle {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin: 0 0 6px;
+}
+
+.repairButton {
+  margin-top: 10px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--brown-deep);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }

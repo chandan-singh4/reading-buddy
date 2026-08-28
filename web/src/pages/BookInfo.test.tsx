@@ -161,9 +161,7 @@ describe('BookInfo', () => {
     openInfo()
 
     expect(await screen.findByText('Not started')).toBeTruthy()
-    // "Read", not "Start reading": the button is the shortest true thing it
-    // could say, and the line under it already says where it lands.
-    expect(screen.getByRole('link', { name: 'Read' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Continue reading' })).toBeTruthy()
   })
 
   it('shows progress and offers to continue once reading has begun', async () => {
@@ -171,8 +169,67 @@ describe('BookInfo', () => {
     await repository.savePosition(BOOK_ID, formatAnchor({ chapter: 1, section: 1, paragraph: 1 }), 42)
     openInfo()
 
-    expect(await screen.findByText('Reading — 42%')).toBeTruthy()
+    expect(await screen.findByText('Reading · 42%')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Continue reading' })).toBeTruthy()
+  })
+
+  /*
+   * The two states of this screen, and the one rule that binds them: the
+   * chapter summaries are one door, so they appear in exactly one place.
+   */
+  describe('a book the reader has finished', () => {
+    async function finish() {
+      await repository.saveParsedBook(bookOf())
+      await repository.savePosition(
+        BOOK_ID,
+        formatAnchor({ chapter: 1, section: 1, paragraph: 1 }),
+        100,
+      )
+    }
+
+    it('offers to start it again, and dates the finish', async () => {
+      await finish()
+      openInfo()
+
+      expect(await screen.findByRole('button', { name: 'Start again' })).toBeTruthy()
+      expect(screen.getByText(/^Finished · /)).toBeTruthy()
+      expect(screen.queryByRole('link', { name: 'Continue reading' })).toBeNull()
+    })
+
+    it('moves the summaries into the recap slot and folds Veda’s block away', async () => {
+      await finish()
+      openInfo()
+
+      expect(await screen.findByRole('link', { name: 'Read chapter summaries' })).toBeTruthy()
+      // The block below is gone, so the same door is never on screen twice.
+      expect(screen.queryByText('study companion')).toBeNull()
+      expect(screen.queryByRole('link', { name: /Chapter summaries/ })).toBeNull()
+    })
+
+    it('puts the reader back at the first paragraph, keeping the book read', async () => {
+      await finish()
+      openInfo()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Start again' }))
+
+      await waitFor(async () => {
+        expect((await repository.getPosition(BOOK_ID))?.percent).toBe(0)
+      })
+      // The position moved; it was not deleted. Reading a book twice does not
+      // un-read it the first time.
+      expect(await repository.getPosition(BOOK_ID)).toBeTruthy()
+    })
+  })
+
+  it('sends an unfinished book to the summaries through Veda’s block', async () => {
+    await repository.saveParsedBook(bookOf())
+    openInfo()
+
+    const study = await screen.findByRole('link', { name: /Chapter summaries/ })
+    expect(study.getAttribute('href')).toContain(`/book/${BOOK_ID}/chapters`)
+    expect(screen.getByRole('link', { name: 'Coming back to it' }).getAttribute('href')).toBe(
+      `/book/${BOOK_ID}/last-time`,
+    )
   })
 
   it('says a book is missing rather than showing a blank page', async () => {
@@ -184,7 +241,7 @@ describe('BookInfo', () => {
     await repository.saveParsedBook(bookOf())
     openInfo()
 
-    const overall = within(await screen.findByRole('group', { name: 'Overall' }))
+    const overall = within(await screen.findByRole('group', { name: 'Your rating' }))
     const fourthStar = overall.getByRole('button', { name: '4 stars' })
     fireEvent.click(fourthStar)
 
@@ -203,7 +260,7 @@ describe('BookInfo', () => {
     await repository.saveParsedBook(bookOf())
     openInfo()
 
-    const overall = within(await screen.findByRole('group', { name: 'Overall' }))
+    const overall = within(await screen.findByRole('group', { name: 'Your rating' }))
     fireEvent.click(overall.getByRole('button', { name: '3.5 stars' }))
 
     await waitFor(async () => {
@@ -235,35 +292,6 @@ describe('BookInfo', () => {
     openInfo()
 
     expect(await screen.findByText('Alaska')).toBeTruthy()
-  })
-
-  it('saves notes on blur', async () => {
-    await repository.saveParsedBook(bookOf())
-    openInfo()
-
-    const notes = await screen.findByPlaceholderText('What did you take away from this book?')
-    fireEvent.change(notes, { target: { value: 'Changed how I think about emptiness.' } })
-    fireEvent.blur(notes)
-
-    await waitFor(async () => {
-      expect((await repository.getBook(BOOK_ID))?.notes).toBe('Changed how I think about emptiness.')
-    })
-  })
-
-  it('saves a typed quote and lists it', async () => {
-    await repository.saveParsedBook(bookOf())
-    openInfo()
-
-    const input = await screen.findByPlaceholderText('Add a passage worth remembering…')
-    fireEvent.change(input, { target: { value: 'A line worth keeping.' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save quote' }))
-
-    expect(await screen.findByText('“A line worth keeping.”')).toBeTruthy()
-    await waitFor(async () => {
-      expect((await repository.listQuotes(BOOK_ID)).map((q) => q.text)).toEqual([
-        'A line worth keeping.',
-      ])
-    })
   })
 
   /*
@@ -315,8 +343,10 @@ describe('BookInfo', () => {
 
       await screen.findByText('The Fundamental Wisdom')
       expect(screen.getByText('Oxford University Press')).toBeTruthy()
-      expect(screen.getByText('372')).toBeTruthy()
+      // One line, not three cells: genre, format, length and year together.
+      expect(screen.getByText(/372 pp/)).toBeTruthy()
       expect(screen.getByText('Non-fiction')).toBeTruthy()
+      expect(screen.getByText(/1995/)).toBeTruthy()
     })
 
     // An average resting on two votes, shown as a verdict, is a lie of omission.
@@ -391,16 +421,16 @@ describe('BookInfo', () => {
 
     // The blurb is somebody else's marketing copy; folded, it can't push the
     // reader's own notes and quotes off the bottom of the screen.
-    it('folds the description, and opens it on the chevron', async () => {
+    it('clamps the description, and opens it on Read more', async () => {
       await repository.saveParsedBook(bookOf({ description: 'A breathtaking contemporary epic.' }))
       openInfo()
 
       expect(await screen.findByText('A breathtaking contemporary epic.')).toBeTruthy()
-      const toggle = screen.getByRole('button', { name: 'Show more' })
+      const toggle = screen.getByRole('button', { name: /Read more/ })
       expect(toggle.getAttribute('aria-expanded')).toBe('false')
 
       fireEvent.click(toggle)
-      expect(screen.getByRole('button', { name: 'Show less' }).getAttribute('aria-expanded')).toBe(
+      expect(screen.getByRole('button', { name: /Read less/ }).getAttribute('aria-expanded')).toBe(
         'true',
       )
     })
@@ -412,20 +442,6 @@ describe('BookInfo', () => {
       await screen.findByText('The Fundamental Wisdom')
       expect(screen.getByRole('button', { name: 'Refresh from Google Books' })).toBeTruthy()
     })
-  })
-
-  it('removes a saved quote', async () => {
-    await repository.saveParsedBook(bookOf())
-    await repository.addQuote(BOOK_ID, 'Take this one away.')
-    openInfo()
-
-    await screen.findByText('“Take this one away.”')
-    fireEvent.click(screen.getByRole('button', { name: 'Remove this quote' }))
-
-    await waitFor(() => {
-      expect(screen.queryByText('“Take this one away.”')).toBeNull()
-    })
-    expect(await repository.listQuotes(BOOK_ID)).toEqual([])
   })
 
   /**
