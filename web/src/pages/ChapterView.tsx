@@ -7,7 +7,7 @@ import type { BookId } from '../structure/index.ts'
 import { backLabel, backTo } from '../summary/backTo.ts'
 import { summaryData } from '../summary/dataSource.ts'
 import { approve } from '../summary/engine.ts'
-import { finishedChapters } from '../summary/queue.ts'
+import { finishedChapters, readSections, titledSections } from '../summary/queue.ts'
 import { Flourish, Paper, Rail, RichText, type RailItem } from '../summary/Paper.tsx'
 import styles from '../summary/summary.module.css'
 import type { ChapterListEntry, ChapterSummary, SectionSummary } from '../summary/types.ts'
@@ -54,7 +54,24 @@ export default function ChapterView() {
      it is a fair thing to offer. Unread chapters are never offered: a recap of
      a chapter you have not reached is a spoiler. */
   const [finished, setFinished] = useState(false)
+  /*
+   * Whether the two questions the empty state depends on have been answered.
+   *
+   * Without it the page paints "you have finished this, ask for a summary"
+   * before the check that decides it has come back, and the button appears for
+   * an instant and vanishes. The reader saw exactly that flicker moving from
+   * chapter 5 to 6.
+   */
+  const [checked, setChecked] = useState(false)
   const [asking, setAsking] = useState(false)
+  /**
+   * The named parts of this chapter the reader has finished and not summarised.
+   *
+   * The bell offers these too, but the bell is not where a reader is standing
+   * when they wonder where the summaries are. This one chapter's parts belong
+   * on this one chapter's page.
+   */
+  const [waiting, setWaiting] = useState<{ section: number; title: string }[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -100,18 +117,33 @@ export default function ChapterView() {
       repository.getPosition(id),
     ]).then(([spine, position]) => {
       if (cancelled) return
+      const here = Number(current)
       const done = finishedChapters(spine, position ?? undefined)
-      setFinished(done.includes(Number(current)))
+      const whole = done.includes(here)
+      setFinished(whole)
+
+      /*
+       * A finished chapter offers all of its named parts. The chapter still in
+       * hand offers the parts already read — the same rule `plan` follows, so
+       * the page and the bell can never disagree about what is on offer.
+       */
+      const entry = spine.find((row) => row.chapter === here)
+      const eligible = whole
+        ? titledSections(entry)
+        : readSections(spine, position ?? undefined).filter((row) => row.chapter === here)
+      setWaiting(eligible.map((row) => ({ section: row.section, title: row.title })))
+      setChecked(true)
     })
     return () => {
       cancelled = true
     }
-  }, [id, current])
+  }, [id, current, open])
 
-  async function onAsk() {
+  /** Ask for one thing — the whole chapter, or one named part of it. */
+  async function onAsk(part?: { section: number; title: string }) {
     setAsking(true)
     try {
-      await approve(id, Number(current))
+      await approve(id, Number(current), part)
       setOpen(await summaryData().getChapter(id, current))
     } catch {
       // Nothing was stored, so the page is unchanged and the button comes back.
@@ -170,7 +202,7 @@ export default function ChapterView() {
         {open && <div className={styles.chapterTtl}>{open.chapterTitle}</div>}
         <Flourish wide />
 
-        {loading ? null : open ? (
+        {loading || !checked ? null : open ? (
           <>
             {/*
              * The chapter recap waits for the whole chapter, so the ordinary
@@ -206,6 +238,7 @@ export default function ChapterView() {
             )}
 
             {open.sections?.map((part) => <Part key={part.section} part={part} />)}
+            <Waiting parts={waiting} asking={asking} onAsk={onAsk} />
           </>
         ) : (
           /*
@@ -226,6 +259,8 @@ export default function ChapterView() {
                 ? 'This book has no chapters saved on this device, so there is nothing to summarise. Re-import it from Book details and it will appear here.'
                 : finished
                   ? 'This chapter has no summary yet. Ask for one and Veda will read the whole chapter.'
+                  : waiting.length > 0
+                  ? 'The recap of the whole chapter comes when you finish it. These are the parts you have already read.'
                   : 'This chapter has no summary yet. It appears here once you have finished reading it.'}
             </p>
             {finished && (
@@ -238,6 +273,7 @@ export default function ChapterView() {
                 {asking ? 'Reading the chapter…' : 'Summarise this chapter'}
               </button>
             )}
+            <Waiting parts={waiting} asking={asking} onAsk={onAsk} />
           </>
         )}
       </main>
@@ -309,4 +345,47 @@ function Part({ part }: { part: SectionSummary }) {
 function Byline({ model }: { model?: string }) {
   if (!model) return null
   return <p className={styles.byline}>{modelLabel(model)}</p>
+}
+
+/**
+ * The named parts on offer, each with its own button.
+ *
+ * Drawn wherever the reader is: under a chapter that already has summaries, and
+ * on a chapter that has none at all. The bell offers the same parts, but the
+ * bell is not where a reader is standing when they wonder where a summary went.
+ *
+ * Each button is a paid call, so each is asked for on its own. There is no
+ * "all of them" here on purpose — the bell has that, next to the book it
+ * belongs to, where the reader can see the whole bill at once.
+ */
+function Waiting({
+  parts,
+  asking,
+  onAsk,
+}: {
+  parts: { section: number; title: string }[]
+  asking: boolean
+  onAsk: (part: { section: number; title: string }) => void
+}) {
+  if (parts.length === 0) return null
+  return (
+    <section className={styles.part}>
+      <div className={styles.secLabel}>Parts you have finished</div>
+      <ul className={styles.waiting}>
+        {parts.map((part) => (
+          <li key={part.section} className={styles.waitingRow}>
+            <span>{part.title}</span>
+            <button
+              type="button"
+              className={styles.ask}
+              disabled={asking}
+              onClick={() => onAsk(part)}
+            >
+              Summarise
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
 }

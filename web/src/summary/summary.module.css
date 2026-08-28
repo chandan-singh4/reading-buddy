@@ -415,3 +415,28 @@
   text-transform: uppercase;
   color: var(--ink-faint);
 }
+
+/* The parts on offer. One row each, because each one is a separate call. */
+.waiting {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.waitingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  font-family: 'EB Garamond', serif;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.waitingRow .ask {
+  flex: none;
+  font-size: 13px;
+  min-height: 38px;
+  padding: 0 12px;
+}

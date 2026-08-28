@@ -133,3 +133,60 @@ describe('the chapter summary page', () => {
     expect(word.tagName).toBe('EM')
   })
 })
+
+describe('a chapter the reader is still inside', () => {
+  /*
+   * The screen the reader kept sending back. PART 1 of Man and His Symbols has
+   * six named parts and they were four parts in. The chapter is not finished,
+   * so it has no recap and the page said "it appears here once you have
+   * finished reading it" — with nothing to do about the three parts they had
+   * genuinely read.
+   */
+  const PART1 = 'part-one' as BookId
+
+  beforeEach(async () => {
+    await repository.saveBook(bookOf(PART1, 'Man and His Symbols'))
+    await repository.saveChapterIndex(PART1, {
+      chapter: 6,
+      title: 'PART 1 APPROACHING THE UNCONSCIOUS',
+      path: 'ch06' as never,
+      sections: [
+        'The importance of dreams',
+        'Past and future in the unconscious',
+        'The function of dreams',
+        'The analysis of dreams',
+      ].map((title, index) => ({
+        section: index + 1,
+        title,
+        path: `ch06-s0${index + 1}` as never,
+      })),
+    })
+    await repository.savePosition(PART1, '[ch06-s04-p012]' as never)
+    setSummaryData({
+      ...fixtureDataSource,
+      async getChapterList() {
+        return [{ chapter: 6, chapterTitle: 'PART 1', distilled: false }]
+      },
+      async getChapter() {
+        return undefined
+      },
+    })
+  })
+
+  it('offers the parts already read, and not the one in hand', async () => {
+    open(`/book/${PART1}/chapters?chapter=6`)
+
+    expect(await screen.findByText('Parts you have finished')).toBeTruthy()
+    expect(screen.getByText('The importance of dreams')).toBeTruthy()
+    expect(screen.getByText('The function of dreams')).toBeTruthy()
+    // Being on the last page of a part is not having finished it.
+    expect(screen.queryByText('The analysis of dreams')).toBeNull()
+  })
+
+  it('does not blame the reader for a chapter they are working through', async () => {
+    open(`/book/${PART1}/chapters?chapter=6`)
+
+    await screen.findByText('Parts you have finished')
+    expect(screen.queryByText(/once you have finished reading it/)).toBeNull()
+  })
+})
