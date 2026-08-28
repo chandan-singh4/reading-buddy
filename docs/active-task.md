@@ -5,47 +5,50 @@
 
 ## Task
 
-**Nothing is mid-edit.** The chapter summary page is built, tested and shipped.
-Pick the next task with `/plan-task`, or take one of the three below.
+**Nothing is mid-edit.** Everything is merged, pushed and deployed. The next
+step needs a phone, not an editor.
 
-## Option A — watch the two models run for real
+## Option A — judge the summaries on the phone
 
-The task this session earned. No code unless something is wrong.
+Six things shipped this session and none of them has been seen on a device.
+Take the update first, then open a book with named sections inside a chapter
+(Man and His Symbols has them).
 
-Neither model has ever answered. Everything around them is tested; they are
-not. Finish a chapter, then open Home and wait for the bell.
+Check, in this order:
 
-Watch for two things especially:
-
-- A reply in the wrong shape. `summary/parse.ts` is written to survive one, but
-  it has never met a real answer.
-- A summary that reads badly. That is a prompt question, and the prompts are
-  yours — I may not edit them.
+1. **The two-row rail.** Open a chapter that has parts. Swipe the top strip to
+   move between chapters. Swipe the lower strip to move between parts. Neither
+   row may drag the other. No text may run off the right edge.
+2. **One button, one job.** Under "The parts you have finished", press one
+   Summarise button. Only that one may start.
+3. **The model name.** A finished summary prints the model that wrote it.
+4. **The bell.** It asks once for a book. "Pick chapters" opens the list.
+5. **Settings → the summary model.** Choose a model. Make a summary. Check the
+   name printed on it is the one you chose.
+6. **The paper.** This page does not follow your theme. In Dark, at night, you
+   get a bright page. Say if that is right or wrong.
 
 ### Definition of done
 
-1. See a real summary appear in the bell, and read it on the chapter page.
-2. Look at the page on the phone. Say whether the paper reads as paper.
-2. Answer the one open question: this page **does not** follow your theme. In
-   Dark, at night, you get a bright page. Is that right or wrong?
-3. Check the rail. On a phone it lies down and scrolls sideways. Check that it
-   works with a thumb.
-4. Write the answer to point 2 in `docs/decisions.md` either way.
+- Every point above is either good or reported with a screenshot.
+- The answer to point 6 goes in `docs/decisions.md` either way.
 
 ### Files in scope
 
-None, unless a fault appears. Then:
+None, unless a fault appears. Then, and only the ones the fault names:
 
-- `web/src/summary/summary.module.css` — every rule for the page.
-- `web/src/pages/ChapterView.tsx`.
-- `web/src/summary/Bell.tsx`, `web/src/summary/bell.module.css`.
+- `web/src/summary/summary.module.css` — every rule for the page and the rail.
+- `web/src/pages/ChapterView.tsx` — the page itself.
+- `web/src/summary/Paper.tsx` — the rail.
+- `web/src/summary/queue.ts`, `web/src/summary/engine.ts` — what gets made.
+- `web/src/summary/Bell.tsx`, `web/src/summary/bellGroups.ts`.
+- `web/src/pages/Settings.tsx`, `web/src/reader/models.ts` — the model picker.
 
 ## Option B — the Obsidian export
 
 **Do this after you have used Obsidian a little, not before.** The export should
 be shaped by how you actually work in a vault, not by a guess. Everything it
-needs is already stored from today: every claim, every concept name, every
-anchor.
+needs is already stored: every claim, every concept name, every anchor.
 
 1. Learn Obsidian by hand first. Make a few notes. See how links feel.
 2. Then decide the shape: one note per chapter, one per concept, or both.
@@ -73,7 +76,8 @@ Files: `web/src/app/updates.ts`, `web/src/app/UpdatePrompt.tsx`,
 
 ## Out of scope for all three
 
-- `api/tutor.ts` and every prompt.
+- `api/tutor.ts` and every prompt. Edit a `.md` in `prompts/`, then run
+  `node scripts/build-prompts.mjs`. Never edit the generated block by hand.
 - Any parsing file, and `PARSER_VERSION`.
 - Syncing notes to the cloud. Notes stay device-local.
 
@@ -81,23 +85,26 @@ Files: `web/src/app/updates.ts`, `web/src/app/UpdatePrompt.tsx`,
 
 ## Done, 2026-08-27
 
-**The Librarian and the Scribe run.** Both prompts copied byte for byte, both
-models wired to the relay, the queue and the bell built. 2,185 tests pass, build
-green. Written up in `docs/decisions.md` under "the Librarian and the Scribe
-run". The Obsidian export is deliberately not built.
+**Summaries by part, by book, and by a model you choose.** The bell groups by
+book. A titled section is summarised on its own. The rail holds two rows. Each
+summary records its model, and the model is now chosen in Settings. 2,221 tests
+pass, build green. Written up in `docs/decisions.md` under the five headings
+from "the prompts are written into `api/tutor.ts`" to "the model that writes
+summaries".
+
+**One root cause behind every empty page.** Four screens imported the device
+store instead of the store that follows the reader's choice.
+`summary/repository.test.ts` now guards it by reading imports.
 
 ## Done, earlier on 2026-08-27
 
+**The Librarian and the Scribe run.** Both prompts copied byte for byte, both
+models wired to the relay, the queue and the bell built.
+
 **The chapter summary page.** Built to the reference design, then cut back by
-the reader to two sections: the Librarian's summary of the chapter with its
-tags, and the Scribe's summary of the conversation. The Commonplace Book was
-built and then deleted — it is in git. 2,156 tests pass, build green. Both
-models are stubbed and not started. Written up in `docs/decisions.md` under
-"the chapter summary page".
+the reader to two sections.
 
 ## Done, 2026-08-26
 
 **VEDA-QUOTES.** Shipped over five rounds, the last four of them fixes the
-reader had to report. 2,130 tests pass, build green. Written up in
-`docs/decisions.md` under the five headings from "keeping a line Veda said"
-to "a mended line must close the marks it opens".
+reader had to report.

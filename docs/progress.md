@@ -19,7 +19,17 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,185 tests across 122 files.
+  2,221 tests across 127 files.
+- **A screen must import `repository` from `storage/index.ts`.** Four screens
+  imported `storage/repository.ts`, which is the device store only. The reader's
+  library is in the cloud, so every summary page read an empty database and
+  showed nothing. `summary/repository.test.ts` reads the imports of every file
+  in `summary/`, `pages/` and `tutor/` and fails on a new offender.
+- **Waiting on the phone: the two-row rail.** A chapter with named parts now
+  shows two strips. The overflow fix was proved by reading the CSS, not by
+  looking — this dev database holds no books. Swipe both rows.
+- **Waiting on the phone: the model picker.** Settings can now name the model
+  that writes summaries. It has never been switched on a device.
 - **Not proved yet: a real call to either model.** Every part around them is
   tested — the queue, the parser, the stores, the bell. The models themselves
   have never answered. The first real proof is the reader finishing a chapter
@@ -52,6 +62,34 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **Summaries by part, by book, and by a model you choose** (2026-08-27). Not
+  a waypoint — every item came from the reader. Build green: 2,221 tests across
+  127 files.
+  - **The bell asks once for a book, not once for a chapter.** Three finished
+    chapters were three near-identical rows and three yeses. Now one row per
+    book, with "Summarise the book" or a chapter picker behind "Pick chapters".
+  - **A titled section inside a chapter is summarised on its own**, next to the
+    chapter recap and not instead of it. A part row shares the chapter's table:
+    the key is `[bookId+chapterId]` and the new fields are not indexed, so no
+    schema bump was needed.
+  - **The rail holds two rows on a phone.** The first is the chapters, the
+    second the parts of the chapter in hand. Each strip scrolls by itself.
+  - **The fix the rail needed.** A grid child and a flex child report their full
+    content width as their smallest size, so the strips pushed the whole card
+    off the screen. `minmax(0, 1fr)`, `min-width: 0` and `flex: 0 0 auto` on the
+    tabs. Without the last one the labels squeeze and nothing scrolls.
+  - **Every summary records which model wrote it**, and the page prints it. The
+    relay already returned the name; `askGolden` was dropping it.
+  - **The reader can name the summary model** in Settings, apart from the model
+    Veda uses. Empty means "same as Veda".
+  - **The prompts are written into `api/tutor.ts`, not imported.** Two Vercel
+    builds failed first: a file under `api/` must be a function, and `api/` is
+    typechecked without `allowImportingTsExtensions`. No file in `api/` has ever
+    imported another local file, so this stopped trying to be the first.
+  - **The empty page had one cause, not the two I guessed.** The reader had to
+    say so twice. Reading every `import { repository }` in the tree found it in
+    one step, after two hypotheses found nothing.
 
 - **The Librarian and the Scribe run** (2026-08-27). Not a waypoint — the
   reader supplied both prompts. Build green: 2,185 tests across 122 files.
@@ -212,39 +250,6 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     pictures.
   - Two Library tests were racing and failed under the extra load of two new
     test files. Both asserted before a second read had landed; they now wait.
-
-- **Ask about a picture — the epub half of WP-39** (2026-08-25). Build green:
-  1983 tests across 108 files, up 35.
-  - An **Ask** button under every plate that has a picture. A button and not a
-    tap on the picture: the page already spends its taps, the edges to turn and
-    the middle to raise the toolbar.
-  - The plate is scaled to 1,024 pixels on its long edge and encoded as JPEG
-    before it is sent — `reader/figurePicture.ts`. The arithmetic is a pure
-    function, so it is tested without a browser.
-  - **The roster now records which models can read a picture**, from each
-    provider rather than a hand-written list. A blind model does not refuse a
-    picture; it drops it and answers from the caption. So a picture question
-    filters its whole fallback chain, not just its head, and with no seeing
-    model the lamp refuses and says why.
-  - A message in `api/tutor.ts` can now be text plus a picture. Text-only
-    conversations go out byte for byte as before.
-  - PDF regions stay open, so WP-39 stays `[~]`.
-
-- **The tutor's reach is settled: the page, and not the book** (2026-08-25).
-  No code changed. Five waypoints were read against the code and closed.
-  - **WP-09 and WP-18 are declined.** Both exist to search across a book. The
-    tutor does not: `reader/context.ts` sends the title, the author, the
-    chapter, the section, and the paragraph either side. That answers "explain
-    this", which is the question the reader asks.
-  - **WP-28 goes with them.** It guards cross-book retrieval. There is none.
-  - **WP-10 and WP-21 are closed as built, in a different shape.** The persona
-    is `BASE_PROMPT` in `api/tutor.ts` and the modes are eight task modules.
-    Nothing reads a book's kind, so classifying one earns nothing.
-  - Two stale things found while reading: `reader/genre.ts` is named in a
-    comment in `api/tutor.ts` and was never built, and `BookGenre` is declared
-    and unused.
-  - The build board learned a **cut** state, which counts in neither half of a
-    tally, and a shift-tap now steps back one place instead of two.
 
 > **Older entries are deleted, not archived.** Only the five newest survive —
 > see this file's own header. Git holds every earlier version of this file, so

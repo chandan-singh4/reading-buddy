@@ -1956,3 +1956,76 @@ way to mark a helper that is not a route.
 project has now been bitten at both joins. Proving it took one command: fetch
 the live `index.html`, read the bundle hash, and compare it with `web/dist`.
 Do that before believing a deploy happened.
+
+### The prompts are written into `api/tutor.ts`, not imported — 2026-08-27
+
+The entry above moved the module to `api/_prompts/`. That failed too. Vercel
+typechecks `api/` without `allowImportingTsExtensions`, so the `.ts` at the end
+of the import path is an error there (TS5097), and the bundler then could not
+resolve the module at all.
+
+`api/tutor.ts` had no imports of local files before this work, and neither does
+any other file in `api/`. There was no working example to copy. So the text is
+now generated straight into `api/tutor.ts`, between two markers, beside the two
+prompts that already live there. Nothing for a bundler to resolve.
+
+The two `.md` files in `prompts/` stay the source of truth, outside `api/`.
+`prompts.test.ts` re-runs the injection and compares, so an edited prompt that
+was never regenerated fails the suite.
+
+### A screen reads `storage/index.ts`, never `storage/repository.ts` — 2026-08-27
+
+Every chapter summary page was empty. The cause was one import, repeated in four
+files. `storage/repository.ts` is the device store. `storage/index.ts` picks the
+device store or the cloud store from the reader's own setting. The reader's
+library is in the cloud, so the pages queried an empty local database.
+
+No unit test could see it: a test has no backend choice to ignore.
+`summary/repository.test.ts` therefore reads imports, not behaviour. It fails
+if any file in `summary/`, `pages/` or `tutor/` imports `repository` from the
+device store.
+
+**The lesson is about method, not code.** Two hypotheses were guessed and both
+were wrong, and the reader paid for both. Grepping every `import { repository }`
+in the tree found the answer in one step. Read the data first.
+
+### A titled section is summarised as its own unit — 2026-08-27
+
+Some books name sections inside a chapter. The reader asked for those to be
+treated as chapters. They are summarised as well as the chapter, not instead of
+it — a recap of the whole chapter is still what a reader wants first.
+
+A part row lives in the same table as a chapter row. The primary key is already
+`[bookId+chapterId]`, and the new fields (`section`, `sectionTitle`) are not
+indexed, so this needed no schema change.
+
+Parts are offered for the chapter the reader is still inside, not only for
+finished chapters, because a part they have passed is finished even if the
+chapter is not.
+
+### The rail is two rows on a phone — 2026-08-27
+
+The parts first appeared as a list on the page. The reader rejected it: parts
+belong where chapters are. The rail now has two strips, chapters above and parts
+below, each scrolling sideways on its own.
+
+Two levels folded into one strip would make the reader read every label to learn
+which level they were on. Two rows say it before a word is read.
+
+**The bug it caused is worth remembering.** A grid child and a flex child report
+the full width of their contents as their smallest size. So the strips, which
+are wider than the screen on purpose, pushed the whole card off the screen and
+took the text with it. The cure is three declarations: `minmax(0, 1fr)` on the
+column, `min-width: 0` on the rail and each strip, and `flex: 0 0 auto` on each
+tab. Without the last one the labels squeeze together and the strip never
+scrolls at all.
+
+### The model that writes summaries is chosen apart from Veda's — 2026-08-27
+
+The reader asked for the best model on summaries. A summary is written once and
+read many times, so it is worth more than a chat turn. Settings now holds a
+second picker. Empty means "same as Veda", which keeps one setting for a reader
+who does not care.
+
+Every summary also records which model wrote it, and the page prints it. The
+relay already returned the name; the client was throwing it away.
