@@ -426,6 +426,7 @@ describe('watching a summary being written', () => {
     chapterTitle: 'First',
     recapText: 'The summary you already had.',
     tags: [],
+    qaText: 'What you and Veda worked through.',
   }
 
   beforeEach(async () => {
@@ -434,7 +435,10 @@ describe('watching a summary being written', () => {
     setSummaryData({
       ...fixtureDataSource,
       async getChapterList() {
-        return [{ chapter: 1, chapterTitle: 'First', distilled: true }]
+        return [
+          { chapter: 1, chapterTitle: 'First', distilled: true },
+          { chapter: 2, chapterTitle: 'Second', distilled: false },
+        ]
       },
       async getChapter() {
         return written
@@ -508,5 +512,33 @@ describe('watching a summary being written', () => {
 
     expect(writeText).toHaveBeenCalledWith('The summary you already had.')
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeTruthy()
+  })
+
+  it('takes the whole page away while it writes, not the recap alone', async () => {
+    // The dots appeared above a summary of a conversation that belongs to the
+    // words being replaced: half the old page under a heading for the new one.
+    vi.mocked(approve).mockImplementation(async () => {
+      await new Promise(() => {})
+    })
+
+    open(`/book/${WATCHED}/chapters?chapter=1`)
+    expect(await screen.findByText('What you and Veda worked through.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Redo the summary' }))
+
+    await screen.findByLabelText('Veda is reading the chapter')
+    expect(screen.queryByText('What we worked through')).toBeNull()
+    expect(screen.queryByText('What you and Veda worked through.')).toBeNull()
+  })
+
+  it('leaves the failure behind when the reader moves on', async () => {
+    // The line accused models in chapters that had never been asked anything.
+    vi.mocked(approve).mockRejectedValue(new Error('the relay answered 429'))
+
+    open(`/book/${WATCHED}/chapters?chapter=1`)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redo the summary' }))
+    expect(await screen.findByText(/The model did not answer/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /Second/ }))
+    await waitFor(() => expect(screen.queryByText(/The model did not answer/)).toBeNull())
   })
 })

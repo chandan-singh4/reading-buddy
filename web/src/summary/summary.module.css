@@ -573,38 +573,70 @@
 /* ---- what you can do with a finished summary ---------------------------- */
 
 /*
- * Under the summary, not over it. These are things to do *with* what you have
- * read, so they come after reading it — and quieter than the Summarise button,
- * which is the one control on this page that spends money unasked.
+ * The summary's heading, with its two controls on the right.
+ *
+ * At the top, level with the label, because that is where the reader's eye is
+ * when they decide the words are worth keeping or worth having again. Below the
+ * summary they were three paragraphs of scrolling away.
  */
-.actions {
+.secHead {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 14px 0 6px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
 }
 
-.action {
-  font-family: 'EB Garamond', serif;
-  font-style: italic;
-  font-size: 14px;
-  color: var(--ink-soft);
-  background: none;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  /* Smaller than `.ask` on purpose, and still a thumb's worth of height. */
-  min-height: 40px;
-  padding: 0 14px;
-  cursor: pointer;
+/* The label already carries the top margin, so this row must not add another. */
+.secHead .secLabel {
+  margin-top: 34px;
 }
 
-.action:hover {
-  color: var(--ink);
+.secTools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
 }
 
-.action:disabled {
+/*
+ * An icon, not a word. A control reading "Redo the summary" is wider than the
+ * heading beside it and shouts louder than the summary itself. The name lives
+ * in `aria-label` and `title`, so nothing is lost to a screen reader or to a
+ * cursor that waits.
+ */
+.tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 40px of tappable area around a 17px mark. Smaller than the 44px of a
+     button that spends money, which is the one this must not be mistaken for. */
+  width: 40px;
+  height: 40px;
   color: var(--ink-faint);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.tool:hover {
+  color: var(--ink);
+  background: rgba(93, 79, 158, 0.06);
+}
+
+.tool:disabled {
+  color: var(--rule);
   cursor: default;
+  background: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool {
+    transition: none;
+  }
 }
 
 /* A run that produced nothing. Said next to the summary it did not replace. */

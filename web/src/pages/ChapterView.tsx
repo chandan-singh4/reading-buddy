@@ -123,7 +123,14 @@ export default function ChapterView() {
    * the three dots are for.
    */
   const [live, setLive] = useState<string | undefined>()
-  /** Set when a run ended with nothing. Cleared the moment another starts. */
+  /**
+   * Set when a run ended with nothing. Cleared when another starts, and when
+   * the reader moves.
+   *
+   * Moving matters as much as running. The line says the model did not answer
+   * about *this* summary, so carrying it to the next chapter accuses a model
+   * that was never asked. See the effect below.
+   */
   const [failed, setFailed] = useState(false)
   /*
    * The picker's own columns, held here so a drag inside the sheet survives
@@ -338,6 +345,16 @@ export default function ChapterView() {
   const writingHere =
     asking !== undefined && (partOnScreen ? asking === partOnScreen.section : asking === 'chapter')
 
+  /*
+   * A failure belongs to the summary it happened to, so it is dropped the
+   * moment the reader looks at another one. The reader saw "The model did not
+   * answer" follow them from chapter to chapter, accusing models that had
+   * never been asked anything.
+   */
+  useEffect(() => {
+    setFailed(false)
+  }, [current, currentPart])
+
   const exit = backTo(location.search)
 
   return (
@@ -379,61 +396,59 @@ export default function ChapterView() {
         )}
         <Flourish wide />
 
-        {loading || !checked ? null : partOnScreen && !openPart ? (
+        {loading || !checked ? null : writingHere ? (
+          /*
+           * While the model writes, the page is the model writing.
+           *
+           * Not the recap area alone. The reader pressed Redo and watched the
+           * dots appear above a summary of a conversation that belongs to the
+           * words being replaced — half the old page under a heading for the
+           * new one. Everything below stands aside and comes back together.
+           */
+          <>
+            <div className={styles.secLabel}>
+              {partOnScreen ? 'This part, in plain words' : 'The chapter, in plain words'}
+            </div>
+            <Writing text={live ?? ''} />
+          </>
+        ) : partOnScreen && !openPart ? (
           /*
            * A part with no summary yet. It still has a tab, so it still needs a
            * page: one that says which of the two reasons it is empty for, and
            * offers the call when the reader has earned it.
            */
           <>
-            {writingHere ? (
-              <>
-                <div className={styles.secLabel}>This part, in plain words</div>
-                <Writing text={live ?? ''} />
-              </>
-            ) : (
-              <>
-                {failed && <Failure />}
-                <p className={styles.empty}>
-                  {eligible.includes(partOnScreen.section)
-                    ? 'You have finished this part. Ask for a summary and Veda will read it.'
-                    : 'The summary of this part comes when you finish reading it.'}
-                </p>
-                {eligible.includes(partOnScreen.section) && (
-                  <button
-                    type="button"
-                    className={styles.ask}
-                    disabled={asking !== undefined}
-                    onClick={() => onWant(partOnScreen)}
-                  >
-                    Summarise this part
-                  </button>
-                )}
-              </>
+            {failed && <Failure />}
+            <p className={styles.empty}>
+              {eligible.includes(partOnScreen.section)
+                ? 'You have finished this part. Ask for a summary and Veda will read it.'
+                : 'The summary of this part comes when you finish reading it.'}
+            </p>
+            {eligible.includes(partOnScreen.section) && (
+              <button
+                type="button"
+                className={styles.ask}
+                disabled={asking !== undefined}
+                onClick={() => onWant(partOnScreen)}
+              >
+                Summarise this part
+              </button>
             )}
           </>
         ) : openPart ? (
           /* One part, alone. The same two labels as the chapter, because it is
              the same job one level down. */
           <>
-            <div className={styles.secLabel}>This part, in plain words</div>
-            {writingHere ? (
-              /* The old recap stands aside while the new one is written, and
-                 comes back untouched if the model never answers. */
-              <Writing text={live ?? ''} />
-            ) : (
-              <>
-                {failed && <Failure />}
-                <Byline model={openPart.recapModel} />
-                <RichText text={openPart.recapText} className={styles.recap} />
-                {openPart.tags.length > 0 && <Tags tags={openPart.tags} />}
-                <Actions
-                  text={openPart.recapText}
-                  busy={asking !== undefined}
-                  onRedo={() => onWant(partOnScreen, true)}
-                />
-              </>
-            )}
+            <SectionHead
+              label="This part, in plain words"
+              text={openPart.recapText}
+              busy={asking !== undefined}
+              onRedo={() => onWant(partOnScreen, true)}
+            />
+            {failed && <Failure />}
+            <Byline model={openPart.recapModel} />
+            <RichText text={openPart.recapText} className={styles.recap} />
+            {openPart.tags.length > 0 && <Tags tags={openPart.tags} />}
 
             <div className={styles.secLabel}>What we worked through</div>
             {openPart.qaText ? (
@@ -455,20 +470,18 @@ export default function ChapterView() {
              * state of the chapter in hand is parts but no recap yet. Saying
              * that plainly is better than an empty heading over nothing.
              */}
-            <div className={styles.secLabel}>The chapter, in plain words</div>
-            {writingHere ? (
-              <Writing text={live ?? ''} />
-            ) : open.recapText ? (
+            {open.recapText ? (
               <>
-                {failed && <Failure />}
-                <Byline model={open.recapModel} />
-                <RichText text={open.recapText} className={styles.recap} />
-                {open.tags.length > 0 && <Tags tags={open.tags} />}
-                <Actions
+                <SectionHead
+                  label="The chapter, in plain words"
                   text={open.recapText}
                   busy={asking !== undefined}
                   onRedo={() => onWant(undefined, true)}
                 />
+                {failed && <Failure />}
+                <Byline model={open.recapModel} />
+                <RichText text={open.recapText} className={styles.recap} />
+                {open.tags.length > 0 && <Tags tags={open.tags} />}
 
                 <div className={styles.secLabel}>What we worked through</div>
                 {open.qaText ? (
@@ -636,47 +649,124 @@ function Writing({ text }: { text: string }) {
 }
 
 /**
- * What the reader can do with a summary once it is written.
+ * The heading of a summary, with what you can do to it on the right.
  *
- * **Copy** because a summary is the one thing on this page worth taking
- * somewhere else — a note, a message, the vault the export will one day write.
- * The text is selectable too; the button is for a thumb, which is bad at
+ * The two controls sit level with the label — at the top of the summary, where
+ * the reader's eye already is when they decide the words are worth keeping or
+ * worth having again. Underneath, they were furniture the reader had to scroll
+ * past three paragraphs to find.
+ *
+ * Icons, not words. At this size a label reading "Redo the summary" is wider
+ * than the heading it sits beside and shouts louder than the summary. The
+ * meaning is carried by `aria-label` and `title`, so a screen reader and a
+ * hovering cursor both get the full sentence.
+ *
+ * **Copy**, because a summary is the one thing here worth taking elsewhere.
+ * The text is selectable too; the icon is for a thumb, which is bad at
  * selecting three paragraphs.
  *
- * **Redo** because a summary is one model's reading of a chapter, and the
- * reader may want another's. It opens the picker first, exactly as the first
- * call did, so choosing a different model *is* the redo rather than a setting
- * to change beforehand.
- *
- * Both wait while any call is running. Two summaries of one chapter at once
- * would be two bills for one answer.
+ * **Redo**, because a summary is one model's reading of a chapter and the
+ * reader may want another's. It opens the picker first, so choosing a
+ * different model *is* the redo.
  */
-function Actions({ text, busy, onRedo }: { text: string; busy: boolean; onRedo: () => void }) {
+function SectionHead({
+  label,
+  text,
+  busy,
+  onRedo,
+}: {
+  label: string
+  text: string
+  busy: boolean
+  onRedo: () => void
+}) {
   const [copied, setCopied] = useState(false)
 
   return (
-    <div className={styles.actions}>
-      <button
-        type="button"
-        className={styles.action}
-        onClick={() => {
-          void navigator.clipboard
-            ?.writeText(text)
-            .then(() => {
-              setCopied(true)
-              window.setTimeout(() => setCopied(false), 1600)
-            })
-            .catch(() => {
-              /* No clipboard permission. The text is still selectable. */
-            })
-        }}
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-      <button type="button" className={styles.action} disabled={busy} onClick={onRedo}>
-        Redo the summary
-      </button>
+    <div className={styles.secHead}>
+      <div className={styles.secLabel}>{label}</div>
+      <div className={styles.secTools}>
+        <button
+          type="button"
+          className={styles.tool}
+          aria-label={copied ? 'Copied' : 'Copy'}
+          title={copied ? 'Copied' : 'Copy the summary'}
+          onClick={() => {
+            void navigator.clipboard
+              ?.writeText(text)
+              .then(() => {
+                setCopied(true)
+                window.setTimeout(() => setCopied(false), 1600)
+              })
+              .catch(() => {
+                /* No clipboard permission. The text is still selectable. */
+              })
+          }}
+        >
+          {copied ? <TickIcon /> : <CopyIcon />}
+        </button>
+        <button
+          type="button"
+          className={styles.tool}
+          disabled={busy}
+          aria-label="Redo the summary"
+          title="Redo the summary"
+          onClick={onRedo}
+        >
+          <RedoIcon />
+        </button>
+      </div>
     </div>
+  )
+}
+
+/* Drawn at 16px in a 20px box, to sit on the heading's own line without
+   growing it. `currentColor` so they inherit the button's ink and its hover. */
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="17" height="17" fill="none" aria-hidden="true">
+      <rect x="7" y="7" width="9" height="9" rx="2" stroke="currentColor" strokeWidth="1.4" />
+      <path
+        d="M13 5.5A1.5 1.5 0 0 0 11.5 4h-6A1.5 1.5 0 0 0 4 5.5v6A1.5 1.5 0 0 0 5.5 13"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function TickIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="17" height="17" fill="none" aria-hidden="true">
+      <path
+        d="M4.5 10.5l3.5 3.5 7.5-8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function RedoIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="17" height="17" fill="none" aria-hidden="true">
+      <path
+        d="M15.5 6.5A6.5 6.5 0 1 0 16.4 12"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M15.8 3.2v3.6h-3.6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 
