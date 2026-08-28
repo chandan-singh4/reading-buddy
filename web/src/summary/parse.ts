@@ -1,4 +1,5 @@
 import type { StoredChapterSummary } from '../storage/db.ts'
+import { recapSoFar } from './streaming.ts'
 
 /**
  * Reading what the two models sent back.
@@ -80,7 +81,25 @@ function trimmedString(value: unknown): string {
  * their length trying to prevent.
  */
 export function librarianResult(reply: string): LibrarianResult {
-  const data = asRecord(jsonFrom(reply))
+  /*
+   * A cut-off answer still holds the recap the reader watched appear.
+   *
+   * The Librarian writes `recap` first and the concept list after it, so an
+   * answer that stops early — the model hit its ceiling, or closed the stream
+   * a token short — has the whole recap and no closing brace. `JSON.parse`
+   * refuses all of it, and the reader was told "the model did not answer"
+   * about words they had just read. The same walk the live view uses gets
+   * them back. The concept list is the part genuinely lost, so it goes empty
+   * rather than half-read.
+   */
+  let data: Record<string, unknown>
+  try {
+    data = asRecord(jsonFrom(reply))
+  } catch (error) {
+    const salvaged = recapSoFar(reply).trim()
+    if (salvaged === '') throw error
+    return { recap: salvaged, concepts: [] }
+  }
 
   const recap = trimmedString(data.recap)
   if (recap === '') throw new Error('the Librarian sent no recap')

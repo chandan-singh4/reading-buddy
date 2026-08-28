@@ -115,3 +115,19 @@ describe('the Scribe’s reply', () => {
     expect(scribeResult('{"items":[]}', canonical).items).toEqual([])
   })
 })
+
+describe('an answer that stopped before it closed', () => {
+  it('keeps the recap the model did finish writing', () => {
+    // The reader watched the whole recap appear, then was told the model did
+    // not answer. The words were there; only the closing brace was missing.
+    const cut = '{"recap": "Jung reads a dream as a message, not a riddle.", "concepts": [{"nam'
+    const result = librarianResult(cut)
+    expect(result.recap).toBe('Jung reads a dream as a message, not a riddle.')
+    // The concept list is the part genuinely lost, so it is empty, not half read.
+    expect(result.concepts).toEqual([])
+  })
+
+  it('still refuses an answer with no recap in it at all', () => {
+    expect(() => librarianResult('I am sorry, I cannot do that.')).toThrow()
+  })
+})

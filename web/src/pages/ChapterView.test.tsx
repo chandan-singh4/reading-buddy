@@ -489,13 +489,14 @@ describe('watching a summary being written', () => {
   })
 
   it('keeps the summary the reader had when the model does not answer', async () => {
-    vi.mocked(approve).mockRejectedValue(new Error('the relay answered 429'))
+    vi.mocked(approve).mockRejectedValue(new Error('the model did not send readable JSON'))
 
     open(`/book/${WATCHED}/chapters?chapter=1`)
     expect(await screen.findByText('The summary you already had.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Redo the chapter summary' }))
 
-    expect(await screen.findByText(/The model did not answer/)).toBeTruthy()
+    // The reason is shown as it came, not flattened to "did not answer".
+    expect(await screen.findByText(/The model did not send readable JSON/)).toBeTruthy()
     // The words the reader had are still the words on the page.
     expect(screen.getByText('The summary you already had.')).toBeTruthy()
   })
@@ -557,13 +558,13 @@ describe('watching a summary being written', () => {
 
   it('leaves the failure behind when the reader moves on', async () => {
     // The line accused models in chapters that had never been asked anything.
-    vi.mocked(approve).mockRejectedValue(new Error('the relay answered 429'))
+    vi.mocked(approve).mockRejectedValue(new Error('the free model is busy'))
 
     open(`/book/${WATCHED}/chapters?chapter=1`)
     fireEvent.click(await screen.findByRole('button', { name: 'Redo the chapter summary' }))
-    expect(await screen.findByText(/The model did not answer/)).toBeTruthy()
+    expect(await screen.findByText(/The free model is busy/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /Second/ }))
-    await waitFor(() => expect(screen.queryByText(/The model did not answer/)).toBeNull())
+    await waitFor(() => expect(screen.queryByText(/The free model is busy/)).toBeNull())
   })
 })

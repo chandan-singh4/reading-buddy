@@ -18,7 +18,7 @@ import { repository } from '../storage/index.ts'
 import type { BookId } from '../structure/index.ts'
 import { backLabel, backTo } from '../summary/backTo.ts'
 import { summaryData } from '../summary/dataSource.ts'
-import { approve, Refusal } from '../summary/engine.ts'
+import { approve } from '../summary/engine.ts'
 import { finishedChapters, readSections, titledSections } from '../summary/queue.ts'
 import { Flourish, Paper, Rail, RichText, type RailItem } from '../summary/Paper.tsx'
 import styles from '../summary/summary.module.css'
@@ -278,9 +278,10 @@ export default function ChapterView() {
       setOpen(await summaryData().getChapter(id, current))
     } catch (error) {
       /* The model did not answer. The page still holds what it held before.
-         When the relay worded the refusal for the reader, that is what they
-         are told: "the free model is busy" says what to do next. */
-      setFailed(error instanceof Refusal ? error.message : '')
+         The reason is shown as it came: "the free model is busy" says what to
+         do next, and so does "the model did not send readable JSON". A blank
+         "did not answer" for both told the reader nothing. */
+      setFailed(error instanceof Error ? error.message : '')
     } finally {
       setAsking(undefined)
       setLive(undefined)
@@ -858,7 +859,16 @@ function RedoIcon() {
 function Failure({ said }: { said: string }) {
   return (
     <p className={styles.failure} role="status">
-      {said || 'The model did not answer.'} Nothing was changed — what you had is still here.
+      {sentence(said) || 'The model did not answer.'} Nothing was changed — what you had is
+      still here.
     </p>
   )
+}
+
+/* A reason written to sit inside another sentence, made to stand as its own. */
+function sentence(said: string): string {
+  const text = said.trim()
+  if (text === '') return ''
+  const stopped = /[.!?]$/.test(text) ? text : `${text}.`
+  return stopped[0].toUpperCase() + stopped.slice(1)
 }
