@@ -162,18 +162,15 @@ describe('DayLog', () => {
     expect(screen.getAllByText('<1 min')).toHaveLength(2)
   })
 
-  it('says so in the summary when the day ran past midnight', () => {
+  it('does not editorialise about a day that ran past midnight', () => {
+    // The commit line already names the day the sitting ended. Saying it a
+    // second time in the summary was one note too many.
     const overran = line({
       startTime: new Date(2026, 7, 28, 23, 41).getTime(),
       endTime: new Date(2026, 7, 29, 0, 25).getTime(),
     })
     render(<DayLog day={day([overran])} />)
-    expect(screen.getByText(/ran past midnight/)).toBeTruthy()
-  })
-
-  it('does not say it for a day that stayed inside itself', () => {
-    render(<DayLog day={day([line()])} />)
-    expect(screen.queryByText(/ran past midnight/)).toBeNull()
+    expect(screen.queryByText(/midnight/)).toBeNull()
   })
 
   it('draws nothing at all for a day with no reading', () => {

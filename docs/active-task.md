@@ -246,3 +246,23 @@ The label is dropped; the days stay.
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 6 — the period's goal and the focus window (2026-08-29)
+
+1. "· ran past midnight" is gone from the day summary. The commit line already
+   names the day the sitting ended.
+2. The Day scope names the weekday: `Today · Saturday, Aug 29`.
+3. New `stats/goal.ts` — the target each scope is measured against. New
+   `stats/PeriodGoalCard.tsx` draws it as one bar inside the period card.
+4. New `stats/circadian.ts` — reading spread over the 24 hours of the day. New
+   `stats/Spectrum.tsx` draws it, with the peak window named.
+
+Both live inside the period card, under the trio, so they move with the toggle.
+See `docs/decisions.md` for the targets and the two rules that keep them honest.
+
+The design came from a reference the reader supplied. Its palette was not
+copied: the screen's own tokens already mean the same things (green is done,
+amber is time), and a second palette would break the key.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.

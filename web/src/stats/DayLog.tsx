@@ -228,14 +228,12 @@ export default function DayLog({ day }: { day: DayActivity | undefined }) {
   if (day === undefined || day.books.length === 0) return null
 
   const sessions = day.books.reduce((sum, book) => sum + book.sessions.length, 0)
-  const overran = day.books.some((book) => book.sessions.some(pastMidnight))
 
   return (
     <div className={styles.log}>
       <div className={styles.logSum}>
         {day.books.length} book{day.books.length === 1 ? '' : 's'} · {sessions} session
         {sessions === 1 ? '' : 's'} · {spell(day.totalMinutes)} total
-        {overran && ' · ran past midnight'}
       </div>
       {day.books.map((book) => (
         <BookLog key={book.bookId} book={book} />

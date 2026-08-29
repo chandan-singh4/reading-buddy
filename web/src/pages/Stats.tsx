@@ -2,8 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 
 import BooksTimeChart from '../stats/BooksTimeChart.tsx'
 import GenreBars from '../stats/GenreBars.tsx'
+import PeriodGoalCard from '../stats/PeriodGoalCard.tsx'
+import Spectrum from '../stats/Spectrum.tsx'
 import Heatmap from '../stats/Heatmap.tsx'
 import RangeCalendar from '../stats/RangeCalendar.tsx'
+import { circadianOf } from '../stats/circadian.ts'
+import { goalFor } from '../stats/goal.ts'
 import { loadStats } from '../stats/load.ts'
 import { dayKey } from '../stats/sessions.ts'
 import {
@@ -80,7 +84,20 @@ const MONTHS_SHORT = [
   'Dec',
 ]
 
+const WEEKDAYS_LONG = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+]
+
 const dayLabel = (d: Date): string => `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`
+
+/** `Saturday, Aug 29`. The day scope names the weekday; no other scope does. */
+const weekdayLabel = (d: Date): string => `${WEEKDAYS_LONG[d.getDay()]}, ${dayLabel(d)}`
 
 const SCOPES: { key: Exclude<Scope, 'custom'>; label: string }[] = [
   { key: 'day', label: 'Day' },
@@ -171,6 +188,27 @@ export default function Stats() {
     () => (sources ? summarisePeriod(sources, period, previousPeriod(period), now) : undefined),
     [sources, period, now],
   )
+
+  /*
+   * The goal and the hours move with the toggle, like the rest of the period
+   * card — but they are their own memos so a scope change does not recompute
+   * the whole summary to redraw one bar.
+   */
+  const goal = useMemo(
+    () => (sources ? goalFor(period, stats?.minutes ?? 0, sources.books) : undefined),
+    [sources, period, stats],
+  )
+
+  const hours = useMemo(() => {
+    if (!sources) return undefined
+    const from = period.start.getTime()
+    const to = new Date(
+      period.through.getFullYear(),
+      period.through.getMonth(),
+      period.through.getDate() + 1,
+    ).getTime()
+    return circadianOf(sources.sessions.filter((s) => s.startedAt >= from && s.startedAt < to))
+  }, [sources, period])
 
   if (state.status === 'loading') {
     return (
@@ -324,6 +362,13 @@ export default function Stats() {
             <div className={styles.trioT}>longest</div>
           </div>
         </div>
+
+        {/* The target this period is measured against. A custom range has none,
+            because the reader invented the window — see `goal.ts`. */}
+        {goal !== undefined && <PeriodGoalCard goal={goal} />}
+
+        {/* When in the day the reading happened. */}
+        {hours !== undefined && <Spectrum data={hours} />}
       </div>
 
       {/* 5 — Veda */}
@@ -448,7 +493,7 @@ function rangeLine(period: Period) {
     case 'day':
       return (
         <>
-          Today · <b>{dayLabel(period.start)}</b>
+          Today · <b>{weekdayLabel(period.start)}</b>
         </>
       )
     case 'week':

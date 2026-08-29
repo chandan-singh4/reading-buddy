@@ -1077,3 +1077,144 @@
   color: var(--ink-soft);
   font-style: italic;
 }
+
+/* --- The period's goal, and the hours it was met in ------------------------ */
+
+/*
+ * Both blocks live inside the period card, under the trio. They answer the two
+ * questions the big number does not: how far through the target this is, and
+ * what time of day it happened.
+ *
+ * No new colours. Green is a thing completed and amber is time in motion, which
+ * is what these two need — a third palette would break the screen's key.
+ */
+
+.goal {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  text-align: left;
+}
+
+.goalTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.goalTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.goalFrac {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.goalBar {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--h0);
+  overflow: hidden;
+}
+
+.goalBar i {
+  display: block;
+  height: 100%;
+  background: var(--amber);
+  border-radius: 99px;
+  transition: width 0.25s ease;
+}
+
+.goalMet .goalBar i {
+  background: var(--accent);
+}
+
+.goalNote {
+  margin-top: 7px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+.spectrum {
+  margin-top: 18px;
+  text-align: left;
+}
+
+.specTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+/* The label's own rule would cut straight through the peak window beside it. */
+.specTop .cardLabel::after {
+  display: none;
+}
+
+.specPeak {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.specBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 48px;
+}
+
+.specCol {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.specCol i {
+  display: block;
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+}
+
+.quiet {
+  background: var(--h0);
+}
+
+.warm {
+  background: var(--amber);
+}
+
+.peak {
+  background: var(--accent);
+}
+
+.specAxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 6px;
+}
+
+.specNote {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 8px 10px;
+}

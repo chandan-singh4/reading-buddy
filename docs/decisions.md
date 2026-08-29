@@ -2176,3 +2176,46 @@ lines. A reflowable book does not: it paginates at the reader's own text size,
 so "+24 pages" would be arbitrary. The diff line therefore reports what the
 reader *did* — marked, asked — and not how far the text moved. See
 `docs/active-task.md` for the sections-advanced idea that would replace it.
+
+## The goal changes with the period
+
+A day and a year do not ask the same question. "Did I read for two hours?" is a
+fact about today that the reader can still act on. "Have I read twelve books?"
+is a fact about a year that one evening does not change. So the target under
+"A closer look" follows the scope:
+
+| Scope | Target | Unit |
+|---|---|---|
+| Day | 2 hours | minutes |
+| Week | 14 hours (seven days of the daily target) | minutes |
+| Month | 1 book | books finished |
+| Year | 12 books | books finished |
+
+Three rules hold it honest:
+
+1. A custom range gets **no goal**. The reader invented the window, so no target
+   was ever agreed for it. Prorating twelve books over a hand-picked stretch
+   would make a number with nothing behind it.
+2. The bar stops at full; the percent does not. A three-hour day reads "123%".
+3. The year's pace is flat, not calendar-based. On 15 February the reader is due
+   half a book. A half-book gap rounds to **on schedule**, never to "1 book
+   behind" — the screen must not scold arithmetic.
+
+The targets are constants in `stats/goal.ts`. They are the one thing here a
+settings page would later own.
+
+## The focus window shows when, not how much
+
+The 24-hour spectrum is the only card that answers "when do I read?". It is the
+part of a habit a person can move.
+
+- A sitting is **spread** across every hour it touched, in proportion. Filing
+  all 63 minutes of an 8:48 pm sitting to the eight o'clock hour would draw a
+  spike at the wrong hour.
+- The **active** minutes are spread, not the wall-clock span. Only the reading
+  is a fact. Spreading it evenly inside the sitting is an assumption, and the
+  honest one: we never recorded which minute the reader looked away.
+- Bars are scaled against the busiest hour, not against the target. A morning
+  reader and a night reader should see the same shape at their own scale.
+- The peak window is stated as a description with a percentage, never as a
+  target. There is no good hour to read.
