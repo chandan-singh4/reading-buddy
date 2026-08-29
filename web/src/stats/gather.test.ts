@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   chartOf,
-  logByDay,
+  activityByDay,
   summariseAll,
   heatmapOf,
   levelOf,
@@ -18,7 +18,7 @@ import {
   type StatsSources,
 } from './gather.ts'
 import { customPeriod, periodOf, previousPeriod } from './period.ts'
-import type { StoredSession, StoredTutorThread } from '../storage/db.ts'
+import type { StoredNote, StoredSession, StoredTutorThread } from '../storage/db.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 
 const FRIDAY = new Date(2026, 7, 28, 14, 30)
@@ -38,7 +38,14 @@ function session(day: Date, minutes: number, hour = 10): StoredSession {
   }
 }
 
-const empty: StatsSources = { books: [], sessions: [], threads: [], summaries: [], concepts: [] }
+const empty: StatsSources = {
+  books: [],
+  sessions: [],
+  threads: [],
+  summaries: [],
+  notes: [],
+  concepts: [],
+}
 
 describe('levelOf', () => {
   it('draws the reference’s five bands on their exact boundaries', () => {
@@ -123,32 +130,67 @@ describe('heatmapOf', () => {
   })
 })
 
-describe('logByDay — the heatmap tip’s ledger', () => {
+describe('activityByDay — the day’s commit log', () => {
   const day = new Date(2026, 7, 28)
   const morning = { ...session(day, 20, 9), chapterTitle: 'Of Anger', sectionTitle: 'ii' }
   const evening = { ...session(day, 43, 20), bookId: 'b2' as BookId }
+  const glance = { ...session(day, 1, 22), activeMs: 12_000 }
   const books = [
-    { id: 'b1' as BookId, title: 'On the Shortness of Life' } as BookMeta,
+    { id: 'b1' as BookId, title: 'On the Shortness of Life', author: 'Seneca' } as BookMeta,
     { id: 'b2' as BookId, title: 'Letters' } as BookMeta,
   ]
+  const note = (at: Date, colour?: string): StoredNote =>
+    ({
+      bookId: 'b1' as BookId,
+      id: `${at.getTime()}`,
+      createdAt: at.toISOString(),
+      ...(colour ? { colour } : {}),
+    }) as StoredNote
 
-  it('tells each sitting in full, in the order they happened', () => {
-    const lines = logByDay([evening, morning], books).get('2026-08-28')
-    expect(lines?.map((l) => [l.book, l.minutes])).toEqual([
-      ['On the Shortness of Life', 20],
+  it('groups a day by book, longest first, and names the author', () => {
+    const activity = activityByDay([morning, evening], books, []).get('2026-08-28')
+    expect(activity?.totalMinutes).toBe(63)
+    expect(activity?.books.map((b) => [b.bookTitle, b.totalMinutes])).toEqual([
       ['Letters', 43],
+      ['On the Shortness of Life', 20],
     ])
-    expect(lines?.[0].chapterTitle).toBe('Of Anger')
-    expect(lines?.[0].sectionTitle).toBe('ii')
+    expect(activity?.books[1].author).toBe('Seneca')
   })
 
-  it('leaves the place empty for a session recorded before it was tracked', () => {
-    expect(logByDay([evening], books).get('2026-08-28')?.[0].chapterTitle).toBeUndefined()
+  it('marks a sub-minute session for squashing and leaves the rest alone', () => {
+    const activity = activityByDay([morning, glance], books, []).get('2026-08-28')
+    expect(activity?.books[0].sessions.map((s) => s.micro)).toEqual([false, true])
+  })
+
+  it('adds a squashed session to the totals even though it is not shown', () => {
+    // Squashing is a way of drawing the day, not a way of discounting it.
+    const activity = activityByDay([morning, glance], books, []).get('2026-08-28')
+    expect(activity?.totalMinutes).toBe(20)
+    expect(activity?.books[0].sessions).toHaveLength(2)
+  })
+
+  it('counts the marks made while a session was running, and no others', () => {
+    const marks = [
+      note(new Date(2026, 7, 28, 9, 10), '#f2df6b'),
+      note(new Date(2026, 7, 28, 9, 15), '#f2df6b'),
+      note(new Date(2026, 7, 28, 9, 20)),
+      // After the session ended — a note written up later belongs to no sitting.
+      note(new Date(2026, 7, 28, 12, 0), '#f2df6b'),
+    ]
+    const line = activityByDay([morning], books, marks).get('2026-08-28')?.books[0].sessions[0]
+    expect(line?.highlightCount).toBe(2)
+    expect(line?.noteCount).toBe(1)
+  })
+
+  it('keeps the sessions in the order they happened', () => {
+    const later = { ...session(day, 15, 21) }
+    const order = activityByDay([later, morning], books, []).get('2026-08-28')?.books[0].sessions
+    expect(order?.map((s) => new Date(s.startTime).getHours())).toEqual([9, 21])
   })
 
   it('says nothing rather than guessing when the book has been deleted', () => {
     // Sessions deliberately outlive their book. The title cannot.
-    expect(logByDay([morning], []).get('2026-08-28')?.[0].book).toBeUndefined()
+    expect(activityByDay([morning], [], []).get('2026-08-28')?.books[0].bookTitle).toBeUndefined()
   })
 })
 

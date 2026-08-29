@@ -18,10 +18,11 @@ import { countGenres, splitFiction, type GenreCount } from './genres.ts'
 import type {
   StoredChapterSummary,
   StoredConcept,
+  StoredNote,
   StoredSession,
   StoredTutorThread,
 } from '../storage/db.ts'
-import type { BookMeta } from '../structure/index.ts'
+import type { BookId, BookMeta } from '../structure/index.ts'
 
 /** Everything the screen reads, handed in together. */
 export interface StatsSources {
@@ -29,6 +30,8 @@ export interface StatsSources {
   sessions: readonly StoredSession[]
   threads: readonly StoredTutorThread[]
   summaries: readonly StoredChapterSummary[]
+  /** Notes and highlights together — a highlight is a note with a colour. */
+  notes: readonly StoredNote[]
   concepts: readonly StoredConcept[]
 }
 
@@ -123,60 +126,151 @@ export function heatmapOf(byDay: ReadonlyMap<string, number>, today: Date): Heat
 }
 
 /**
- * One session, told in full, for the heatmap tip.
+ * One session, told in full, for the day's activity feed.
  *
  * The reason it exists: a day of "63 min" is a number the reader cannot check.
- * Two books and four sittings behind it is a record they can recognise — which
- * one, when, for how long, and how far they got.
+ * The sittings behind it are a record they can recognise — which book, when,
+ * for how long, how far they got, and what they marked while they were there.
  */
-export interface SessionLine {
+export interface ReadingSession {
   id: string
+  bookId: BookId
   /** Epoch milliseconds. */
-  startedAt: number
-  endedAt: number
-  minutes: number
-  /** The book's title, or `undefined` once the book has left the library. */
-  book: string | undefined
+  startTime: number
+  endTime: number
+  durationMinutes: number
   chapterTitle: string | undefined
   sectionTitle: string | undefined
+  highlightCount: number
+  noteCount: number
+  /**
+   * Under a minute. Squashed in the feed rather than shown, because a reader
+   * who opens a book to check one word makes a row that is true and says
+   * nothing — and enough of them bury the reading.
+   */
+  micro: boolean
 }
 
-/** Every session grouped by the local day it started, newest day first is not needed — the tip looks one day up. */
-export function logByDay(
+/** A day's sessions in one book, in the order they happened. */
+export interface BookActivity {
+  bookId: BookId
+  bookTitle: string | undefined
+  author: string | undefined
+  totalMinutes: number
+  sessions: ReadingSession[]
+}
+
+export interface DayActivity {
+  /** `YYYY-MM-DD`. */
+  date: string
+  totalMinutes: number
+  books: BookActivity[]
+}
+
+/** Under this, a session is a lookup rather than a sitting. */
+export const MICRO_MS = 60_000
+
+/**
+ * Every day's reading, grouped by book — what a tapped heatmap square opens.
+ *
+ * Grouped rather than listed flat because a day is usually one or two books,
+ * and the book is the thing the reader recognises first. A flat list repeats
+ * the title on every row and still makes "how long on this one?" a sum the
+ * reader has to do in their head.
+ */
+export function activityByDay(
   sessions: readonly StoredSession[],
   books: readonly BookMeta[],
-): Map<string, SessionLine[]> {
-  const titles = new Map(books.map((book) => [book.id, book.title]))
-  const out = new Map<string, SessionLine[]>()
+  notes: readonly StoredNote[],
+): Map<string, DayActivity> {
+  const meta = new Map(books.map((book) => [book.id, book]))
 
-  for (const session of sessions) {
-    const line: SessionLine = {
-      id: session.id,
-      startedAt: session.startedAt,
-      endedAt: session.endedAt,
-      // Rounded per session here, unlike the day total: this line has to add up
-      // to what the reader remembers sitting through, not to the day's figure.
-      // A day of six one-minute visits therefore shows six lines of 1 min and a
-      // total of 5, and that is the honest report of both facts.
-      minutes: Math.round(session.activeMs / 60_000),
-      book: titles.get(session.bookId),
-      chapterTitle: session.chapterTitle,
-      sectionTitle: session.sectionTitle,
+  // Marks are counted by when they were made, against the session that was
+  // running at the time. A highlight carries a colour and a note does not —
+  // that is the app's own way of telling them apart (see `StoredNote.colour`).
+  const marks: { bookId: BookId; at: number; highlight: boolean }[] = []
+  for (const note of notes) {
+    const at = Date.parse(note.createdAt)
+    if (Number.isFinite(at)) {
+      marks.push({ bookId: note.bookId, at, highlight: note.colour !== undefined })
     }
-    const day = out.get(session.day)
-    if (day) day.push(line)
-    else out.set(session.day, [line])
   }
 
-  for (const lines of out.values()) lines.sort((a, b) => a.startedAt - b.startedAt)
-  return out
+  const days = new Map<string, DayActivity>()
+
+  for (const session of sessions) {
+    const made = marks.filter(
+      (mark) =>
+        mark.bookId === session.bookId &&
+        mark.at >= session.startedAt &&
+        mark.at <= session.endedAt,
+    )
+
+    const line: ReadingSession = {
+      id: session.id,
+      bookId: session.bookId,
+      startTime: session.startedAt,
+      endTime: session.endedAt,
+      // Rounded per session here, unlike the day total: this row has to match
+      // what the reader remembers sitting through, not add up to the day's
+      // figure. A day of six one-minute visits shows six rows of 1 min and a
+      // total of 5, and that is the honest report of both facts.
+      durationMinutes: Math.round(session.activeMs / 60_000),
+      chapterTitle: session.chapterTitle,
+      sectionTitle: session.sectionTitle,
+      highlightCount: made.filter((mark) => mark.highlight).length,
+      noteCount: made.filter((mark) => !mark.highlight).length,
+      micro: session.activeMs < MICRO_MS,
+    }
+
+    let day = days.get(session.day)
+    if (day === undefined) {
+      day = { date: session.day, totalMinutes: 0, books: [] }
+      days.set(session.day, day)
+    }
+
+    let book = day.books.find((entry) => entry.bookId === session.bookId)
+    if (book === undefined) {
+      const found = meta.get(session.bookId)
+      book = {
+        bookId: session.bookId,
+        // A deleted book leaves its sessions behind on purpose — the reading
+        // happened. So there may be no title to give.
+        bookTitle: found?.title,
+        author: found?.author,
+        totalMinutes: 0,
+        sessions: [],
+      }
+      day.books.push(book)
+    }
+    book.sessions.push(line)
+  }
+
+  // Totals are summed from milliseconds and rounded once, so a day of short
+  // visits is not rounded away one row at a time.
+  const msOf = (id: string): number => sessions.find((s) => s.id === id)?.activeMs ?? 0
+  for (const day of days.values()) {
+    let dayMs = 0
+    for (const book of day.books) {
+      book.sessions.sort((a, b) => a.startTime - b.startTime)
+      const bookMs = book.sessions.reduce((sum, line) => sum + msOf(line.id), 0)
+      book.totalMinutes = Math.round(bookMs / 60_000)
+      dayMs += bookMs
+    }
+    // The book read most that day leads. On a day with one book this is a
+    // no-op, which is most days.
+    day.books.sort((a, b) => b.totalMinutes - a.totalMinutes)
+    day.totalMinutes = Math.round(dayMs / 60_000)
+  }
+
+  return days
 }
 
 export interface AllTimeStats {
   streak: Streak
   heatmap: HeatDay[]
-  /** Every session, by day — what a tapped heatmap square opens. */
-  log: Map<string, SessionLine[]>
+  /** Every day's reading, grouped by book — what a tapped square opens. */
+  log: Map<string, DayActivity>
   /** The books with a recorded session — what the genre bars count. */
   readBooks: BookMeta[]
   /** `YYYY-MM-DD`, or `undefined` before anything was ever recorded. */
@@ -207,7 +301,7 @@ export function summariseAll(sources: StatsSources, today: Date): AllTimeStats {
   return {
     streak: streakOf(byDay, today),
     heatmap: heatmapOf(byDay, today),
-    log: logByDay(sources.sessions, sources.books),
+    log: activityByDay(sources.sessions, sources.books, sources.notes),
     readBooks,
     trackingStart: [...byDay.keys()].sort()[0],
     genres: counts,

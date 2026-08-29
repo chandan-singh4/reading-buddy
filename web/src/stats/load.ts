@@ -13,6 +13,7 @@
  */
 
 import { repository } from '../storage/index.ts'
+import { noteStore } from '../storage/notes.ts'
 import { tutorStore } from '../storage/tutor.ts'
 import { conceptStore, summaryStore } from '../storage/summaries.ts'
 import { repairFirstEvening } from './repair.ts'
@@ -24,13 +25,14 @@ export async function loadStats(): Promise<StatsSources> {
   // this line both come out once the reader has seen the screen.
   await repairFirstEvening()
 
-  const [books, sessions, threads, summaries, concepts] = await Promise.all([
+  const [books, sessions, threads, summaries, notes, concepts] = await Promise.all([
     repository.listBooks(),
     sessionStore.all(),
     tutorStore.allThreads(),
     summaryStore.all(),
+    noteStore.allNotes(),
     conceptStore.rows(),
   ])
 
-  return { books, sessions, threads, summaries, concepts }
+  return { books, sessions, threads, summaries, notes, concepts }
 }

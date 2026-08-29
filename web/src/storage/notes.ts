@@ -70,6 +70,17 @@ export function createNoteStore(database: ReadingBuddyDB = defaultDb) {
     },
 
     /**
+     * Every note and highlight in every book, unordered.
+     *
+     * For the Statistics screen, which counts the marks a reader made during a
+     * session and so cannot ask book by book — it does not know which books
+     * until it has read the sessions.
+     */
+    async allNotes(): Promise<StoredNote[]> {
+      return database.notes.toArray()
+    },
+
+    /**
      * Change a highlight's colour, keeping the note it is part of.
      *
      * A recolour is not a new highlight. Deleting and adding would give the

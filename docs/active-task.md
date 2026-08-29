@@ -172,3 +172,44 @@ app's name is in the bar directly above it.
 edit of the evening of 2026-08-28: it drops that day's sub-minute rows and
 copies the chapter and section titles onto the hour that had none. The reader
 confirmed both facts. It runs once, behind a flag in `localStorage`.
+
+## Fourth pass — the day as a commit log (2026-08-28, later)
+
+The reader's own analogy, and the right one. A day's total is a diffstat: true,
+and impossible to check. A git log is readable because it groups by repository,
+hangs each change off one line, and squashes the noise. A day of reading has
+those same three problems.
+
+`stats/DayLog.tsx` draws it:
+
+- **Grouped by book.** A book is a repository: cover mark, title, author, and
+  the time in that book that day. The book read most that day leads.
+- **A branch line of commits.** Start time, then the chapter and section in
+  bold, then a quieter line of duration, highlights and notes. A count of zero
+  is left out, never printed as "0".
+- **Filled node for a sitting, hollow for a lookup** (under two minutes). Drawn
+  rather than labelled, because it is a hint and not a claim.
+- **Micro-sessions squashed.** Anything under a minute folds into one row that
+  says how many, and opens when tapped. Nothing is discarded, and the squashed
+  rows still count towards every total.
+
+**Highlights and notes are real, counted, and new.** A note carries a
+`createdAt` and a highlight is a note with a colour, so the marks made inside a
+session's window are countable without storing anything new. `noteStore` gained
+`allNotes()`, and `StatsSources` gained `notes`.
+
+**Two kinds of repetition are trimmed** from a heading, both the book's habit
+rather than ours: a chapter that repeats the book's title, and an EPUB heading
+with the author glued to the end ("Part 1: Approaching the Unconscious Carl G.
+Jung").
+
+### Not built: pages
+
+The spec asked for `+24 pages (pp. 25–49)`. **Pages are not a fact this app can
+state.** The reader is reflowable and paginates into columns at the reader's own
+text size, so the same reading gives different page numbers on a different day
+or a different phone. A page range would look precise and be arbitrary.
+
+The honest version of that number is sections advanced, which is stable across
+text sizes. It needs the session to record where it *started* as well as where
+it ended, and there is no back-data for it. Not started — ask the reader first.
