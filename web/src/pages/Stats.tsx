@@ -393,7 +393,8 @@ function Header() {
     // banner landmark, and a second one is a screen reader announcing two
     // headers for one screen.
     <div className={styles.header}>
-      <div className={styles.kicker}>Reading Buddy</div>
+      {/* No kicker. The app's name is already in the bar directly above this,
+          and printing it twice makes the reader read it twice. */}
       <h1 className={styles.h1}>Statistics</h1>
     </div>
   )

@@ -15,10 +15,15 @@
 import { repository } from '../storage/index.ts'
 import { tutorStore } from '../storage/tutor.ts'
 import { conceptStore, summaryStore } from '../storage/summaries.ts'
+import { repairFirstEvening } from './repair.ts'
 import { sessionStore } from './sessions.ts'
 import type { StatsSources } from './gather.ts'
 
 export async function loadStats(): Promise<StatsSources> {
+  // A one-off, and temporary. See the header of `repair.ts` — that file and
+  // this line both come out once the reader has seen the screen.
+  await repairFirstEvening()
+
   const [books, sessions, threads, summaries, concepts] = await Promise.all([
     repository.listBooks(),
     sessionStore.all(),

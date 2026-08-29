@@ -77,20 +77,11 @@
   margin: 6px 0 18px;
 }
 
-.kicker {
-  font-size: 12px;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  font-weight: 500;
-}
-
 .h1 {
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 600;
   font-size: 34px;
   line-height: 1.05;
-  margin-top: 4px;
   color: var(--ink);
 }
 

@@ -8,6 +8,7 @@ import { AuthGate } from './auth/AuthGate.tsx'
 import { RouteTransition, useViewLocation } from './app/routeTransition.tsx'
 import { UpdatePrompt } from './app/UpdatePrompt.tsx'
 import { startSummaries } from './summary/engine.ts'
+import { useReadingClock } from './stats/useReadingClock.ts'
 import BookInfo from './pages/BookInfo.tsx'
 import ChapterView from './pages/ChapterView.tsx'
 import Home from './pages/Home.tsx'
@@ -28,6 +29,18 @@ export function AppRoutes() {
   // while the outgoing screen is photographed. Identical to `useLocation()` at
   // every other moment — see `routeTransition.tsx`.
   const location = useViewLocation()
+
+  /*
+   * The reading clock lives here, above the route table, and not in the reading
+   * screen. A book has four screens on four sibling routes, so the screen
+   * unmounts every time the reader opens the book details — and a session that
+   * ends there is a report of the router. See `stats/useReadingClock.ts`.
+   *
+   * Deliberately the browser's location, not `useViewLocation`: a session
+   * should start when the reader arrives, not when the page-turn animation has
+   * finished photographing the screen they left.
+   */
+  useReadingClock()
 
   return (
     <Routes location={location}>

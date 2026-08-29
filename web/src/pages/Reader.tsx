@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
-import { startSession, type Place } from '../stats/timer.ts'
+import { reportPlace } from '../stats/place.ts'
 
 import {
   Block,
@@ -444,15 +444,6 @@ export default function Reader() {
   const [here, setHere] = useState<SectionRef>(firstSection())
   const [page, setPage] = useState<PageState>({ status: 'loading' })
 
-  /*
-   * Where the reader is, for the session row (`stats/timer.ts`).
-   *
-   * A ref rather than state, and read through a function rather than passed as
-   * a value. The session must survive every page turn, so the turn cannot be a
-   * dependency of the effect that starts it. Kept up to date far below, where
-   * the chapter and section titles are actually known.
-   */
-  const place = useRef<Place>({})
   const [neighbours, setNeighbours] = useState<{
     previous?: SectionRef
     next?: SectionRef
@@ -500,24 +491,16 @@ export default function Reader() {
    * the wrong thing being painted — and that frame is the whole bug.
    */
   /*
-   * The reading clock (`stats/timer.ts`).
+   * The reading clock is not started here.
    *
-   * One session per visit to a book: it starts when this screen mounts with a
-   * book id and stops when the screen goes away. The cleanup is what stops it,
-   * so a back-swipe, a route change and an unmount all end the session by the
-   * same path — and following one book with another ends the first and starts
-   * the second, because `id` is the dependency.
+   * It used to be, and that was the bug: a book has four screens on four
+   * sibling routes, so this component unmounts whenever the reader opens the
+   * book details, and the session ended with it. The clock now runs from `App`,
+   * keyed on the book in the address. See `stats/useReadingClock.ts`.
    *
-   * There is no idle detector, on the reader's instruction. Half an hour spent
-   * arguing with Veda about one paragraph is reading, and a pause rule would
-   * have thrown it away for looking like an idle phone. The one guard is a cap
-   * on a single session — see `stats/clock.ts`.
+   * What this screen still owns is the *place* — it is the only one that knows
+   * which chapter is open. It reports it below, where the titles are known.
    */
-  useEffect(() => {
-    if (id === undefined) return
-    const session = startSession(id, { place: () => place.current })
-    return () => session.stop()
-  }, [id])
 
   const [describing, setDescribing] = useState(id)
   if (describing !== id) {
@@ -3949,17 +3932,22 @@ export default function Reader() {
   /*
    * Hand the reading clock the place, every time it changes.
    *
-   * An effect, not a render-time assignment: the ref is read asynchronously by
-   * a timer, and writing it during a render that React may throw away would
-   * file the session under a page the reader never actually saw.
+   * An effect, not a render-time report: the clock reads this asynchronously,
+   * and reporting during a render that React may throw away would file the
+   * session under a page the reader never actually saw.
+   *
+   * Nothing is cleared on unmount. Opening the book details is not leaving the
+   * book, and the last page read is still the true answer while the reader is
+   * over there. The book id guards against it outliving its book.
    */
   const sectionTitle = page.status === 'ready' ? page.section.title : undefined
   useEffect(() => {
-    place.current = {
+    if (id === undefined) return
+    reportPlace(id, {
       ...(title ? { chapterTitle: title } : {}),
       ...(sectionTitle ? { sectionTitle } : {}),
-    }
-  }, [title, sectionTitle])
+    })
+  }, [id, title, sectionTitle])
 
   /** The same, for a chapter that is not the one on screen. */
   const titleOfChapter = (chapter: number) =>

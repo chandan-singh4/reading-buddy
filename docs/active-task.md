@@ -140,3 +140,35 @@ one older session with no place recorded, and one unopened book that the genre
 bars correctly ignore. The seeded rows were deleted afterwards.
 
 **Still not seen on a phone.**
+
+## Third pass — one visit, one session (2026-08-28, later)
+
+The reader opened a book, looked at the book details, came back, and closed it.
+The screen recorded three sessions. Two of them were seconds long.
+
+**The cause.** `book/:bookId`, `book/:bookId/info`, `book/:bookId/last-time`
+and `book/:bookId/chapters` are four *sibling* routes, not a parent and its
+children. The reading screen therefore unmounts whenever the reader opens the
+book details, and the clock lived inside it.
+
+**The rule, in the reader's words.** Once I am in the book, whatever I do in the
+book is one session. Closing the book ends it.
+
+**The fix.** The clock moved up to `App`, which never unmounts, and is keyed on
+the book id in the address (`stats/useReadingClock.ts`). Moving between the four
+screens does not change that id, so nothing starts or stops. The reading screen
+keeps only the *place*, which it reports through `stats/place.ts` — a module
+variable, because the screen unmounts while the session continues.
+
+No grace timer. The address changes in one step and never passes through a
+moment of being nowhere.
+
+**Also:** the "READING BUDDY" kicker above the Statistics heading is gone. The
+app's name is in the bar directly above it.
+
+### Delete next session
+
+`web/src/stats/repair.ts` and its one call in `stats/load.ts`. It is a one-off
+edit of the evening of 2026-08-28: it drops that day's sub-minute rows and
+copies the chapter and section titles onto the hour that had none. The reader
+confirmed both facts. It runs once, behind a flag in `localStorage`.
