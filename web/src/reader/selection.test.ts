@@ -10,6 +10,7 @@ import {
   selectionBetween,
   spanBetween,
   rangeAtOffset,
+  highlightAt,
   rangeOfQuote,
   wordAtIn,
   type ReaderSelection,
@@ -255,5 +256,49 @@ describe('a quote that covers more than one paragraph', () => {
       expect(rangeAtOffset(range, 99)).toBeNull()
       expect(rangeAtOffset(range, -1)).toBeNull()
     })
+  })
+})
+
+describe('the highlight under a finger', () => {
+  const HIGHLIGHT = { anchor: '[ch01-s01-p001]' as Anchor, quote: 'The cat laughed' }
+
+  /** One line of ink at the top of a tall, otherwise empty column. */
+  function inkAt(box: DOMRect): void {
+    Range.prototype.getClientRects = () => [box] as unknown as DOMRectList
+  }
+
+  afterEach(() => {
+    Range.prototype.getClientRects = () => [] as unknown as DOMRectList
+  })
+
+  it('answers when the finger is on the ink', () => {
+    page()
+    inkAt(new DOMRect(20, 100, 300, 24))
+    expect(highlightAt(150, 110, [HIGHLIGHT])?.highlight).toBe(HIGHLIGHT)
+  })
+
+  it('leaves the empty half of a page alone', () => {
+    /*
+     * The bug the reader hit. Four marked lines at the top of a section's last
+     * page, and eight hundred pixels of nothing under them. The old hit test
+     * asked for the caret position, which never answers "nowhere" — it snapped
+     * to the nearest text, so every tap on the emptiness opened the highlight
+     * and the toolbar could not be raised at all.
+     */
+    page()
+    inkAt(new DOMRect(20, 100, 300, 24))
+    expect(highlightAt(150, 800, [HIGHLIGHT])).toBeNull()
+  })
+
+  it('allows a finger’s width around the line', () => {
+    page()
+    inkAt(new DOMRect(20, 100, 300, 24))
+    expect(highlightAt(150, 97, [HIGHLIGHT])?.highlight).toBe(HIGHLIGHT)
+  })
+
+  it('has nothing to say for a note with no words', () => {
+    page()
+    inkAt(new DOMRect(20, 100, 300, 24))
+    expect(highlightAt(150, 110, [{ anchor: HIGHLIGHT.anchor }])).toBeNull()
   })
 })

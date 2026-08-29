@@ -2382,3 +2382,38 @@ to reach this morning's highlight.
 
 The kept words were already newest first. The four note chips now agree with
 them.
+
+## A tap on blank paper is a tap on the page
+
+A highlight is ink, not an element: it is painted, and there is nothing under
+the finger to receive a tap. So the hit test used to ask for the caret position
+under the point and then ask each highlight whether that offset was inside it.
+
+`caretPositionFromPoint` never answers "nowhere". It snaps to the nearest text.
+On the last page of a section — four marked lines at the top and the rest of the
+column empty — every tap on that emptiness snapped into the highlight. The
+reader could not raise the toolbar at all. The page had become one large button
+nobody asked for.
+
+**A range's own client rects are the ink**, one box per line. The test is now
+whether the point is inside one of them, with six pixels of slop for the width
+of a finger. Blank space is blank again. It also fixed a thing nobody had
+noticed: a highlight in an off-screen column can no longer be hit, because its
+boxes are off screen.
+
+## A mark's page is measured, not estimated
+
+The notes and bookmarks lists numbered every mark with the page its *section*
+opens on. The exact page needs the words inside the section counted up to that
+paragraph, and that needs the section's text — judged too expensive to draw a
+list with.
+
+It was too expensive when a section was a whole chapter. Since `PARSER_VERSION`
+34 a section is a named part of one, and the sections a reader has marked are a
+handful of small rows in the same local table the reading screen reads all day.
+The error, meanwhile, had grown into the thing the reader saw: every mark in one
+section reported one number. A highlight on page 92 said 72.
+
+The sections holding marks are now read once, in the background, and each marked
+paragraph gets its own number. Nothing waits for it: until it arrives, and for
+any section that fails to load, the section-opening estimate stands.

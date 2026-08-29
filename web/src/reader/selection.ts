@@ -616,13 +616,51 @@ function rangeIn(element: Element | null, quote: string): Range | null {
 }
 
 /**
+ * How far outside a line of marked text still counts as a tap on it.
+ *
+ * A finger is wider than a caret, and a line box is barely taller than the
+ * letters in it. Without a little room, a tap that lands in the leading between
+ * two marked lines hits nothing.
+ */
+const TOUCH_SLOP = 6
+
+/** Is the point inside one of the line boxes this range actually occupies? */
+function coversPoint(range: Range, x: number, y: number): boolean {
+  for (const rect of range.getClientRects()) {
+    if (rect.width <= 0 || rect.height <= 0) continue
+    if (
+      x >= rect.left - TOUCH_SLOP &&
+      x <= rect.right + TOUCH_SLOP &&
+      y >= rect.top - TOUCH_SLOP &&
+      y <= rect.bottom + TOUCH_SLOP
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
  * The highlight under a point on screen, if a finger landed on one.
  *
  * A highlight painted by the browser's own highlight API is ink, not an
  * element: there is nothing under the finger to receive a click, and
- * `elementFromPoint` will only ever name the paragraph. So the hit test is done
- * the other way round — find the text position under the point, then ask each
- * highlight's range whether that position is inside it.
+ * `elementFromPoint` will only ever name the paragraph. So the hit test asks
+ * each highlight's range where it is drawn, and whether the point is on it.
+ *
+ * ## Why the line boxes and not the caret
+ *
+ * It used to take the caret position under the finger and ask whether that
+ * offset fell inside the highlight. That is the wrong question, because
+ * `caretPositionFromPoint` never answers "nowhere" — it snaps to the nearest
+ * text. On the last page of a section, where four marked lines sit at the top
+ * and the rest of the column is empty, every tap on that emptiness snapped into
+ * the highlight. The reader could not raise the toolbar at all: the page had
+ * become one large button they had not asked for.
+ *
+ * A range's own client rects are the ink itself, one box per line. Asking
+ * whether the point is inside one of them is the same question the eye asks.
+ * Blank space is then blank, and a tap there reaches the page underneath.
  *
  * The last match wins, so the newest highlight is the one a reader gets when
  * two overlap.
@@ -632,17 +670,14 @@ export function highlightAt<T extends { anchor: Anchor; quote?: string }>(
   y: number,
   highlights: readonly T[],
 ): { highlight: T; range: Range } | null {
-  const caret = caretAt(x, y)
-  if (!caret) return null
-
   let found: { highlight: T; range: Range } | null = null
   for (const highlight of highlights) {
     if (!highlight.quote) continue
     const range = rangeOfQuote(highlight.anchor, highlight.quote)
     if (!range) continue
-    // `isPointInRange` throws if the node is in another document.
+    // `getClientRects` throws if the range's node has left the document.
     try {
-      if (range.isPointInRange(caret.node, caret.offset)) found = { highlight, range }
+      if (coversPoint(range, x, y)) found = { highlight, range }
     } catch {
       continue
     }

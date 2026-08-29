@@ -130,7 +130,7 @@ import {
   type StoredNote,
   type StoredTutorThread,
 } from '../storage/index.ts'
-import { tryParseAnchor } from '../structure/index.ts'
+import { sectionPath, tryParseAnchor } from '../structure/index.ts'
 import type {
   Anchor,
   BookId,
@@ -143,6 +143,9 @@ import type {
 } from '../structure/index.ts'
 import { Opening } from './Opening.tsx'
 import styles from './Reader.module.css'
+
+/** No section read yet, so every mark falls back to its section's opening page. */
+const EMPTY_PAGES: ReadonlyMap<string, number> = new Map()
 
 /** The book and its manifest — loaded once, then never again while reading. */
 type FrameState =
@@ -1164,28 +1167,6 @@ export default function Reader() {
     () =>
       frame.status === 'ready' ? contentsOutline(frame.manifest, chapterIndexes, spine) : [],
     [frame, chapterIndexes, spine],
-  )
-
-  /**
-   * The page a bookmark or a note sits on — the number on a bookmark's flag.
-   *
-   * **Section-granular, and knowingly so.** The exact page needs the words
-   * *inside* the section counted up to that paragraph, and that needs the
-   * section's text loaded. A reader with marks in nine chapters would have the
-   * app fetch nine chapters to draw one list. So this answers with the page the
-   * mark's section opens on: right in a book whose chapters are one section
-   * each, and a page or two early in a long one. The mark itself is unaffected
-   * — it is an anchor, and tapping it lands on the exact paragraph.
-   *
-   * `null` for a book with no word counts, and for an anchor that cannot be
-   * parsed. The panels then simply show no number.
-   */
-  const pageOfAnchor = useCallback(
-    (parts: { chapter: number; section: number } | null | undefined): number | null => {
-      if (!spine || !parts) return null
-      return pagesOf(spine, { chapter: parts.chapter, section: parts.section }).page
-    },
-    [spine],
   )
 
   /**
@@ -2385,6 +2366,55 @@ export default function Reader() {
    * 0 and the book's title as its heading — it is still the reader's mark, and
    * `inBookOrder` has already put it at the end where it can't interleave.
    */
+  /**
+   * The exact page of each marked paragraph, once its section has been read.
+   *
+   * This used to be section-granular on purpose: the precise page needs the
+   * words *inside* a section counted up to the paragraph, and that needs the
+   * section's text. The cost was judged too high to draw a list with.
+   *
+   * It was too high when a section was a chapter. Since `PARSER_VERSION` 34 a
+   * section is a named part of a chapter — nine in Part 1 of *Man and His
+   * Symbols* where there were six — and the sections a reader has actually
+   * marked are a handful of small rows in the same local table the reading
+   * screen reads from all day. Meanwhile the error grew into the thing the
+   * reader saw: every mark in one section reported the same number, which is
+   * the section's opening page and not theirs. A highlight on page 92 said 72.
+   *
+   * So the sections holding marks are read once, in the background, and each
+   * marked paragraph gets its own number. Nothing waits for it: until it
+   * arrives, and for any section that fails to load, the old section-opening
+   * estimate stands.
+   *
+   * The state lives here, beside the reader of it. The read that fills it needs
+   * the tutor threads, so it sits with those further down.
+   */
+  const [markPages, setMarkPages] = useState<ReadonlyMap<string, number>>(EMPTY_PAGES)
+
+  /**
+   * The page a bookmark or a note sits on — the number on a bookmark's flag.
+   *
+   * The measured page when its section has been read, and the page the mark's
+   * section opens on until then. The estimate is never wrong by more than the
+   * section is long, and the mark itself is unaffected either way — it is an
+   * anchor, and tapping it lands on the exact paragraph.
+   *
+   * `null` for a book with no word counts, and for an anchor that cannot be
+   * parsed. The panels then simply show no number.
+   */
+  const pageOfAnchor = useCallback(
+    (
+      parts: { chapter: number; section: number } | null | undefined,
+      anchor?: Anchor,
+    ): number | null => {
+      if (!spine || !parts) return null
+      const exact = anchor === undefined ? undefined : markPages.get(anchor)
+      if (exact !== undefined) return exact
+      return pagesOf(spine, { chapter: parts.chapter, section: parts.section }).page
+    },
+    [spine, markPages],
+  )
+
   const bookmarkRows: BookmarkRow[] = useMemo(() => {
     if (frame.status !== 'ready') return []
     return inBookOrder(bookmarks).map((row) => {
@@ -2396,7 +2426,7 @@ export default function Reader() {
         label: row.label,
         chapter,
         chapterTitle: chapterTitle(frame.manifest, chapter) ?? 'Elsewhere',
-        page: pageOfAnchor(parts),
+        page: pageOfAnchor(parts, row.anchor),
         savedAt: row.addedAt,
       }
     })
@@ -2437,6 +2467,64 @@ export default function Reader() {
    * and reopening a mark hands its thread back to the lamp.
    */
   const [threads, setThreads] = useState<StoredTutorThread[]>([])
+
+  /* Every paragraph the reader has marked, and the read that prices them in
+     pages. See `markPages` above for why this is worth a handful of reads. */
+  const markAnchors = useMemo(() => {
+    const seen = new Set<string>()
+    for (const note of notes) seen.add(note.anchor)
+    for (const thread of threads) seen.add(thread.anchor)
+    for (const mark of bookmarks) seen.add(mark.anchor)
+    // Sorted so the key is the *set* of anchors: re-ordering the notes list
+    // must not re-run the read.
+    return [...seen].sort()
+  }, [notes, threads, bookmarks])
+
+  useEffect(() => {
+    if (!id || !spine || markAnchors.length === 0) {
+      setMarkPages(EMPTY_PAGES)
+      return
+    }
+
+    let live = true
+
+    void (async () => {
+      // Grouped by section, because one read answers every mark inside it.
+      const byPath = new Map<SectionPath, Anchor[]>()
+      for (const anchor of markAnchors) {
+        const parts = tryParseAnchor(anchor)
+        if (!parts) continue
+        const path = sectionPath(parts.chapter, parts.section)
+        const list = byPath.get(path)
+        if (list) list.push(anchor as Anchor)
+        else byPath.set(path, [anchor as Anchor])
+      }
+
+      const pages = new Map<string, number>()
+      for (const [path, anchors] of byPath) {
+        let section
+        try {
+          section = await repository.getSection(id, path)
+        } catch {
+          continue
+        }
+        if (!live) return
+        if (!section) continue
+
+        const here = { chapter: section.chapter, section: section.section }
+        for (const anchor of anchors) {
+          pages.set(anchor, pagesAt(spine, here, wordsAt(spine, here, section, anchor)).page)
+        }
+      }
+
+      if (live) setMarkPages(pages)
+    })()
+
+    return () => {
+      live = false
+    }
+  }, [id, spine, markAnchors])
+
 
   useEffect(() => {
     if (!id) return
@@ -2514,7 +2602,7 @@ export default function Reader() {
         text: 'fromThread' in row ? mended(row) : row.text,
         chapter,
         chapterTitle: chapterTitle(frame.manifest, chapter) ?? 'Elsewhere',
-        page: pageOfAnchor(parts),
+        page: pageOfAnchor(parts, row.anchor),
         createdAt: row.createdAt,
         colour: 'colour' in row ? row.colour : undefined,
         /*

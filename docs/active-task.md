@@ -364,3 +364,17 @@ those words.
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 11 — the tap and the page number (2026-08-29)
+
+1. `reader/selection.ts` — `highlightAt` tests the highlight's own line boxes
+   instead of the caret under the finger. A tap on the empty half of a page no
+   longer opens the highlight, so the toolbar can be raised there.
+2. `pages/Reader.tsx` — the notes and bookmarks lists now measure each mark's
+   page. The sections holding marks are read once in the background; until they
+   arrive the old section-opening estimate stands.
+
+See `docs/decisions.md` for both.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.
