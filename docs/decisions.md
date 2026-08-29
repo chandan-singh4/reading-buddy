@@ -2219,3 +2219,46 @@ part of a habit a person can move.
   reader and a night reader should see the same shape at their own scale.
 - The peak window is stated as a description with a percentage, never as a
   target. There is no good hour to read.
+
+## Minutes follow the clock; a sitting follows its start
+
+A sitting that runs 11:41 pm to 12:25 am is 19 minutes of one day and 25 of the
+next. Counting all 44 against the day it began made a reader who read past
+midnight see nothing on the new day, and no progress on that day's goal.
+
+So the screen answers two different questions two different ways:
+
+- **Quantities** — the heatmap, the streak, the period total, the goal, the
+  chart, the hours of the day — are measured against the clock. A session lends
+  each window only the minutes that fell inside it. `stats/spread.ts` is the one
+  place that rule lives.
+- **Events** — the commit log — file a sitting under the day it began, the way
+  a commit keeps its author date. One sitting is one row.
+
+Two rules keep the two from contradicting each other:
+
+1. A row that crossed midnight shows `19 min of 44 min`, so the day's total adds
+   up in the reader's head.
+2. A session counts toward a period if it *touched* it. Counting only sessions
+   that *started* in the period produced "25 minutes read across 0 sessions".
+
+The minutes inside a sitting are spread evenly across its span. We never
+recorded which minute the reader looked away, so this is an assumption — and
+because it is a proportion, the parts always add back up to the whole.
+
+## The heatmap opens as one week
+
+A year of squares is a third of a phone screen. The question a reader has on
+most days is "how is this week going?", so the card opens as seven squares with
+no controls, and one tap opens the year.
+
+Collapsing keeps the reader's place: with a day selected, the strip shows *that*
+day's week, not this one. The year is a way to travel, and a card should not
+undo the journey when it shrinks.
+
+## The range calendar turns its pages
+
+The pickable window is still [tracking start, today] — that guardrail did not
+move. But the month arrows always work. A calendar that will not turn its own
+pages is not a calendar, and the line under the month name says when tracking
+began, so an all-grey month explains itself.

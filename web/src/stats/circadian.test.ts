@@ -72,3 +72,23 @@ describe('naming the hours', () => {
     expect(windowName(22, 23)).toBe('10 pm – 12 am')
   })
 })
+
+describe('a period’s own hours', () => {
+  it('draws only the part of a midnight sitting that fell inside the period', () => {
+    // The 29th owns twenty-five minutes of this sitting, all of them in the
+    // midnight hour. Last night's eleven o'clock belongs to the 28th.
+    const overnight = {
+      startedAt: new Date(2026, 7, 28, 23, 41).getTime(),
+      endedAt: new Date(2026, 7, 29, 0, 25).getTime(),
+      activeMs: 44 * 60_000,
+    }
+    const { hours, totalMinutes } = circadianOf(
+      [overnight],
+      new Date(2026, 7, 29).getTime(),
+      new Date(2026, 7, 30).getTime(),
+    )
+    expect(totalMinutes).toBe(25)
+    expect(hours[0].minutes).toBe(25)
+    expect(hours[23].minutes).toBe(0)
+  })
+})

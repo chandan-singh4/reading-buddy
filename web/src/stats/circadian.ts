@@ -3,15 +3,10 @@
  *
  * ## Why the minutes are spread, not filed
  *
- * A session that runs 8:48 pm to 9:51 pm belongs to two hours, not to one. So
- * each session's reading is spread across the wall-clock hours it covers, in
- * proportion to how much of the session fell in each. Filing the whole hour to
- * `startedAt` would draw an 8 pm spike for a reader who mostly reads at 10.
- *
- * The *active* minutes are spread, not the wall-clock span. A session is paused
- * time as well as reading time, and only the reading is a fact worth drawing.
- * Spreading it evenly across the span is an assumption, and the honest one: we
- * do not record which minute inside a sitting the reader was looking away.
+ * A session that runs 8:48 pm to 9:51 pm belongs to two hours, not to one, so
+ * it is spread across both — by `spread.ts`, the same rule that puts a sitting
+ * that crosses midnight on both days. Filing the whole hour to `startedAt`
+ * would draw an 8 pm spike for a reader who mostly reads at 10.
  *
  * ## The peak window
  *
@@ -19,6 +14,8 @@
  * real share of the busiest. It is a description of a habit, so it is stated as
  * a window and a percentage, never as a target.
  */
+
+import { msInWindow, type Span } from './spread.ts'
 
 /** An hour is part of the peak window while it holds this much of the busiest. */
 const PEAK_SHARE = 0.4
@@ -47,25 +44,23 @@ export interface Circadian {
   }
 }
 
-interface Span {
-  startedAt: number
-  endedAt: number
-  activeMs: number
-}
-
-export function circadianOf(sessions: readonly Span[]): Circadian {
+/**
+ * `from` and `to` bound the period. A sitting that ran past midnight is counted
+ * only for the hours inside them, so the Day view does not draw last night's
+ * hours onto today.
+ */
+export function circadianOf(
+  sessions: readonly Span[],
+  from = -Infinity,
+  to = Infinity,
+): Circadian {
   const ms = new Array<number>(24).fill(0)
 
   for (const s of sessions) {
     if (s.activeMs <= 0) continue
 
-    const span = Math.max(s.endedAt - s.startedAt, 1)
-    // A row whose active time exceeds its span (a clock corrected mid-session,
-    // or an older row) is spread over the span it claims, not beyond it.
-    const rate = Math.min(s.activeMs / span, 1)
-
-    let cursor = s.startedAt
-    const end = Math.max(s.endedAt, s.startedAt + 1)
+    let cursor = Math.max(s.startedAt, from)
+    const end = Math.min(Math.max(s.endedAt, s.startedAt + 1), to)
     while (cursor < end) {
       const at = new Date(cursor)
       const nextHour = new Date(
@@ -75,7 +70,7 @@ export function circadianOf(sessions: readonly Span[]): Circadian {
         at.getHours() + 1,
       ).getTime()
       const until = Math.min(nextHour, end)
-      ms[at.getHours()] += (until - cursor) * rate
+      ms[at.getHours()] += msInWindow(s, cursor, until)
       cursor = until
     }
   }
@@ -93,14 +88,14 @@ export function circadianOf(sessions: readonly Span[]): Circadian {
   if (total === 0 || busiest === 0) return { hours, totalMinutes: 0 }
 
   const top = minutes.indexOf(busiest)
-  let from = top
-  let to = top
-  while (from > 0 && minutes[from - 1] >= busiest * PEAK_SHARE) from -= 1
-  while (to < 23 && minutes[to + 1] >= busiest * PEAK_SHARE) to += 1
+  let lo = top
+  let hi = top
+  while (lo > 0 && minutes[lo - 1] >= busiest * PEAK_SHARE) lo -= 1
+  while (hi < 23 && minutes[hi + 1] >= busiest * PEAK_SHARE) hi += 1
 
   let inside = 0
   for (let h = 0; h < 24; h += 1) {
-    if (h >= from && h <= to) {
+    if (h >= lo && h <= hi) {
       hours[h].level = 'peak'
       inside += minutes[h]
     } else if (minutes[h] >= busiest * WARM_SHARE) {
@@ -111,7 +106,7 @@ export function circadianOf(sessions: readonly Span[]): Circadian {
   return {
     hours,
     totalMinutes: total,
-    peak: { from, to, percent: Math.round((inside / total) * 100) },
+    peak: { from: lo, to: hi, percent: Math.round((inside / total) * 100) },
   }
 }
 

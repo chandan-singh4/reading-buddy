@@ -20,6 +20,7 @@ const line = (over: Partial<ReadingSession> = {}): ReadingSession => ({
   startTime: at(20, 48),
   endTime: at(21, 50),
   durationMinutes: 63,
+  dayMinutes: 63,
   chapterTitle: 'Part 1: Approaching the Unconscious',
   sectionTitle: undefined,
   highlightCount: 0,
@@ -160,6 +161,11 @@ describe('DayLog', () => {
     // Nothing was thrown away — a squashed commit is still in the history.
     expect(screen.queryByRole('button', { name: /squashed/ })).toBeNull()
     expect(screen.getAllByText('<1 min')).toHaveLength(2)
+  })
+
+  it('says how much of a midnight sitting belongs to this day', () => {
+    // The day's total counts 19 of the 44 minutes. The row has to show why.
+    expect(diff(line({ durationMinutes: 44, dayMinutes: 19 }))).toBe('19 min of 44 min')
   })
 
   it('does not editorialise about a day that ran past midnight', () => {

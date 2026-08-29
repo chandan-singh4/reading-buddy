@@ -7,12 +7,13 @@ import styles from './stats.module.css'
 /**
  * A one-month range picker for the Custom scope.
  *
- * ## The window is [tracking start, today], and it is enforced twice
+ * ## The window is [tracking start, today], and it is a guardrail, not a cage
  *
- * A day outside it is disabled, *and* the month arrows stop once they would
- * leave it. Disabling only the days would let a reader page back to 2019 and
- * find an entire month greyed out, which reads as a broken calendar rather than
- * as a boundary. Both walls are the same fact stated at two zoom levels.
+ * A day outside it cannot be picked. The month arrows, though, always work: the
+ * reader asked to be able to *look*, and a calendar that will not turn its own
+ * pages is not a calendar. Paging to a month with every day greyed out is not a
+ * puzzle when the line under the month says when tracking began — the boundary
+ * explains itself.
  *
  * Before any reading has been recorded there is no window at all. The button
  * that opens this is disabled in that case, so this never renders empty.
@@ -41,9 +42,6 @@ const MONTH_NAMES = [
 ]
 
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-/** Months since year zero — the only sane way to compare two month boxes. */
-const monthKey = (d: Date): number => d.getFullYear() * 12 + d.getMonth()
 
 export default function RangeCalendar({
   trackingStart,
@@ -94,8 +92,9 @@ export default function RangeCalendar({
               type="button"
               className={styles.nav}
               aria-label="Previous month"
-              disabled={monthKey(view) <= monthKey(floor)}
-              onClick={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))}
+              // Stepped from the previous state, not from the render's own
+              // `view`: two quick taps must move two months, not one.
+              onClick={() => setView((v) => new Date(v.getFullYear(), v.getMonth() - 1, 1))}
             >
               ‹
             </button>
@@ -106,8 +105,7 @@ export default function RangeCalendar({
               type="button"
               className={styles.nav}
               aria-label="Next month"
-              disabled={monthKey(view) >= monthKey(ceiling)}
-              onClick={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))}
+              onClick={() => setView((v) => new Date(v.getFullYear(), v.getMonth() + 1, 1))}
             >
               ›
             </button>

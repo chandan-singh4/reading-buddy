@@ -266,3 +266,22 @@ amber is time), and a second palette would break the key.
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 7 — the clock, the calendar, and two folds (2026-08-29)
+
+1. New `stats/spread.ts`. Every count of minutes now follows the clock, so a
+   sitting that crosses midnight feeds both days — the heatmap, the streak, the
+   period total, the daily goal, the chart and the focus window. The commit log
+   still files a sitting under the day it began, and a crossing row now reads
+   `19 min of 44 min` so the day's total adds up.
+2. The range calendar's month arrows always work. Only the *days* are bounded.
+   The arrows also step from the previous state, so two fast taps move two
+   months.
+3. The day's log folds. The summary line is the button; it opens by default,
+   because the reader tapped a square to see it.
+4. The heatmap folds to one week: seven squares, no year picker, no key. Tapping
+   it opens the year; the chevron closes it. Collapsing with a day selected
+   keeps that day's week on screen, with the day still ringed.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.

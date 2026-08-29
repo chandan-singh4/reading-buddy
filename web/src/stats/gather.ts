@@ -13,6 +13,7 @@
  */
 
 import { dayKey } from './sessions.ts'
+import { msInWindow } from './spread.ts'
 import { addDays, bucketsOf, daysBetween, startOfDay, type Bucket, type Period } from './period.ts'
 import { countGenres, splitFiction, type GenreCount } from './genres.ts'
 import type {
@@ -57,11 +58,25 @@ export function levelOf(minutes: number): HeatDay['level'] {
   return 4
 }
 
-/** Minutes read per day, keyed `YYYY-MM-DD`. */
+/**
+ * Minutes read per day, keyed `YYYY-MM-DD`.
+ *
+ * A sitting that crosses midnight is split between the two days it touched —
+ * see `spread.ts`. The row's own `day` field is where the *sitting* is filed,
+ * which is not the same question as where its minutes fell.
+ */
 export function minutesByDay(sessions: readonly StoredSession[]): Map<string, number> {
   const byDay = new Map<string, number>()
   for (const session of sessions) {
-    byDay.set(session.day, (byDay.get(session.day) ?? 0) + session.activeMs)
+    let cursor = startOfDay(new Date(session.startedAt))
+    const last = startOfDay(new Date(Math.max(session.endedAt, session.startedAt)))
+    while (cursor <= last) {
+      const from = cursor.getTime()
+      const to = addDays(cursor, 1).getTime()
+      const ms = msInWindow(session, from, to)
+      if (ms > 0) byDay.set(dayKey(cursor), (byDay.get(dayKey(cursor)) ?? 0) + ms)
+      cursor = addDays(cursor, 1)
+    }
   }
   // Rounded once, at the end. Rounding each session first turns six fifty-second
   // visits into zero minutes instead of five.
@@ -138,6 +153,23 @@ export function heatmapOf(byDay: ReadonlyMap<string, number>, year: number): Hea
  * The sittings behind it are a record they can recognise — which book, when,
  * for how long, how far they got, and what they marked while they were there.
  */
+/**
+ * The seven days of one week, Monday first — the heatmap's collapsed form.
+ *
+ * `anchor` is any day inside the week to show. It is usually today, and it is
+ * the picked day when the reader collapses the year with a square selected: the
+ * card then keeps showing the week they were looking at, rather than snapping
+ * back to now and losing their place.
+ */
+export function weekOf(byDay: ReadonlyMap<string, number>, anchor: Date): HeatDay[] {
+  const monday = addDays(startOfDay(anchor), -((startOfDay(anchor).getDay() + 6) % 7))
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = dayKey(addDays(monday, i))
+    const minutes = byDay.get(day) ?? 0
+    return { day, minutes, level: levelOf(minutes) }
+  })
+}
+
 export interface ReadingSession {
   id: string
   bookId: BookId
@@ -145,6 +177,12 @@ export interface ReadingSession {
   startTime: number
   endTime: number
   durationMinutes: number
+  /**
+   * The part of `durationMinutes` that fell on the day this row is listed
+   * under. The same number on every ordinary row; smaller on one that ran past
+   * midnight, where the rest of the sitting belongs to the next day.
+   */
+  dayMinutes: number
   chapterTitle: string | undefined
   sectionTitle: string | undefined
   highlightCount: number
@@ -207,6 +245,9 @@ export function activityByDay(
   }
 
   const days = new Map<string, DayActivity>()
+  /* Each row's share of the day it is filed under, kept unrounded so a day of
+     short visits is rounded once at the end rather than one row at a time. */
+  const shareOf = new Map<string, number>()
 
   for (const session of sessions) {
     const within = (bookId: BookId, at: number): boolean =>
@@ -234,6 +275,14 @@ export function activityByDay(
       qaCount += asked
     }
 
+    // The bounds of the day this row is filed under — the sitting's own start
+    // day, which is where the log puts it.
+    const filedOn = startOfDay(new Date(session.startedAt))
+    const dayStart = filedOn.getTime()
+    const dayEnd = addDays(filedOn, 1).getTime()
+    const share = msInWindow(session, dayStart, dayEnd)
+    shareOf.set(session.id, share)
+
     const line: ReadingSession = {
       id: session.id,
       bookId: session.bookId,
@@ -244,6 +293,7 @@ export function activityByDay(
       // figure. A day of six one-minute visits shows six rows of 1 min and a
       // total of 5, and that is the honest report of both facts.
       durationMinutes: Math.round(session.activeMs / 60_000),
+      dayMinutes: Math.round(share / 60_000),
       chapterTitle: session.chapterTitle,
       sectionTitle: session.sectionTitle,
       highlightCount,
@@ -277,12 +327,13 @@ export function activityByDay(
 
   // Totals are summed from milliseconds and rounded once, so a day of short
   // visits is not rounded away one row at a time.
-  const msOf = (id: string): number => sessions.find((s) => s.id === id)?.activeMs ?? 0
   for (const day of days.values()) {
     let dayMs = 0
     for (const book of day.books) {
       book.sessions.sort((a, b) => a.startTime - b.startTime)
-      const bookMs = book.sessions.reduce((sum, line) => sum + msOf(line.id), 0)
+      // The day's share, not the whole sitting. A row that ran past midnight
+      // contributes only the part that happened before it.
+      const bookMs = book.sessions.reduce((sum, line) => sum + (shareOf.get(line.id) ?? 0), 0)
       book.totalMinutes = Math.round(bookMs / 60_000)
       dayMs += bookMs
     }
@@ -383,17 +434,27 @@ export function summarisePeriod(
   const from = period.start.getTime()
   const to = endOf(period.through)
 
-  const sessions = sources.sessions.filter((s) => inWindow(s.startedAt, from, to))
-  const ms = sessions.reduce((sum, s) => sum + s.activeMs, 0)
+  /*
+   * A sitting counts here if it *touched* the period, and it lends the period
+   * only the minutes that fell inside it.
+   *
+   * Touching rather than starting, because a sitting that began at 11:41 pm and
+   * ran past midnight is part of both days — and "25 minutes read across 0
+   * sessions" is a line no reader should have to decode. The lengths stay whole
+   * sittings, so the longest is the longest sitting and not the longest slice.
+   */
+  const ms = sources.sessions.reduce((sum, s) => sum + msInWindow(s, from, to), 0)
+  const sessions = sources.sessions.filter((s) => msInWindow(s, from, to) > 0)
   const longest = sessions.reduce((max, s) => Math.max(max, s.activeMs), 0)
 
   let deltaPercent: number | undefined
   if (previous !== undefined) {
     const previousFrom = previous.start.getTime()
     const previousTo = endOf(previous.through)
-    const before = sources.sessions
-      .filter((s) => inWindow(s.startedAt, previousFrom, previousTo))
-      .reduce((sum, s) => sum + s.activeMs, 0)
+    const before = sources.sessions.reduce(
+      (sum, s) => sum + msInWindow(s, previousFrom, previousTo),
+      0,
+    )
     // No previous reading means there is no percentage to state. "Up 100% from
     // nothing" is worse than saying nothing, because it looks measured.
     deltaPercent = before > 0 ? Math.round(((ms - before) / before) * 100) : undefined
@@ -449,7 +510,12 @@ export function summarisePeriod(
     minutes: Math.round(ms / 60_000),
     deltaPercent,
     sessions: sessions.length,
-    averageSession: sessions.length === 0 ? 0 : Math.round(ms / sessions.length / 60_000),
+    averageSession:
+      sessions.length === 0
+        ? 0
+        : Math.round(
+            sessions.reduce((sum, s) => sum + s.activeMs, 0) / sessions.length / 60_000,
+          ),
     longestSession: Math.round(longest / 60_000),
     questions,
     chats: touched.length,
@@ -487,9 +553,8 @@ export function chartOf(sources: StatsSources, period: Period, now: Date): Chart
     minutes: bucket.future
       ? 0
       : Math.round(
-          sources.sessions
-            .filter((s) => inWindow(s.startedAt, bucket.from, bucket.to))
-            .reduce((sum, s) => sum + s.activeMs, 0) / 60_000,
+          sources.sessions.reduce((sum, s) => sum + msInWindow(s, bucket.from, bucket.to), 0) /
+            60_000,
         ),
   }))
 }

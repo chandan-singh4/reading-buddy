@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import BooksTimeChart from '../stats/BooksTimeChart.tsx'
 import GenreBars from '../stats/GenreBars.tsx'
@@ -16,6 +16,7 @@ import {
   spanDays,
   summariseAll,
   summarisePeriod,
+  weekOf,
   type StatsSources,
 } from '../stats/gather.ts'
 import {
@@ -176,6 +177,23 @@ export default function Stats() {
     return out
   }, [allTime, now])
 
+  /*
+   * The seven days the collapsed heatmap shows. It takes the anchor rather
+   * than holding one, so the card can keep the reader on the week they were
+   * looking at when they fold the year away.
+   */
+  const weekFor = useCallback(
+    (anchor: string | undefined) => {
+      if (allTime === undefined) return []
+      const on =
+        anchor === undefined
+          ? now
+          : (([y, m, d]) => new Date(Number(y), Number(m) - 1, Number(d)))(anchor.split('-'))
+      return weekOf(allTime.byDay, on)
+    },
+    [allTime, now],
+  )
+
   const period: Period = useMemo(
     () =>
       scope === 'custom' && custom !== undefined
@@ -207,7 +225,9 @@ export default function Stats() {
       period.through.getMonth(),
       period.through.getDate() + 1,
     ).getTime()
-    return circadianOf(sources.sessions.filter((s) => s.startedAt >= from && s.startedAt < to))
+    // Bounded, not filtered: a sitting that crossed midnight contributes only
+    // the hours that fell inside the period.
+    return circadianOf(sources.sessions, from, to)
   }, [sources, period])
 
   if (state.status === 'loading') {
@@ -274,6 +294,7 @@ export default function Stats() {
         year={year}
         years={years}
         onYear={setYear}
+        weekFor={weekFor}
       />
 
       {/* 3 — Scope */}

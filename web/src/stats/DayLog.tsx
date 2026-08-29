@@ -119,7 +119,17 @@ export function heading(
  * conversation say what they did while they were there.
  */
 export function meta(line: ReadingSession): { text: string; veda: boolean }[] {
-  const parts = [{ text: spell(line.durationMinutes), veda: false }]
+  /*
+   * A sitting that crossed midnight lent only part of itself to this day, and
+   * the day's total counts only that part. Saying "19 min of 44 min" is what
+   * makes the column add up in the reader's head instead of looking wrong.
+   */
+  const time =
+    line.dayMinutes < line.durationMinutes
+      ? `${spell(line.dayMinutes)} of ${spell(line.durationMinutes)}`
+      : spell(line.durationMinutes)
+
+  const parts = [{ text: time, veda: false }]
   if (line.highlightCount > 0) {
     parts.push({
       text: `${line.highlightCount} highlight${line.highlightCount === 1 ? '' : 's'}`,
@@ -225,19 +235,34 @@ function BookLog({ book }: { book: BookActivity }) {
 }
 
 export default function DayLog({ day }: { day: DayActivity | undefined }) {
+  // Open on arrival: the reader tapped a square to see this, so hiding it
+  // behind a second tap would answer their question with a door.
+  const [open, setOpen] = useState(true)
+
   if (day === undefined || day.books.length === 0) return null
 
   const sessions = day.books.reduce((sum, book) => sum + book.sessions.length, 0)
 
   return (
     <div className={styles.log}>
-      <div className={styles.logSum}>
-        {day.books.length} book{day.books.length === 1 ? '' : 's'} · {sessions} session
-        {sessions === 1 ? '' : 's'} · {spell(day.totalMinutes)} total
-      </div>
-      {day.books.map((book) => (
-        <BookLog key={book.bookId} book={book} />
-      ))}
+      {/* The summary is the button. A day with four books is a long list, and
+          the one line above it already says most of what the reader came for —
+          so the list folds away and the line stays. */}
+      <button
+        type="button"
+        className={styles.logSum}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <span>
+          {day.books.length} book{day.books.length === 1 ? '' : 's'} · {sessions} session
+          {sessions === 1 ? '' : 's'} · {spell(day.totalMinutes)} total
+        </span>
+        <span className={styles.logFold} aria-hidden="true">
+          {open ? '⌃' : '⌄'}
+        </span>
+      </button>
+      {open && day.books.map((book) => <BookLog key={book.bookId} book={book} />)}
     </div>
   )
 }

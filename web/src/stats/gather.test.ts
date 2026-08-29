@@ -15,6 +15,7 @@ import {
   minutesByDay,
   streakOf,
   summarisePeriod,
+  weekOf,
   type StatsSources,
 } from './gather.ts'
 import { customPeriod, periodOf, previousPeriod } from './period.ts'
@@ -405,5 +406,58 @@ describe('chartOf', () => {
     expect(points[9].minutes).toBe(20)
     expect(points[13].minutes).toBe(40)
     expect(points[10].minutes).toBe(0)
+  })
+})
+
+describe('a sitting that crossed midnight', () => {
+  const overnight = {
+    id: 'x',
+    bookId: 'b1' as BookId,
+    day: '2026-08-28',
+    startedAt: new Date(2026, 7, 28, 23, 41).getTime(),
+    endedAt: new Date(2026, 7, 29, 0, 25).getTime(),
+    activeMs: 44 * 60_000,
+  } as StoredSession
+
+  it('lends its minutes to both days', () => {
+    // The reader's own case: 24 minutes of reading on the 29th that the daily
+    // goal used to score as zero.
+    const byDay = minutesByDay([overnight])
+    expect(byDay.get('2026-08-28')).toBe(19)
+    expect(byDay.get('2026-08-29')).toBe(25)
+  })
+
+  it('is still one row, filed under the day it began', () => {
+    const log = activityByDay([overnight], [], [], [])
+    expect([...log.keys()]).toEqual(['2026-08-28'])
+    const line = log.get('2026-08-28')!.books[0].sessions[0]
+    expect(line.durationMinutes).toBe(44)
+    // …but the day only counts the part that happened in it.
+    expect(line.dayMinutes).toBe(19)
+    expect(log.get('2026-08-28')!.totalMinutes).toBe(19)
+  })
+})
+
+describe('weekOf', () => {
+  it('is Monday to Sunday around the day it is given', () => {
+    const byDay = new Map([['2026-08-28', 63]])
+    const week = weekOf(byDay, new Date(2026, 7, 29))
+    expect(week.map((d) => d.day)).toEqual([
+      '2026-08-24',
+      '2026-08-25',
+      '2026-08-26',
+      '2026-08-27',
+      '2026-08-28',
+      '2026-08-29',
+      '2026-08-30',
+    ])
+    expect(week[4].minutes).toBe(63)
+    expect(week[4].level).toBe(4)
+  })
+
+  it('crosses the turn of the year without a gap', () => {
+    const week = weekOf(new Map(), new Date(2027, 0, 1))
+    expect(week[0].day).toBe('2026-12-28')
+    expect(week[6].day).toBe('2027-01-03')
   })
 })

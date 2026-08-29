@@ -15,6 +15,16 @@ import styles from './stats.module.css'
  *
  * The grid is columns of weeks, not rows of days, because that is the shape
  * that fits a phone: 53 columns scroll sideways, 53 rows would not fit at all.
+ *
+ * ## Two sizes
+ *
+ * It opens as one week: seven squares, no scrolling, no controls. That is the
+ * answer to "how am I doing?", and it costs the screen one line instead of a
+ * third of it. Tapping it opens the year, with the picker and the key.
+ *
+ * Collapsing again keeps the reader's place. If a day is selected, the strip
+ * shows *that* day's week rather than snapping back to this one — the year is
+ * a way to travel, and a card should not undo the journey when it shrinks.
  */
 
 const CELL = 13
@@ -25,6 +35,9 @@ const COLUMN = CELL + GAP
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 const LEVEL_CLASS = ['', styles.l1, styles.l2, styles.l3, styles.l4] as const
+
+/** Monday first, to match the grid's own rows. */
+const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
 /** `2026-08-28` to `Aug 28` without going near a timezone. */
 function label(day: string): string {
@@ -40,6 +53,7 @@ export default function Heatmap({
   year,
   years,
   onYear,
+  weekFor,
 }: {
   days: readonly HeatDay[]
   today: string
@@ -50,8 +64,11 @@ export default function Heatmap({
   /** Every year there is anything to show, newest first. */
   years: readonly number[]
   onYear: (year: number) => void
+  /** The seven days around a chosen day, or around today when none is chosen. */
+  weekFor: (anchor: string | undefined) => readonly HeatDay[]
 }) {
   const [picked, setPicked] = useState<HeatDay | undefined>()
+  const [open, setOpen] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
 
   /*
@@ -63,7 +80,9 @@ export default function Heatmap({
     const el = scroller.current
     if (!el) return
     el.scrollLeft = today.startsWith(String(year)) ? el.scrollWidth : 0
-  }, [days.length, year, today])
+    // `open` is a dependency because the scroller does not exist while the card
+    // is collapsed: the year has to find today the moment it is unfolded.
+  }, [days.length, year, today, open])
 
   // The picked day belongs to the year that was on screen when it was tapped.
   useEffect(() => setPicked(undefined), [year])
@@ -99,23 +118,66 @@ export default function Heatmap({
   return (
     <div className={styles.card}>
       <div className={styles.hmTop}>
-        <div className={styles.cardLabel}>Days you read</div>
-        {/* A native select: on a phone this is the system's own year wheel,
-            which is better than anything drawn here and already accessible. */}
-        <select
-          className={styles.hmYear}
-          aria-label="Year"
-          value={year}
-          onChange={(event) => onYear(Number(event.target.value))}
-        >
-          {years.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+        <div className={styles.cardLabel}>{open ? 'Days you read' : 'This week'}</div>
+        {open && (
+          <>
+            {/* A native select: on a phone this is the system's own year wheel,
+                which is better than anything drawn here and already accessible. */}
+            <select
+              className={styles.hmYear}
+              aria-label="Year"
+              value={year}
+              onChange={(event) => onYear(Number(event.target.value))}
+            >
+              {years.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={styles.hmFold}
+              aria-label="Show this week only"
+              aria-expanded={true}
+              onClick={() => setOpen(false)}
+            >
+              ⌃
+            </button>
+          </>
+        )}
       </div>
 
+      {!open && (
+        <button
+          type="button"
+          className={styles.hmWeekStrip}
+          aria-label="Show the whole year"
+          aria-expanded={false}
+          onClick={() => setOpen(true)}
+        >
+          {weekFor(picked?.day).map((day, i) => (
+            <span className={styles.hmWeekDay} key={day.day}>
+              <span className={styles.hmDow} aria-hidden="true">
+                {DOW[i]}
+              </span>
+              <span
+                className={[
+                  styles.cell,
+                  LEVEL_CLASS[day.level],
+                  day.day > today ? styles.ahead : '',
+                  picked?.day === day.day ? styles.cellOn : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              />
+            </span>
+          ))}
+        </button>
+      )}
+
+      {open && (
+        <>
       <div className={styles.hmScroll} ref={scroller}>
         <div className={styles.hmGrid}>
           <div className={styles.hmMonths} aria-hidden="true">
@@ -153,6 +215,7 @@ export default function Heatmap({
                       LEVEL_CLASS[day.level],
                       ahead ? styles.ahead : '',
                       !ahead && untracked ? styles.untracked : '',
+                      picked?.day === day.day ? styles.cellOn : '',
                     ]
                       .filter(Boolean)
                       .join(' ')
@@ -189,6 +252,8 @@ export default function Heatmap({
       </div>
 
       <div className={styles.cap}>Shade = minutes read that day.</div>
+        </>
+      )}
 
       {/* `aria-live` because the tip is the only place a tapped square reports
           itself, and a tap that says nothing aloud is a tap that did nothing. */}
