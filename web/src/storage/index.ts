@@ -37,6 +37,9 @@ export type { NewNote } from './notes.ts'
 
 export { createTutorStore, findThread, tutorStore } from './tutor.ts'
 
+export { relocate, relocateMarks } from './relocate.ts'
+export type { Relocation } from './relocate.ts'
+
 export { createWordStore, wordStore } from './words.ts'
 export type { WordFrom, WordStore } from './words.ts'
 

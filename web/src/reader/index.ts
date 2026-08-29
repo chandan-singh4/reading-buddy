@@ -127,7 +127,7 @@ export type {
 export { NotesPanel } from './NotesPanel.tsx'
 export type { NoteRow, NotesPanelProps, WordRow } from './NotesPanel.tsx'
 
-export { groupByChapter, inNoteOrder, NOTE_FILTERS, notesUnder } from './notes.ts'
+export { groupByChapter, inNoteOrder, inRecentOrder, NOTE_FILTERS, notesUnder } from './notes.ts'
 export type { NoteFilter, NoteGroup, NoteLike } from './notes.ts'
 
 export { MAX_HITS, MIN_QUERY, searchBook } from './search.ts'

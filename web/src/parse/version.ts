@@ -507,4 +507,20 @@
  *
  * Every book on a shelf re-parses on this bump.
  */
-export const PARSER_VERSION = 34
+/**
+ * 35 — the reader's marks come with the book.
+ *
+ * Version 34 divided several books differently, which moved every paragraph
+ * after each new section. An anchor is a position, so every highlight and every
+ * conversation with Veda in those books pointed at a place that no longer held
+ * those words. Nothing was deleted; nothing could be seen.
+ *
+ * A re-parse now re-finds each mark by the words it stores — see
+ * `storage/relocate.ts`. This bump exists to run that: the text of every book
+ * comes out exactly as version 34 left it, and the marks are put back where
+ * their words are. It also protects the next change to the divisions, whenever
+ * that comes.
+ *
+ * Every book on a shelf re-parses on this bump.
+ */
+export const PARSER_VERSION = 35

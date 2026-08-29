@@ -4,6 +4,7 @@ import {
   canGroupByChapter,
   groupByChapter,
   inNoteOrder,
+  inRecentOrder,
   notesUnder,
   type NoteLike,
 } from './notes.ts'
@@ -37,6 +38,30 @@ describe('the order notes read in', () => {
 
   it('keeps a note with a broken anchor, at the end', () => {
     const ordered = inNoteOrder([note('2', 'not-an-anchor'), note('1', '[ch01-s01-p001]')])
+
+    expect(ordered.map((row) => row.id)).toEqual(['1', '2'])
+  })
+})
+
+describe('the order the flat list reads in', () => {
+  it('puts the newest first', () => {
+    // Note 3 was written last. The reader wants it at the top: the flat list is
+    // a record of what they have been doing.
+    const ordered = inRecentOrder([
+      note('1', '[ch01-s01-p004]'),
+      note('3', '[ch02-s01-p001]'),
+      note('2', '[ch01-s02-p001]'),
+    ])
+
+    expect(ordered.map((row) => row.id)).toEqual(['3', '2', '1'])
+  })
+
+  it('falls back to the book when two notes share a moment', () => {
+    const same = (id: string, anchor: string): NoteLike => ({
+      ...note(id, anchor),
+      createdAt: '2026-01-01T00:00:00.000Z',
+    })
+    const ordered = inRecentOrder([same('2', '[ch04-s01-p001]'), same('1', '[ch01-s01-p001]')])
 
     expect(ordered.map((row) => row.id)).toEqual(['1', '2'])
   })

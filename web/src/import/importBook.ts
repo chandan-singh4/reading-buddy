@@ -12,7 +12,7 @@
  */
 
 import type { ParsedBook, Repository } from '../storage/index.ts'
-import { repository as defaultRepository } from '../storage/index.ts'
+import { relocateMarks, repository as defaultRepository } from '../storage/index.ts'
 import { PARSER_VERSION } from '../parse/version.ts'
 import type { BookId, BookMeta, SourceFormat } from '../structure/index.ts'
 import { FILE_METADATA_KEYS } from '../structure/index.ts'
@@ -541,6 +541,25 @@ export async function reparseBook(
   // Cleared and rewritten, not merged: a fresh parse decides afresh which
   // pictures the book shows, and the old set may name files it no longer does.
   await saveAssetsQuietly(repository, toSave)
+
+  /*
+   * The reader's marks come with the book.
+   *
+   * An anchor is a position, so a parser that divides a book differently moves
+   * every paragraph after the change — and every highlight, thread and bookmark
+   * is then pointing at a place that no longer holds those words. This is the
+   * one moment when both halves are in hand: the new text is parsed, and the
+   * marks still carry the old anchors. See `storage/relocate.ts`.
+   *
+   * Quiet, like the assets above and for the same reason. A book that is read
+   * again and saved has been updated; failing the whole update because the
+   * marks could not be re-found would leave the reader with neither.
+   */
+  try {
+    await relocateMarks(toSave)
+  } catch {
+    // Nothing to do and nothing to say: the marks keep the anchors they have.
+  }
 
   return toSave.meta
 }

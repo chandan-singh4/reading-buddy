@@ -101,6 +101,36 @@ export function inNoteOrder<T extends NoteLike>(notes: readonly T[]): T[] {
 }
 
 /**
+ * Notes newest first — the order the flat list reads in.
+ *
+ * The list has two jobs and they want opposite orders. Grouped under chapter
+ * headings it is a way through the book, so it follows the book. Flat, it is a
+ * record of what the reader has been doing, and the thing they want is almost
+ * always the thing they just marked. Book order buried it: a reader forty pages
+ * into a long book had to scroll past everything they had ever kept to reach
+ * this morning's highlight.
+ *
+ * Ties fall back to the anchor, so the order is total and the list never
+ * reshuffles itself between renders. A note with no date sorts last: it is
+ * older than anything that can prove its age.
+ */
+export function inRecentOrder<T extends NoteLike>(notes: readonly T[]): T[] {
+  return [...notes].sort((a, b) => {
+    const later = (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
+    if (later !== 0) return later
+
+    const left = tryParseAnchor(a.anchor)
+    const right = tryParseAnchor(b.anchor)
+    if (!left || !right) return 0
+    return (
+      left.chapter - right.chapter ||
+      left.section - right.section ||
+      left.paragraph - right.paragraph
+    )
+  })
+}
+
+/**
  * Which notes a chip leaves on screen.
  *
  * The two Veda chips split one author. Both hold rows written by the tutor, and

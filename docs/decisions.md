@@ -2332,3 +2332,53 @@ move. No book lost a chapter or a paragraph.
 `PARSER_VERSION` is 34, so every book on the shelf re-parses. A re-parse keeps
 the reading position and the reader's own title. Anchors inside the new sections
 move, so a highlight in one of them can be lost.
+
+## A re-parse carries the reader's marks with it
+
+An anchor is a position — `[ch06-s07-p003]` — and that is what makes a highlight
+survive a re-import. Parse the same file twice and every paragraph lands in the
+same place.
+
+The rule holds until the parser changes how a book is divided. It did, at
+`PARSER_VERSION` 34. In *Man and His Symbols* the paragraph that was
+`ch06-s06-p050` became `ch06-s07-p069`. Nothing was deleted. Every highlight and
+every conversation with Veda in the changed books pointed at a place that no
+longer held those words, so none of them could be drawn.
+
+**The marks are now re-found by their words, not by arithmetic.** Every mark in
+this app already stores the text it is about: a highlight keeps its `quote`, a
+thread keeps its `excerpt`. That copy was made because character offsets die on
+the first re-parse. It answers this too, and answers it better than any
+comparison of the old division with the new one could — the words are what the
+reader marked, so finding the words again is finding the mark. It needs no memory
+of the old parser, so it will work for the next change to the divisions.
+
+`storage/relocate.ts` holds it, and `reparseBook` calls it. Four rules:
+
+1. **Nothing is ever deleted.** A mark whose words cannot be found keeps the
+   anchor it has. A passage the parser stopped producing is a reason to look, not
+   a reason to throw away what somebody wrote.
+2. **The old anchor decides between duplicates.** A passage a book prints twice
+   goes to the copy nearest the mark.
+3. **A quote under 12 characters is matched inside its own chapter only.** A
+   dozen characters can honestly appear anywhere.
+4. **Typography is folded before comparing.** Curly quotes, dashes and runs of
+   space differ between two parses without a word of the book changing.
+
+Bookmarks carry no copy of the book, only a label, so one is moved when its label
+is still the opening of a paragraph and left alone otherwise. Veda's section
+summaries carry no anchor either; they are re-pointed by `sectionTitle`, because
+the summary of "The role of symbols" belongs to that section whatever number it
+now has.
+
+## The notes list reads newest first
+
+The list has two shapes and they want opposite orders. Grouped under chapter
+headings it is a way through the book, so it follows the book — that is what a
+heading promises. Flat, it is a record of what the reader has been doing, and the
+row they want is nearly always the last one they made. Book order buried it: a
+reader forty pages into a long book scrolled past everything they had ever kept
+to reach this morning's highlight.
+
+The kept words were already newest first. The four note chips now agree with
+them.

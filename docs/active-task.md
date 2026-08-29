@@ -333,3 +333,34 @@ from titled sections, so the new sections appear in each.
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 10 — the marks follow the book (2026-08-29)
+
+Pass 9 divided several books differently. That moved every paragraph after each
+new section, and an anchor is a position — so the reader's highlights and their
+conversations with Veda pointed at places that no longer held those words. They
+were still in storage. Nothing could draw them.
+
+1. New `web/src/storage/relocate.ts`. A re-parse re-finds each mark by the words
+   it stores. It never deletes. See `docs/decisions.md`.
+2. `reparseBook` calls it, quietly, after the book is saved.
+3. `PARSER_VERSION` is 35. The text comes out exactly as 34 left it; the bump
+   exists to run the relocation.
+4. The flat notes list reads newest first (`inRecentOrder`). Grouped by chapter
+   it still follows the book.
+
+Proved against the reader's own file: the highlight and the thread on
+`[ch06-s06-p050]` both moved to `[ch06-s07-p069]`, which is where the parse puts
+those words.
+
+### Files in scope
+
+- `web/src/storage/relocate.ts` + its test — new.
+- `web/src/storage/index.ts` — exports it.
+- `web/src/import/importBook.ts` — calls it at the end of `reparseBook`.
+- `web/src/parse/version.ts` — 35.
+- `web/src/reader/notes.ts`, `reader/index.ts`, `reader/NotesPanel.tsx` — the
+  flat list's order.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.

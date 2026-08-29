@@ -18,6 +18,7 @@ import { Markdown } from './markdown.tsx'
 import {
   canGroupByChapter,
   groupByChapter,
+  inRecentOrder,
   NOTE_FILTERS,
   notesUnder,
   type NoteFilter,
@@ -201,8 +202,16 @@ export function NotesPanel({
   const [grouped, setGrouped] = useState(false)
   const chips = useRef<(HTMLButtonElement | null)[]>([])
 
-  const shown = notesUnder(notes, filter)
   const groupable = canGroupByChapter(filter)
+
+  /*
+   * Two orders, one for each shape of the list. Under chapter headings it reads
+   * with the book, because that is what a heading promises. Flat it reads newest
+   * first, because a flat list is a record of what you have been doing and the
+   * row you want is nearly always the last one you made.
+   */
+  const chosen = notesUnder(notes, filter)
+  const shown = grouped && groupable ? chosen : inRecentOrder(chosen)
 
   /** A tutor row reopens its conversation; every other note goes to its page. */
   function visit(note: NoteRow) {
