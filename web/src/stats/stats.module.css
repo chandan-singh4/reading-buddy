@@ -290,6 +290,51 @@
   font-weight: 600;
 }
 
+/* The day's sittings under the tip. A ledger, so it is set upright and in the
+   numeral face — italic prose would make a list of times hard to scan. */
+.hmLog {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  font-style: normal;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hmLog li {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  gap: 2px 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+
+.hmWhen {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.hmMins {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  text-align: right;
+}
+
+/* Spans both columns: a chapter title is long and must not squeeze the time. */
+.hmWhat {
+  grid-column: 1 / -1;
+  color: var(--ink-faint);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.hmWhat em {
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
 /* --- Scope ----------------------------------------------------------------- */
 
 .divide {

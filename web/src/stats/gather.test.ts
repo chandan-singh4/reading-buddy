@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   chartOf,
+  logByDay,
+  summariseAll,
   heatmapOf,
   levelOf,
   minutesByDay,
@@ -121,6 +123,57 @@ describe('heatmapOf', () => {
   })
 })
 
+describe('logByDay — the heatmap tip’s ledger', () => {
+  const day = new Date(2026, 7, 28)
+  const morning = { ...session(day, 20, 9), chapterTitle: 'Of Anger', sectionTitle: 'ii' }
+  const evening = { ...session(day, 43, 20), bookId: 'b2' as BookId }
+  const books = [
+    { id: 'b1' as BookId, title: 'On the Shortness of Life' } as BookMeta,
+    { id: 'b2' as BookId, title: 'Letters' } as BookMeta,
+  ]
+
+  it('tells each sitting in full, in the order they happened', () => {
+    const lines = logByDay([evening, morning], books).get('2026-08-28')
+    expect(lines?.map((l) => [l.book, l.minutes])).toEqual([
+      ['On the Shortness of Life', 20],
+      ['Letters', 43],
+    ])
+    expect(lines?.[0].chapterTitle).toBe('Of Anger')
+    expect(lines?.[0].sectionTitle).toBe('ii')
+  })
+
+  it('leaves the place empty for a session recorded before it was tracked', () => {
+    expect(logByDay([evening], books).get('2026-08-28')?.[0].chapterTitle).toBeUndefined()
+  })
+
+  it('says nothing rather than guessing when the book has been deleted', () => {
+    // Sessions deliberately outlive their book. The title cannot.
+    expect(logByDay([morning], []).get('2026-08-28')?.[0].book).toBeUndefined()
+  })
+})
+
+describe('summariseAll — genres', () => {
+  const shelf = [
+    { id: 'b1' as BookId, title: 'read', subjects: ['Philosophy / Ethics'] } as BookMeta,
+    { id: 'b2' as BookId, title: 'unread', subjects: ['Philosophy / Logic'] } as BookMeta,
+  ]
+
+  it('counts only the books that were actually opened', () => {
+    // The reported fault: a shelf of 14 imports and one hour of reading said
+    // "Philosophy 14", then listed thirteen books that were never opened.
+    const all = summariseAll(
+      { ...empty, books: shelf, sessions: [session(new Date(2026, 7, 28), 60)] },
+      FRIDAY,
+    )
+    expect(all.genres).toEqual([{ name: 'Philosophy', books: 1 }])
+    expect(all.readBooks.map((b) => b.title)).toEqual(['read'])
+  })
+
+  it('counts nothing at all before any reading is recorded', () => {
+    expect(summariseAll({ ...empty, books: shelf }, FRIDAY).genres).toEqual([])
+  })
+})
+
 describe('summarisePeriod — time', () => {
   const sources: StatsSources = {
     ...empty,
@@ -206,9 +259,8 @@ describe('summarisePeriod — Veda', () => {
   const week = periodOf('week', FRIDAY)
   const stats = summarisePeriod(sources, week, previousPeriod(week), FRIDAY)
 
-  it('counts every turn, follow-ups included', () => {
+  it('counts every question the reader asked, follow-ups included', () => {
     expect(stats.questions).toBe(4)
-    expect(stats.answers).toBe(4)
   })
 
   it('counts a thread as one passage and one chat', () => {
@@ -219,10 +271,6 @@ describe('summarisePeriod — Veda', () => {
   it('splits chats on how deep they went', () => {
     expect(stats.singleChats).toBe(1)
     expect(stats.deepChats).toBe(1)
-  })
-
-  it('counts an explain-back only when the reader answered the probe', () => {
-    expect(stats.explainBacks).toBe(1)
   })
 
   it('leaves a thread from another month out entirely', () => {

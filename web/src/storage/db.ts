@@ -630,6 +630,19 @@ export interface StoredSession {
   endedAt: number
   /** Milliseconds of reading, capped. See `stats/clock.ts`. */
   activeMs: number
+  /*
+   * Where the reader had got to when this row was last written.
+   *
+   * Denormalised titles rather than a `SectionRef`, on purpose. The heatmap tip
+   * has to name the place months later, and a book can be deleted or reimported
+   * between then and now — a stored chapter *number* would need a manifest that
+   * may no longer exist to become words. The words are the fact worth keeping.
+   *
+   * Both optional, and rows written before this existed have neither. Anything
+   * reading them has to survive their absence.
+   */
+  chapterTitle?: string
+  sectionTitle?: string
 }
 
 export const DB_NAME = 'reading-buddy'
@@ -871,6 +884,14 @@ function defineSchema(db: Dexie): void {
   db.version(17).stores({
     sessions: 'id, day, startedAt, bookId',
   })
+
+  /*
+   * No v18 for `StoredSession.chapterTitle` / `sectionTitle`. Dexie only
+   * declares *indexes*, and neither field is one — nothing queries by chapter.
+   * A version block with an unchanged store string would migrate every install
+   * to say nothing. Old rows simply have the fields missing, which is a state
+   * the heatmap tip already has to handle for other reasons.
+   */
 }
 
 export function createDb(name: string = DB_NAME): ReadingBuddyDB {

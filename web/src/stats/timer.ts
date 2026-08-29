@@ -30,9 +30,22 @@ export interface ReadingSession {
   stop: () => void
 }
 
+/** Where the reader is, asked for fresh at every write. */
+export interface Place {
+  chapterTitle?: string
+  sectionTitle?: string
+}
+
 interface Options {
   store?: SessionStore
   now?: () => number
+  /*
+   * A function, not a value, and that is the whole point. The Reader starts one
+   * session per visit and must not restart it every time a page turns — so the
+   * position cannot be an argument or a dependency. Asking for it at each flush
+   * keeps one long session that knows where it ended up.
+   */
+  place?: () => Place | undefined
 }
 
 /**
@@ -51,6 +64,9 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
 
   const write = (): void => {
     const at = now()
+    // The furthest the session got, not where it started: each write overwrites
+    // the last, so the row ends up naming the place the reader left off.
+    const place = options.place?.()
     // Deliberately not awaited anywhere. A flush that loses a race with the
     // next flush writes an older, shorter total over a newer one and is
     // corrected 30 seconds later; a flush that blocks the reading screen is a
@@ -63,6 +79,10 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
       startedAt: clock.openedAt,
       endedAt: at,
       activeMs: total(clock, at),
+      // Spread conditionally: an absent title has to stay absent rather than
+      // become `undefined`, which Dexie would store as a real field.
+      ...(place?.chapterTitle ? { chapterTitle: place.chapterTitle } : {}),
+      ...(place?.sectionTitle ? { sectionTitle: place.sectionTitle } : {}),
     })
   }
 

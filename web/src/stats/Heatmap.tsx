@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import type { HeatDay } from './gather.ts'
+import type { HeatDay, SessionLine } from './gather.ts'
 import styles from './stats.module.css'
 
 /**
@@ -29,14 +29,38 @@ function label(day: string): string {
   return `${MONTHS[Number(month) - 1]} ${Number(date)}`
 }
 
+/** `9:05 am`. The 12-hour clock, because the rest of the screen reads as prose. */
+function clock(at: number): string {
+  const d = new Date(at)
+  const h = d.getHours()
+  const minute = String(d.getMinutes()).padStart(2, '0')
+  return `${h % 12 === 0 ? 12 : h % 12}:${minute} ${h < 12 ? 'am' : 'pm'}`
+}
+
+/** The chapter and section, with anything that merely repeats itself dropped. */
+function place(line: SessionLine): string[] {
+  const seen = new Set([line.book?.trim().toLowerCase()])
+  const out: string[] = []
+  for (const part of [line.chapterTitle, line.sectionTitle]) {
+    const key = part?.trim().toLowerCase()
+    if (part === undefined || key === undefined || key === '' || seen.has(key)) continue
+    seen.add(key)
+    out.push(part)
+  }
+  return out
+}
+
 export default function Heatmap({
   days,
   today,
   trackingStart,
+  log,
 }: {
   days: readonly HeatDay[]
   today: string
   trackingStart: string | undefined
+  /** Every session by day. A tapped square opens its own day's entries. */
+  log: ReadonlyMap<string, SessionLine[]>
 }) {
   const [picked, setPicked] = useState<HeatDay | undefined>()
   const scroller = useRef<HTMLDivElement>(null)
@@ -138,6 +162,31 @@ export default function Heatmap({
           <>
             <b>{label(picked.day)}</b>
             {picked.minutes > 0 ? ` — ${picked.minutes} min of reading` : ' — no reading'}
+            {/* The whole day, sitting by sitting. A total is a number the reader
+                has to take on trust; the sittings behind it are a record they
+                can recognise — and the only way to see that an hour was two
+                books, not one. */}
+            {(log.get(picked.day) ?? []).length > 0 && (
+              <ol className={styles.hmLog}>
+                {(log.get(picked.day) ?? []).map((line) => (
+                  <li key={line.id}>
+                    <span className={styles.hmWhen}>
+                      {clock(line.startedAt)} – {clock(line.endedAt)}
+                    </span>
+                    <span className={styles.hmMins}>{line.minutes} min</span>
+                    <span className={styles.hmWhat}>
+                      {/* A deleted book leaves its sessions behind on purpose —
+                          the reading happened. So the title can be gone. */}
+                      <em>{line.book ?? 'A book no longer in your library'}</em>
+                      {/* Each part only if it says something new. A book whose
+                          first chapter carries the book's own name is common,
+                          and "Walden · Walden · Economy" is noise. */}
+                      {place(line).map((part) => ` · ${part}`)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </>
         )}
       </div>

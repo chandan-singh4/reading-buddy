@@ -8,9 +8,13 @@ import styles from './stats.module.css'
 /**
  * What you read about, as book counts per genre.
  *
- * Independent of the scope toggle: a shelf is a shelf. Slicing it to "this
- * week" would answer a different and much less interesting question, and on a
- * quiet week it would answer nothing at all.
+ * Counts the books that have a recorded session, not everything imported.
+ * An unopened book is a plan, and a chart of plans is not a picture of what
+ * somebody reads.
+ *
+ * Independent of the scope toggle even so: a reading history is a history.
+ * Slicing it to "this week" would answer a different and much less interesting
+ * question, and on a quiet week it would answer nothing at all.
  *
  * The five hues carry no meaning — they separate adjacent bars and stop there.
  * The one colour on this screen that *does* mean something is violet, and it is
@@ -59,7 +63,8 @@ export default function GenreBars({
 
       {genres.length === 0 ? (
         <p className={styles.empty}>
-          No subject headings yet. Genres appear once the catalogue has matched your books.
+          Nothing to count yet. Genres appear once you have read a book the catalogue
+          recognises.
         </p>
       ) : (
         genres.map((genre, i) => (
@@ -101,7 +106,7 @@ export default function GenreBars({
       )}
 
       <div className={styles.cap}>
-        From Google Books subject tags · tap a bar to see those books.
+        Books you have read · from Google Books subject tags · tap a bar to see them.
         {/* Said out loud rather than folded into an "Other" bar: an unmatched
             book is a gap in the catalogue, not a reading habit. */}
         {uncounted > 0 && ` ${uncounted} book${uncounted === 1 ? '' : 's'} uncounted.`}

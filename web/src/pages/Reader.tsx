@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
-import { startSession } from '../stats/timer.ts'
+import { startSession, type Place } from '../stats/timer.ts'
 
 import {
   Block,
@@ -443,6 +443,16 @@ export default function Reader() {
   const [frame, setFrame] = useState<FrameState>({ status: 'loading' })
   const [here, setHere] = useState<SectionRef>(firstSection())
   const [page, setPage] = useState<PageState>({ status: 'loading' })
+
+  /*
+   * Where the reader is, for the session row (`stats/timer.ts`).
+   *
+   * A ref rather than state, and read through a function rather than passed as
+   * a value. The session must survive every page turn, so the turn cannot be a
+   * dependency of the effect that starts it. Kept up to date far below, where
+   * the chapter and section titles are actually known.
+   */
+  const place = useRef<Place>({})
   const [neighbours, setNeighbours] = useState<{
     previous?: SectionRef
     next?: SectionRef
@@ -505,7 +515,7 @@ export default function Reader() {
    */
   useEffect(() => {
     if (id === undefined) return
-    const session = startSession(id)
+    const session = startSession(id, { place: () => place.current })
     return () => session.stop()
   }, [id])
 
@@ -3935,6 +3945,21 @@ export default function Reader() {
 
   const title =
     frame.status === 'ready' ? chapterTitle(frame.manifest, here.chapter) : undefined
+
+  /*
+   * Hand the reading clock the place, every time it changes.
+   *
+   * An effect, not a render-time assignment: the ref is read asynchronously by
+   * a timer, and writing it during a render that React may throw away would
+   * file the session under a page the reader never actually saw.
+   */
+  const sectionTitle = page.status === 'ready' ? page.section.title : undefined
+  useEffect(() => {
+    place.current = {
+      ...(title ? { chapterTitle: title } : {}),
+      ...(sectionTitle ? { sectionTitle } : {}),
+    }
+  }, [title, sectionTitle])
 
   /** The same, for a chapter that is not the one on screen. */
   const titleOfChapter = (chapter: number) =>

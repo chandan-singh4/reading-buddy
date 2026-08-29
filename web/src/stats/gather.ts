@@ -122,9 +122,63 @@ export function heatmapOf(byDay: ReadonlyMap<string, number>, today: Date): Heat
   return out
 }
 
+/**
+ * One session, told in full, for the heatmap tip.
+ *
+ * The reason it exists: a day of "63 min" is a number the reader cannot check.
+ * Two books and four sittings behind it is a record they can recognise — which
+ * one, when, for how long, and how far they got.
+ */
+export interface SessionLine {
+  id: string
+  /** Epoch milliseconds. */
+  startedAt: number
+  endedAt: number
+  minutes: number
+  /** The book's title, or `undefined` once the book has left the library. */
+  book: string | undefined
+  chapterTitle: string | undefined
+  sectionTitle: string | undefined
+}
+
+/** Every session grouped by the local day it started, newest day first is not needed — the tip looks one day up. */
+export function logByDay(
+  sessions: readonly StoredSession[],
+  books: readonly BookMeta[],
+): Map<string, SessionLine[]> {
+  const titles = new Map(books.map((book) => [book.id, book.title]))
+  const out = new Map<string, SessionLine[]>()
+
+  for (const session of sessions) {
+    const line: SessionLine = {
+      id: session.id,
+      startedAt: session.startedAt,
+      endedAt: session.endedAt,
+      // Rounded per session here, unlike the day total: this line has to add up
+      // to what the reader remembers sitting through, not to the day's figure.
+      // A day of six one-minute visits therefore shows six lines of 1 min and a
+      // total of 5, and that is the honest report of both facts.
+      minutes: Math.round(session.activeMs / 60_000),
+      book: titles.get(session.bookId),
+      chapterTitle: session.chapterTitle,
+      sectionTitle: session.sectionTitle,
+    }
+    const day = out.get(session.day)
+    if (day) day.push(line)
+    else out.set(session.day, [line])
+  }
+
+  for (const lines of out.values()) lines.sort((a, b) => a.startedAt - b.startedAt)
+  return out
+}
+
 export interface AllTimeStats {
   streak: Streak
   heatmap: HeatDay[]
+  /** Every session, by day — what a tapped heatmap square opens. */
+  log: Map<string, SessionLine[]>
+  /** The books with a recorded session — what the genre bars count. */
+  readBooks: BookMeta[]
   /** `YYYY-MM-DD`, or `undefined` before anything was ever recorded. */
   trackingStart: string | undefined
   genres: GenreCount[]
@@ -136,12 +190,25 @@ export interface AllTimeStats {
 
 export function summariseAll(sources: StatsSources, today: Date): AllTimeStats {
   const byDay = minutesByDay(sources.sessions)
-  const { counts, uncounted } = countGenres(sources.books)
-  const split = splitFiction(sources.books)
+
+  /*
+   * Genres count books the reader has actually *read*, not everything on the
+   * shelf. An import is an intention; a session is the fact. Counting the shelf
+   * made one hour with one book report "Philosophy 14", which is a description
+   * of the library rather than of the reading — and tapping the bar then listed
+   * thirteen books that were never opened.
+   */
+  const opened = new Set(sources.sessions.map((s) => s.bookId))
+  const readBooks = sources.books.filter((book) => opened.has(book.id))
+
+  const { counts, uncounted } = countGenres(readBooks)
+  const split = splitFiction(readBooks)
 
   return {
     streak: streakOf(byDay, today),
     heatmap: heatmapOf(byDay, today),
+    log: logByDay(sources.sessions, sources.books),
+    readBooks,
     trackingStart: [...byDay.keys()].sort()[0],
     genres: counts,
     uncountedGenres: uncounted,
@@ -167,13 +234,13 @@ export interface PeriodStats {
   /** Minutes. */
   longestSession: number
   questions: number
-  answers: number
   chats: number
   singleChats: number
   deepChats: number
   concepts: number
   passages: number
-  explainBacks: number
+  /** Chapters Veda summarised in the period. */
+  chaptersSummarised: number
   tags: number
   chart: ChartPoint[]
 }
@@ -213,26 +280,20 @@ export function summarisePeriod(
   // Scoped by the timestamp on each *message*, not by the thread's own dates: a
   // thread opened last month and followed up on today is one question today,
   // not a whole conversation retroactively moved into this week.
+  //
+  // Only the reader's turns are counted. Veda's replies were counted too, on a
+  // second tile, and the two were the same number on every real day — a reply
+  // follows a question. Two tiles reporting one fact is decoration.
   let questions = 0
-  let answers = 0
-  let explainBacks = 0
   const touched: StoredTutorThread[] = []
 
   for (const thread of sources.threads) {
     let inPeriod = false
-    thread.messages.forEach((message, i) => {
-      if (!inWindow(message.ts, from, to)) return
+    for (const message of thread.messages) {
+      if (!inWindow(message.ts, from, to)) continue
       inPeriod = true
-      if (message.role === 'you') {
-        questions += 1
-        // An explain-back is done when Veda asked the reader to say it back and
-        // the reader answered. The probe alone is Veda talking; the reply is the
-        // reader doing the work, which is the part worth counting.
-        if (thread.messages[i - 1]?.isProbe === true) explainBacks += 1
-      } else {
-        answers += 1
-      }
-    })
+      if (message.role === 'you') questions += 1
+    }
     if (inPeriod) touched.push(thread)
   }
 
@@ -252,9 +313,11 @@ export function summarisePeriod(
   // The tags Veda wrote for the reader's vault, counted distinctly: one idea
   // named in three chapters is one note in Obsidian, so it is one tag here.
   const tags = new Set<string>()
+  let chaptersSummarised = 0
   for (const summary of sources.summaries) {
     const ts = Date.parse(summary.recapAt)
     if (!Number.isFinite(ts) || !inWindow(ts, from, to)) continue
+    chaptersSummarised += 1
     for (const concept of summary.concepts) tags.add(concept.name.trim().toLowerCase())
   }
 
@@ -265,13 +328,12 @@ export function summarisePeriod(
     averageSession: sessions.length === 0 ? 0 : Math.round(ms / sessions.length / 60_000),
     longestSession: Math.round(longest / 60_000),
     questions,
-    answers,
     chats: touched.length,
     singleChats,
     deepChats: touched.length - singleChats,
     concepts,
     passages: touched.length,
-    explainBacks,
+    chaptersSummarised,
     tags: tags.size,
     chart: chartOf(sources, period, now),
   }

@@ -198,6 +198,7 @@ export default function Stats() {
         days={allTime.heatmap}
         today={dayKey(now)}
         trackingStart={allTime.trackingStart}
+        log={allTime.log}
       />
 
       {/* 3 — Scope */}
@@ -292,14 +293,15 @@ export default function Stats() {
       <div className={`${styles.card} ${styles.veda}`}>
         <div className={styles.cardLabel}>With Veda · this period</div>
 
+        {/* One figure, not two. "Answers from Veda" sat here and was the same
+            number as the questions on every real day, because a reply follows a
+            question — a second tile reporting the first tile's fact. */}
         <div className={styles.qa}>
           <div className={styles.qaCell}>
             <div className={styles.qaN}>{stats.questions}</div>
-            <div className={styles.qaT}>questions asked</div>
-          </div>
-          <div className={styles.qaCell}>
-            <div className={styles.qaN}>{stats.answers}</div>
-            <div className={styles.qaT}>answers from Veda</div>
+            <div className={styles.qaT}>
+              question{stats.questions === 1 ? '' : 's'} asked &amp; answered
+            </div>
           </div>
         </div>
 
@@ -340,8 +342,12 @@ export default function Stats() {
             <div className={styles.vstatT}>passages explained</div>
           </div>
           <div>
-            <div className={styles.vstatN}>{stats.explainBacks}</div>
-            <div className={styles.vstatT}>explain-backs done</div>
+            {/* Not the reference's "explain-backs done". That counted only the
+                replies to Veda's own Socratic probes, which are rare — so the
+                tile read zero on days full of conversation and taught the
+                reader to distrust the card. */}
+            <div className={styles.vstatN}>{stats.chaptersSummarised}</div>
+            <div className={styles.vstatT}>chapters summarised</div>
           </div>
           <div>
             {/* Not the reference's "revision flags cleared" — nothing in the app
@@ -359,7 +365,7 @@ export default function Stats() {
       {/* 7 — Genres. Independent of the toggle. */}
       <GenreBars
         genres={allTime.genres}
-        books={state.sources.books}
+        books={allTime.readBooks}
         uncounted={allTime.uncountedGenres}
         fiction={allTime.fiction}
         nonfiction={allTime.nonfiction}

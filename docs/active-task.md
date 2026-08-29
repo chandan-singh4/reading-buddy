@@ -104,3 +104,39 @@ Read only:
 - `web/src/structure/types.ts` — `BookMeta.subjects`, `genre`, `finishedAt`.
 - `web/src/storage/db.ts` — `StoredTutorThread`, `StoredChapterSummary`,
   `StoredConcept`.
+
+## Second pass — after the first real hour of reading (2026-08-28)
+
+The reader read for one hour, looked at the screen, and asked for four changes.
+All four are done.
+
+1. **The heatmap tip now tells the whole day.** A tapped square lists every
+   sitting: start time, end time, minutes, the book, and the chapter and section
+   the reader reached. A day of "63 min" is a number nobody can check. Two books
+   and two sittings is a record they can recognise.
+   - `StoredSession` gained `chapterTitle` and `sectionTitle`. Both optional.
+     Titles, not chapter numbers: the tip must name the place months later, and
+     a book can be deleted or reimported in between.
+   - **No schema version was added.** Dexie declares indexes only, and neither
+     field is one. A version block with an unchanged store string would migrate
+     every install to say nothing.
+   - The Reader hands the timer a *function* that reports the place. A value
+     would restart the session at every page turn.
+2. **"Answers from Veda" is gone.** It was equal to the questions on every real
+   day, because a reply follows a question. One tile now says "questions asked
+   and answered".
+3. **"Explain-backs done" is replaced by "chapters summarised".** The old tile
+   counted only replies to Veda's Socratic probes, which are rare. It read zero
+   on days full of conversation, which taught the reader to distrust the card.
+4. **Genres count books that were read, not books that were imported.** A shelf
+   of 14 imports and one hour of reading reported "Philosophy 14", and tapping
+   the bar listed thirteen books that were never opened. `summariseAll` now
+   filters the library by the books with a session.
+
+### Status
+
+Built, tested and seen in a browser against seeded data — two books in one day,
+one older session with no place recorded, and one unopened book that the genre
+bars correctly ignore. The seeded rows were deleted afterwards.
+
+**Still not seen on a phone.**
