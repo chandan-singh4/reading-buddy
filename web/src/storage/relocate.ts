@@ -152,8 +152,10 @@ export async function relocateMarks(
   const places = placesIn(book.sections)
   if (places.length === 0) return NOTHING
 
-  const notes = await relocateNotes(bookId, places, database)
+  // Threads first: a kept line of Veda's takes its anchor from the conversation
+  // it came out of, so that conversation has to have found its place already.
   const threads = await relocateThreads(bookId, places, database)
+  const notes = await relocateNotes(bookId, places, threads.anchors, database)
   const bookmarks = await relocateBookmarks(bookId, places, database)
   const summaries = await relocateSummaries(bookId, book.sections, database)
 
@@ -163,6 +165,7 @@ export async function relocateMarks(
 async function relocateNotes(
   bookId: BookId,
   places: readonly Place[],
+  threadAnchors: ReadonlyMap<string, Anchor>,
   database: ReadingBuddyDB,
 ): Promise<Relocation> {
   const rows = await database.notes.where('bookId').equals(bookId).toArray()
@@ -170,6 +173,30 @@ async function relocateNotes(
   let lost = 0
 
   for (const row of rows) {
+    /*
+     * A kept line of Veda's follows its conversation, not its own words.
+     *
+     * Every other mark quotes the book, so the book can be searched for it.
+     * This one quotes *Veda* — a line the reader picked out of an answer — and
+     * those words appear nowhere in the text. Searching for them finds nothing,
+     * which is why these were the one kind of row left pointing at the old
+     * place after the first relocation. The thread it came from is anchored to
+     * the passage they were talking about, and that is where the line belongs.
+     */
+    if (row.fromThread !== undefined) {
+      const anchor = threadAnchors.get(row.fromThread)
+      if (anchor === undefined) {
+        // The conversation is gone. Fall through and try the words, which is
+        // right for the rare kept line that quotes the book back at itself.
+      } else {
+        if (anchor !== row.anchor) {
+          await database.notes.update([bookId, row.id], { anchor })
+          moved += 1
+        }
+        continue
+      }
+    }
+
     // A note on a whole paragraph, with no words of its own copied, cannot be
     // searched for. It keeps its anchor; see the note at the top.
     if (!row.quote) continue
@@ -185,26 +212,38 @@ async function relocateNotes(
   return { moved, lost }
 }
 
+/** A relocation, plus where each thread ended up — what the kept lines follow. */
+interface Threads extends Relocation {
+  anchors: ReadonlyMap<string, Anchor>
+}
+
 async function relocateThreads(
   bookId: BookId,
   places: readonly Place[],
   database: ReadingBuddyDB,
-): Promise<Relocation> {
+): Promise<Threads> {
   const rows = await database.tutor.where('bookId').equals(bookId).toArray()
+  const anchors = new Map<string, Anchor>()
   let moved = 0
   let lost = 0
 
   for (const row of rows) {
     const found = relocate(places, row.anchor, row.excerpt)
     if (found === undefined) {
+      // Its own anchor is still the best answer there is, and it is what a line
+      // kept out of this thread should follow.
+      anchors.set(row.id, row.anchor)
       lost += 1
-    } else if (found !== row.anchor) {
+      continue
+    }
+    anchors.set(row.id, found)
+    if (found !== row.anchor) {
       await database.tutor.update([bookId, row.id], { anchor: found })
       moved += 1
     }
   }
 
-  return { moved, lost }
+  return { moved, lost, anchors }
 }
 
 /**

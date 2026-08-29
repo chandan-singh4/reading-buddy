@@ -42,20 +42,33 @@ export interface HeatDay {
   /** `YYYY-MM-DD`. */
   day: string
   minutes: number
-  /** 0 to 4 — the reference's five shades. */
-  level: 0 | 1 | 2 | 3 | 4
+  /** 0 to 5 — empty, then one shade per hour. */
+  level: 0 | 1 | 2 | 3 | 4 | 5
 }
 
+/** The width of a band. One shade is one hour of reading. */
+const BAND_MINUTES = 60
+
+/** The darkest shade. Four hours or more, and there is no shade above it. */
+const TOP_LEVEL = 5
+
 /**
- * The reference's five bands: none, under a quarter hour, under half an hour,
- * under an hour, an hour or more.
+ * One shade per hour read: under 1, under 2, under 3, under 4, and 4 or more.
+ *
+ * The bands used to be quarter-hours up to a ceiling of one hour, taken from
+ * the design reference before anyone had read a real day on this app. The
+ * ceiling was the problem: an ordinary day of the reader's own now *starts* in
+ * the top band, so 88 minutes and 200 minutes drew the identical square and the
+ * map had four shades of which one was ever used.
+ *
+ * An hour is the band because the reader chose it, and because it keeps the key
+ * sayable: a reader can look at a square and know what it means without going
+ * back to the legend.
  */
 export function levelOf(minutes: number): HeatDay['level'] {
   if (minutes <= 0) return 0
-  if (minutes < 15) return 1
-  if (minutes < 30) return 2
-  if (minutes < 60) return 3
-  return 4
+  const band = Math.floor(minutes / BAND_MINUTES) + 1
+  return Math.min(band, TOP_LEVEL) as HeatDay['level']
 }
 
 /**

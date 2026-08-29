@@ -2417,3 +2417,24 @@ section reported one number. A highlight on page 92 said 72.
 The sections holding marks are now read once, in the background, and each marked
 paragraph gets its own number. Nothing waits for it: until it arrives, and for
 any section that fails to load, the section-opening estimate stands.
+
+## A kept line of Veda's follows its conversation
+
+A re-parse finds every mark again by the words it stores. This works for each
+mark except one. A line the reader keeps out of Veda's answer quotes *Veda*,
+not the book. Those words are in no paragraph, so the search finds nothing and
+the line keeps the old, wrong anchor. That is why only "Veda's Quotes" showed a
+bad page number.
+
+The line now takes its anchor from the conversation it came out of. The thread
+is anchored to the passage they discussed, and that is where the line belongs.
+So `relocateMarks` moves the threads first, then gives each kept line its
+thread's new anchor. A line whose thread is gone falls back to the word search.
+
+## One shade of the heatmap is one hour
+
+The shades before this were set by a share of the reader's best day. So 88
+minutes and 203 minutes could look the same. A shade now means a fixed amount
+of time: 1-60 minutes, 60-120, 120-180, 180-240, and 240 or more. Five shades,
+one hour each, and the fifth is the darkest. The scale does not move, so two
+days that look alike are alike.

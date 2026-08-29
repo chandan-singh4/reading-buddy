@@ -523,4 +523,21 @@
  *
  * Every book on a shelf re-parses on this bump.
  */
-export const PARSER_VERSION = 35
+/**
+ * 36 — a kept line of Veda's follows its conversation.
+ *
+ * Version 35 re-found every mark by the words it stores. That works because
+ * every mark quotes the book — except one. A line the reader keeps out of one of
+ * Veda's answers quotes *Veda*, and those words appear nowhere in the text, so
+ * the search found nothing and the line kept its old anchor. Under Notes, the
+ * "Veda's Quotes" chip was the one list still showing the pages of a book that
+ * had been divided differently.
+ *
+ * A kept line now takes the anchor of the thread it came out of, which is
+ * anchored to the passage they were talking about. That is where the line
+ * belongs, and it needed no words of its own.
+ *
+ * Every book on a shelf re-parses on this bump. The text is untouched again;
+ * only the kept lines move.
+ */
+export const PARSER_VERSION = 36

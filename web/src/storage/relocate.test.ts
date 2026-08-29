@@ -1,10 +1,13 @@
 // The marks that have to survive a re-parse. The cases here are the ones that
 // actually happened to a reader's copy of Man and His Symbols.
 
+import 'fake-indexeddb/auto'
+
 import { describe, expect, it } from 'vitest'
 
-import { placesIn, relocate } from './relocate.ts'
-import type { Anchor, Paragraph, Section } from '../structure/index.ts'
+import { db } from './db.ts'
+import { placesIn, relocate, relocateMarks } from './relocate.ts'
+import type { Anchor, BookId, Paragraph, Section } from '../structure/index.ts'
 import { formatAnchor, sectionPath } from '../structure/index.ts'
 
 /** A section of prose, anchored exactly as the parser anchors it. */
@@ -83,5 +86,53 @@ describe('relocate', () => {
     expect(relocate(after, 'not-an-anchor' as Anchor, JUNG)).toBe(
       formatAnchor({ chapter: 6, section: 7, paragraph: 2 }),
     )
+  })
+})
+
+describe('a line kept out of one of Veda’s answers', () => {
+  it('follows the conversation, not its own words', async () => {
+    /*
+     * The one mark that does not quote the book. Searching the text for Veda's
+     * sentence finds nothing, so before this the kept line was the only row
+     * left pointing at the old place — which is exactly what the reader saw
+     * under the "Veda's Quotes" chip.
+     */
+    const bookId = 'kept' as BookId
+    const OLD = formatAnchor({ chapter: 6, section: 6, paragraph: 50 })
+
+    await db.tutor.put({
+      bookId,
+      id: 'thread-1',
+      anchor: OLD,
+      excerpt: JUNG,
+      kind: 'paragraph',
+      messages: [],
+      createdAt: '2026-08-28T20:00:00.000Z',
+      updatedAt: '2026-08-28T20:00:00.000Z',
+    })
+    await db.notes.put({
+      bookId,
+      id: 'kept-1',
+      anchor: OLD,
+      author: 'claude',
+      text: 'Jung means the gods did not leave; they changed their names.',
+      createdAt: '2026-08-28T20:05:00.000Z',
+      quote: 'the gods did not leave; they changed their names',
+      fromThread: 'thread-1',
+    })
+
+    await relocateMarks({
+      meta: { id: bookId },
+      sections: [
+        section(6, 6, ['The problem of types opens here.'], 'The problem of types'),
+        section(6, 7, ['A page of the archetype.', JUNG], 'The archetype in dream symbolism'),
+      ],
+      chapters: [],
+      manifest: { chapters: [] },
+    } as never)
+
+    const moved = formatAnchor({ chapter: 6, section: 7, paragraph: 2 })
+    expect((await db.tutor.get([bookId, 'thread-1']))?.anchor).toBe(moved)
+    expect((await db.notes.get([bookId, 'kept-1']))?.anchor).toBe(moved)
   })
 })

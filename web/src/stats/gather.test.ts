@@ -49,15 +49,28 @@ const empty: StatsSources = {
 }
 
 describe('levelOf', () => {
-  it('draws the reference’s five bands on their exact boundaries', () => {
+  it('gives one shade to each hour, on the exact boundaries', () => {
     expect(levelOf(0)).toBe(0)
     expect(levelOf(1)).toBe(1)
-    expect(levelOf(14)).toBe(1)
-    expect(levelOf(15)).toBe(2)
-    expect(levelOf(29)).toBe(2)
-    expect(levelOf(30)).toBe(3)
-    expect(levelOf(59)).toBe(3)
-    expect(levelOf(60)).toBe(4)
+    expect(levelOf(59)).toBe(1)
+    expect(levelOf(60)).toBe(2)
+    expect(levelOf(119)).toBe(2)
+    expect(levelOf(120)).toBe(3)
+    expect(levelOf(179)).toBe(3)
+    expect(levelOf(180)).toBe(4)
+    expect(levelOf(239)).toBe(4)
+    expect(levelOf(240)).toBe(5)
+  })
+
+  it('tells 88 minutes from 200', () => {
+    // The reader's own two days. Under the old bands both were the darkest
+    // square, because everything past an hour was.
+    expect(levelOf(88)).toBe(2)
+    expect(levelOf(203)).toBe(4)
+  })
+
+  it('has no shade above the darkest', () => {
+    expect(levelOf(600)).toBe(5)
   })
 })
 
@@ -136,7 +149,8 @@ describe('heatmapOf', () => {
     expect(map.find((d) => d.day === '2026-08-28')).toEqual({
       day: '2026-08-28',
       minutes: 42,
-      level: 3,
+      // Under an hour: the first shade. One shade is one hour.
+      level: 1,
     })
   })
 
@@ -452,7 +466,7 @@ describe('weekOf', () => {
       '2026-08-30',
     ])
     expect(week[4].minutes).toBe(63)
-    expect(week[4].level).toBe(4)
+    expect(week[4].level).toBe(2)
   })
 
   it('crosses the turn of the year without a gap', () => {

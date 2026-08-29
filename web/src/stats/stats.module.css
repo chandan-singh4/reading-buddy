@@ -56,6 +56,7 @@
   --h2: #d19a4e;
   --h3: #a9662b;
   --h4: #6e3e17;
+  --h5: #47270e;
   /* Violet belongs to Veda alone */
   --veda: #6c5ce0;
   --veda-lite: #b7adf0;
@@ -279,6 +280,10 @@
   background: var(--h4);
 }
 
+.l5 {
+  background: var(--h5);
+}
+
 /* A day after today. Kept in the flow so the week columns stay square. */
 .ahead {
   visibility: hidden;
@@ -303,10 +308,12 @@
 }
 
 /* The legend and the caption it belongs with, on one line where there is room:
-   the key on the right, the sentence explaining it on the left. */
+   the key on the right, the sentence explaining it on the left. The width is
+   what is left over once six swatches and their two words have been paid for —
+   a caption that wraps to a second line lands on top of the key. */
 .hmLegend + .cap {
   margin-top: -14px;
-  max-width: 60%;
+  max-width: 48%;
 }
 
 .hmLegend .cell {

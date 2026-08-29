@@ -378,3 +378,17 @@ See `docs/decisions.md` for both.
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 12 — Veda's kept lines, and the heatmap shades
+
+- `storage/relocate.ts`: threads move first and hand their anchors to the notes.
+  A note with `fromThread` takes the thread's anchor instead of searching the
+  text for words that are not in the book.
+- `parse/version.ts`: `PARSER_VERSION` 36. The reader must re-parse once more to
+  put the kept lines right.
+- `stats/gather.ts`: `levelOf` gives one shade an hour, to a fifth shade at 4h+.
+  `stats.module.css` gained `--h5` and `.l5`; `Heatmap.tsx` gained the sixth
+  legend swatch.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.
