@@ -2301,3 +2301,34 @@ A selected square used to stay selected for ever, and its log with it. Tapping
 the square again clears it, and so does a tap anywhere on the card that is not a
 control. Nothing else on the screen holds a selection, and a card that will not
 let go quietly costs the reader the rest of the page.
+
+## Every heading below the chapter divides the book
+
+A book has more than two heading levels. *Man and His Symbols* sets Part 1 as
+`<h1>`, its parts as `<h2>`, and "The soul of man" as `<h3>` — a real title, in
+the publisher's own markup, over eleven pages of prose.
+
+The parser read only the two shallowest levels. Anything deeper became prose
+with a `subheading` label. It looked like a heading on the page and divided
+nothing. So it was not in the contents, the reader could not jump to it, and
+Veda could not be asked to summarise it.
+
+**The rule now: every heading level below the chapter opens a section.** The
+model has two tiers, so a third level lands in the second one. The outline is
+flatter than the book's, and it is true. A reader looking for "The soul of man"
+finds it.
+
+**One exception: a guessed heading.** `parse/html.ts` infers headings from type
+size when a document has none of its own, and ranks the sizes per document. Those
+levels are our arithmetic, not the author's. *The Mountains of My Life* opens a
+part with five centred lines at two sizes; letting the deeper guesses divide
+would cut that book into titles nobody wrote. A guess divides only at the exact
+section level.
+
+Measured on the whole shelf, before and after: *Man and His Symbols* 35 sections
+to 57, *Be As You Are* 44 to 78, *Nondual Love* 21 to 42. Five books did not
+move. No book lost a chapter or a paragraph.
+
+`PARSER_VERSION` is 34, so every book on the shelf re-parses. A re-parse keeps
+the reading position and the reader's own title. Anchors inside the new sections
+move, so a highlight in one of them can be lost.

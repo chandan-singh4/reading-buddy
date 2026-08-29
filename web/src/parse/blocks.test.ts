@@ -380,3 +380,36 @@ describe('a chapter title the book prints twice', () => {
     expect(book.sections[0].paragraphs[0].anchor).toBe('[ch01-s01-p001]')
   })
 })
+
+describe('a heading deeper than the section level', () => {
+  const outline = (book: ReturnType<typeof assembleBook>) =>
+    book.sections.map((section) => section.title ?? '(untitled)')
+
+  it('divides the chapter, so the contents can name it', () => {
+    // Man and His Symbols, Part 1. The publisher wrote <h1>, <h2> and <h3>, and
+    // "The soul of man" is the third of them: a real title over eleven pages.
+    const book = assembleBook(
+      htmlToBlocks(
+        '<h1>Part 1</h1><h2>The problem of types</h2><p>One.</p>' +
+          '<h3>The soul of man</h3><p>Two.</p>',
+      ),
+      meta(),
+    )
+    expect(outline(book)).toEqual(['The problem of types', 'The soul of man'])
+  })
+
+  it('leaves a guessed heading as prose', () => {
+    // Guessed levels are our arithmetic, not the author's — see `isSection`.
+    const book = assembleBook(
+      [
+        { kind: 'heading', level: 1, text: 'Part One' },
+        { kind: 'heading', level: 2, text: 'A named section' },
+        { kind: 'heading', level: 3, text: 'A larger line', guessed: true },
+        { kind: 'prose', text: 'Body.' },
+      ],
+      meta(),
+    )
+    expect(outline(book)).toEqual(['A named section'])
+    expect(book.sections[0].paragraphs.map((p) => p.label)).toContain('subheading')
+  })
+})

@@ -484,4 +484,27 @@
  *
  * Every PDF on a shelf re-parses on this bump. No other format reads this code.
  */
-export const PARSER_VERSION = 33
+/**
+ * 34 — a third heading level divides the book.
+ *
+ * *Man and His Symbols* sets Part 1 as `<h1>`, its parts as `<h2>`, and "The
+ * soul of man" as `<h3>`. Only the two shallowest levels divided, so that third
+ * title became a bold line of prose. It was not in the contents, the reader
+ * could not jump to it, and Veda could not be asked to summarise it: as far as
+ * the book's structure knew, it was not there.
+ *
+ * Every level below the chapter now opens a section. The model has two tiers,
+ * so a third level lands in the second one — a flatter outline than the book's,
+ * and a true one.
+ *
+ * A *guessed* heading is the exception. Those levels are inferred from type
+ * size, ranked per document, so they are our arithmetic and not the author's.
+ * A guess still divides only at the exact section level.
+ *
+ * Measured on the shelf: *Man and His Symbols* 35 sections to 57, *Be As You
+ * Are* 44 to 78, *Nondual Love* 21 to 42. Five books did not move at all, and
+ * no book lost a chapter or a paragraph.
+ *
+ * Every book on a shelf re-parses on this bump.
+ */
+export const PARSER_VERSION = 34

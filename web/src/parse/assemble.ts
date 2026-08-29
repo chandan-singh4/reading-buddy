@@ -211,6 +211,33 @@ function resolveLevels(blocks: readonly Block[]): Levels | null {
 }
 
 /**
+ * Is this heading a section of its chapter?
+ *
+ * The section level is the second-shallowest the book uses — but a book does not
+ * stop at two. *Man and His Symbols* sets Part 1 as `<h1>`, its parts as `<h2>`,
+ * and then "The soul of man" as `<h3>`: a real title, in the publisher's own
+ * markup, opening eleven pages of prose. Reading only the exact section level
+ * left it as a line of bold text. It was not in the contents, and Veda could not
+ * be asked to summarise it, because as far as the book's structure was concerned
+ * it did not exist.
+ *
+ * So every level below the chapter divides. The model has two tiers, so a third
+ * level lands in the second one — a flatter outline than the book's, and a true
+ * one, which is the better trade: a reader looking for "The soul of man" finds
+ * it.
+ *
+ * The exception is a *guessed* heading. Those are inferred from type size by
+ * `html.ts`, ranked per document, so their levels are our arithmetic and not the
+ * author's. `The Mountains of My Life` opens a part with five centred lines at
+ * two sizes; letting the deeper guesses divide would cut that book into titles
+ * nobody wrote. A guess divides only at the exact section level.
+ */
+function isSection(block: HeadingBlock, levels: Levels): boolean {
+  if (levels.section === null || block.level < levels.section) return false
+  return block.level === levels.section || block.guessed !== true
+}
+
+/**
  * Demote a heading that turned out not to be structural. Levels deeper than the
  * section level are content, not divisions — keeping them as prose means no
  * text is lost between the source file and the reader.
@@ -299,7 +326,7 @@ function groupByHeadings(
 
     const chapter = currentChapter()
 
-    if (block.kind === 'heading' && levels.section !== null && block.level === levels.section) {
+    if (block.kind === 'heading' && isSection(block, levels)) {
       chapter.sections.push({ title: block.text, blocks: [] })
       pendingIds = [...pendingIds, ...(block.ids ?? [])]
       continue

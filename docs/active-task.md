@@ -305,3 +305,31 @@ Two deviations from the reference, both stated on the card itself:
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 9 — the third heading level (2026-08-29)
+
+The reader found "The soul of man" in *Man and His Symbols*. The publisher set it
+as `<h3>`; the app drew it as bold prose and knew nothing about it.
+
+**The cause.** `parse/assemble.ts` read only the two shallowest heading levels.
+Everything deeper was demoted to prose. It is not one book: *Be As You Are* lost
+36 headings the same way, *Nondual Love* 21, *Man and His Symbols* 23.
+
+**The fix.** New `isSection` in `assemble.ts`. Every heading level below the
+chapter opens a section. A *guessed* heading — one inferred from type size —
+still divides only at the exact section level. See `docs/decisions.md`.
+
+The contents page and "Summarize with Veda" needed no change. Both already work
+from titled sections, so the new sections appear in each.
+
+`PARSER_VERSION` is 34. Every book re-parses.
+
+### Files in scope
+
+- `web/src/parse/assemble.ts` — `isSection`, and the grouping rule.
+- `web/src/parse/version.ts` — 34.
+- `web/src/parse/blocks.test.ts` — two tests.
+- `web/src/parse/library.report.ts` — read only, run by hand for the numbers.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.
