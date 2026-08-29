@@ -23,7 +23,8 @@ const line = (over: Partial<ReadingSession> = {}): ReadingSession => ({
   chapterTitle: 'Part 1: Approaching the Unconscious',
   sectionTitle: undefined,
   highlightCount: 0,
-  noteCount: 0,
+  chatCount: 0,
+  qaCount: 0,
   micro: false,
   ...over,
 })
@@ -86,6 +87,12 @@ describe('heading', () => {
   })
 })
 
+/** The rendered diff line, whose parts are separate elements so Veda can be violet. */
+function diff(one: ReadingSession): string {
+  const { container } = render(<DayLog day={day([one])} />)
+  return container.querySelectorAll('li > div > div')[1].textContent ?? ''
+}
+
 describe('DayLog', () => {
   it('heads the group with the book and its author', () => {
     render(<DayLog day={day([line()])} />)
@@ -94,8 +101,21 @@ describe('DayLog', () => {
   })
 
   it('leaves an empty count out rather than printing a zero', () => {
-    render(<DayLog day={day([line({ highlightCount: 2 })])} />)
-    expect(screen.getByText('1h 3m · 2 highlights')).toBeTruthy()
+    expect(diff(line({ highlightCount: 2 }))).toBe('1h 3m · 2 highlights')
+  })
+
+  it('reads as a diff: what was marked and what was asked', () => {
+    expect(diff(line({ highlightCount: 2, chatCount: 3, qaCount: 11 }))).toBe(
+      '1h 3m · 2 highlights · 3 chats with Veda · 11 Q&A',
+    )
+  })
+
+  it('says one chat, not one chats', () => {
+    expect(diff(line({ chatCount: 1, qaCount: 1 }))).toBe('1h 3m · 1 chat with Veda · 1 Q&A')
+  })
+
+  it('leaves the Q&A count out when there were no chats to attach it to', () => {
+    expect(diff(line({ qaCount: 4 }))).toBe('1h 3m')
   })
 
   it('squashes the micro-sessions, and opens them when asked', () => {

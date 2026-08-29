@@ -142,7 +142,10 @@ export interface ReadingSession {
   chapterTitle: string | undefined
   sectionTitle: string | undefined
   highlightCount: number
-  noteCount: number
+  /** Conversations with Veda that were open during this session. */
+  chatCount: number
+  /** Questions asked in them, each of which Veda answered. */
+  qaCount: number
   /**
    * Under a minute. Squashed in the feed rather than shown, because a reader
    * who opens a book to check one word makes a row that is true and says
@@ -182,29 +185,48 @@ export function activityByDay(
   sessions: readonly StoredSession[],
   books: readonly BookMeta[],
   notes: readonly StoredNote[],
+  threads: readonly StoredTutorThread[],
 ): Map<string, DayActivity> {
   const meta = new Map(books.map((book) => [book.id, book]))
 
-  // Marks are counted by when they were made, against the session that was
-  // running at the time. A highlight carries a colour and a note does not —
-  // that is the app's own way of telling them apart (see `StoredNote.colour`).
-  const marks: { bookId: BookId; at: number; highlight: boolean }[] = []
+  // A highlight is a note with a colour — the app's own way of telling the two
+  // apart (see `StoredNote.colour`). Only highlights are counted here. A typed
+  // note is a different act and the reader asked for Veda in its place.
+  const marks: { bookId: BookId; at: number }[] = []
   for (const note of notes) {
     const at = Date.parse(note.createdAt)
-    if (Number.isFinite(at)) {
-      marks.push({ bookId: note.bookId, at, highlight: note.colour !== undefined })
+    if (Number.isFinite(at) && note.colour !== undefined) {
+      marks.push({ bookId: note.bookId, at })
     }
   }
 
   const days = new Map<string, DayActivity>()
 
   for (const session of sessions) {
-    const made = marks.filter(
-      (mark) =>
-        mark.bookId === session.bookId &&
-        mark.at >= session.startedAt &&
-        mark.at <= session.endedAt,
-    )
+    const within = (bookId: BookId, at: number): boolean =>
+      bookId === session.bookId && at >= session.startedAt && at <= session.endedAt
+
+    const highlightCount = marks.filter((mark) => within(mark.bookId, mark.at)).length
+
+    /*
+     * Veda, counted the way the rest of the screen counts her: by the timestamp
+     * on each message, never by the thread's own dates. A conversation opened
+     * last week and picked up again tonight belongs to tonight's session for
+     * the questions asked tonight, and to no other.
+     *
+     * A question is a Q&A because Veda answers every one. The Statistics card
+     * above already collapsed the pair for the same reason.
+     */
+    let chatCount = 0
+    let qaCount = 0
+    for (const thread of threads) {
+      const asked = thread.messages.filter(
+        (message) => message.role === 'you' && within(thread.bookId, message.ts),
+      ).length
+      const spoke = thread.messages.some((message) => within(thread.bookId, message.ts))
+      if (spoke) chatCount += 1
+      qaCount += asked
+    }
 
     const line: ReadingSession = {
       id: session.id,
@@ -218,8 +240,9 @@ export function activityByDay(
       durationMinutes: Math.round(session.activeMs / 60_000),
       chapterTitle: session.chapterTitle,
       sectionTitle: session.sectionTitle,
-      highlightCount: made.filter((mark) => mark.highlight).length,
-      noteCount: made.filter((mark) => !mark.highlight).length,
+      highlightCount,
+      chatCount,
+      qaCount,
       micro: session.activeMs < MICRO_MS,
     }
 
@@ -301,7 +324,7 @@ export function summariseAll(sources: StatsSources, today: Date): AllTimeStats {
   return {
     streak: streakOf(byDay, today),
     heatmap: heatmapOf(byDay, today),
-    log: activityByDay(sources.sessions, sources.books, sources.notes),
+    log: activityByDay(sources.sessions, sources.books, sources.notes, sources.threads),
     readBooks,
     trackingStart: [...byDay.keys()].sort()[0],
     genres: counts,

@@ -148,7 +148,7 @@ describe('activityByDay — the day’s commit log', () => {
     }) as StoredNote
 
   it('groups a day by book, longest first, and names the author', () => {
-    const activity = activityByDay([morning, evening], books, []).get('2026-08-28')
+    const activity = activityByDay([morning, evening], books, [], []).get('2026-08-28')
     expect(activity?.totalMinutes).toBe(63)
     expect(activity?.books.map((b) => [b.bookTitle, b.totalMinutes])).toEqual([
       ['Letters', 43],
@@ -158,39 +158,67 @@ describe('activityByDay — the day’s commit log', () => {
   })
 
   it('marks a sub-minute session for squashing and leaves the rest alone', () => {
-    const activity = activityByDay([morning, glance], books, []).get('2026-08-28')
+    const activity = activityByDay([morning, glance], books, [], []).get('2026-08-28')
     expect(activity?.books[0].sessions.map((s) => s.micro)).toEqual([false, true])
   })
 
   it('adds a squashed session to the totals even though it is not shown', () => {
     // Squashing is a way of drawing the day, not a way of discounting it.
-    const activity = activityByDay([morning, glance], books, []).get('2026-08-28')
+    const activity = activityByDay([morning, glance], books, [], []).get('2026-08-28')
     expect(activity?.totalMinutes).toBe(20)
     expect(activity?.books[0].sessions).toHaveLength(2)
   })
 
-  it('counts the marks made while a session was running, and no others', () => {
+  it('counts the highlights made while a session was running, and no others', () => {
     const marks = [
       note(new Date(2026, 7, 28, 9, 10), '#f2df6b'),
       note(new Date(2026, 7, 28, 9, 15), '#f2df6b'),
+      // No colour: a note the reader typed, which is a different act.
       note(new Date(2026, 7, 28, 9, 20)),
-      // After the session ended — a note written up later belongs to no sitting.
+      // After the session ended — a highlight made later belongs to no sitting.
       note(new Date(2026, 7, 28, 12, 0), '#f2df6b'),
     ]
-    const line = activityByDay([morning], books, marks).get('2026-08-28')?.books[0].sessions[0]
+    const line = activityByDay([morning], books, marks, []).get('2026-08-28')?.books[0].sessions[0]
     expect(line?.highlightCount).toBe(2)
-    expect(line?.noteCount).toBe(1)
+  })
+
+  it('counts the chats with Veda by when each question was asked', () => {
+    const spoke = (id: string, at: number[]): StoredTutorThread =>
+      ({
+        bookId: 'b1' as BookId,
+        id,
+        messages: at.flatMap((ts) => [
+          { role: 'you', text: 'q', ts },
+          { role: 'claude', text: 'a', ts },
+        ]),
+      }) as StoredTutorThread
+
+    // The sitting runs 9:00 to 9:20.
+    const inside = new Date(2026, 7, 28, 9, 10).getTime()
+    // A thread opened during the sitting and picked up again after it. Only the
+    // question asked inside belongs to this session; the follow-up does not.
+    const afterwards = new Date(2026, 7, 28, 9, 40).getTime()
+    const elsewhere = new Date(2026, 7, 28, 14, 0).getTime()
+
+    const line = activityByDay([morning], books, [], [
+      spoke('t1', [inside, afterwards]),
+      spoke('t2', [inside]),
+      spoke('t3', [elsewhere]),
+    ]).get('2026-08-28')?.books[0].sessions[0]
+
+    expect(line?.chatCount).toBe(2)
+    expect(line?.qaCount).toBe(2)
   })
 
   it('keeps the sessions in the order they happened', () => {
     const later = { ...session(day, 15, 21) }
-    const order = activityByDay([later, morning], books, []).get('2026-08-28')?.books[0].sessions
+    const order = activityByDay([later, morning], books, [], []).get('2026-08-28')?.books[0].sessions
     expect(order?.map((s) => new Date(s.startTime).getHours())).toEqual([9, 21])
   })
 
   it('says nothing rather than guessing when the book has been deleted', () => {
     // Sessions deliberately outlive their book. The title cannot.
-    expect(activityByDay([morning], [], []).get('2026-08-28')?.books[0].bookTitle).toBeUndefined()
+    expect(activityByDay([morning], [], [], []).get('2026-08-28')?.books[0].bookTitle).toBeUndefined()
   })
 })
 

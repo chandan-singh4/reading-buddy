@@ -415,6 +415,10 @@
   margin-top: 3px;
 }
 
+.metaVeda {
+  color: var(--veda-soft);
+}
+
 .squashBtn {
   border: 0;
   background: none;

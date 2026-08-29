@@ -2132,3 +2132,47 @@ repository method stay; only the UI is gone.
   colour as the unselected ones. The same fault hit the chart legend and the
   calendar's Apply button. Every modifier in `stats.module.css` is now scoped to
   its parent. The browser found this; the code read as correct.
+
+## The day's reading is drawn as a git log
+
+Settled 2026-08-28. The reader proposed it, in these words: "it's like git where
+we know every action."
+
+**The problem.** A heatmap square said "63 min". That is true and the reader
+cannot check it. It does not say which book, or how many sittings, or what they
+did while they were there.
+
+**The borrowed shape.** A git log is readable for three reasons, and a day of
+reading has all three problems:
+
+1. It groups by repository. Two books in a day are two repositories.
+2. It hangs each change off one line, with a quieter diff line under it. A
+   sitting is a commit; time, highlights and chats are its diff.
+3. It squashes the noise. A ten-second look at the subject tags is the typo fix
+   nobody needs to read.
+
+**What each part maps to.**
+
+| git | Reading Buddy |
+|---|---|
+| repository | a book |
+| commit | one sitting |
+| timestamp and message | the time it started, and the chapter reached |
+| diff line | duration · highlights · chats with Veda · Q&A |
+| squashed commits | sittings under a minute, folded and openable |
+
+**The rules that came out of it.**
+
+- A squashed session is hidden, never discounted. It still counts in every
+  total. Squashing is a way to draw the day, not a way to shorten it.
+- A count of zero is left out. "0 highlights" is noise.
+- Q&A appears only beside the chats it happened in.
+- Violet marks anything of Veda's, here as everywhere else in the app.
+- Marks and questions are counted by *when they happened*, against the session
+  that was running at that moment — never by a thread's own dates.
+
+**What the analogy does not buy.** A git log can show a diff because a file has
+lines. A reflowable book does not: it paginates at the reader's own text size,
+so "+24 pages" would be arbitrary. The diff line therefore reports what the
+reader *did* — marked, asked — and not how far the text moved. See
+`docs/active-task.md` for the sections-advanced idea that would replace it.

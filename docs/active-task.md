@@ -185,18 +185,27 @@ those same three problems.
 - **Grouped by book.** A book is a repository: cover mark, title, author, and
   the time in that book that day. The book read most that day leads.
 - **A branch line of commits.** Start time, then the chapter and section in
-  bold, then a quieter line of duration, highlights and notes. A count of zero
-  is left out, never printed as "0".
+  bold, then a quieter diff line: duration, highlights, chats with Veda and the
+  Q&A in them. A count of zero is left out, never printed as "0". Anything of
+  Veda's is violet, as everywhere else in the app.
 - **Filled node for a sitting, hollow for a lookup** (under two minutes). Drawn
   rather than labelled, because it is a hint and not a claim.
 - **Micro-sessions squashed.** Anything under a minute folds into one row that
   says how many, and opens when tapped. Nothing is discarded, and the squashed
   rows still count towards every total.
 
-**Highlights and notes are real, counted, and new.** A note carries a
-`createdAt` and a highlight is a note with a colour, so the marks made inside a
+**Highlights and Veda are real, counted, and new.** A note carries a `createdAt`
+and a highlight is a note with a colour, so the highlights made inside a
 session's window are countable without storing anything new. `noteStore` gained
 `allNotes()`, and `StatsSources` gained `notes`.
+
+The reader's typed notes are **not** counted. The line reports the chats with
+Veda instead, and the questions asked in them — counted by the timestamp on each
+message, so a thread picked up again tomorrow belongs to tomorrow for
+tomorrow's questions. The reader asked for this by name.
+
+See `docs/decisions.md`, "The day's reading is drawn as a git log", for the
+whole mapping.
 
 **Two kinds of repetition are trimmed** from a heading, both the book's habit
 rather than ours: a chapter that repeats the book's title, and an EPUB heading

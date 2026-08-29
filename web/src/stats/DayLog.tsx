@@ -86,16 +86,31 @@ export function heading(
   return parts.length === 0 ? 'Reading' : parts.join(' · ')
 }
 
-/** `63 min · 2 highlights · 1 note`, with the zeroes left out. */
-function meta(line: ReadingSession): string {
-  const parts = [spell(line.durationMinutes)]
+/**
+ * `1h 3m · 2 highlights · 3 chats with Veda · 11 Q&A`, zeroes left out.
+ *
+ * This is the diff line of the commit: what changed in that sitting, not just
+ * how long it took. Time alone says the reader was present. The marks and the
+ * conversation say what they did while they were there.
+ */
+export function meta(line: ReadingSession): { text: string; veda: boolean }[] {
+  const parts = [{ text: spell(line.durationMinutes), veda: false }]
   if (line.highlightCount > 0) {
-    parts.push(`${line.highlightCount} highlight${line.highlightCount === 1 ? '' : 's'}`)
+    parts.push({
+      text: `${line.highlightCount} highlight${line.highlightCount === 1 ? '' : 's'}`,
+      veda: false,
+    })
   }
-  if (line.noteCount > 0) {
-    parts.push(`${line.noteCount} note${line.noteCount === 1 ? '' : 's'}`)
+  if (line.chatCount > 0) {
+    parts.push({
+      text: `${line.chatCount} chat${line.chatCount === 1 ? '' : 's'} with Veda`,
+      veda: true,
+    })
+    // Only alongside the chats it happened in. On its own it would be a count
+    // with nothing to attach to.
+    if (line.qaCount > 0) parts.push({ text: `${line.qaCount} Q&A`, veda: true })
   }
-  return parts.join(' · ')
+  return parts
 }
 
 function Commit({
@@ -120,7 +135,16 @@ function Commit({
           <span className={styles.commitAt}>{clockTime(line.startTime)}</span>
           <span className={styles.commitWhat}>{heading(line, bookTitle, author)}</span>
         </div>
-        <div className={styles.commitMeta}>{meta(line)}</div>
+        {/* Violet is Veda's and nothing else's, everywhere in this app. The
+            separators stay in the quiet colour so the eye follows the words. */}
+        <div className={styles.commitMeta}>
+          {meta(line).map((part, i) => (
+            <span key={part.text}>
+              {i > 0 && ' · '}
+              <span className={part.veda ? styles.metaVeda : undefined}>{part.text}</span>
+            </span>
+          ))}
+        </div>
       </div>
     </li>
   )
