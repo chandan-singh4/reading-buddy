@@ -222,3 +222,27 @@ or a different phone. A page range would look precise and be arbitrary.
 The honest version of that number is sections advanced, which is stable across
 text sizes. It needs the session to record where it *started* as well as where
 it ended, and there is no back-data for it. Not started — ask the reader first.
+
+## Pass 5 — the year, the ends, and the calendar (2026-08-29)
+
+The reader tested with real reading again. Six changes:
+
+1. A sitting that runs past midnight now says so. The row keeps the day it
+   started. The time range names the day it ended: `11:41 pm – 12:25 am ·
+   Aug 29`. The day summary adds `· ran past midnight`.
+2. Every commit line shows the end time, not only the start.
+3. The heatmap legend moved to directly under the grid.
+4. The heatmap is one calendar year, Jan to Dec. A year picker sits at the top
+   right of the card. It defaults to the current year and lists every year with
+   data. A past year opens at January; the current year opens at today.
+   `AllTimeStats` now carries `byDay`, so the screen can slice any year.
+5. "Break It Down" is now "A closer look". The screen opens on Day, not Week.
+6. The range calendar was transparent. `Portal` moves it out of `.shell`, so it
+   lost the palette. The tokens are now declared on `.shell, .backdrop`.
+
+A small one found while checking: the grid starts on the Monday before Jan 1, so
+the first column can hold December days. Its "Dec" label collided with "Jan".
+The label is dropped; the days stay.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.

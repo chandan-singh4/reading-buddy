@@ -6,7 +6,14 @@ import Heatmap from '../stats/Heatmap.tsx'
 import RangeCalendar from '../stats/RangeCalendar.tsx'
 import { loadStats } from '../stats/load.ts'
 import { dayKey } from '../stats/sessions.ts'
-import { splitTime, spanDays, summariseAll, summarisePeriod, type StatsSources } from '../stats/gather.ts'
+import {
+  heatmapOf,
+  splitTime,
+  spanDays,
+  summariseAll,
+  summarisePeriod,
+  type StatsSources,
+} from '../stats/gather.ts'
 import {
   customPeriod,
   periodOf,
@@ -84,9 +91,12 @@ const SCOPES: { key: Exclude<Scope, 'custom'>; label: string }[] = [
 
 export default function Stats() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
-  const [scope, setScope] = useState<Scope>('week')
+  // Day, not week. The reader opens this screen after reading, and the question
+  // they came with is "what did I just do?", not "how was my week?".
+  const [scope, setScope] = useState<Scope>('day')
   const [custom, setCustom] = useState<{ start: Date; end: Date } | undefined>()
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const [year, setYear] = useState(() => new Date().getFullYear())
 
   /*
    * "Now" is pinned once, when the screen mounts.
@@ -124,6 +134,30 @@ export default function Stats() {
     () => (sources ? summariseAll(sources, now) : undefined),
     [sources, now],
   )
+
+  /*
+   * The heatmap's own year, rebuilt only when the year changes. It is not part
+   * of `summariseAll` because it is the one thing on this screen with a control
+   * of its own — and recomputing every card to move one card would be a waste
+   * the reader can feel on a phone.
+   */
+  const heatmap = useMemo(
+    () => (allTime ? heatmapOf(allTime.byDay, year) : []),
+    [allTime, year],
+  )
+
+  /*
+   * Every year there is anything to show, newest first. The list stops at this
+   * year rather than running on: a year with no reading yet is still a year the
+   * reader is in, but next year is not a place to look.
+   */
+  const years = useMemo(() => {
+    const thisYear = now.getFullYear()
+    const first = allTime?.trackingStart ? Number(allTime.trackingStart.slice(0, 4)) : thisYear
+    const out: number[] = []
+    for (let y = thisYear; y >= Math.min(first, thisYear); y -= 1) out.push(y)
+    return out
+  }, [allTime, now])
 
   const period: Period = useMemo(
     () =>
@@ -195,15 +229,18 @@ export default function Stats() {
 
       {/* 2 — Heatmap. Independent of the toggle. */}
       <Heatmap
-        days={allTime.heatmap}
+        days={heatmap}
         today={dayKey(now)}
         trackingStart={allTime.trackingStart}
         log={allTime.log}
+        year={year}
+        years={years}
+        onYear={setYear}
       />
 
       {/* 3 — Scope */}
       <div className={styles.divide}>
-        <span>Break it down</span>
+        <span>A closer look</span>
       </div>
 
       <div className={styles.scope}>

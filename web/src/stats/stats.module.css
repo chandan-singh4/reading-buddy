@@ -24,7 +24,18 @@
  * screen edges and re-pads to the reference's 20px.
  */
 
-.shell {
+/*
+ * The screen's palette, declared on two roots rather than one.
+ *
+ * `.shell` is the page. `.backdrop` is the range calendar, which `Portal`
+ * reparents to the document root — outside `.shell`, and therefore outside the
+ * scope of anything declared on it. Every `var(--card)` in the calendar
+ * resolved to nothing and the panel rendered with no background at all: the
+ * page showed straight through it. This is that bug's fix, and the reason the
+ * list is shared instead of copied.
+ */
+.shell,
+.backdrop {
   /* Paper */
   --paper: #efe8d9;
   --card: #fbf7ed;
@@ -61,6 +72,9 @@
   --g4: #7e8c4e;
   --g5: #8b7690;
 
+}
+
+.shell {
   /* Out of `.content`'s padding, back to the screen edge, then in again at the
      reference's own 20px. `--space-5`/`--space-4` are what `AppShell` used. */
   margin: calc(var(--space-5) * -1) calc(var(--space-4) * -1);
@@ -151,6 +165,33 @@
 }
 
 /* --- Heatmap --------------------------------------------------------------- */
+
+/* The label and the year picker share a line. The label's rule already runs to
+   the end of its box, so the picker sits outside it rather than inside. */
+.hmTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hmTop .cardLabel {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.hmYear {
+  flex: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: #ede4d2;
+  border: 1px solid var(--card-edge);
+  border-radius: 9px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
 
 .hmScroll {
   overflow-x: auto;
@@ -261,6 +302,13 @@
   margin-top: 12px;
 }
 
+/* The legend and the caption it belongs with, on one line where there is room:
+   the key on the right, the sentence explaining it on the left. */
+.hmLegend + .cap {
+  margin-top: -14px;
+  max-width: 60%;
+}
+
 .hmLegend .cell {
   width: 11px;
   height: 11px;
@@ -269,8 +317,10 @@
 
 .hmTip {
   font-size: 13px;
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
   color: var(--ink-soft);
-  margin-top: 10px;
+  margin-top: 14px;
   min-height: 19px;
   font-style: italic;
 }
@@ -870,6 +920,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
+  color: var(--ink);
   /* Below the drawer's scrim and panel at 8 and 9 — see `app/Portal.tsx`.
      Opening the drawer must cover this, not leave it floating on the glass. */
   z-index: 7;

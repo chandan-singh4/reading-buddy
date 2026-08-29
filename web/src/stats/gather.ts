@@ -103,18 +103,24 @@ export function streakOf(byDay: ReadonlyMap<string, number>, today: Date): Strea
 }
 
 /**
- * A rolling 12 months of days, oldest first, aligned so the first entry is a
- * Monday — the heatmap draws whole week-columns, and a ragged first column
+ * One calendar year of days, January to December, aligned so the first entry is
+ * a Monday — the heatmap draws whole week-columns, and a ragged first column
  * would put Tuesday at the top of it.
  *
- * Days before the first recorded session come back as `level: 0`, like any
- * other empty day. Whether to grey those out is a question about presentation,
- * and the screen answers it; this function only reports minutes.
+ * A calendar year rather than a rolling twelve months, on the reader's
+ * instruction. A rolling window has no edges anybody recognises: it starts on
+ * an arbitrary day in a month that is half missing, and "last August" and "this
+ * August" sit in the same strip meaning different things. A year is a thing a
+ * reader can name, compare with another year, and finish.
+ *
+ * Days that have not happened yet, and days before the first recorded session,
+ * come back as `level: 0` like any other empty day. Whether to grey them out is
+ * a question about presentation; this function only reports minutes.
  */
-export function heatmapOf(byDay: ReadonlyMap<string, number>, today: Date): HeatDay[] {
-  const end = startOfDay(today)
-  const rough = addDays(end, -364)
-  const start = addDays(rough, -((rough.getDay() + 6) % 7))
+export function heatmapOf(byDay: ReadonlyMap<string, number>, year: number): HeatDay[] {
+  const first = new Date(year, 0, 1)
+  const start = addDays(first, -((first.getDay() + 6) % 7))
+  const end = new Date(year, 11, 31)
 
   const out: HeatDay[] = []
   for (let day = start; day <= end; day = addDays(day, 1)) {
@@ -291,7 +297,8 @@ export function activityByDay(
 
 export interface AllTimeStats {
   streak: Streak
-  heatmap: HeatDay[]
+  /** Minutes per day, all of them. The heatmap slices this by year. */
+  byDay: Map<string, number>
   /** Every day's reading, grouped by book — what a tapped square opens. */
   log: Map<string, DayActivity>
   /** The books with a recorded session — what the genre bars count. */
@@ -323,7 +330,7 @@ export function summariseAll(sources: StatsSources, today: Date): AllTimeStats {
 
   return {
     streak: streakOf(byDay, today),
-    heatmap: heatmapOf(byDay, today),
+    byDay,
     log: activityByDay(sources.sessions, sources.books, sources.notes, sources.threads),
     readBooks,
     trackingStart: [...byDay.keys()].sort()[0],

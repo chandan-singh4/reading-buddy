@@ -5,11 +5,13 @@ import type { DayActivity, HeatDay } from './gather.ts'
 import styles from './stats.module.css'
 
 /**
- * A rolling twelve months, one square per day, shaded by how long you read.
+ * One calendar year, one square per day, shaded by how long you read.
  *
  * Independent of the scope toggle by design: a year of days is the one view on
  * this screen that shows a *habit* rather than a total, and slicing it to "this
- * week" would leave seven squares and no habit.
+ * week" would leave seven squares and no habit. The year picker at the top
+ * right is its own control for that reason — it moves this card and nothing
+ * else on the screen.
  *
  * The grid is columns of weeks, not rows of days, because that is the shape
  * that fits a phone: 53 columns scroll sideways, 53 rows would not fit at all.
@@ -35,22 +37,36 @@ export default function Heatmap({
   today,
   trackingStart,
   log,
+  year,
+  years,
+  onYear,
 }: {
   days: readonly HeatDay[]
   today: string
   trackingStart: string | undefined
   /** Every day's reading, grouped by book. A tapped square opens its day. */
   log: ReadonlyMap<string, DayActivity>
+  year: number
+  /** Every year there is anything to show, newest first. */
+  years: readonly number[]
+  onYear: (year: number) => void
 }) {
   const [picked, setPicked] = useState<HeatDay | undefined>()
   const scroller = useRef<HTMLDivElement>(null)
 
-  // Today is the point of the whole strip, and it is at the far right. Opening
-  // scrolled to January would show a year of history and hide this week.
+  /*
+   * The current year opens scrolled to today, which is near the right. A past
+   * year opens at January, because all of it is behind us and the beginning is
+   * where a finished year is read from.
+   */
   useEffect(() => {
     const el = scroller.current
-    if (el) el.scrollLeft = el.scrollWidth
-  }, [days.length])
+    if (!el) return
+    el.scrollLeft = today.startsWith(String(year)) ? el.scrollWidth : 0
+  }, [days.length, year, today])
+
+  // The picked day belongs to the year that was on screen when it was tapped.
+  useEffect(() => setPicked(undefined), [year])
 
   // Whole weeks, Monday at the top. `heatmapOf` guarantees the first day is a
   // Monday, so no column is ever ragged.
@@ -70,9 +86,35 @@ export default function Heatmap({
     }
   })
 
+  /*
+   * The grid starts on the Monday before January 1, so the first column can
+   * still belong to December. One column is too narrow for a label, and "Dec"
+   * printed there collides with "Jan". The days stay; only the label goes.
+   */
+  if (marks.length > 1 && marks[1].at < 2) {
+    marks[1].at = 0
+    marks.shift()
+  }
+
   return (
     <div className={styles.card}>
-      <div className={styles.cardLabel}>Days you read</div>
+      <div className={styles.hmTop}>
+        <div className={styles.cardLabel}>Days you read</div>
+        {/* A native select: on a phone this is the system's own year wheel,
+            which is better than anything drawn here and already accessible. */}
+        <select
+          className={styles.hmYear}
+          aria-label="Year"
+          value={year}
+          onChange={(event) => onYear(Number(event.target.value))}
+        >
+          {years.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className={styles.hmScroll} ref={scroller}>
         <div className={styles.hmGrid}>
@@ -133,6 +175,21 @@ export default function Heatmap({
         </div>
       </div>
 
+      {/* Directly under the grid it explains. It used to sit after the day's
+          log, so tapping a square pushed the key hundreds of pixels away from
+          the squares whose colours it was there to name. */}
+      <div className={styles.hmLegend} aria-hidden="true">
+        Less
+        <span className={styles.cell} />
+        <span className={`${styles.cell} ${styles.l1}`} />
+        <span className={`${styles.cell} ${styles.l2}`} />
+        <span className={`${styles.cell} ${styles.l3}`} />
+        <span className={`${styles.cell} ${styles.l4}`} />
+        More
+      </div>
+
+      <div className={styles.cap}>Shade = minutes read that day.</div>
+
       {/* `aria-live` because the tip is the only place a tapped square reports
           itself, and a tap that says nothing aloud is a tap that did nothing. */}
       <div className={styles.hmTip} aria-live="polite">
@@ -151,17 +208,6 @@ export default function Heatmap({
           reader, and a whole day announced on every tap is not a tip. */}
       {picked !== undefined && <DayLog day={log.get(picked.day)} />}
 
-      <div className={styles.hmLegend} aria-hidden="true">
-        Less
-        <span className={styles.cell} />
-        <span className={`${styles.cell} ${styles.l1}`} />
-        <span className={`${styles.cell} ${styles.l2}`} />
-        <span className={`${styles.cell} ${styles.l3}`} />
-        <span className={`${styles.cell} ${styles.l4}`} />
-        More
-      </div>
-
-      <div className={styles.cap}>Rolling 12 months · shade = minutes read that day.</div>
     </div>
   )
 }

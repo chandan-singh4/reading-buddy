@@ -113,11 +113,13 @@ describe('streakOf', () => {
 })
 
 describe('heatmapOf', () => {
-  const map = heatmapOf(new Map([['2026-08-28', 42]]), FRIDAY)
+  const map = heatmapOf(new Map([['2026-08-28', 42]]), 2026)
 
-  it('covers a rolling year and stops at today', () => {
-    expect(map.at(-1)?.day).toBe('2026-08-28')
-    expect(map.length).toBeGreaterThan(365)
+  it('runs January to December, whatever today happens to be', () => {
+    // A calendar year, not a rolling window: it must end on the 31st of
+    // December even though December has not happened yet.
+    expect(map.at(-1)?.day).toBe('2026-12-31')
+    expect(map.some((d) => d.day === '2026-01-01')).toBe(true)
   })
 
   it('starts on a Monday, so no week column is ragged', () => {
@@ -125,8 +127,20 @@ describe('heatmapOf', () => {
     expect(new Date(y, m - 1, d).getDay()).toBe(1)
   })
 
+  it('reaches back into December for that first Monday, and no further', () => {
+    expect(map[0].day).toBe('2025-12-29')
+  })
+
   it('shades a day by its own minutes', () => {
-    expect(map.at(-1)).toEqual({ day: '2026-08-28', minutes: 42, level: 3 })
+    expect(map.find((d) => d.day === '2026-08-28')).toEqual({
+      day: '2026-08-28',
+      minutes: 42,
+      level: 3,
+    })
+  })
+
+  it('shows another year as empty rather than borrowing this one’s days', () => {
+    expect(heatmapOf(new Map([['2026-08-28', 42]]), 2025).every((d) => d.minutes === 0)).toBe(true)
   })
 })
 

@@ -6,7 +6,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import DayLog, { heading, spell } from './DayLog.tsx'
+import DayLog, { heading, span, spell } from './DayLog.tsx'
 import type { DayActivity, ReadingSession } from './gather.ts'
 import type { BookId } from '../structure/index.ts'
 
@@ -53,6 +53,32 @@ describe('spell', () => {
     expect(spell(43)).toBe('43 min')
     expect(spell(63)).toBe('1h 3m')
     expect(spell(120)).toBe('2h')
+  })
+})
+
+describe('span', () => {
+  it('gives both ends of an ordinary sitting', () => {
+    expect(span(line())).toBe('8:48 pm – 9:50 pm')
+  })
+
+  it('names the day a sitting ended when it ran past midnight', () => {
+    // The reader started twenty minutes before midnight and read through it.
+    // The session is filed under the 28th, which is right — but the card must
+    // not leave "11:41 pm – 12:25 am" looking like a session that went
+    // backwards.
+    const overran = line({
+      startTime: new Date(2026, 7, 28, 23, 41).getTime(),
+      endTime: new Date(2026, 7, 29, 0, 25).getTime(),
+    })
+    expect(span(overran)).toBe('11:41 pm – 12:25 am · Aug 29')
+  })
+
+  it('is not fooled by a sitting that merely lasts a long time', () => {
+    const long = line({
+      startTime: new Date(2026, 7, 28, 9, 0).getTime(),
+      endTime: new Date(2026, 7, 28, 14, 0).getTime(),
+    })
+    expect(span(long)).toBe('9:00 am – 2:00 pm')
   })
 })
 
@@ -134,6 +160,20 @@ describe('DayLog', () => {
     // Nothing was thrown away — a squashed commit is still in the history.
     expect(screen.queryByRole('button', { name: /squashed/ })).toBeNull()
     expect(screen.getAllByText('<1 min')).toHaveLength(2)
+  })
+
+  it('says so in the summary when the day ran past midnight', () => {
+    const overran = line({
+      startTime: new Date(2026, 7, 28, 23, 41).getTime(),
+      endTime: new Date(2026, 7, 29, 0, 25).getTime(),
+    })
+    render(<DayLog day={day([overran])} />)
+    expect(screen.getByText(/ran past midnight/)).toBeTruthy()
+  })
+
+  it('does not say it for a day that stayed inside itself', () => {
+    render(<DayLog day={day([line()])} />)
+    expect(screen.queryByText(/ran past midnight/)).toBeNull()
   })
 
   it('draws nothing at all for a day with no reading', () => {

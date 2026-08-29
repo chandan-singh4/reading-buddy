@@ -41,6 +41,31 @@ export function clockTime(at: number): string {
   }`
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** Whether a sitting finished on a later calendar day than it began. */
+export function pastMidnight(line: ReadingSession): boolean {
+  const from = new Date(line.startTime)
+  const to = new Date(line.endTime)
+  return from.toDateString() !== to.toDateString()
+}
+
+/**
+ * `11:41 pm – 12:25 am`, and `· Aug 29` when the sitting ran past midnight.
+ *
+ * A session belongs to the day it *began*, which is the right answer — one
+ * sitting is one sitting, and a chapter finished at ten past midnight was read
+ * in the evening, not in the small hours of a day the reader had not begun.
+ * But the filing must not hide the fact. Naming the day it ended is the whole
+ * of the fix: nothing moves, and nothing is unexplained.
+ */
+export function span(line: ReadingSession): string {
+  const range = `${clockTime(line.startTime)} – ${clockTime(line.endTime)}`
+  if (!pastMidnight(line)) return range
+  const end = new Date(line.endTime)
+  return `${range} · ${MONTHS[end.getMonth()]} ${end.getDate()}`
+}
+
 /** `1h 3m`, or `43 min`. Hours only once there are hours. */
 export function spell(minutes: number): string {
   if (minutes < 1) return '<1 min'
@@ -132,7 +157,7 @@ function Commit({
       />
       <div className={styles.commitBody}>
         <div className={styles.commitHead}>
-          <span className={styles.commitAt}>{clockTime(line.startTime)}</span>
+          <span className={styles.commitAt}>{span(line)}</span>
           <span className={styles.commitWhat}>{heading(line, bookTitle, author)}</span>
         </div>
         {/* Violet is Veda's and nothing else's, everywhere in this app. The
@@ -203,12 +228,14 @@ export default function DayLog({ day }: { day: DayActivity | undefined }) {
   if (day === undefined || day.books.length === 0) return null
 
   const sessions = day.books.reduce((sum, book) => sum + book.sessions.length, 0)
+  const overran = day.books.some((book) => book.sessions.some(pastMidnight))
 
   return (
     <div className={styles.log}>
       <div className={styles.logSum}>
         {day.books.length} book{day.books.length === 1 ? '' : 's'} · {sessions} session
         {sessions === 1 ? '' : 's'} · {spell(day.totalMinutes)} total
+        {overran && ' · ran past midnight'}
       </div>
       {day.books.map((book) => (
         <BookLog key={book.bookId} book={book} />
