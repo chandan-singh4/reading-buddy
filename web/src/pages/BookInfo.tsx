@@ -8,6 +8,9 @@ import { fullTitle } from '../app/title.ts'
 import { forgetCovers, useCovers } from '../app/useCovers.ts'
 import { catalogueDeps, refreshBook } from '../catalogue/index.ts'
 import { isOutOfDate, reparseBooks } from '../import/index.ts'
+import { sessionStore } from '../stats/sessions.ts'
+import TrajectoryCard from '../stats/Trajectory.tsx'
+import { trajectoryOf, type Trajectory } from '../stats/trajectory.ts'
 import { repository } from '../storage/index.ts'
 import type { ReadingPosition } from '../storage/db.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
@@ -215,6 +218,14 @@ export default function BookInfo() {
   const [catalogue, setCatalogue] = useState<CatalogueState>({ status: 'idle' })
   /** Whether the file this book came from is still kept — see `updateThis`. */
   const [hasSource, setHasSource] = useState(false)
+  /*
+   * The pacing forecast, for a book being read right now.
+   *
+   * Loaded separately from the book itself, and allowed to fail quietly: it is
+   * the last card on a long page, and a details page must still open when the
+   * session history does not.
+   */
+  const [pace, setPace] = useState<Trajectory | undefined>()
 
   useEffect(() => {
     let cancelled = false
@@ -231,6 +242,29 @@ export default function BookInfo() {
       cancelled = true
     }
   }, [id])
+
+  const percent = state.status === 'ready' ? state.position?.percent : undefined
+
+  useEffect(() => {
+    // Only a book in progress. A finished book has no finish to forecast, and
+    // one never opened has nothing to forecast from.
+    if (percent === undefined || percent <= 0 || percent >= 100) {
+      setPace(undefined)
+      return
+    }
+    let cancelled = false
+    sessionStore
+      .forBook(id)
+      .then((sessions) => {
+        if (!cancelled) setPace(trajectoryOf(sessions, percent, new Date()))
+      })
+      .catch(() => {
+        if (!cancelled) setPace(undefined)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id, percent])
 
   const covers = useCovers(useMemo(() => (state.status === 'ready' ? [id] : []), [state.status, id]))
 
@@ -600,6 +634,10 @@ export default function BookInfo() {
           Updated. This book has been re-read with the current version.
         </p>
       )}
+
+      {/* The last word on the page: when this book will be finished. Only for
+          a book being read now — see the effect above. */}
+      {pace !== undefined && <TrajectoryCard data={pace} title={book.title} />}
     </div>
   )
 }

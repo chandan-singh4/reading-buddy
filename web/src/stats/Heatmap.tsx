@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 
 import DayLog from './DayLog.tsx'
 import type { DayActivity, HeatDay } from './gather.ts'
@@ -115,8 +115,18 @@ export default function Heatmap({
     marks.shift()
   }
 
+  /*
+   * A tap on the card that is not a tap on a control clears the selection, and
+   * the day's log goes with it. Nothing else on this screen stays selected for
+   * ever, and a card that will not let go of a day quietly costs the reader the
+   * rest of the screen.
+   */
+  const clearIfBackground = (event: MouseEvent<HTMLDivElement>): void => {
+    if (!(event.target as HTMLElement).closest('button, select')) setPicked(undefined)
+  }
+
   return (
-    <div className={styles.card}>
+    <div className={styles.card} onClick={clearIfBackground}>
       <div className={styles.hmTop}>
         <div className={styles.cardLabel}>{open ? 'Days you read' : 'This week'}</div>
         {open && (
@@ -227,7 +237,8 @@ export default function Heatmap({
                         className={className}
                         disabled={ahead || untracked}
                         aria-label={`${label(day.day)}, ${day.minutes} minutes`}
-                        onClick={() => setPicked(day)}
+                        // Tapping the chosen day again lets it go.
+                        onClick={() => setPicked(picked?.day === day.day ? undefined : day)}
                       />
                     )
                   })}

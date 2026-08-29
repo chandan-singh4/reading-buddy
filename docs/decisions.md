@@ -2262,3 +2262,42 @@ The pickable window is still [tracking start, today] — that guardrail did not
 move. But the month arrows always work. A calendar that will not turn its own
 pages is not a calendar, and the line under the month name says when tracking
 began, so an all-grey month explains itself.
+
+## The finish date is worked out from the reading, not from a page count
+
+A reflowable book has no fixed pages, so a forecast cannot divide pages by a
+reading speed. It divides two things the app actually measures:
+
+    estimated total = minutes logged / (percent read / 100)
+
+Nothing is guessed. Both inputs improve with every session.
+
+Three rules keep it honest:
+
+1. **It refuses to answer early.** Under 5% read, or under 15 minutes logged,
+   the card shows a calibrating state instead. Dividing by a small percentage
+   multiplies its error — at 2%, one wrong minute becomes fifty — and a reader
+   cannot tell a bad number from a good one by looking.
+2. **The drawn curve is effort, not position.** The app has never recorded what
+   percentage the reader was at last Tuesday. So the past line is cumulative
+   *minutes*, scaled so today's point is today's real percentage: flat on days
+   not read, steep on long evenings. The card says this under the chart.
+3. **The dotted reference line is the monthly goal**, one book in 30 days from
+   the day this book was started. It is the only target the app has, and it is
+   drawn in the faintest ink because it is a reference, not a demand. `Ahead` /
+   `On track` / `Behind` compare the projection against it, with two days of
+   slack either way.
+
+Pace is the last seven days, falling back to the all-time average when the last
+week is empty. A reader with no pace at all gets no date, and is told why —
+"Infinity days" is worse than saying nothing.
+
+The card appears only on a book being read now: a finished book has no finish
+to forecast, and an unopened one has nothing to forecast from.
+
+## The heatmap lets a day go
+
+A selected square used to stay selected for ever, and its log with it. Tapping
+the square again clears it, and so does a tap anywhere on the card that is not a
+control. Nothing else on the screen holds a selection, and a card that will not
+let go quietly costs the reader the rest of the page.

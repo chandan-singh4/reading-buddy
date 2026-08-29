@@ -285,3 +285,23 @@ amber is time), and a second palette would break the key.
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 8 — letting go, and the pacing card (2026-08-29)
+
+1. The heatmap clears its selection: tap the chosen square again, or tap the
+   card's background. The day's log goes with it.
+2. New `stats/trajectory.ts`, `stats/Trajectory.tsx` and
+   `stats/trajectory.module.css` — the pacing forecast. It sits at the very
+   bottom of Book details, and only for a book in progress (percent above 0 and
+   below 100). `BookInfo.tsx` loads the book's own sessions through
+   `sessionStore.forBook`, in its own effect, and fails quietly.
+
+Two deviations from the reference, both stated on the card itself:
+
+- There is no historical record of progress, so the past curve is drawn from
+  cumulative minutes, scaled to today's real percentage.
+- There is no "original target date" in the app, so the dotted reference line is
+  the monthly goal: this book finished within 30 days of starting it.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.
