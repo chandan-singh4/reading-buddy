@@ -214,6 +214,15 @@ export interface ReadingSession {
    * how much of this one had Veda in it.
    */
   vedaMinutes: number
+  /** Minutes already taken off this sitting because the reader was away. */
+  awayMinutes: number
+  /**
+   * Minutes between the last sign of life and the end of the sitting.
+   *
+   * What the reader can still trim by hand. Zero for a sitting that ended on a
+   * page turn, and zero for every row written before the app watched for this.
+   */
+  quietMinutes: number
   /**
    * Under a minute. Squashed in the feed rather than shown, because a reader
    * who opens a book to check one word makes a row that is true and says
@@ -324,6 +333,11 @@ export function activityByDay(
       highlightCount,
       chatCount,
       qaCount,
+      awayMinutes: Math.round((session.awayMs ?? 0) / 60_000),
+      quietMinutes:
+        session.lastSeenAt === undefined
+          ? 0
+          : Math.max(0, Math.round((session.endedAt - session.lastSeenAt) / 60_000)),
       vedaMinutes: Math.round(
         vedaMsIn(threads, session.bookId, session.startedAt, session.endedAt) / 60_000,
       ),

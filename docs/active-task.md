@@ -425,3 +425,20 @@ neighbours. Religion keeps religion, religious, theology.
 **Next (step 2):** the "Still reading?" check-in after X minutes of silence,
 and an away figure that comes off the session total without moving its start or
 end.
+
+## Pass 17 — steps 2, 3 and 4 of the check-in
+
+- `stats/vigil.ts` (new): the store between the clock and the bar. `ASK_AFTER_MS`
+  is 10 minutes; `VIGIL_MARK` is the attribute that makes the bar's own taps
+  invisible to the clock.
+- `stats/StillReading.tsx` + CSS (new): the bar. Rendered from `App`, above the
+  routes, because the session outlives every screen of a book.
+- `stats/timer.ts`: the watch, the two answers, and `awayMs` off `activeMs`.
+- `storage/db.ts`: `StoredSession.awayMs`. `stats/sessions.ts`: `setAway`.
+- `stats/gather.ts`: `awayMinutes` and `quietMinutes` per sitting.
+- `stats/DayLog.tsx`: the away chip and the one correction control.
+- `stats/Heatmap.tsx`: the tapped day is held by key and looked up fresh, so a
+  correction below updates the line above it.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.

@@ -33,6 +33,13 @@ import styles from './stats.module.css'
 /** Under this many minutes, a session reads as a lookup rather than a sitting. */
 const LOOKUP_MINUTES = 2
 
+/**
+ * A quiet tail this long is worth offering to trim. It matches the silence the
+ * check-in waits for, so the log offers by hand exactly what the bar offers in
+ * the moment — and never proposes trimming an ordinary pause.
+ */
+const QUIET_TO_OFFER = 10
+
 /** `9:05 pm`. The 12-hour clock, because the rest of the screen reads as prose. */
 export function clockTime(at: number): string {
   const d = new Date(at)
@@ -169,6 +176,14 @@ export function meta(line: ReadingSession): { text: string; veda: boolean }[] {
   if (line.vedaMinutes >= 1) {
     parts.push({ text: `${spell(line.vedaMinutes)} with Veda`, veda: true })
   }
+  /*
+   * Said plainly, and next to the time it came out of. A sitting that reads
+   * "1h 12m · 22 min away" is one the reader can check against their memory —
+   * which is the only way this figure earns any trust at all.
+   */
+  if (line.awayMinutes >= 1) {
+    parts.push({ text: `${spell(line.awayMinutes)} away`, veda: false })
+  }
   if (line.chatCount > 0) {
     parts.push({
       text: `${line.chatCount} chat${line.chatCount === 1 ? '' : 's'} with Veda`,
@@ -181,14 +196,62 @@ export function meta(line: ReadingSession): { text: string; veda: boolean }[] {
   return parts
 }
 
+/**
+ * The one correction the reader can make to a sitting.
+ *
+ * Two directions, never both. A sitting with time already taken off offers it
+ * back; a sitting that ended in a long silence offers to take it off. The
+ * second case is the flat battery and the phone left face-down — the check-in
+ * never got an answer because nobody was there to close the book either.
+ *
+ * Deliberately not a general time editor. A reader who can set any number can
+ * write themselves a streak, and then the whole screen is a diary rather than
+ * a record.
+ */
+function Correction({
+  line,
+  onAdjust,
+}: {
+  line: ReadingSession
+  onAdjust: Adjust
+}) {
+  if (line.awayMinutes >= 1) {
+    return (
+      <button
+        type="button"
+        className={styles.fixBtn}
+        onClick={() => onAdjust(line.id, 0)}
+      >
+        I was reading — count it back
+      </button>
+    )
+  }
+
+  if (line.quietMinutes >= QUIET_TO_OFFER) {
+    return (
+      <button
+        type="button"
+        className={styles.fixBtn}
+        onClick={() => onAdjust(line.id, line.quietMinutes * 60_000)}
+      >
+        I stepped away for the last {spell(line.quietMinutes)}
+      </button>
+    )
+  }
+
+  return null
+}
+
 function Commit({
   line,
   bookTitle,
   author,
+  onAdjust,
 }: {
   line: ReadingSession
   bookTitle: string | undefined
   author: string | undefined
+  onAdjust?: Adjust
 }) {
   return (
     <li className={styles.commit}>
@@ -213,12 +276,13 @@ function Commit({
             </span>
           ))}
         </div>
+        {onAdjust !== undefined && <Correction line={line} onAdjust={onAdjust} />}
       </div>
     </li>
   )
 }
 
-function BookLog({ book }: { book: BookActivity }) {
+function BookLog({ book, onAdjust }: { book: BookActivity; onAdjust?: Adjust }) {
   const [open, setOpen] = useState(false)
 
   const sittings = book.sessions.filter((line) => !line.micro)
@@ -241,7 +305,13 @@ function BookLog({ book }: { book: BookActivity }) {
 
       <ol className={styles.tree}>
         {sittings.map((line) => (
-          <Commit key={line.id} line={line} bookTitle={book.bookTitle} author={book.author} />
+          <Commit
+            key={line.id}
+            line={line}
+            bookTitle={book.bookTitle}
+            author={book.author}
+            onAdjust={onAdjust}
+          />
         ))}
 
         {micro.length > 0 &&
@@ -252,6 +322,7 @@ function BookLog({ book }: { book: BookActivity }) {
                 line={line}
                 bookTitle={book.bookTitle}
                 author={book.author}
+                onAdjust={onAdjust}
               />
             ))
           ) : (
@@ -267,7 +338,16 @@ function BookLog({ book }: { book: BookActivity }) {
   )
 }
 
-export default function DayLog({ day }: { day: DayActivity | undefined }) {
+/** How a screen above hears that a sitting's away time should change. */
+export type Adjust = (sessionId: string, awayMs: number) => void
+
+export default function DayLog({
+  day,
+  onAdjust,
+}: {
+  day: DayActivity | undefined
+  onAdjust?: Adjust
+}) {
   // Open on arrival: the reader tapped a square to see this, so hiding it
   // behind a second tap would answer their question with a door.
   const [open, setOpen] = useState(true)
@@ -295,7 +375,10 @@ export default function DayLog({ day }: { day: DayActivity | undefined }) {
           {open ? '⌃' : '⌄'}
         </span>
       </button>
-      {open && day.books.map((book) => <BookLog key={book.bookId} book={book} />)}
+      {open &&
+        day.books.map((book) => (
+          <BookLog key={book.bookId} book={book} onAdjust={onAdjust} />
+        ))}
     </div>
   )
 }

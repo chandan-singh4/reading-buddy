@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 
-import DayLog from './DayLog.tsx'
+import DayLog, { type Adjust } from './DayLog.tsx'
 import type { DayActivity, HeatDay } from './gather.ts'
 import styles from './stats.module.css'
 
@@ -53,6 +53,7 @@ export default function Heatmap({
   year,
   years,
   onYear,
+  onAdjust,
   weekFor,
 }: {
   days: readonly HeatDay[]
@@ -64,10 +65,19 @@ export default function Heatmap({
   /** Every year there is anything to show, newest first. */
   years: readonly number[]
   onYear: (year: number) => void
+  /** Passed straight to the day's log, which is where a sitting is corrected. */
+  onAdjust?: Adjust
   /** The seven days around a chosen day, or around today when none is chosen. */
   weekFor: (anchor: string | undefined) => readonly HeatDay[]
 }) {
-  const [picked, setPicked] = useState<HeatDay | undefined>()
+  /*
+   * The *key* of the tapped day, not the day itself. Correcting a sitting in
+   * the log below rewrites the day it belongs to, and a copy taken at the
+   * moment of the tap would go on reporting the old figure under a log that had
+   * already changed. The key is stable; the reading is looked up fresh.
+   */
+  const [pickedDay, setPickedDay] = useState<string | undefined>()
+  const picked = pickedDay === undefined ? undefined : days.find((d) => d.day === pickedDay)
   const [open, setOpen] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
 
@@ -85,7 +95,7 @@ export default function Heatmap({
   }, [days.length, year, today, open])
 
   // The picked day belongs to the year that was on screen when it was tapped.
-  useEffect(() => setPicked(undefined), [year])
+  useEffect(() => setPickedDay(undefined), [year])
 
   // Whole weeks, Monday at the top. `heatmapOf` guarantees the first day is a
   // Monday, so no column is ever ragged.
@@ -122,7 +132,7 @@ export default function Heatmap({
    * rest of the screen.
    */
   const clearIfBackground = (event: MouseEvent<HTMLDivElement>): void => {
-    if (!(event.target as HTMLElement).closest('button, select')) setPicked(undefined)
+    if (!(event.target as HTMLElement).closest('button, select')) setPickedDay(undefined)
   }
 
   return (
@@ -238,7 +248,7 @@ export default function Heatmap({
                         disabled={ahead || untracked}
                         aria-label={`${label(day.day)}, ${day.minutes} minutes`}
                         // Tapping the chosen day again lets it go.
-                        onClick={() => setPicked(picked?.day === day.day ? undefined : day)}
+                        onClick={() => setPickedDay(pickedDay === day.day ? undefined : day.day)}
                       />
                     )
                   })}
@@ -282,7 +292,7 @@ export default function Heatmap({
       {/* The day itself, told as a commit log — the reader's own analogy. It
           sits outside the tip because the tip is one live line for a screen
           reader, and a whole day announced on every tap is not a tip. */}
-      {picked !== undefined && <DayLog day={log.get(picked.day)} />}
+      {picked !== undefined && <DayLog day={log.get(picked.day)} onAdjust={onAdjust} />}
 
     </div>
   )

@@ -9,6 +9,7 @@ import RangeCalendar from '../stats/RangeCalendar.tsx'
 import { circadianOf } from '../stats/circadian.ts'
 import { goalFor } from '../stats/goal.ts'
 import { loadStats } from '../stats/load.ts'
+import { sessionStore } from '../stats/sessions.ts'
 import { dayKey } from '../stats/sessions.ts'
 import {
   heatmapOf,
@@ -125,6 +126,28 @@ export default function Stats() {
    * the visit, is what makes every card on the screen agree with every other.
    */
   const now = useMemo(() => new Date(), [])
+
+  /*
+   * Correcting one sitting, from its row in the day's log.
+   *
+   * It writes and then reloads everything, rather than patching the loaded
+   * copy. A day total, a streak, a heatmap shade and a pace all fall out of the
+   * same session rows, so a patched copy would have to reproduce every one of
+   * those sums by hand and would drift from the screen's own arithmetic the
+   * first time either changed.
+   */
+  const adjustAway = useCallback((sessionId: string, awayMs: number) => {
+    void sessionStore
+      .setAway(sessionId, awayMs)
+      .then(loadStats)
+      .then((sources) => {
+        setState({ status: 'ready', sources })
+      })
+      .catch(() => {
+        // The row is unchanged and the screen still shows the truth. A failed
+        // correction is not worth a message over the reader's statistics.
+      })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -294,6 +317,7 @@ export default function Stats() {
         year={year}
         years={years}
         onYear={setYear}
+        onAdjust={adjustAway}
         weekFor={weekFor}
       />
 

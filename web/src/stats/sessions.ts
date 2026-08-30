@@ -48,6 +48,23 @@ export function createSessionStore(database: ReadingBuddyDB = defaultDb) {
       await database.sessions.put(session)
     },
 
+    /**
+     * Change how much of one session counts as away, from the day log.
+     *
+     * `activeMs` is kept net of the away time so that every total downstream is
+     * right without knowing about any of this — see `storage/db.ts`. The raw
+     * time in the book is therefore `activeMs + awayMs`, and it is recovered
+     * here before the new figure is taken off it. That is what makes the trim
+     * undoable however many times the reader changes their mind.
+     */
+    async setAway(id: string, awayMs: number): Promise<void> {
+      const row = await database.sessions.get(id)
+      if (row === undefined) return
+      const raw = row.activeMs + (row.awayMs ?? 0)
+      const away = Math.min(Math.max(0, Math.round(awayMs)), raw)
+      await database.sessions.put({ ...row, activeMs: raw - away, awayMs: away })
+    },
+
     /** Every session that started within `[from, to]`, by day key, inclusive. */
     async between(from: string, to: string): Promise<StoredSession[]> {
       return database.sessions.where('day').between(from, to, true, true).toArray()

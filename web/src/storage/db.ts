@@ -602,6 +602,11 @@ export interface StoredWord {
  * phone. The one guard is a per-session cap (`stats/clock.ts`), so a book left
  * open overnight is credited with a long sitting rather than a whole night.
  *
+ * There is still no idle detector. What there is now is a question: after a
+ * long silence the app asks whether the reader is there, and time the reader
+ * says they were away — or never answers for — comes off `activeMs` and is
+ * kept in `awayMs`. The app never decides this on its own without asking.
+ *
  * `day` is the local calendar day the session *started*, as `YYYY-MM-DD`. A
  * session that crosses midnight is filed under the day it began. That is one
  * row on one side of a boundary rather than two rows split by arithmetic
@@ -680,6 +685,16 @@ export interface StoredSession {
    * before it existed, and on a session with no touch at all.
    */
   lastSeenAt?: number
+  /*
+   * Time inside this session that the reader was not there for.
+   *
+   * It is already subtracted from `activeMs`, so nothing downstream has to know
+   * this field exists — a day total, a streak, a heatmap shade and a pace all
+   * read `activeMs` and are right. The raw time in the book is `activeMs +
+   * awayMs`, which is what makes the trim undoable: the day log can give it
+   * back. See `stats/vigil.ts`.
+   */
+  awayMs?: number
 }
 
 export const DB_NAME = 'reading-buddy'

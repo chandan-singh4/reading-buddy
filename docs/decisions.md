@@ -2491,3 +2491,36 @@ reader put the conversation down. Overlapping stretches are merged, because a
 minute lived once is counted once. See `stats/vedaTime.ts`.
 
 The day log now reads `1h 3m · 20 min with Veda · 6 Q&A`. No total changes.
+
+## The app asks rather than guesses about sleep
+
+The clock has no idle detector and still does not. After ten minutes with no
+touch, a bar appears at the foot of the book: *Still reading?* The clock keeps
+running while it waits, because the reader is probably reading.
+
+The three answers:
+
+- **Still here** gives every minute back.
+- **I stepped away** takes off the silence from the last touch, not from the
+  moment the question appeared. The reader knows when they put the book down.
+- **No answer** takes off the silence from the moment the question appeared.
+  This is the sleeper and the flat battery. The ten minutes before the question
+  are always credited to the reader.
+
+A touch anywhere on the page answers the question, because a touch is the proof
+the question was asking for. A touch on the bar itself does not — the bar
+carries `data-vigil`, and the clock ignores taps inside it, or answering would
+erase the silence being answered for.
+
+`awayMs` is subtracted from `activeMs` when the row is written, so every total
+downstream — the day, the streak, the shade, the pace — is right without knowing
+any of this happened. The raw time is `activeMs + awayMs`, which is what makes
+the trim undoable.
+
+## A sitting can be corrected from the day log
+
+One control per row, and only one direction at a time. A sitting with time taken
+off offers it back. A sitting that ended in ten minutes or more of silence
+offers to take it off. It is deliberately not a time editor: a reader who can
+type any number can write themselves a streak, and then the screen is a diary
+and not a record.

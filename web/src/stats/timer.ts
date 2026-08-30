@@ -20,11 +20,19 @@
 
 import { openClock, total, type Clock } from './clock.ts'
 import { dayKey, sessionStore, type SessionStore } from './sessions.ts'
+import { ASK_AFTER_MS, VIGIL_MARK, ask, stopAsking } from './vigil.ts'
 import type { SessionActivity } from '../storage/db.ts'
 import type { BookId } from '../structure/index.ts'
 
 /** How often the growing row is written back. */
 export const FLUSH_MS = 30_000
+
+/**
+ * How often the silence is measured. Shorter than a flush, because a question
+ * that is a quarter of a minute late is fine and one that is half a minute late
+ * is noticeable.
+ */
+export const WATCH_MS = 15_000
 
 export interface ReadingSession {
   /** Write the final row and stop flushing. Safe to call twice. */
@@ -86,8 +94,21 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
    */
   /*
    * The reader opened the book, so the book opening is itself a sign of life.
+   *
    */
   let lastSeenAt = clock.openedAt
+
+  /*
+   * Time the reader has agreed they were not here for, and the moment the
+   * question went up.
+   *
+   * While the question is unanswered its silence counts as away — that is the
+   * whole answer to the reader who falls asleep and never taps anything. It is
+   * pending rather than settled: tapping "Yes, still here" gives every minute
+   * of it back.
+   */
+  let awayMs = 0
+  let askedAt: number | undefined
 
   const spent = new Map<Activity, number>()
   // Asked once here as well as at every write. Without it the first stretch of
@@ -116,6 +137,8 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
     const place = options.place?.()
 
     const active = total(clock, at)
+    const pendingAway = askedAt === undefined ? 0 : at - askedAt
+    const away = awayMs + pendingAway
     spent.set(current, (spent.get(current) ?? 0) + (active - counted))
     counted = active
     current = place?.activity ?? 'reading'
@@ -131,13 +154,16 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
       day,
       startedAt: clock.openedAt,
       endedAt: at,
-      activeMs: active,
+      // Net of the time the reader was away, so every total downstream is
+      // right without knowing this happened. `awayMs` keeps it recoverable.
+      activeMs: Math.max(0, active - away),
       // Spread conditionally: an absent title has to stay absent rather than
       // become `undefined`, which Dexie would store as a real field.
       ...(place?.chapterTitle ? { chapterTitle: place.chapterTitle } : {}),
       ...(place?.sectionTitle ? { sectionTitle: place.sectionTitle } : {}),
       ...(activity ? { activity } : {}),
       lastSeenAt,
+      ...(away > 0 ? { awayMs: away } : {}),
     })
   }
 
@@ -151,14 +177,72 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
    * Passive and on the capture phase, so nothing in the app can stop it and
    * nothing waits on it.
    */
-  const touched = (): void => {
+  const touched = (event: Event): void => {
+    /*
+     * Except a touch on the bar itself. Its two buttons are taps like any
+     * other, and the document sees them first — without this, tapping "I
+     * stepped away" would erase the very silence it is there to report.
+     */
+    const target = event.target
+    if (target instanceof Element && target.closest(`[${VIGIL_MARK}]`) !== null) return
+
     lastSeenAt = now()
+    /*
+     * A touch while the question is up answers it. The reader is holding the
+     * phone, which is the whole thing the question was trying to establish, and
+     * making them tap "Yes" to go on reading would be a toll gate.
+     *
+     * The two buttons still work, because the document sees their tap first and
+     * `seenBefore` survives it.
+     */
+    if (askedAt !== undefined) {
+      askedAt = undefined
+      stopAsking()
+      write()
+    }
   }
   const TOUCHES = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
   for (const kind of TOUCHES) {
     document.addEventListener(kind, touched, { capture: true, passive: true })
   }
 
+  /** Yes: nothing was away. The pending silence is given back in full. */
+  const stillHere = (): void => {
+    askedAt = undefined
+    lastSeenAt = now()
+    stopAsking()
+    write()
+  }
+
+  /**
+   * No: the silence was real, and it started at the last sign of life rather
+   * than when the question went up. The reader knows they put the book down;
+   * the app only knew ten minutes later.
+   */
+  const steppedAway = (): void => {
+    const at = now()
+    awayMs += Math.max(0, at - lastSeenAt)
+    askedAt = undefined
+    lastSeenAt = at
+    stopAsking()
+    write()
+  }
+
+  /*
+   * The watch. It asks nothing while the reader is touching the phone, and it
+   * asks once — the question stays up until it is answered or a touch answers
+   * it for them.
+   */
+  const watch = (): void => {
+    if (askedAt !== undefined) return
+    const at = now()
+    if (at - lastSeenAt < ASK_AFTER_MS) return
+    askedAt = at
+    ask(at, { stillHere, steppedAway })
+    write()
+  }
+
+  const watcher = setInterval(watch, WATCH_MS)
   const interval = setInterval(write, FLUSH_MS)
 
   const onVisibility = (): void => {
@@ -173,6 +257,10 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
     if (stopped) return
     stopped = true
     clearInterval(interval)
+    clearInterval(watcher)
+    // A question nobody is left to answer. The silence it was asking about has
+    // already been taken off the total by the write below.
+    if (askedAt !== undefined) stopAsking()
     for (const kind of TOUCHES) {
       document.removeEventListener(kind, touched, { capture: true })
     }

@@ -8,6 +8,7 @@ import { AuthGate } from './auth/AuthGate.tsx'
 import { RouteTransition, useViewLocation } from './app/routeTransition.tsx'
 import { UpdatePrompt } from './app/UpdatePrompt.tsx'
 import { startSummaries } from './summary/engine.ts'
+import StillReading from './stats/StillReading.tsx'
 import { useReadingClock } from './stats/useReadingClock.ts'
 import BookInfo from './pages/BookInfo.tsx'
 import ChapterView from './pages/ChapterView.tsx'
@@ -43,29 +44,35 @@ export function AppRoutes() {
   useReadingClock()
 
   return (
-    <Routes location={location}>
-      <Route element={<AppShell />}>
-        <Route index element={<Home />} />
-        <Route path="library" element={<Library />} />
-        <Route path="stats" element={<Stats />} />
-        <Route path="settings" element={<Settings />} />
-      </Route>
-      <Route path="book/:bookId" element={<Reader />} />
-      <Route path="book/:bookId/info" element={<BookInfo />} />
-      <Route path="book/:bookId/last-time" element={<LastTime />} />
-      {/*
-       * The chapter summaries, outside `AppShell` and full-bleed.
-       *
-       * This is the one part of the app that does not follow the reader's
-       * theme — it is a paper object in one fixed palette (see
-       * `summary/summary.module.css`). The shell's top bar and drawer in the
-       * app's own colours, wrapped around a page pretending to be paper, would
-       * undo exactly the thing the design is doing. The page carries its own
-       * way back instead.
-       */}
-      <Route path="book/:bookId/chapters" element={<ChapterView />} />
-      <Route path="*" element={<Home />} />
-    </Routes>
+    <>
+      {/* Above the route table for the same reason the clock is: the question
+          belongs to the session, and the session outlives every one of a
+          book's four screens. It draws nothing unless it is being asked. */}
+      <StillReading />
+      <Routes location={location}>
+        <Route element={<AppShell />}>
+          <Route index element={<Home />} />
+          <Route path="library" element={<Library />} />
+          <Route path="stats" element={<Stats />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+        <Route path="book/:bookId" element={<Reader />} />
+        <Route path="book/:bookId/info" element={<BookInfo />} />
+        <Route path="book/:bookId/last-time" element={<LastTime />} />
+        {/*
+         * The chapter summaries, outside `AppShell` and full-bleed.
+         *
+         * This is the one part of the app that does not follow the reader's
+         * theme — it is a paper object in one fixed palette (see
+         * `summary/summary.module.css`). The shell's top bar and drawer in the
+         * app's own colours, wrapped around a page pretending to be paper, would
+         * undo exactly the thing the design is doing. The page carries its own
+         * way back instead.
+         */}
+        <Route path="book/:bookId/chapters" element={<ChapterView />} />
+        <Route path="*" element={<Home />} />
+      </Routes>
+    </>
   )
 }
 

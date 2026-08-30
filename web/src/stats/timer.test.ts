@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { FLUSH_MS, startSession, type Place } from './timer.ts'
+import { answerSteppedAway, answerStillHere, forgetVigil, snapshot } from './vigil.ts'
 import type { StoredSession } from '../storage/db.ts'
 import type { BookId } from '../structure/index.ts'
 
@@ -80,11 +81,17 @@ describe('the screen a session is named after', () => {
 })
 
 describe('the last sign of life', () => {
-  /** A visit of `minutes`, with a tap after `tapAt` minutes when given. */
-  function watched(minutes: number, tapAt?: number): StoredSession | undefined {
+  /**
+   * A visit of `minutes`, with a tap after `tapAt` minutes when given, and an
+   * answer to the check-in after `answerAt` minutes when given.
+   */
+  function watched(
+    minutes: number,
+    tapAt?: number,
+    answer?: { at: number; say: 'here' | 'away' },
+  ): StoredSession | undefined {
     const store = spy()
-    const opened = Date.parse('2026-08-30T22:00:00.000Z')
-    let at = opened
+    let at = Date.parse('2026-08-30T22:00:00.000Z')
     const timers = vi.useFakeTimers({ now: at })
     const session = startSession('b1' as BookId, { store: store as never, now: () => at })
 
@@ -92,22 +99,111 @@ describe('the last sign of life', () => {
       at += 60_000
       timers.advanceTimersByTime(60_000)
       if (m === tapAt) document.dispatchEvent(new Event('pointerdown'))
+      if (answer && m === answer.at) {
+        if (answer.say === 'here') answerStillHere()
+        else answerSteppedAway()
+      }
     }
     session.stop()
     vi.useRealTimers()
+    forgetVigil()
     return store.last()
   }
 
   it('is the moment the book opened when nothing was ever touched', () => {
-    const row = watched(40)
+    const row = watched(5)
     expect(row?.lastSeenAt).toBe(row?.startedAt)
   })
 
   it('moves to the last touch, not to the end of the session', () => {
-    const row = watched(40, 5)
+    const row = watched(8, 5)
     expect(row?.lastSeenAt).toBe((row?.startedAt ?? 0) + 5 * 60_000)
-    // Forty minutes in the book, five of them awake. This is the difference the
-    // check-in will read; nothing here changes the total.
-    expect(row?.activeMs).toBe(40 * 60_000)
+  })
+})
+
+describe('the check-in', () => {
+  /** As above, but reporting what the row was credited with. */
+  function visit(
+    minutes: number,
+    tapAt?: number,
+    answer?: { at: number; say: 'here' | 'away' },
+  ): { active: number; away: number; asked: boolean } {
+    const store = spy()
+    let at = Date.parse('2026-08-30T22:00:00.000Z')
+    const timers = vi.useFakeTimers({ now: at })
+    const session = startSession('b1' as BookId, { store: store as never, now: () => at })
+    let asked = false
+
+    for (let m = 1; m <= minutes; m += 1) {
+      at += 60_000
+      timers.advanceTimersByTime(60_000)
+      if (snapshot().askedAt !== undefined) asked = true
+      if (m === tapAt) document.dispatchEvent(new Event('pointerdown'))
+      if (answer && m === answer.at) {
+        // No pointer event: a tap on the bar is ignored by the clock on
+        // purpose, so that answering does not erase the silence being
+        // answered for. See `VIGIL_MARK` in `timer.ts`.
+        if (answer.say === 'here') answerStillHere()
+        else answerSteppedAway()
+      }
+    }
+    session.stop()
+    vi.useRealTimers()
+    forgetVigil()
+    const row = store.last()
+    return {
+      active: Math.round((row?.activeMs ?? 0) / 60_000),
+      away: Math.round((row?.awayMs ?? 0) / 60_000),
+      asked,
+    }
+  }
+
+  it('asks nothing of a reader who is turning pages', () => {
+    // Nine minutes of silence is a page of Jung, not a nap.
+    expect(visit(9).asked).toBe(false)
+  })
+
+  it('asks after ten quiet minutes, and keeps counting while it waits', () => {
+    expect(visit(11).asked).toBe(true)
+  })
+
+  it('gives every minute back when the reader says they are here', () => {
+    const row = visit(18, undefined, { at: 12, say: 'here' })
+    expect(row.active).toBe(18)
+    expect(row.away).toBe(0)
+  })
+
+  it('trims from the last sign of life when the reader stepped away', () => {
+    // A page turned at the fifth minute, then nothing. The question goes up at
+    // the fifteenth, and the reader answers it at the seventeenth. The twelve
+    // minutes since that page turn are the ones that were not reading — not
+    // the two since the question, and not the whole session.
+    const row = visit(25, 5, { at: 17, say: 'away' })
+    expect(row.away).toBe(12)
+    expect(row.active).toBe(13)
+  })
+
+  it('trims from the question when nobody ever answers it', () => {
+    // The sleeper. The ten minutes before the question are still credited —
+    // they may well have been reading — and the rest is not.
+    const row = visit(60)
+    expect(row.away).toBe(50)
+    expect(row.active).toBe(10)
+  })
+
+  it('takes a touch on the page as an answer', () => {
+    // A reader deep in a long passage is not made to tap a button to go on
+    // being counted. Touching the page is the proof the question wanted.
+    const row = visit(20, 15)
+    expect(row.away).toBe(0)
+    expect(row.active).toBe(20)
+  })
+
+  it('asks again if the silence comes back', () => {
+    // Touched at the fifteenth minute, quiet from then on. The second question
+    // goes up at the twenty-fifth and is never answered.
+    const row = visit(40, 15)
+    expect(row.away).toBe(15)
+    expect(row.active).toBe(25)
   })
 })

@@ -4,7 +4,7 @@
 // feed reads as a record or as bookkeeping.
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import DayLog, { heading, span, spell } from './DayLog.tsx'
 import type { DayActivity, ReadingSession } from './gather.ts'
@@ -28,6 +28,8 @@ const line = (over: Partial<ReadingSession> = {}): ReadingSession => ({
   chatCount: 0,
   qaCount: 0,
   vedaMinutes: 0,
+  awayMinutes: 0,
+  quietMinutes: 0,
   micro: false,
   ...over,
 })
@@ -218,5 +220,37 @@ describe('DayLog', () => {
   it('draws nothing at all for a day with no reading', () => {
     const { container } = render(<DayLog day={undefined} />)
     expect(container.innerHTML).toBe('')
+  })
+})
+
+describe('correcting a sitting', () => {
+  it('says how much was taken off', () => {
+    expect(diff(line({ awayMinutes: 22 }))).toBe('1h 3m · 22 min away')
+  })
+
+  it('offers the time back on a sitting that was trimmed', () => {
+    const onAdjust = vi.fn()
+    render(<DayLog day={day([line({ awayMinutes: 22, quietMinutes: 30 })])} onAdjust={onAdjust} />)
+    fireEvent.click(screen.getByRole('button', { name: /count it back/i }))
+    expect(onAdjust).toHaveBeenCalledWith(expect.any(String), 0)
+  })
+
+  it('offers to trim a sitting that ended in a long silence', () => {
+    // The flat battery: nobody answered the check-in because nobody closed the
+    // book either.
+    const onAdjust = vi.fn()
+    render(<DayLog day={day([line({ awayMinutes: 0, quietMinutes: 25 })])} onAdjust={onAdjust} />)
+    fireEvent.click(screen.getByRole('button', { name: /stepped away/i }))
+    expect(onAdjust).toHaveBeenCalledWith(expect.any(String), 25 * 60_000)
+  })
+
+  it('says nothing about an ordinary sitting', () => {
+    render(<DayLog day={day([line({ awayMinutes: 0, quietMinutes: 3 })])} onAdjust={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /away|count it back/i })).toBeNull()
+  })
+
+  it('offers nothing at all when no screen is listening', () => {
+    render(<DayLog day={day([line({ awayMinutes: 22 })])} />)
+    expect(screen.queryByRole('button', { name: /count it back/i })).toBeNull()
   })
 })

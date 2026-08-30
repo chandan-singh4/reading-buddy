@@ -1296,3 +1296,19 @@
   color: var(--ink-faint);
   cursor: pointer;
 }
+
+/* The one correction a sitting offers. Quiet, and the same quiet as the
+   squashed-sessions button: both are the log admitting it may be wrong about
+   something, and neither is an action the reader came here to take. */
+.fixBtn {
+  margin-top: 5px;
+  border: 1px solid var(--rule);
+  background: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-align: left;
+}
