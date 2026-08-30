@@ -40,7 +40,27 @@ export const GENRES: readonly { name: string; match: readonly string[] }[] = [
   { name: 'Biography', match: ['biography', 'autobiography', 'memoir'] },
   { name: 'Economics', match: ['economic', 'business', 'finance', 'management'] },
   { name: 'Politics', match: ['political', 'politics', 'social science', 'sociology', 'law'] },
-  { name: 'Religion', match: ['religion', 'religious', 'spiritual', 'theology', 'body, mind'] },
+  { name: 'Religion', match: ['religion', 'religious', 'theology', 'buddhis', 'hindu'] },
+  /*
+   * Split out of Religion, which used to hold `body, mind` and so filed an
+   * astrology book as religion. A publisher shelves astrology, meditation and
+   * non-dual writing under "Body, Mind & Spirit", and a reader looking at that
+   * bar does not read those as religion. Religion keeps the word religion.
+   */
+  {
+    name: 'Spirituality',
+    match: [
+      'body, mind',
+      'body mind',
+      'spiritual',
+      'meditation',
+      'mindfulness',
+      'astrology',
+      'occult',
+      'new age',
+      'yoga',
+    ],
+  },
   { name: 'Self-help', match: ['self-help', 'self help', 'personal growth', 'motivational'] },
   { name: 'Literature', match: ['literary criticism', 'literary collections', 'poetry', 'drama'] },
   { name: 'Art', match: ['art', 'music', 'photography', 'design', 'performing arts'] },

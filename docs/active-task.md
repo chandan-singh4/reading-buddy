@@ -409,3 +409,8 @@ See `docs/decisions.md` for both.
 
 The heatmap ramp now stops at four: 1-60, 60-120, 120-180, and 180+. `--h5` and
 `.l5` are gone, and the legend shows the blank day plus four shades.
+
+## Pass 15 — Spirituality out of Religion
+
+`stats/genres.ts`: a new Spirituality genre takes "Body, Mind & Spirit" and its
+neighbours. Religion keeps religion, religious, theology.

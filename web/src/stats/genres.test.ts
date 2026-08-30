@@ -86,3 +86,18 @@ describe('splitFiction', () => {
     expect(split).toEqual({ fiction: 1, nonfiction: 2, unknown: 1 })
   })
 })
+
+describe('Body, Mind & Spirit', () => {
+  const book = (...subjects: string[]) => ({ subjects }) as never
+
+  it('is spirituality, not religion', () => {
+    // The reader's own case: an astrology book showed under Religion, and the
+    // word religion was nowhere in its tags.
+    expect(genreOf(book('Body, Mind & Spirit / Astrology / General'))).toBe('Spirituality')
+    expect(genreOf(book('Body, Mind & Spirit / Mindfulness & Meditation'))).toBe('Spirituality')
+  })
+
+  it('leaves religion to the books that say religion', () => {
+    expect(genreOf(book('Religion / Comparative Religion'))).toBe('Religion')
+  })
+})

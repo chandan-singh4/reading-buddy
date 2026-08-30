@@ -2455,3 +2455,18 @@ and are never named, so old rows need no repair.
 The routes name themselves (`/info`, `/chapters`, `/last-time`). The reading
 screen reports its own panels, because the contents and the notes are panels
 over it and the address cannot see them.
+
+## Spirituality is its own genre
+
+The genre bars read the publisher's subject headings, but the twelve buckets
+are ours. The Religion bucket matched the fragment `body, mind`, so every book
+shelved under "Body, Mind & Spirit" became religion — an astrology book showed
+under Religion with the word nowhere in its tags.
+
+Those headings now make a Spirituality bucket: body mind & spirit, spiritual,
+meditation, mindfulness, astrology, occult, new age, yoga. Religion keeps the
+books that say religion.
+
+The buckets stay because one book must make one bar. A publisher gives a book
+six to twelve overlapping headings, so counting them as they come gives forty
+bars of one and a chart that adds up to more than the shelf.
