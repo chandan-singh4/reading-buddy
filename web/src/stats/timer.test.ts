@@ -78,3 +78,36 @@ describe('the screen a session is named after', () => {
     )
   })
 })
+
+describe('the last sign of life', () => {
+  /** A visit of `minutes`, with a tap after `tapAt` minutes when given. */
+  function watched(minutes: number, tapAt?: number): StoredSession | undefined {
+    const store = spy()
+    const opened = Date.parse('2026-08-30T22:00:00.000Z')
+    let at = opened
+    const timers = vi.useFakeTimers({ now: at })
+    const session = startSession('b1' as BookId, { store: store as never, now: () => at })
+
+    for (let m = 1; m <= minutes; m += 1) {
+      at += 60_000
+      timers.advanceTimersByTime(60_000)
+      if (m === tapAt) document.dispatchEvent(new Event('pointerdown'))
+    }
+    session.stop()
+    vi.useRealTimers()
+    return store.last()
+  }
+
+  it('is the moment the book opened when nothing was ever touched', () => {
+    const row = watched(40)
+    expect(row?.lastSeenAt).toBe(row?.startedAt)
+  })
+
+  it('moves to the last touch, not to the end of the session', () => {
+    const row = watched(40, 5)
+    expect(row?.lastSeenAt).toBe((row?.startedAt ?? 0) + 5 * 60_000)
+    // Forty minutes in the book, five of them awake. This is the difference the
+    // check-in will read; nothing here changes the total.
+    expect(row?.activeMs).toBe(40 * 60_000)
+  })
+})

@@ -667,6 +667,19 @@ export interface StoredSession {
    * every row written before this says.
    */
   activity?: SessionActivity
+  /*
+   * The last moment the reader touched the phone during this session.
+   *
+   * The clock counts time in the book and cannot tell reading from a book left
+   * face-up on a table — deliberately, see `stats/clock.ts`. This is the fact
+   * that tells them apart later: a session whose last touch was forty minutes
+   * before it ended was not being read for those forty minutes.
+   *
+   * Nothing reads it to change a total yet. It is recorded now so that when the
+   * check-in arrives there is a history behind it. Absent on every row written
+   * before it existed, and on a session with no touch at all.
+   */
+  lastSeenAt?: number
 }
 
 export const DB_NAME = 'reading-buddy'

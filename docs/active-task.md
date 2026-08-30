@@ -414,3 +414,14 @@ The heatmap ramp now stops at four: 1-60, 60-120, 120-180, and 180+. `--h5` and
 
 `stats/genres.ts`: a new Spirituality genre takes "Body, Mind & Spirit" and its
 neighbours. Religion keeps religion, religious, theology.
+
+## Pass 16 — step 1 of the sleep check-in
+
+- `stats/vedaTime.ts` (new): `vedaMsIn` — minutes in conversation, from message
+  times. `gather.ts` puts `vedaMinutes` on each session; `DayLog.tsx` shows it.
+- `storage/db.ts`: `StoredSession.lastSeenAt`. Not indexed, no version bump.
+- `stats/timer.ts`: document-level pointerdown/keydown/wheel/touchstart set it.
+
+**Next (step 2):** the "Still reading?" check-in after X minutes of silence,
+and an away figure that comes off the session total without moving its start or
+end.

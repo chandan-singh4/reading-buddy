@@ -84,6 +84,11 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
    * screen that held the reader for less than half a minute is not what the
    * visit was about.
    */
+  /*
+   * The reader opened the book, so the book opening is itself a sign of life.
+   */
+  let lastSeenAt = clock.openedAt
+
   const spent = new Map<Activity, number>()
   // Asked once here as well as at every write. Without it the first stretch of
   // every visit would go to the pages, and a reader who opened the book details
@@ -132,7 +137,26 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
       ...(place?.chapterTitle ? { chapterTitle: place.chapterTitle } : {}),
       ...(place?.sectionTitle ? { sectionTitle: place.sectionTitle } : {}),
       ...(activity ? { activity } : {}),
+      lastSeenAt,
     })
+  }
+
+  /*
+   * The last touch, watched at the document rather than reported by each
+   * screen. A page turn, a tap on the lamp, a word typed to Veda and a scroll
+   * are all the same fact here — the reader is awake and holding the phone —
+   * and one listener catches every one of them without a screen having to
+   * remember to say so.
+   *
+   * Passive and on the capture phase, so nothing in the app can stop it and
+   * nothing waits on it.
+   */
+  const touched = (): void => {
+    lastSeenAt = now()
+  }
+  const TOUCHES = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const
+  for (const kind of TOUCHES) {
+    document.addEventListener(kind, touched, { capture: true, passive: true })
   }
 
   const interval = setInterval(write, FLUSH_MS)
@@ -149,6 +173,9 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
     if (stopped) return
     stopped = true
     clearInterval(interval)
+    for (const kind of TOUCHES) {
+      document.removeEventListener(kind, touched, { capture: true })
+    }
     document.removeEventListener('visibilitychange', onVisibility)
     window.removeEventListener('pagehide', write)
     write()

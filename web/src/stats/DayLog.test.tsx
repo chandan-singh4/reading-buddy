@@ -27,6 +27,7 @@ const line = (over: Partial<ReadingSession> = {}): ReadingSession => ({
   highlightCount: 0,
   chatCount: 0,
   qaCount: 0,
+  vedaMinutes: 0,
   micro: false,
   ...over,
 })
@@ -160,6 +161,20 @@ describe('DayLog', () => {
 
   it('says one chat, not one chats', () => {
     expect(diff(line({ chatCount: 1, qaCount: 1 }))).toBe('1h 3m · 1 chat with Veda · 1 Q&A')
+  })
+
+  it('says how much of the sitting had Veda in it', () => {
+    // The reader's question: was that an hour of reading, or an hour of
+    // arguing with Veda about one paragraph?
+    expect(diff(line({ vedaMinutes: 20, chatCount: 1, qaCount: 6 }))).toBe(
+      '1h 3m · 20 min with Veda · 1 chat with Veda · 6 Q&A',
+    )
+  })
+
+  it('leaves a conversation too short to measure out of the row', () => {
+    expect(diff(line({ vedaMinutes: 0, chatCount: 1, qaCount: 1 }))).toBe(
+      '1h 3m · 1 chat with Veda · 1 Q&A',
+    )
   })
 
   it('leaves the Q&A count out when there were no chats to attach it to', () => {

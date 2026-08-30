@@ -161,6 +161,14 @@ export function meta(line: ReadingSession): { text: string; veda: boolean }[] {
       veda: false,
     })
   }
+  /*
+   * Before the counts, because it is a length of time and the row's first part
+   * is a length of time. "1h 3m · 20m with Veda" says at a glance what the
+   * sitting was: most of an hour, a third of it talking.
+   */
+  if (line.vedaMinutes >= 1) {
+    parts.push({ text: `${spell(line.vedaMinutes)} with Veda`, veda: true })
+  }
   if (line.chatCount > 0) {
     parts.push({
       text: `${line.chatCount} chat${line.chatCount === 1 ? '' : 's'} with Veda`,

@@ -2470,3 +2470,24 @@ books that say religion.
 The buckets stay because one book must make one bar. A publisher gives a book
 six to twelve overlapping headings, so counting them as they come gives forty
 bars of one and a chart that adds up to more than the shelf.
+
+## A session records the last sign of life
+
+The clock counts time in the book and cannot tell reading from a phone left
+face-up. That is on purpose: an idle pause once threw away a long conversation
+with Veda, and the reader had it removed.
+
+Each session now also stores `lastSeenAt` — the last tap, key, scroll or touch,
+watched at the document so no screen has to report it. It changes no total. It
+is the fact the check-in needs: a session whose last touch came forty minutes
+before it ended was not being read for those forty minutes.
+
+## Veda's share of a sitting is read off the messages
+
+Every message already carries its time, so the minutes spent in conversation
+can be worked out for sittings that happened months ago. A gap between two
+messages counts when it is short (five minutes or less); a longer gap means the
+reader put the conversation down. Overlapping stretches are merged, because a
+minute lived once is counted once. See `stats/vedaTime.ts`.
+
+The day log now reads `1h 3m · 20 min with Veda · 6 Q&A`. No total changes.

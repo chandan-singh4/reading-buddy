@@ -14,6 +14,7 @@
 
 import { dayKey } from './sessions.ts'
 import { msInWindow } from './spread.ts'
+import { vedaMsIn } from './vedaTime.ts'
 import { addDays, bucketsOf, daysBetween, startOfDay, type Bucket, type Period } from './period.ts'
 import { countGenres, splitFiction, type GenreCount } from './genres.ts'
 import type {
@@ -208,6 +209,12 @@ export interface ReadingSession {
   /** Questions asked in them, each of which Veda answered. */
   qaCount: number
   /**
+   * Minutes of the sitting that were spent in conversation, worked out from
+   * the message times. See `vedaTime.ts` — it changes no total, it only says
+   * how much of this one had Veda in it.
+   */
+  vedaMinutes: number
+  /**
    * Under a minute. Squashed in the feed rather than shown, because a reader
    * who opens a book to check one word makes a row that is true and says
    * nothing — and enough of them bury the reading.
@@ -317,6 +324,9 @@ export function activityByDay(
       highlightCount,
       chatCount,
       qaCount,
+      vedaMinutes: Math.round(
+        vedaMsIn(threads, session.bookId, session.startedAt, session.endedAt) / 60_000,
+      ),
       micro: session.activeMs < MICRO_MS,
     }
 
