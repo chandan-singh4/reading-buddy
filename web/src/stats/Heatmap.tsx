@@ -34,7 +34,7 @@ const COLUMN = CELL + GAP
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-const LEVEL_CLASS = ['', styles.l1, styles.l2, styles.l3, styles.l4, styles.l5] as const
+const LEVEL_CLASS = ['', styles.l1, styles.l2, styles.l3, styles.l4] as const
 
 /** Monday first, to match the grid's own rows. */
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -259,11 +259,10 @@ export default function Heatmap({
         <span className={`${styles.cell} ${styles.l2}`} />
         <span className={`${styles.cell} ${styles.l3}`} />
         <span className={`${styles.cell} ${styles.l4}`} />
-        <span className={`${styles.cell} ${styles.l5}`} />
         More
       </div>
 
-      <div className={styles.cap}>One shade an hour, to 4h+.</div>
+      <div className={styles.cap}>One shade an hour, to 3h+.</div>
         </>
       )}
 

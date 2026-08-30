@@ -43,18 +43,19 @@ export interface HeatDay {
   /** `YYYY-MM-DD`. */
   day: string
   minutes: number
-  /** 0 to 5 — empty, then one shade per hour. */
-  level: 0 | 1 | 2 | 3 | 4 | 5
+  /** 0 to 4 — a blank day, then one shade per hour. */
+  level: 0 | 1 | 2 | 3 | 4
 }
 
 /** The width of a band. One shade is one hour of reading. */
 const BAND_MINUTES = 60
 
-/** The darkest shade. Four hours or more, and there is no shade above it. */
-const TOP_LEVEL = 5
+/** The darkest shade. Three hours or more, and there is no shade above it. */
+const TOP_LEVEL = 4
 
 /**
- * One shade per hour read: under 1, under 2, under 3, under 4, and 4 or more.
+ * One shade per hour read: under 1, under 2, under 3, and 3 or more. A day with
+ * no reading takes no shade at all and stays blank.
  *
  * The bands used to be quarter-hours up to a ceiling of one hour, taken from
  * the design reference before anyone had read a real day on this app. The

@@ -2435,9 +2435,10 @@ thread's new anchor. A line whose thread is gone falls back to the word search.
 
 The shades before this were set by a share of the reader's best day. So 88
 minutes and 203 minutes could look the same. A shade now means a fixed amount
-of time: 1-60 minutes, 60-120, 120-180, 180-240, and 240 or more. Five shades,
-one hour each, and the fifth is the darkest. The scale does not move, so two
-days that look alike are alike.
+of time: 1-60 minutes, 60-120, 120-180, and 180 or more. Four shades,
+one hour each, and the fourth is the darkest. A day with no reading takes no
+shade and stays blank. The scale does not move, so two days that look alike are
+alike.
 
 ## A session says which screen of the book it was spent on
 

@@ -58,8 +58,7 @@ describe('levelOf', () => {
     expect(levelOf(120)).toBe(3)
     expect(levelOf(179)).toBe(3)
     expect(levelOf(180)).toBe(4)
-    expect(levelOf(239)).toBe(4)
-    expect(levelOf(240)).toBe(5)
+    expect(levelOf(240)).toBe(4)
   })
 
   it('tells 88 minutes from 200', () => {
@@ -67,10 +66,11 @@ describe('levelOf', () => {
     // square, because everything past an hour was.
     expect(levelOf(88)).toBe(2)
     expect(levelOf(203)).toBe(4)
+    expect(levelOf(88)).not.toBe(levelOf(203))
   })
 
   it('has no shade above the darkest', () => {
-    expect(levelOf(600)).toBe(5)
+    expect(levelOf(600)).toBe(4)
   })
 })
 
