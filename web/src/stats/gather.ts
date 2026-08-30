@@ -214,6 +214,12 @@ export interface ReadingSession {
    * how much of this one had Veda in it.
    */
   vedaMinutes: number
+  /**
+   * Whether `vedaMinutes` was measured or worked out afterwards. Old sittings
+   * carry the estimate, and the log marks them so the two are never read as the
+   * same kind of number.
+   */
+  vedaMeasured: boolean
   /** Minutes already taken off this sitting because the reader was away. */
   awayMinutes: number
   /**
@@ -338,9 +344,17 @@ export function activityByDay(
         session.lastSeenAt === undefined
           ? 0
           : Math.max(0, Math.round((session.endedAt - session.lastSeenAt) / 60_000)),
+      /*
+       * Measured if this session watched the lamp; estimated from the message
+       * times if it is older than that. The estimate is a floor — it cannot see
+       * the reader thinking, and it drops any gap over five minutes — which is
+       * why it is labelled rather than quietly mixed in.
+       */
       vedaMinutes: Math.round(
-        vedaMsIn(threads, session.bookId, session.startedAt, session.endedAt) / 60_000,
+        (session.vedaMs ??
+          vedaMsIn(threads, session.bookId, session.startedAt, session.endedAt)) / 60_000,
       ),
+      vedaMeasured: session.vedaMs !== undefined,
       micro: session.activeMs < MICRO_MS,
     }
 

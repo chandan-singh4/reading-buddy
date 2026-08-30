@@ -638,6 +638,7 @@ export type SessionActivity =
   | 'bookmarks'
   | 'chapters'
   | 'recap'
+  | 'veda'
 
 export interface StoredSession {
   id: string
@@ -695,6 +696,17 @@ export interface StoredSession {
    * back. See `stats/vigil.ts`.
    */
   awayMs?: number
+  /*
+   * Milliseconds of this session with the study lamp open — the real length of
+   * the conversations, measured while they happened.
+   *
+   * It replaces an estimate. Before this, time with Veda was worked out
+   * afterwards from the gaps between messages (`stats/vedaTime.ts`), which
+   * cannot see the reader thinking about the last answer and drops any gap
+   * longer than five minutes. Absent on every session recorded before this, and
+   * those still fall back to the estimate.
+   */
+  vedaMs?: number
 }
 
 export const DB_NAME = 'reading-buddy'

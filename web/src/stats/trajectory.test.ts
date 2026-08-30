@@ -90,3 +90,35 @@ describe('trajectoryOf', () => {
     expect(slow.status).toBe('Behind')
   })
 })
+
+describe('time with Veda', () => {
+  const day = (n: number): number => Date.parse('2026-08-01T20:00:00.000Z') + n * 86_400_000
+
+  /** Ten days, an hour a day, `veda` of each hour spent under the lamp. */
+  const tenDays = (vedaMinutes: number) =>
+    Array.from({ length: 10 }, (_, i) => ({
+      startedAt: day(i),
+      endedAt: day(i) + 60 * 60_000,
+      activeMs: 60 * 60_000,
+      vedaMs: vedaMinutes * 60_000,
+    }))
+
+  it('does not count a conversation as progress through the book', () => {
+    // Half of every hour went to Veda, so the pace is half an hour a day and
+    // the forecast has to be built on that, not on the hour.
+    const pace = trajectoryOf(tenDays(30), 50, new Date(day(9)))
+    expect(pace?.minutesLogged).toBe(300)
+    expect(pace?.estimatedTotalMinutes).toBe(600)
+  })
+
+  it('matches a sitting with no conversation in it', () => {
+    const withNone = trajectoryOf(tenDays(0), 50, new Date(day(9)))
+    expect(withNone?.minutesLogged).toBe(600)
+    expect(withNone?.estimatedTotalMinutes).toBe(1200)
+  })
+
+  it('reads a session recorded before the lamp was timed as all reading', () => {
+    const older = tenDays(0).map(({ vedaMs, ...rest }) => rest)
+    expect(trajectoryOf(older, 50, new Date(day(9)))?.minutesLogged).toBe(600)
+  })
+})

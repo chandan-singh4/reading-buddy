@@ -442,3 +442,14 @@ end.
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 18 — the lamp is timed
+
+- `storage/db.ts`: `SessionActivity` gains `veda`; `StoredSession.vedaMs`.
+- `stats/place.ts`: `onPlaceChange` — one listener, the clock, told at once when
+  the screen changes.
+- `stats/timer.ts`: writes `vedaMs` from the per-screen tally.
+- `pages/Reader.tsx`: the lamp reports `veda`, above the browse-page panels.
+- `stats/gather.ts`: `vedaMinutes` prefers the measurement; `vedaMeasured` says
+  which it is. `DayLog.tsx` prints `~` on the estimate.
+- `stats/trajectory.ts`: takes `vedaMs` off before any of the forecast is built.

@@ -31,6 +31,8 @@ export interface Span {
   endedAt: number
   /** Milliseconds of reading inside that span. */
   activeMs: number
+  /** Of those, the ones spent with the study lamp open. */
+  vedaMs?: number
 }
 
 /** Reading milliseconds that fall inside `[from, to)`. */

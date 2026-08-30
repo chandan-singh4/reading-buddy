@@ -4036,8 +4036,18 @@ export default function Reader() {
    * clock cannot see it in the address. Aa is left out: changing the type size
    * is something you do *to* the page, and the reader is still on the page.
    */
-  const activity: Activity =
-    sheetOpen && sheetTab !== 'aa' ? (sheetTab as Activity) : 'reading'
+  /*
+   * The lamp wins over the browse page. It is drawn on top of everything, and
+   * a reader with a conversation open is talking to Veda whatever is behind it
+   * — which is the point of measuring this at all: the time with Veda is now
+   * the time the lamp was open, not a guess made afterwards from the gaps
+   * between messages. See `stats/vedaTime.ts` for the guess it replaces.
+   */
+  const activity: Activity = lamp
+    ? 'veda'
+    : sheetOpen && sheetTab !== 'aa'
+      ? (sheetTab as Activity)
+      : 'reading'
 
   useEffect(() => {
     if (id === undefined) return

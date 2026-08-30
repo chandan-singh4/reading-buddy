@@ -20,6 +20,7 @@
 
 import { openClock, total, type Clock } from './clock.ts'
 import { dayKey, sessionStore, type SessionStore } from './sessions.ts'
+import { onPlaceChange } from './place.ts'
 import { ASK_AFTER_MS, VIGIL_MARK, ask, stopAsking } from './vigil.ts'
 import type { SessionActivity } from '../storage/db.ts'
 import type { BookId } from '../structure/index.ts'
@@ -143,6 +144,9 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
     counted = active
     current = place?.activity ?? 'reading'
     const activity = busiest()
+    // The measured length of the conversations. `spent` is exact at this point:
+    // the line above has just closed off the stretch that ended now.
+    const vedaMs = spent.get('veda') ?? 0
     // Deliberately not awaited anywhere. A flush that loses a race with the
     // next flush writes an older, shorter total over a newer one and is
     // corrected 30 seconds later; a flush that blocks the reading screen is a
@@ -164,6 +168,7 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
       ...(activity ? { activity } : {}),
       lastSeenAt,
       ...(away > 0 ? { awayMs: away } : {}),
+      ...(vedaMs > 0 ? { vedaMs } : {}),
     })
   }
 
@@ -242,6 +247,13 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
     write()
   }
 
+  /*
+   * A screen change is written at once rather than waited for. See the note in
+   * `place.ts`: the clock has to close off a stretch at the moment it ends, or
+   * a two-minute conversation is measured to the nearest half minute.
+   */
+  onPlaceChange(write)
+
   const watcher = setInterval(watch, WATCH_MS)
   const interval = setInterval(write, FLUSH_MS)
 
@@ -258,6 +270,7 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
     stopped = true
     clearInterval(interval)
     clearInterval(watcher)
+    onPlaceChange(undefined)
     // A question nobody is left to answer. The silence it was asking about has
     // already been taken off the total by the write below.
     if (askedAt !== undefined) stopAsking()

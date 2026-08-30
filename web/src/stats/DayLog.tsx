@@ -91,6 +91,7 @@ const ACTIVITY_NAMES: Record<SessionActivity, string | undefined> = {
   contents: 'Contents',
   bookmarks: 'Bookmarks',
   recap: 'Last time',
+  veda: 'With Veda',
 }
 
 /**
@@ -174,7 +175,10 @@ export function meta(line: ReadingSession): { text: string; veda: boolean }[] {
    * sitting was: most of an hour, a third of it talking.
    */
   if (line.vedaMinutes >= 1) {
-    parts.push({ text: `${spell(line.vedaMinutes)} with Veda`, veda: true })
+    // A tilde on the sittings from before the lamp was timed. They are floors,
+    // and a reader comparing two rows should be able to see which is which.
+    const about = line.vedaMeasured ? '' : '~'
+    parts.push({ text: `${about}${spell(line.vedaMinutes)} with Veda`, veda: true })
   }
   /*
    * Said plainly, and next to the time it came out of. A sitting that reads

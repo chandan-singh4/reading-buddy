@@ -2524,3 +2524,30 @@ off offers it back. A sitting that ended in ten minutes or more of silence
 offers to take it off. It is deliberately not a time editor: a reader who can
 type any number can write themselves a streak, and then the screen is a diary
 and not a record.
+
+## Time with Veda is measured, not inferred
+
+The first version worked it out afterwards from the gaps between messages. That
+is a floor and not a measurement: it cannot see the reader thinking about the
+last answer, it counts nothing after the final message, and it drops any gap
+longer than five minutes rather than trimming it.
+
+The study lamp now reports itself as a screen of the book, the way the notes and
+the book details do, and the clock times it. `StoredSession.vedaMs` is the
+result. `reportPlace` also wakes the clock the moment a screen changes, because
+a flush half a minute later would credit the wrong screen — which does not
+matter to a day's total and does matter to a two-minute conversation.
+
+Sessions older than this keep the estimate, and the day log prints them with a
+tilde: `~13 min with Veda`. Two numbers of different kinds must not look alike.
+
+## The pacing forecast counts reading minutes only
+
+The forecast divides minutes by the fraction of the book they covered, so every
+minute in it has to be a minute that moved the reader forward. Time under the
+lamp is reading in every sense that matters and it advances no percentage; left
+in, it makes the book look slower and walks the finish date away from a reader
+who is doing their most engaged reading.
+
+The minutes are not lost. The day totals, the streak and the heatmap all count
+them. The trajectory card is about pace, and pace is pages an hour.

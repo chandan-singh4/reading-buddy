@@ -75,11 +75,30 @@ export interface Trajectory {
 }
 
 export function trajectoryOf(
-  sessions: readonly Span[],
+  all: readonly Span[],
   percent: number,
   today: Date,
 ): Trajectory | undefined {
-  if (sessions.length === 0) return undefined
+  if (all.length === 0) return undefined
+
+  /*
+   * Time with Veda is taken out before anything is worked out.
+   *
+   * The forecast divides minutes by the fraction of the book they covered, so
+   * every minute counted has to be a minute that moved the reader through the
+   * book. A conversation about one paragraph is reading in every sense that
+   * matters, and it advances no percentage — leave it in and the book looks
+   * slower than it is, and the finish date walks away from a reader who is
+   * doing the most engaged reading of their life.
+   *
+   * The minutes are not lost. The day totals, the streak and the heatmap all
+   * count them, because they are time spent on the book. This one number is
+   * about pace, and pace is pages an hour.
+   */
+  const sessions = all.map((session) => ({
+    ...session,
+    activeMs: Math.max(0, session.activeMs - (session.vedaMs ?? 0)),
+  }))
 
   const first = sessions.reduce((min, s) => Math.min(min, s.startedAt), Infinity)
   const startedOn = startOfDay(new Date(first))

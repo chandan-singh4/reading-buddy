@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { FLUSH_MS, startSession, type Place } from './timer.ts'
 import { answerSteppedAway, answerStillHere, forgetVigil, snapshot } from './vigil.ts'
+import { forgetPlace, placeIn, reportPlace } from './place.ts'
 import type { StoredSession } from '../storage/db.ts'
 import type { BookId } from '../structure/index.ts'
 
@@ -205,5 +206,54 @@ describe('the check-in', () => {
     const row = visit(40, 15)
     expect(row.away).toBe(15)
     expect(row.active).toBe(25)
+  })
+})
+
+describe('time with Veda', () => {
+  const VEDA: Place = { chapterTitle: 'Approaching the Unconscious', activity: 'veda' }
+
+  /**
+   * A visit in flush-sized steps, reporting the measured conversation.
+   *
+   * The screen is reported through `reportPlace`, the way the reading screen
+   * reports it, so this also covers the part that matters most: the clock
+   * closing off a stretch the moment the lamp shuts, rather than at its next
+   * flush.
+   */
+  function conversation(steps: Place[]): number {
+    const store = spy()
+    let at = Date.parse('2026-08-30T22:00:00.000Z')
+    const timers = vi.useFakeTimers({ now: at })
+    const session = startSession('b1' as BookId, {
+      store: store as never,
+      now: () => at,
+      place: () => placeIn('b1' as BookId),
+    })
+
+    for (const step of steps) {
+      reportPlace('b1' as BookId, step)
+      at += FLUSH_MS
+      timers.advanceTimersByTime(FLUSH_MS)
+    }
+    session.stop()
+    vi.useRealTimers()
+    forgetPlace()
+    forgetVigil()
+    return Math.round((store.last()?.vedaMs ?? 0) / 1000)
+  }
+
+  it('says nothing about a sitting that never opened the lamp', () => {
+    expect(conversation([READING, READING])).toBe(0)
+  })
+
+  it('counts every second the lamp was open', () => {
+    // Two flushes with the lamp open, one without. The reading of the last
+    // answer is inside those two, which is exactly what the old estimate from
+    // the message times could never see.
+    expect(conversation([READING, VEDA, VEDA, READING])).toBe(60)
+  })
+
+  it('stops counting the moment the lamp shuts', () => {
+    expect(conversation([VEDA, READING, READING, READING])).toBe(30)
   })
 })

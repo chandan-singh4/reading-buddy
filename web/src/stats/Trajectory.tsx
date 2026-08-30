@@ -7,7 +7,9 @@ import styles from './trajectory.module.css'
  *
  * It answers one question — "when will I finish this?" — from two measured
  * facts: the minutes logged and how far through the book the position says the
- * reader is. See `trajectory.ts` for the arithmetic and for the one assumption
+ * reader is. The minutes are reading minutes: time spent talking to Veda is
+ * taken out first, because it advances no percentage and would make the book
+ * look slower than it is. See `trajectory.ts` for the arithmetic and for the one assumption
  * the drawn curve makes.
  *
  * The card is deliberately quiet about the past and clear about the future. The
@@ -190,7 +192,8 @@ export default function TrajectoryCard({ data, title }: { data: Trajectory; titl
           {/* Said plainly, because the line looks like a record and is not. */}
           <p className={styles.small}>
             The curve follows the minutes you read, scaled to today’s real percentage. Reading Buddy
-            doesn’t record where you were on an earlier day.
+            doesn’t record where you were on an earlier day. Time under the lamp with Veda is left
+            out of the pace — it is reading, but it turns no pages.
           </p>
         </>
       )}

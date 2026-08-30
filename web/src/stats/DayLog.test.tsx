@@ -28,6 +28,7 @@ const line = (over: Partial<ReadingSession> = {}): ReadingSession => ({
   chatCount: 0,
   qaCount: 0,
   vedaMinutes: 0,
+  vedaMeasured: true,
   awayMinutes: 0,
   quietMinutes: 0,
   micro: false,
@@ -163,6 +164,11 @@ describe('DayLog', () => {
 
   it('says one chat, not one chats', () => {
     expect(diff(line({ chatCount: 1, qaCount: 1 }))).toBe('1h 3m · 1 chat with Veda · 1 Q&A')
+  })
+
+  it('marks a sitting whose conversation was never timed', () => {
+    // Older than the lamp's own clock, so the figure is a floor and says so.
+    expect(diff(line({ vedaMinutes: 13, vedaMeasured: false }))).toBe('1h 3m · ~13 min with Veda')
   })
 
   it('says how much of the sitting had Veda in it', () => {
