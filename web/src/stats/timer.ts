@@ -20,6 +20,7 @@
 
 import { openClock, total, type Clock } from './clock.ts'
 import { dayKey, sessionStore, type SessionStore } from './sessions.ts'
+import type { SessionActivity } from '../storage/db.ts'
 import type { BookId } from '../structure/index.ts'
 
 /** How often the growing row is written back. */
@@ -30,10 +31,20 @@ export interface ReadingSession {
   stop: () => void
 }
 
+/**
+ * What the reader is doing, when it is not turning pages.
+ *
+ * `reading` is the absence of an answer as much as an answer: the pages are
+ * what a book is for, so a session settles on `reading` unless the reader spent
+ * most of the visit somewhere else in the book.
+ */
+export type Activity = SessionActivity
+
 /** Where the reader is, asked for fresh at every write. */
 export interface Place {
   chapterTitle?: string
   sectionTitle?: string
+  activity?: Activity
 }
 
 interface Options {
@@ -62,11 +73,48 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
   const day = dayKey(clock.openedAt)
   let stopped = false
 
+  /*
+   * Which screen of the book had the reader's time, and for how long.
+   *
+   * The session cannot be labelled by where it *ends*, which is what the last
+   * write would give. A reader who reads a chapter and glances at the notes on
+   * the way out read a chapter. So the active milliseconds between two writes
+   * go to whatever screen was open at the first of them, and the longest total
+   * names the session. The grain is one flush, which is coarse and enough — a
+   * screen that held the reader for less than half a minute is not what the
+   * visit was about.
+   */
+  const spent = new Map<Activity, number>()
+  // Asked once here as well as at every write. Without it the first stretch of
+  // every visit would go to the pages, and a reader who opened the book details
+  // and nothing else would have half the visit filed as reading.
+  let current: Activity = options.place?.()?.activity ?? 'reading'
+  let counted = 0
+
+  /** The screen with the most of the visit, or `undefined` for the pages. */
+  const busiest = (): Activity | undefined => {
+    let best: Activity | undefined
+    let most = 0
+    for (const [activity, ms] of spent) {
+      if (ms > most) {
+        most = ms
+        best = activity
+      }
+    }
+    return best === 'reading' ? undefined : best
+  }
+
   const write = (): void => {
     const at = now()
     // The furthest the session got, not where it started: each write overwrites
     // the last, so the row ends up naming the place the reader left off.
     const place = options.place?.()
+
+    const active = total(clock, at)
+    spent.set(current, (spent.get(current) ?? 0) + (active - counted))
+    counted = active
+    current = place?.activity ?? 'reading'
+    const activity = busiest()
     // Deliberately not awaited anywhere. A flush that loses a race with the
     // next flush writes an older, shorter total over a newer one and is
     // corrected 30 seconds later; a flush that blocks the reading screen is a
@@ -78,11 +126,12 @@ export function startSession(bookId: BookId, options: Options = {}): ReadingSess
       day,
       startedAt: clock.openedAt,
       endedAt: at,
-      activeMs: total(clock, at),
+      activeMs: active,
       // Spread conditionally: an absent title has to stay absent rather than
       // become `undefined`, which Dexie would store as a real field.
       ...(place?.chapterTitle ? { chapterTitle: place.chapterTitle } : {}),
       ...(place?.sectionTitle ? { sectionTitle: place.sectionTitle } : {}),
+      ...(activity ? { activity } : {}),
     })
   }
 

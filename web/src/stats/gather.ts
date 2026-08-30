@@ -20,6 +20,7 @@ import type {
   StoredChapterSummary,
   StoredConcept,
   StoredNote,
+  SessionActivity,
   StoredSession,
   StoredTutorThread,
 } from '../storage/db.ts'
@@ -198,6 +199,8 @@ export interface ReadingSession {
   dayMinutes: number
   chapterTitle: string | undefined
   sectionTitle: string | undefined
+  /** The screen that held the visit, or absent when it was the pages. */
+  activity: SessionActivity | undefined
   highlightCount: number
   /** Conversations with Veda that were open during this session. */
   chatCount: number
@@ -309,6 +312,7 @@ export function activityByDay(
       dayMinutes: Math.round(share / 60_000),
       chapterTitle: session.chapterTitle,
       sectionTitle: session.sectionTitle,
+      activity: session.activity,
       highlightCount,
       chatCount,
       qaCount,

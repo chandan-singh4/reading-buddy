@@ -392,3 +392,15 @@ See `docs/decisions.md` for both.
 
 **Delete next session:** `web/src/stats/repair.ts` and its call in
 `stats/load.ts`, once the reader has opened Statistics on the phone.
+
+## Pass 13 — the log says what the visit was
+
+- `storage/db.ts`: `StoredSession.activity`, a `SessionActivity`. Not indexed,
+  so there is no Dexie version bump.
+- `stats/timer.ts`: tallies active time per screen and writes the longest.
+- `stats/useReadingClock.ts`: `activityInPath` reads the screen off the address.
+- `pages/Reader.tsx`: reports the open panel (notes, contents, bookmarks).
+- `stats/DayLog.tsx`: `Book details · <chapter>` in place of `Reading`.
+
+**Delete next session:** `web/src/stats/repair.ts` and its call in
+`stats/load.ts`, once the reader has opened Statistics on the phone.

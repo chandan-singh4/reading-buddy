@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { type BookActivity, type DayActivity, type ReadingSession } from './gather.ts'
+import type { SessionActivity } from '../storage/db.ts'
 import styles from './stats.module.css'
 
 /**
@@ -74,6 +75,17 @@ export function spell(minutes: number): string {
   return rest === 0 ? `${minutes / 60}h` : `${Math.floor(minutes / 60)}h ${rest}m`
 }
 
+/** What each screen of a book is called in the log. */
+const ACTIVITY_NAMES: Record<SessionActivity, string | undefined> = {
+  reading: undefined,
+  details: 'Book details',
+  chapters: 'Chapter summaries',
+  notes: 'Notes',
+  contents: 'Contents',
+  bookmarks: 'Bookmarks',
+  recap: 'Last time',
+}
+
 /**
  * The chapter and section, with anything that merely repeats itself dropped.
  *
@@ -106,6 +118,19 @@ export function heading(
     seen.add(key)
     parts.push(part)
   }
+  /*
+   * A visit spent somewhere other than the pages says so, and says it first.
+   * "Reading" over a sitting that was the book details or the notes is not
+   * wrong so much as unhelpful — the reader remembers what they did, and the
+   * log has to agree with them before it can tell them anything.
+   *
+   * The chapter still follows it when there is one, because a look at the
+   * notes is a look at the notes *of somewhere*. The section is dropped: three
+   * parts is more than a one-line row can carry.
+   */
+  const doing = line.activity === undefined ? undefined : ACTIVITY_NAMES[line.activity]
+  if (doing !== undefined) return parts.length === 0 ? doing : `${doing} · ${parts[0]}`
+
   // No chapter recorded — true of every session written before the app tracked
   // the place, and of a session that ended before the first page rendered.
   return parts.length === 0 ? 'Reading' : parts.join(' · ')

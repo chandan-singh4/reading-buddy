@@ -2438,3 +2438,19 @@ minutes and 203 minutes could look the same. A shade now means a fixed amount
 of time: 1-60 minutes, 60-120, 120-180, 180-240, and 240 or more. Five shades,
 one hour each, and the fifth is the darkest. The scale does not move, so two
 days that look alike are alike.
+
+## A session says which screen of the book it was spent on
+
+A visit to a book is one session across all of its screens. That is right, and
+it made every row say "Reading" — even a visit that was only the book details
+or only the notes.
+
+Each session now also records an activity. The rule is *where the time went*,
+not where the reader left from: the active time between two flushes goes to the
+screen that was open, and the longest total names the session. So a chapter
+read with a glance at the notes is still the chapter. The pages are the default
+and are never named, so old rows need no repair.
+
+The routes name themselves (`/info`, `/chapters`, `/last-time`). The reading
+screen reports its own panels, because the contents and the notes are panels
+over it and the address cannot see them.

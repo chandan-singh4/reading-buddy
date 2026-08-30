@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { reportPlace } from '../stats/place.ts'
+import type { Activity } from '../stats/timer.ts'
 
 import {
   Block,
@@ -4029,13 +4030,23 @@ export default function Reader() {
    * over there. The book id guards against it outliving its book.
    */
   const sectionTitle = page.status === 'ready' ? page.section.title : undefined
+
+  /*
+   * The browse page is a panel over the reading screen, not a route, so the
+   * clock cannot see it in the address. Aa is left out: changing the type size
+   * is something you do *to* the page, and the reader is still on the page.
+   */
+  const activity: Activity =
+    sheetOpen && sheetTab !== 'aa' ? (sheetTab as Activity) : 'reading'
+
   useEffect(() => {
     if (id === undefined) return
     reportPlace(id, {
       ...(title ? { chapterTitle: title } : {}),
       ...(sectionTitle ? { sectionTitle } : {}),
+      activity,
     })
-  }, [id, title, sectionTitle])
+  }, [id, title, sectionTitle, activity])
 
   /** The same, for a chapter that is not the one on screen. */
   const titleOfChapter = (chapter: number) =>

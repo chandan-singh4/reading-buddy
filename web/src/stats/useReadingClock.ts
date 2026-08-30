@@ -23,11 +23,11 @@
  * timer would only be a way of guessing at a fact already available exactly.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router'
 
 import { placeIn } from './place.ts'
-import { startSession } from './timer.ts'
+import { startSession, type Activity, type Place } from './timer.ts'
 import type { BookId } from '../structure/index.ts'
 
 /**
@@ -40,12 +40,43 @@ export function bookInPath(pathname: string): BookId | undefined {
   return match ? (decodeURIComponent(match[1]) as BookId) : undefined
 }
 
+/**
+ * The screen of the book the address names.
+ *
+ * Three of the four book screens are routes, so the address is the whole
+ * answer for them and no screen has to report anything. The fourth is the
+ * reading screen, which has panels over it — the notes, the contents — and
+ * only it knows which is up. So it reports, and what it reports wins here.
+ */
+export function activityInPath(pathname: string): Activity {
+  if (/^\/book\/[^/]+\/info/.test(pathname)) return 'details'
+  if (/^\/book\/[^/]+\/chapters/.test(pathname)) return 'chapters'
+  if (/^\/book\/[^/]+\/last-time/.test(pathname)) return 'recap'
+  return 'reading'
+}
+
 export function useReadingClock(): void {
-  const bookId = bookInPath(useLocation().pathname)
+  const pathname = useLocation().pathname
+  const bookId = bookInPath(pathname)
+
+  /*
+   * A ref, not a dependency. The session must not restart when the reader taps
+   * from the pages to the book details — that is the whole argument at the top
+   * of this file — so the address is read at each flush, like the place.
+   */
+  const where = useRef(pathname)
+  where.current = pathname
 
   useEffect(() => {
     if (bookId === undefined) return
-    const session = startSession(bookId, { place: () => placeIn(bookId) })
+    const place = (): Place | undefined => {
+      const activity = activityInPath(where.current)
+      const found = placeIn(bookId)
+      // The reading screen's own report of a panel outranks the address, which
+      // can only ever say "the reading screen".
+      return activity === 'reading' ? found : { ...found, activity }
+    }
+    const session = startSession(bookId, { place })
     return () => session.stop()
   }, [bookId])
 }

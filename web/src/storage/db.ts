@@ -619,6 +619,21 @@ export interface StoredWord {
  * is real and accepted — these numbers do not follow the reader to a second
  * device.
  */
+/**
+ * Which screen of a book a session was spent on.
+ *
+ * Declared with the row rather than with the timer that writes it, because the
+ * shape of a stored row belongs to the store. `stats/timer.ts` re-exports it.
+ */
+export type SessionActivity =
+  | 'reading'
+  | 'details'
+  | 'notes'
+  | 'contents'
+  | 'bookmarks'
+  | 'chapters'
+  | 'recap'
+
 export interface StoredSession {
   id: string
   bookId: BookId
@@ -643,6 +658,15 @@ export interface StoredSession {
    */
   chapterTitle?: string
   sectionTitle?: string
+  /*
+   * What the reader spent most of the visit doing, when it was not the pages.
+   *
+   * A visit to a book is one session across all of its screens, so a session
+   * that was entirely the book details used to be filed as "Reading" with no
+   * chapter. Absent means the pages, which is both the common case and what
+   * every row written before this says.
+   */
+  activity?: SessionActivity
 }
 
 export const DB_NAME = 'reading-buddy'

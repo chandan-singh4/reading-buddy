@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { bookInPath } from './useReadingClock.ts'
+import { activityInPath, bookInPath } from './useReadingClock.ts'
 
 describe('bookInPath', () => {
   it('is the same book on every one of its screens', () => {
@@ -33,5 +33,18 @@ describe('bookInPath', () => {
 
   it('reads an id that had to be escaped to fit in a URL', () => {
     expect(bookInPath('/book/a%20b/info')).toBe('a b')
+  })
+})
+
+describe('activityInPath', () => {
+  it('names the screen the address is on', () => {
+    expect(activityInPath('/book/abc/info')).toBe('details')
+    expect(activityInPath('/book/abc/chapters')).toBe('chapters')
+    expect(activityInPath('/book/abc/last-time')).toBe('recap')
+  })
+
+  it('calls the book itself reading', () => {
+    // The panels live over this screen, and only the screen knows about them.
+    expect(activityInPath('/book/abc')).toBe('reading')
   })
 })

@@ -23,6 +23,7 @@ const line = (over: Partial<ReadingSession> = {}): ReadingSession => ({
   dayMinutes: 63,
   chapterTitle: 'Part 1: Approaching the Unconscious',
   sectionTitle: undefined,
+  activity: undefined,
   highlightCount: 0,
   chatCount: 0,
   qaCount: 0,
@@ -111,6 +112,26 @@ describe('heading', () => {
 
   it('still says something for a session recorded before places were tracked', () => {
     expect(heading(line({ chapterTitle: undefined }), 'Man and His Symbols')).toBe('Reading')
+  })
+
+  it('says which screen of the book a visit was spent on', () => {
+    // The reader opened the book details and read nothing. "Reading" over that
+    // row tells them less than they already knew.
+    expect(heading(line({ chapterTitle: undefined, activity: 'details' }), 'Man and His Symbols')).toBe(
+      'Book details',
+    )
+  })
+
+  it('keeps the chapter beside the screen the reader was on', () => {
+    expect(heading(line({ activity: 'notes' }), 'Man and His Symbols')).toBe(
+      'Notes · Part 1: Approaching the Unconscious',
+    )
+  })
+
+  it('says nothing extra about a visit spent on the pages', () => {
+    expect(heading(line({ activity: 'reading' }), 'Man and His Symbols')).toBe(
+      'Part 1: Approaching the Unconscious',
+    )
   })
 })
 
