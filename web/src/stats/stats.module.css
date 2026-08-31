@@ -79,12 +79,27 @@
   --accent-tint: var(--color-accent-wash);
   /* Amber is time. It is never a second accent. */
   --amber: #c77d3a;
-  /* The warm ink ramp: how much you read that day, and nothing else */
+  /*
+   * The warm ink ramp: how much you read that day, and nothing else.
+   *
+   * Four shades, one per hour, and the whole ramp now sits a rung lighter. The
+   * old top shade was a near-black brown, which on a card of warm paper read as
+   * a hole punched in the grid rather than as the most of something. Each shade
+   * moved down one rung and a new lightest was added at the foot, so a first
+   * hour reads as a tint rather than as an already-strong colour.
+   *
+   * Kept literal, unlike the surfaces above. This is a scale, and a theme must
+   * never be able to make one rung equal its neighbour.
+   *
+   * `--h0` is not part of the ramp and never was. A day with no reading takes no
+   * shade at all. It survives as the track behind the goal bar and the quiet
+   * column of the spectrum, which are the only two things that still use it.
+   */
   --h0: #e8ddc8;
-  --h1: #e3c58f;
-  --h2: #d19a4e;
-  --h3: #a9662b;
-  --h4: #6e3e17;
+  --h1: #f0dfba;
+  --h2: #e3c58f;
+  --h3: #d19a4e;
+  --h4: #a9662b;
   /* Violet belongs to Veda alone */
   --veda: #6c5ce0;
   --veda-lite: #b7adf0;

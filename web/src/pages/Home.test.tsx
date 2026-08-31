@@ -349,14 +349,22 @@ describe('the book in hand', () => {
     await screen.findByText('The Wind in the Willows')
   }
 
-  it('offers a way into the book and into its chapter summaries', async () => {
+  it('offers the one route the cover does not already give you', async () => {
     await openHomeReading(28)
 
     const summaries = await shown().findByRole('link', { name: 'Chapter summaries' })
     expect(summaries.getAttribute('href')).toBe('/book/home-a/chapters')
-    expect(
-      shown().getByRole('link', { name: 'Continue reading' }).getAttribute('href'),
-    ).toBe('/book/home-a')
+
+    // No "Continue reading" button. The cover and the title are both already
+    // links to the book, so a third one taught the reader that the buttons on
+    // this card are decoration.
+    expect(shown().queryByRole('link', { name: 'Continue reading' })).toBeNull()
+    // Filtered rather than matched by name: the ⓘ button is labelled "About The
+    // Wind in the Willows", so a loose name matches two links.
+    const toBook = shown()
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href') === '/book/home-a')
+    expect(toBook.length).toBeGreaterThan(0)
   })
 
   it('says so plainly when it cannot forecast a finish yet', async () => {

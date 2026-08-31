@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
@@ -309,8 +316,8 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
               entry={shelves.currentlyReading}
               coverSrc={covers.get(shelves.currentlyReading.book.id)}
               large
+              detail={<CurrentDetail entry={shelves.currentlyReading} />}
             />
-            <CurrentDetail entry={shelves.currentlyReading} />
           </div>
         )}
       </Shelf>
@@ -453,14 +460,16 @@ function CurrentDetail({ entry }: { entry: ShelfEntry }) {
 
   return (
     <div className={styles.currentDetail}>
-      <div className={styles.currentActions}>
-        <Link to={`/book/${book.id}`} className={styles.currentPrimary}>
-          Continue reading
-        </Link>
-        <Link to={`/book/${book.id}/chapters`} className={styles.currentSecondary}>
-          Chapter summaries
-        </Link>
-      </div>
+      {/*
+        One button, not two. "Continue reading" was a third door onto the book —
+        the cover opens it and so does the title — and a card whose most
+        prominent control repeats what tapping anywhere else already does
+        teaches the reader that the buttons are decoration.
+        Chapter summaries is the only thing here that goes somewhere new.
+      */}
+      <Link to={`/book/${book.id}/chapters`} className={styles.currentAction}>
+        Chapter summaries
+      </Link>
 
       {/* Held back until the lookup answers. A strip that says "still learning"
           for a moment and then prints a date is a strip that changed its mind
@@ -468,7 +477,7 @@ function CurrentDetail({ entry }: { entry: ShelfEntry }) {
       {settled && (
         <div className={styles.trajectory}>
           <div className={styles.trajectoryHead}>
-            <span className={styles.trajectoryKicker}>Reading trajectory</span>
+            <span className={styles.trajectoryKicker}>Trajectory</span>
             {forecast && <span className={styles.trajectoryTag}>{pace.status}</span>}
           </div>
 
@@ -502,10 +511,21 @@ function BookTile({
   entry,
   coverSrc,
   large = false,
+  detail,
 }: {
   entry: ShelfEntry
   coverSrc?: string
   large?: boolean
+  /**
+   * Extra content for the column beside the cover — the hero's button and its
+   * trajectory. It sits *inside* the tile rather than under it so that the
+   * cover's own bottom edge is the bottom of the card, and the book can stand
+   * on the plank instead of hovering above a strip of text.
+   *
+   * It cannot go inside `.tileInfo`, which is itself a link to the book: a
+   * button nested in a link is a control the browser has no sane answer for.
+   */
+  detail?: ReactNode
 }) {
   const { book, percent } = entry
   return (
@@ -536,15 +556,18 @@ function BookTile({
           ⓘ
         </Link>
       </div>
-      <Link to={`/book/${book.id}`} className={styles.tileInfo}>
-        <span className={styles.tileTitle}>{book.title}</span>
-        {book.author && <span className={styles.tileAuthor}>{book.author}</span>}
-        {/* On the hero the fore edge says this, and says it better. Everywhere
-            else the number is the only thing that can. */}
-        {!large && percent !== undefined && (
-          <span className={styles.tileProgress}>{percent}% read</span>
-        )}
-      </Link>
+      <div className={detail ? styles.tileColumn : styles.tileColumnBare}>
+        <Link to={`/book/${book.id}`} className={styles.tileInfo}>
+          <span className={styles.tileTitle}>{book.title}</span>
+          {book.author && <span className={styles.tileAuthor}>{book.author}</span>}
+          {/* On the hero the fore edge says this, and says it better. Everywhere
+              else the number is the only thing that can. */}
+          {!large && percent !== undefined && (
+            <span className={styles.tileProgress}>{percent}% read</span>
+          )}
+        </Link>
+        {detail}
+      </div>
     </div>
   )
 }

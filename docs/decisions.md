@@ -2650,6 +2650,31 @@ The card also carries the estimated finish date and the daily pace, from
 there is too little read to forecast, the strip says so in one line. It never
 prints a date it would have to take back.
 
+### One button, and the book stands on the shelf
+
+The card first carried two buttons: *Continue reading* and *Chapter summaries*.
+*Continue reading* is gone. The cover opens the book and so does the title, so
+it was a third door onto the same room — and a card whose most prominent
+control repeats what tapping anywhere else already does teaches the reader that
+the buttons are decoration. *Chapter summaries* is the only thing on the card
+that goes somewhere new.
+
+Everything except the cover now sits in a column to its right: title, author,
+the button, the forecast. That is not only an arrangement. The button and the
+forecast used to be stacked *under* the book, which pushed the book up off the
+plank drawn beneath it — so the one book the screen is about was the only book
+on the page not standing on a shelf. With the column beside it, the cover's own
+bottom edge is the bottom of the card, and the book touches the wood.
+
+The column is half the width the card had, so the two forecast facts stack
+instead of sitting side by side, and the kicker is one word.
+
+Three `min-width: 0` declarations hold this up — on the card, on the row, and on
+the column. The shelf panel is a grid and the row is a flex container, and both
+kinds of child report their full content width as their smallest size. Without
+them the card hung about 30px over the panel's right edge instead of shrinking
+to it. This is the same fault the chapter rail hit, and the same fix.
+
 ## A book is renamed one at a time
 
 `repository.renameBook` existed in all three storage layers from the start and
@@ -2683,3 +2708,9 @@ held together by a faint outline so the grid stays legible.
 
 The key shows four swatches, not five. The blank square is not the lightest
 band. It is the absence of a band, and putting it in the key said otherwise.
+
+The ramp itself then moved a rung lighter. Its old top shade was a near-black
+brown, which on a card of warm paper read as a hole punched in the grid rather
+than as the most of something. Each shade moved down one rung and a new lightest
+was added at the foot, so a first hour is a tint rather than an already-strong
+colour. Four shades and four one-hour bands are unchanged.

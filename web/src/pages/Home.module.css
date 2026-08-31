@@ -206,13 +206,19 @@
    it is the single thing on this screen the reader is most likely to act on. */
 .heroCard {
   display: flex;
-  /* A column now, not a row: the book and its text sit on top, the actions and
-     the trajectory underneath. Two full-width strips under a hero read as part
-     of the same object; the same two squeezed into the text column beside a
-     10rem cover would have about nine characters of room each. */
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3) 0 var(--space-4);
+  /*
+   * No bottom padding. The plank is drawn directly under this card, and every
+   * other shelf's covers sit on it — the hero's did not, because the button and
+   * the trajectory used to be stacked underneath the book and pushed it up off
+   * the wood. They are in the column beside it now, so the cover's own bottom
+   * edge is the bottom of the card and the book stands on the shelf.
+   */
+  padding: var(--space-3) 0 0;
+  /* The shelf panel is a grid, and a grid child reports its full content width
+     as its smallest size — so this card sat 30px over the panel's right edge
+     rather than shrinking to it. The same fault the chapter rail hit; the same
+     one-line fix. `.tileLarge` inside needs its own, being a flex item. */
+  min-width: 0;
 }
 
 /* Current Reading's single hero tile: cover and text side by side rather
@@ -220,9 +226,32 @@
    right now, not as one more card in a row. Its cover runs larger than a
    shelf tile's — the one book in progress earns the biggest cover on the
    page. */
+/* The hero's right-hand column: title, author, the button and the forecast, all
+   stacked beside the cover. `min-width: 0` because a grid child reports its full
+   content width as its smallest size, which would push the cover off-screen the
+   moment a title had no space to wrap in. */
+.tileColumn {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Every other tile: the text column is only the link, so it needs no wrapper of
+   its own beyond one that does not disturb the stacked layout. */
+.tileColumnBare {
+  display: contents;
+}
+
 .tileLarge {
   width: 100%;
   display: flex;
+  /* Without this the card overflowed its panel by about 30px on a phone. A flex
+     item reports its full content width as its smallest size, and the column
+     beside the cover contains a button whose label does not wrap — so the row
+     refused to shrink to the panel and simply hung over the right edge. */
+  min-width: 0;
   gap: var(--space-4);
   /* Title and author at the top of the cover, not floating at its middle. The
      text column now carries only two lines on the hero — the percentage moved
@@ -526,17 +555,11 @@
   gap: var(--space-2);
 }
 
-.currentActions {
-  display: flex;
-  gap: var(--space-2);
-}
-
-/* Both buttons take an equal share. "Continue reading" is the one the reader
-   wants nine times in ten, so it is the filled one — but a chapter summary is
-   not a lesser action, and sizing it smaller would make it look like one. */
-.currentPrimary,
-.currentSecondary {
-  flex: 1 1 0;
+/* The one control on the card. It is outlined rather than filled: the cover
+   beside it is the primary action, and a solid block of accent here would
+   out-shout the book it belongs to. */
+.currentAction {
+  display: block;
   min-width: 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
@@ -546,21 +569,12 @@
   text-decoration: none;
   /* A thumb target, not a link. */
   line-height: 1.4;
-}
-
-.currentPrimary {
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
-}
-
-.currentSecondary {
   background: transparent;
   color: var(--color-text);
   box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
-.currentPrimary:active,
-.currentSecondary:active {
+.currentAction:active {
   transform: translateY(1px);
 }
 
@@ -568,7 +582,7 @@
    screen that is a projection and not a record, and a boundary around it is
    what says so without a sentence of disclaimer. */
 .trajectory {
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
 }
@@ -581,11 +595,16 @@
   margin-bottom: var(--space-2);
 }
 
+/* One word, not two. "Reading trajectory" wrapped to two lines in this column
+   and the status tag landed on top of the second one. The card sits under a
+   book and beside a finish date; nothing here needs telling it is about
+   reading. */
 .trajectoryKicker {
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .trajectoryTag {
@@ -598,10 +617,12 @@
   white-space: nowrap;
 }
 
+/* Stacked, not side by side. Beside a 10rem cover this column has roughly half
+   the width it had under the card, and "Est. finish (33d)" next to "All-time
+   pace" in that space is two labels clipped to ellipses. */
 .trajectoryFacts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .trajectoryFacts > div {
