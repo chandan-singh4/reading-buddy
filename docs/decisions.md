@@ -2759,14 +2759,19 @@ The Pace Horizon draws the last seven days as a wave. It then continues the wave
 as a dashed line to a pin at the finish. A number cannot show a slump. A line
 can.
 
-Three rules hold the drawing honest:
+**It draws what the big chart draws.** The strip is a small copy of the pacing
+card on a book's details page, not a second opinion. Both plot the same axes
+from the same `Trajectory`: days across, percent of the book up. Solid where the
+reading happened, dashed where the forecast takes over, ending where the book
+ends.
 
-1. The past takes the left 55% and the guess takes the rest. A guess with equal
-   room reads as equally known.
-2. The projection ends on the seven-day mean. It never draws a climb, because
-   `trajectoryOf` never forecasts one.
-3. The wave shows all seven days, including the days with zero minutes. Those
-   are the days the reader is looking for.
+The first version plotted minutes per day — a wave that rose and fell. It was an
+honest picture of a different thing. Beside a chart that only ever climbs, it
+made the app look like it held two views about one book. One question, one
+shape, wherever the reader asks it.
+
+The x-axis runs from the first session to the forecast finish. So where the
+solid line stops is how far through the book's whole life the reader is.
 
 **The pin is HTML, not SVG.** The chart stretches to the card. A stretched SVG
 turns circles into ellipses and thins strokes on one axis. The wave uses
@@ -2784,3 +2789,27 @@ badge are the paper theme's own accent and surfaces, so the tokens draw the
 requested palette exactly. On the other seven themes the strip follows the
 reader. Only the moss green is a literal, because it is a verdict and not a
 surface: "you are fine" must mean the same in every theme.
+
+
+## Violet is Veda's on every screen
+
+The "Chapter summaries" button on the front door is violet with a page icon. It
+matches the same button on a book's details screen.
+
+Violet belongs to Veda everywhere in the app and is spent on nothing else. A
+reader who learns the colour once must be able to read it on any screen. An
+outlined grey button said only "this is a control".
+
+The violet is written as a literal, not a theme token. It is an identity, not a
+surface. A violet that followed the theme would stop being Veda's on seven of
+the eight themes, which is the whole of what it is for.
+
+## The book stands on the shelf, at any column height
+
+`.heroCard` gives up its bottom padding so the cover can touch the plank. That
+was not enough. The column beside the cover — button, then forecast — is taller
+than the cover is, so the row took the column's height and left the book hanging
+above the wood.
+
+The cover now takes `align-self: flex-end`. It drops to the row's baseline, so it
+stands on the shelf whatever the column beside it grows to.

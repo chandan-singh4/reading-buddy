@@ -29,7 +29,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,486 tests across 149 files.
+  2,487 tests across 149 files.
 - **The Obsidian export is proved. It met a real vault on 2026-08-31.** The
   reader exported, dropped the folder into Obsidian, and followed the links.
   Still unproved: a *second* export. Nobody has read more and pressed "Export
@@ -86,6 +86,17 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **Four design fixes on the front door** (2026-08-31). Not a waypoint. Build
+  green: 2,487 tests across 149 files.
+  - The Pace Horizon now plots what the details chart plots: percent of the book
+    against days. It used to plot minutes per day, so the two screens drew one
+    book two ways.
+  - The strip is smaller. Shorter chart, smaller numbers, tighter padding.
+  - "Chapter summaries" is violet with a page icon, the same as the button on
+    the details screen. Violet is Veda's.
+  - The cover drops to the bottom of its row, so the book touches the plank
+    however tall the column beside it is.
+
 - **The Pace Horizon** (2026-08-31). Not a waypoint. Build green: 2,486 tests
   across 149 files.
   - The trajectory strip on the front door is now a drawing. It shows the last
@@ -99,7 +110,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     under a wide card.
 
 - **A yes now waits instead of disappearing** (2026-08-31). Not a waypoint.
-  Build green: 2,486 tests across 149 files.
+  Build green: 2,487 tests across 149 files.
   - Approving a book in the bell writes a `pending` line. The line stays and
     says "Waiting for a model". The app tries again every hour while it is open.
     It never gives up. Before this, a refusal lost the yes with no trace.
@@ -110,7 +121,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     background" means "while the app is open". See `docs/decisions.md`.
 
 - **Four changes the reader asked for, and one type system** (2026-08-31). Not
-  a waypoint. Build green: 2,486 tests across 149 files.
+  a waypoint. Build green: 2,487 tests across 149 files.
   - **A day you did not read is now blank.** The bands were already an hour
     each and a zero day already scored `level: 0` — but `--h0` was a filled
     beige, so "I read nothing" and "I read forty minutes" drew two shades of

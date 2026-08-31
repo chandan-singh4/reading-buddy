@@ -20,7 +20,6 @@ import { repository, unavailableBooks } from '../storage/index.ts'
 import { sessionStore } from '../stats/sessions.ts'
 import { trajectoryOf, type Trajectory } from '../stats/trajectory.ts'
 import { PaceHorizon, type PaceStatus } from './PaceHorizon.tsx'
-import type { StoredSession } from '../storage/db.ts'
 import styles from './Home.module.css'
 
 type LoadState =
@@ -425,33 +424,6 @@ function shortDate(d: Date): string {
  * line, rather than printing a date it would have to take back or leaving a gap
  * that reads as something which failed to load.
  */
-/**
- * Minutes read on each of the last seven days, oldest first, this book only.
- *
- * Seven entries always, including the zeroes. A wave drawn from "the days you
- * read" would hide the days you did not, which are exactly the days the reader
- * is looking for. `StoredSession.day` is already the local calendar day, so
- * this never touches a timezone.
- */
-function lastSevenDays(sessions: readonly StoredSession[], now: Date): number[] {
-  const byDay = new Map<string, number>()
-  for (const session of sessions) {
-    byDay.set(session.day, (byDay.get(session.day) ?? 0) + session.activeMs)
-  }
-
-  const days: number[] = []
-  for (let back = 6; back >= 0; back -= 1) {
-    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back)
-    const key = `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`
-    days.push(Math.round((byDay.get(key) ?? 0) / 60000))
-  }
-  return days
-}
-
-function pad2(n: number): string {
-  return String(n).padStart(2, '0')
-}
-
 /** `trajectoryOf` writes its status for a reader; the strip wants it as a key. */
 function statusKey(status: string): PaceStatus {
   if (status === 'Ahead') return 'ahead'
@@ -462,7 +434,6 @@ function statusKey(status: string): PaceStatus {
 function CurrentDetail({ entry }: { entry: ShelfEntry }) {
   const { book, percent } = entry
   const [pace, setPace] = useState<Trajectory | undefined>()
-  const [week, setWeek] = useState<number[]>([])
   const [settled, setSettled] = useState(false)
 
   useEffect(() => {
@@ -480,13 +451,11 @@ function CurrentDetail({ entry }: { entry: ShelfEntry }) {
       .then((sessions) => {
         if (cancelled) return
         setPace(trajectoryOf(sessions, percent, new Date()))
-        setWeek(lastSevenDays(sessions, new Date()))
         setSettled(true)
       })
       .catch(() => {
         if (cancelled) return
         setPace(undefined)
-        setWeek([])
         setSettled(true)
       })
     return () => {
@@ -507,7 +476,25 @@ function CurrentDetail({ entry }: { entry: ShelfEntry }) {
         Chapter summaries is the only thing here that goes somewhere new.
       */}
       <Link to={`/book/${book.id}/chapters`} className={styles.currentAction}>
-        Chapter summaries
+        {/* Violet, and the same page-with-lines mark the details screen uses on
+            its own summaries button. Violet is Veda's throughout the app and is
+            spent on nothing else — this button opens what she wrote, so it
+            takes her colour rather than the ordinary outline every other
+            control here has. */}
+        <svg
+          className={styles.actionIcon}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4 4h13l3 3v13H4z" />
+          <path d="M8 9h8M8 13h8M8 17h5" />
+        </svg>
+        <span>Chapter summaries</span>
       </Link>
 
       {/* Held back until the lookup answers. A strip that says "still learning"
@@ -516,7 +503,7 @@ function CurrentDetail({ entry }: { entry: ShelfEntry }) {
       {settled && (
         forecast ? (
           <PaceHorizon
-            historicalMinutes={week}
+            progress={pace.path}
             projectedDays={pace.daysRemaining}
             estimatedFinishDate={shortDate(finish)}
             pacePerDay={`${pace.velocity}m / day`}

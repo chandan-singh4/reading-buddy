@@ -6,12 +6,22 @@ import { PaceHorizon } from './PaceHorizon.tsx'
 
 afterEach(cleanup)
 
-const WEEK = [65, 40, 25, 30, 55, 90, 77]
+/* A week of reading as the trajectory records it: the day, and how far through
+   the book the reader was at the end of it. */
+const PATH = [
+  { day: 0, percent: 4 },
+  { day: 1, percent: 9 },
+  { day: 2, percent: 11 },
+  { day: 3, percent: 14 },
+  { day: 4, percent: 20 },
+  { day: 5, percent: 25 },
+  { day: 6, percent: 28 },
+]
 
 function show(props: Partial<Parameters<typeof PaceHorizon>[0]> = {}) {
   return render(
     <PaceHorizon
-      historicalMinutes={WEEK}
+      progress={PATH}
       projectedDays={18}
       estimatedFinishDate="Sep 18"
       pacePerDay="77m / day"
@@ -46,28 +56,42 @@ describe('the pace horizon', () => {
     expect(screen.getByText('On track')).toBeTruthy()
   })
 
-  it('draws a curve through every day of the week', () => {
+  it('draws a curve through every day the reader has read', () => {
     const { container } = show()
     // Six cubic segments join seven points.
     const line = paths(container).find((d) => d.startsWith('M 0 ') && d.includes('C'))
-    expect(line?.match(/C /g)).toHaveLength(WEEK.length - 1)
+    expect(line?.match(/C /g)).toHaveLength(PATH.length - 1)
   })
 
-  it('carries the line on to a milestone at the far right', () => {
+  /* The details page plots percent against days and only ever climbs. This is
+     the same chart made small, so it must climb too — an earlier version drew
+     minutes per day, which rose and fell, and the two screens then disagreed
+     about the shape of one book. */
+  it('climbs, the way the chart on the details page climbs', () => {
     const { container } = show()
-    const projection = paths(container).filter((d) => d.endsWith('100 24') || / 100 /.test(d))
-    expect(projection.length).toBeGreaterThan(0)
+    const line = paths(container).find((d) => d.startsWith('M 0 ') && d.includes('C'))!
+    const ys = [...line.matchAll(/, (-?[\d.]+), (-?[\d.]+), (-?[\d.]+) (-?[\d.]+)/g)].map((m) =>
+      Number(m[4]),
+    )
+    // Y grows downward in an SVG, so a rising line is a falling number.
+    for (let i = 1; i < ys.length; i += 1) expect(ys[i]!).toBeLessThanOrEqual(ys[i - 1]!)
   })
 
-  it('survives a reader with one day of history and no week to draw', () => {
-    const { container } = show({ historicalMinutes: [] })
+  it('ends the projection at the top of the book, not at the pace', () => {
+    const { container } = show()
+    const projection = paths(container).find((d) => d.endsWith(' 100 4'))
+    expect(projection).toBeTruthy()
+  })
+
+  it('survives a reader on their first day, with no line to draw yet', () => {
+    const { container } = show({ progress: [] })
     expect(screen.getByText('Sep 18')).toBeTruthy()
     // No NaN anywhere in the geometry — one bad number blanks the whole SVG.
     for (const d of paths(container)) expect(d).not.toMatch(/NaN/)
   })
 
-  it('draws a flat week without dividing by zero', () => {
-    const { container } = show({ historicalMinutes: [0, 0, 0, 0, 0, 0, 0] })
+  it('survives a finish forecast for today, with no days left to span', () => {
+    const { container } = show({ projectedDays: 0 })
     for (const d of paths(container)) expect(d).not.toMatch(/NaN/)
   })
 })

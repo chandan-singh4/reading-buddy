@@ -271,6 +271,17 @@
 
 .tileLarge .mediaWrap {
   width: 10rem;
+  /*
+   * The cover sits at the *bottom* of the row, not the top.
+   *
+   * `.heroCard` gives up its bottom padding so the book can stand on the plank,
+   * but the column beside it — button, then forecast — is taller than the cover
+   * is. That made the row's height the column's height and left the book
+   * hanging in the air above the wood with the gap under it. Dropping the cover
+   * to the row's baseline puts it back on the shelf whatever the column grows
+   * to.
+   */
+  align-self: flex-end;
 }
 
 /*
@@ -558,8 +569,23 @@
 /* The one control on the card. It is outlined rather than filled: the cover
    beside it is the primary action, and a solid block of accent here would
    out-shout the book it belongs to. */
+/*
+ * Violet, because this button opens what Veda wrote.
+ *
+ * Violet belongs to Veda everywhere in the app and is spent on nothing else —
+ * the same rule the book details screen states in its own header, and the same
+ * colour its summaries button takes. A reader who learns the colour once should
+ * be able to read it on any screen.
+ *
+ * Written as literals rather than theme tokens on purpose. This is an identity,
+ * not a surface: if the violet followed the theme it would stop being Veda's on
+ * seven of the eight, which is the whole of what it is for.
+ */
 .currentAction {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
@@ -569,9 +595,15 @@
   text-decoration: none;
   /* A thumb target, not a link. */
   line-height: 1.4;
-  background: transparent;
-  color: var(--color-text);
-  box-shadow: inset 0 0 0 1px var(--color-border);
+  background: #e9e4f1;
+  color: #544a7e;
+  box-shadow: inset 0 0 0 1px #d3c9e6;
+}
+
+.actionIcon {
+  width: 15px;
+  height: 15px;
+  flex: none;
 }
 
 .currentAction:active {
