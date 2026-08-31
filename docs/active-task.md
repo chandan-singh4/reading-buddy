@@ -6,26 +6,29 @@ it.
 
 ## Task
 
-Judge the new summary behaviour on the phone.
+Judge the Pace Horizon and the new summary behaviour on the phone.
 
 ## Steps
 
-1. Open the app. The one-time sweep runs at launch.
-2. Open the bell. Check that only *Man and His Symbols* still offers "Read the
-   summary".
-3. Find a question for another book. Approve it.
-4. Check the line changes to "Waiting for a model".
-5. Leave the app open. Check the line becomes a summary, or stays and waits.
+1. Open the app. Look at the Current Reading shelf.
+2. Check the wave shows your real reading week, and the dashed line ends on a
+   pin.
+3. Check the finish date and the pace read correctly.
+4. Open the bell. Check only *Man and His Symbols* offers "Read the summary".
+5. Approve a question for another book. Check the line says "Waiting for a
+   model".
 
 ## What to watch for
 
-- A `ready` line that opens an empty summary. The sweep missed an alert.
-- Missing *Man and His Symbols* summaries. The title match failed.
+- A flat or empty wave when you have read this week.
+- The strip wider than the card, or a clipped status badge.
+- A `ready` line that opens an empty summary.
 - A yes that vanishes with no waiting line.
 
 ## Files in scope
 
+- `web/src/pages/PaceHorizon.tsx` — the drawing.
+- `web/src/pages/paceHorizon.module.css` — its colours and its container query.
+- `web/src/pages/Home.tsx` — `CurrentDetail` and `lastSevenDays`.
 - `web/src/summary/cleanup.ts` — the one-time sweep.
 - `web/src/summary/engine.ts` — approve, retry, and the launch clock.
-- `web/src/summary/Bell.tsx` — the waiting line.
-- `web/src/summary/bellGroups.ts` — which lines group together.

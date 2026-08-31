@@ -19,6 +19,8 @@ import type { BookId, BookMeta } from '../structure/index.ts'
 import { repository, unavailableBooks } from '../storage/index.ts'
 import { sessionStore } from '../stats/sessions.ts'
 import { trajectoryOf, type Trajectory } from '../stats/trajectory.ts'
+import { PaceHorizon, type PaceStatus } from './PaceHorizon.tsx'
+import type { StoredSession } from '../storage/db.ts'
 import styles from './Home.module.css'
 
 type LoadState =
@@ -423,9 +425,44 @@ function shortDate(d: Date): string {
  * line, rather than printing a date it would have to take back or leaving a gap
  * that reads as something which failed to load.
  */
+/**
+ * Minutes read on each of the last seven days, oldest first, this book only.
+ *
+ * Seven entries always, including the zeroes. A wave drawn from "the days you
+ * read" would hide the days you did not, which are exactly the days the reader
+ * is looking for. `StoredSession.day` is already the local calendar day, so
+ * this never touches a timezone.
+ */
+function lastSevenDays(sessions: readonly StoredSession[], now: Date): number[] {
+  const byDay = new Map<string, number>()
+  for (const session of sessions) {
+    byDay.set(session.day, (byDay.get(session.day) ?? 0) + session.activeMs)
+  }
+
+  const days: number[] = []
+  for (let back = 6; back >= 0; back -= 1) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back)
+    const key = `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`
+    days.push(Math.round((byDay.get(key) ?? 0) / 60000))
+  }
+  return days
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+/** `trajectoryOf` writes its status for a reader; the strip wants it as a key. */
+function statusKey(status: string): PaceStatus {
+  if (status === 'Ahead') return 'ahead'
+  if (status === 'Behind') return 'behind'
+  return 'on_track'
+}
+
 function CurrentDetail({ entry }: { entry: ShelfEntry }) {
   const { book, percent } = entry
   const [pace, setPace] = useState<Trajectory | undefined>()
+  const [week, setWeek] = useState<number[]>([])
   const [settled, setSettled] = useState(false)
 
   useEffect(() => {
@@ -443,11 +480,13 @@ function CurrentDetail({ entry }: { entry: ShelfEntry }) {
       .then((sessions) => {
         if (cancelled) return
         setPace(trajectoryOf(sessions, percent, new Date()))
+        setWeek(lastSevenDays(sessions, new Date()))
         setSettled(true)
       })
       .catch(() => {
         if (cancelled) return
         setPace(undefined)
+        setWeek([])
         setSettled(true)
       })
     return () => {
@@ -475,33 +514,26 @@ function CurrentDetail({ entry }: { entry: ShelfEntry }) {
           for a moment and then prints a date is a strip that changed its mind
           in front of the reader. */}
       {settled && (
-        <div className={styles.trajectory}>
-          <div className={styles.trajectoryHead}>
-            <span className={styles.trajectoryKicker}>Trajectory</span>
-            {forecast && <span className={styles.trajectoryTag}>{pace.status}</span>}
-          </div>
-
-          {forecast ? (
-            <div className={styles.trajectoryFacts}>
-              <div>
-                <span className={styles.trajectoryValue}>{shortDate(finish)}</span>
-                <span className={styles.trajectoryLabel}>Est. finish ({pace.daysRemaining}d)</span>
-              </div>
-              <div>
-                <span className={styles.trajectoryValue}>{pace.velocity}m / day</span>
-                <span className={styles.trajectoryLabel}>
-                  {pace.velocityIsAllTime ? 'All-time pace' : '7-day pace'}
-                </span>
-              </div>
+        forecast ? (
+          <PaceHorizon
+            historicalMinutes={week}
+            projectedDays={pace.daysRemaining}
+            estimatedFinishDate={shortDate(finish)}
+            pacePerDay={`${pace.velocity}m / day`}
+            status={statusKey(pace.status)}
+          />
+        ) : (
+          <div className={styles.trajectory}>
+            <div className={styles.trajectoryHead}>
+              <span className={styles.trajectoryKicker}>Trajectory</span>
             </div>
-          ) : (
             <p className={styles.trajectoryNote}>
               {percent !== undefined && percent > 0
                 ? 'Still learning how fast you read this one.'
                 : 'Open it once and a finish date appears here.'}
             </p>
-          )}
-        </div>
+          </div>
+        )
       )}
     </div>
   )

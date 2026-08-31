@@ -2748,3 +2748,39 @@ The sweep also removes the `ready` lines for the deleted summaries. It keeps
 The title match is loose. The same book arrives with a subtitle or an editor's
 name attached. An exact match would delete the summaries the sweep exists to
 keep.
+
+## The trajectory is drawn, not listed
+
+The strip on the front door showed a finish date and a pace. Both were true.
+Neither answered the question the reader asks there, which is not "how fast do I
+read?" but "is this going anywhere?"
+
+The Pace Horizon draws the last seven days as a wave. It then continues the wave
+as a dashed line to a pin at the finish. A number cannot show a slump. A line
+can.
+
+Three rules hold the drawing honest:
+
+1. The past takes the left 55% and the guess takes the rest. A guess with equal
+   room reads as equally known.
+2. The projection ends on the seven-day mean. It never draws a climb, because
+   `trajectoryOf` never forecasts one.
+3. The wave shows all seven days, including the days with zero minutes. Those
+   are the days the reader is looking for.
+
+**The pin is HTML, not SVG.** The chart stretches to the card. A stretched SVG
+turns circles into ellipses and thins strokes on one axis. The wave uses
+`preserveAspectRatio="none"`, where that is invisible on a smooth curve, and
+`vector-effect: non-scaling-stroke` keeps the line one weight. The pin sits over
+the box as a CSS dot, so it stays round at every width.
+
+**The strip measures itself, not the phone.** It uses a container query. Beside
+the hero cover it gets about 130px and stacks its two facts. Under a wide card it
+gets 340px and splits them left and right. A viewport media query would get the
+narrow case wrong, because the narrow case is a wide phone with a book on it.
+
+**Colours are theme tokens.** The linen ground, the terracotta line and the moss
+badge are the paper theme's own accent and surfaces, so the tokens draw the
+requested palette exactly. On the other seven themes the strip follows the
+reader. Only the moss green is a literal, because it is a verdict and not a
+surface: "you are fine" must mean the same in every theme.

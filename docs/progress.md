@@ -29,7 +29,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,479 tests across 148 files.
+  2,486 tests across 149 files.
 - **The Obsidian export is proved. It met a real vault on 2026-08-31.** The
   reader exported, dropped the folder into Obsidian, and followed the links.
   Still unproved: a *second* export. Nobody has read more and pressed "Export
@@ -86,8 +86,20 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **The Pace Horizon** (2026-08-31). Not a waypoint. Build green: 2,486 tests
+  across 149 files.
+  - The trajectory strip on the front door is now a drawing. It shows the last
+    seven days as a wave and continues it as a dashed line to a pin at the
+    finish date.
+  - New component: `web/src/pages/PaceHorizon.tsx`. Data-driven, so it can move
+    to another screen without change.
+  - The pace no longer says how it was worked out. "7-day pace" answered a
+    question the reader was not asking.
+  - The strip uses a container query, so it stacks beside the cover and splits
+    under a wide card.
+
 - **A yes now waits instead of disappearing** (2026-08-31). Not a waypoint.
-  Build green: 2,479 tests across 148 files.
+  Build green: 2,486 tests across 149 files.
   - Approving a book in the bell writes a `pending` line. The line stays and
     says "Waiting for a model". The app tries again every hour while it is open.
     It never gives up. Before this, a refusal lost the yes with no trace.
@@ -98,7 +110,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     background" means "while the app is open". See `docs/decisions.md`.
 
 - **Four changes the reader asked for, and one type system** (2026-08-31). Not
-  a waypoint. Build green: 2,479 tests across 148 files.
+  a waypoint. Build green: 2,486 tests across 149 files.
   - **A day you did not read is now blank.** The bands were already an hour
     each and a zero day already scored `level: 0` — but `--h0` was a filled
     beige, so "I read nothing" and "I read forty minutes" drew two shades of
