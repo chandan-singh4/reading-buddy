@@ -4,7 +4,13 @@
    same accent colour. A heading that is black on one tab and accent on another
    reads as two different apps. `--color-accent` follows the chosen theme, so one
    line here keeps all seven in agreement. */
+/* Every screen heading in the app: the shelf's "Library", Settings, and the
+   folder names that title the shelf when one is chosen. It takes the display
+   face the front door and Statistics already use — before this it was the only
+   one of the three set in the system sans, which is why moving between them
+   felt like moving between two apps. */
 .title {
+  font-family: var(--font-display);
   font-size: var(--text-2xl);
   font-weight: 700;
   letter-spacing: -0.02em;

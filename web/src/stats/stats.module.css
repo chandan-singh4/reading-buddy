@@ -36,18 +36,47 @@
  */
 .shell,
 .backdrop {
+  /*
+   * ## These are names, not colours, as of this change
+   *
+   * Every one of them used to be a literal hex written here. That had two
+   * costs. The small one: Statistics was the only screen in the app with its
+   * own palette, so a reader moving from the shelf to their figures crossed a
+   * colour boundary for no reason. The large one: a hex cannot follow a theme,
+   * so this screen stayed warm paper in all eight of them — a reader in Dark
+   * got a bright page at night, and one in High contrast got no contrast.
+   *
+   * They are kept as names rather than replaced throughout because the file
+   * below reads `var(--ink)` and `var(--card)` several hundred times, and those
+   * names say what the thing *is* on this screen. Only their source moved.
+   */
   /* Paper */
-  --paper: #efe8d9;
-  --card: #fbf7ed;
-  --card-edge: #e4d8bf;
+  --paper: var(--color-bg);
+  --card: var(--color-surface);
+  --card-edge: var(--color-border);
   /* Ink */
-  --ink: #33302a;
-  --ink-soft: #6b6459;
-  --ink-faint: #9a9184;
-  --rule: #e2d6bd;
-  /* A primary action is forest green, everywhere in this app */
-  --accent: #3f5a38;
-  --accent-tint: #e6eadd;
+  --ink: var(--color-text);
+  --ink-soft: var(--color-text-muted);
+  --ink-faint: color-mix(in srgb, var(--color-text-muted) 72%, transparent);
+  --rule: var(--color-border);
+  /*
+   * A control at rest, and the empty part of a track: the segmented toggle, the
+   * year picker, the calendar button, the genre bars' groove. Between the page
+   * and a card, and darker than both under a dark theme.
+   *
+   * These were six copies of `#ede4d2` and `#efe6d3` — a warm cream that was
+   * correct on paper and stayed cream when everything around it went black.
+   */
+  --well: var(--color-surface-raised);
+  /*
+   * A primary action. This said "forest green, everywhere in this app", which
+   * was true of this screen and of nowhere else: the shelf, the front door and
+   * every button outside Statistics take `--color-accent`, which is warm brown
+   * under the default theme and something different under each of the others.
+   * The claim is now made good rather than repeated.
+   */
+  --accent: var(--color-accent);
+  --accent-tint: var(--color-accent-wash);
   /* Amber is time. It is never a second accent. */
   --amber: #c77d3a;
   /* The warm ink ramp: how much you read that day, and nothing else */
@@ -81,7 +110,7 @@
   padding: 22px 20px 56px;
   background: radial-gradient(120% 80% at 50% -10%, #f6efdf 0%, var(--paper) 55%);
   color: var(--ink);
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-figure);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100%;
@@ -92,7 +121,7 @@
 }
 
 .h1 {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 34px;
   line-height: 1.05;
@@ -152,7 +181,7 @@
 }
 
 .streakN {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-size: 30px;
   font-weight: 600;
   line-height: 1;
@@ -185,7 +214,7 @@
   font: inherit;
   font-size: 13px;
   color: var(--ink-soft);
-  background: #ede4d2;
+  background: var(--well);
   border: 1px solid var(--card-edge);
   border-radius: 9px;
   padding: 4px 8px;
@@ -257,8 +286,15 @@
   padding: 0;
   border: 0;
   border-radius: 3px;
-  background: var(--h0);
-  box-shadow: inset 0 0 0 1px rgb(90 70 35 / 6%);
+  /* A day with no reading takes no shade at all: an empty square, not a pale
+     one. A tint here made "I read nothing" and "I read forty minutes" two
+     shades of the same colour, which is exactly the distinction the map is
+     for. The outline is what keeps the grid legible once the fill is gone. */
+  background: transparent;
+  /* Mixed from the ink rather than written as a warm brown alpha. On paper the
+     two are the same; on a dark theme a fixed brown at 12% over black is
+     invisible, and the grid loses the shape that makes it a grid. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent);
   cursor: pointer;
   display: block;
 }
@@ -288,7 +324,9 @@
    it, so it must not look like a day you failed to read. */
 .untracked {
   background: transparent;
-  box-shadow: inset 0 0 0 1px rgb(90 70 35 / 4%);
+  /* Fainter than a blank day, and for the same reason theme-aware: a day before
+     tracking began is not a day you failed to read. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 5%, transparent);
   cursor: default;
 }
 
@@ -304,7 +342,7 @@
 
 /* The legend and the caption it belongs with, on one line where there is room:
    the key on the right, the sentence explaining it on the left. The width is
-   what is left over once five swatches and their two words have been paid for —
+   what is left over once four swatches and their two words have been paid for —
    a caption that wraps to a second line lands on top of the key. */
 .hmLegend + .cap {
   margin-top: -14px;
@@ -392,7 +430,7 @@
 }
 
 .repoTitle {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);
@@ -541,7 +579,7 @@
      smallest size, which is what pushed the chapter rail off the screen. */
   min-width: 0;
   flex: 1;
-  background: #ede4d2;
+  background: var(--well);
   border: 1px solid var(--card-edge);
   border-radius: 11px;
   padding: 4px;
@@ -554,7 +592,7 @@
   border: 0;
   background: transparent;
   cursor: pointer;
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-figure);
   font-size: 15px;
   color: var(--ink-soft);
   padding: 8px 2px;
@@ -578,7 +616,7 @@
   height: 42px;
   border-radius: 11px;
   border: 1px solid var(--card-edge);
-  background: #ede4d2;
+  background: var(--well);
   color: var(--ink-soft);
   cursor: pointer;
   display: flex;
@@ -614,7 +652,7 @@
 }
 
 .big {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-weight: 600;
   font-size: 50px;
   line-height: 1;
@@ -659,7 +697,7 @@
 }
 
 .trioN {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 600;
   line-height: 1;
@@ -698,7 +736,7 @@
 }
 
 .qaN {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-size: 28px;
   font-weight: 600;
   color: var(--veda);
@@ -772,7 +810,7 @@
 }
 
 .vstatN {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-size: 26px;
   font-weight: 600;
   color: var(--veda);
@@ -850,7 +888,7 @@
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 6px;
-  background: #efe6d3;
+  background: var(--well);
 }
 
 .splitNf {
@@ -892,7 +930,7 @@
 .gbarTrack {
   flex: 1;
   min-width: 0;
-  background: #efe6d3;
+  background: var(--well);
   border-radius: 5px;
   height: 16px;
   overflow: hidden;
@@ -953,7 +991,7 @@
   border-radius: 16px;
   padding: 18px;
   box-shadow: 0 20px 50px -18px rgb(40 30 10 / 60%);
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-figure);
   color: var(--ink);
 }
 
@@ -965,7 +1003,7 @@
 }
 
 .calMonth {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-size: 19px;
   font-weight: 600;
 }
@@ -975,7 +1013,7 @@
   height: 32px;
   border-radius: 8px;
   border: 1px solid var(--card-edge);
-  background: #ede4d2;
+  background: var(--well);
   cursor: pointer;
   color: var(--ink-soft);
   font-size: 16px;
@@ -1064,7 +1102,7 @@
   min-width: 0;
   padding: 11px;
   border-radius: 10px;
-  font-family: 'EB Garamond', Georgia, serif;
+  font-family: var(--font-figure);
   font-size: 15px;
   cursor: pointer;
   border: 1px solid var(--card-edge);
@@ -1132,7 +1170,7 @@
 }
 
 .goalFrac {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);

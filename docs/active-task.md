@@ -3,50 +3,60 @@
 > **What's in here:** the one task in flight, what "done" means, and the exact
 > files to open. Read this first. Do not read the codebase around it.
 
-## Task: judge the Obsidian export in a real vault
+## Task: judge this session's four changes on the phone
 
-The export is built, tested and shipped (2026-08-30). It has never met Obsidian.
-This task needs a device and, at first, no code.
+All four are built, tested and shipped. None has been seen on a device. This
+task needs no code at first.
 
 ### The checks, in order
 
-1. Open **Settings - Take your notes to Obsidian**. Press **Export everything**.
-2. Unzip the file. It must hold exactly one folder: `Reading Buddy`.
-3. Drag that folder to the **top level** of the vault. Nothing else.
-4. Open `Reading Buddy/Reading Buddy.md`. Each book link must resolve.
-5. Open a book note, then a chapter note from it. Check the recap, the section
-   recaps, your highlights and the conversation with Veda.
-6. Tap a `[[concept]]` link. The concept note must list each chapter that raised
-   the idea. Open the graph view and look at the shape.
-7. Read more of a book. Let a new chapter summary write itself.
-8. Export **what's new**. The number on the button must be small.
-9. Drop the folder in again. The vault must gain the new chapter. It must **not**
-   gain a second copy of an old one.
+1. **Statistics - the heatmap.** A day you did not read must be an empty square,
+   not a pale one. The key must show four shades, not five. Check this in Dark
+   and in High contrast as well as your usual theme.
+2. **Statistics - the colours.** The screen now follows your theme. It was warm
+   paper in all eight themes before. Open it in Dark at night and say whether it
+   is right.
+3. **Library - rename.** Press and hold a book. Press **Rename**. The field
+   opens on the current title. Change it and press Rename. Tick two books: the
+   button must go grey.
+4. **Home - the book in hand.** The cover carries a lit fore edge down its right
+   side, as far as you have read. Title and author sit at the top. Under it are
+   **Continue reading** and **Chapter summaries**, then the finish date and your
+   daily pace.
+5. **The three screens together.** Move Home - Library - Statistics. The
+   headings must be the same face and the accent the same colour on all three.
 
 ### Done when
 
-The reader says the notes are worth keeping, and step 9 leaves no duplicates.
+You say the four changes are right on a phone, and the three screens read as one
+app.
 
 ### What to watch for
 
-- **A link that does not resolve.** Links are written from the vault root. They
-  break if the folder is not at the top of the vault. That is the known cost of
-  telling two chapters called "Introduction" apart.
-- **A chapter note that reads as a wall.** A long conversation with Veda is
-  printed in full. If it drowns the recap, the answer is a fold, not a cut.
-- **Notes the reader edits by hand.** A later export replaces the note at the
-  same path, so their own words in a Reading Buddy note would be lost. Nothing
-  guards this yet. If they want to write in these notes, the answer is a section
-  the export never touches, or a separate file beside it.
+- **The lit edge on a dark cover.** It sits on the page block beside the
+  artwork, never on top of it, so it should hold on any cover. Judge it against
+  *Man and His Symbols*, which is the darkest cover on the shelf.
+- **The finish date on a fresh book.** With too little read, the strip says
+  "Still learning how fast you read this one." That is correct, not a failure.
+  It needs about 15 minutes of reading and 5% of the book.
+- **Statistics in a dark theme.** The card, rule and ink now come from the
+  theme. Watch for anything that has gone low-contrast, especially the genre
+  bars and the Veda violet, which are still literal colours by design.
+- **The selection bar wraps to two rows now.** Four actions do not fit across a
+  375px phone, so Delete drops to its own line. That is the correct behaviour
+  and every action is still reachable. Say if it looks wrong to you.
+- **The accent changed on Statistics.** Its pills and buttons were forest green
+  and are now your theme's accent, which is warm brown by default. That is the
+  standardisation working. Say if you preferred the green - the fix would be to
+  move green into `theme.css` for every screen, not to give one screen its own.
 
 ### Files in scope
 
-- `web/src/export/vault.ts` - the whole builder. Pure, and the only file that
-  decides what a note says.
-- `web/src/export/seen.ts` - the fingerprints that make "what's new" work.
-- `web/src/export/zip.ts` / `gather.ts` / `ExportVault.tsx` / `export.module.css`
-- `web/src/export/vault.test.ts` / `zip.test.ts`
-- `docs/decisions.md` - the two export sections at the foot.
+- `web/src/stats/stats.module.css` - the local names now resolve to theme tokens.
+- `web/src/stats/Heatmap.tsx` - the four-swatch key.
+- `web/src/library/SelectionBar.tsx` / `web/src/pages/Library.tsx` - rename.
+- `web/src/pages/Home.tsx` / `Home.module.css` - the hero card and the lit edge.
+- `web/src/styles/theme.css` - `--font-display` and `--font-figure`.
 
 ## Also waiting on a device (no code)
 

@@ -1152,3 +1152,86 @@ describe('leaving the shelf and coming back', () => {
     expect(screen.getAllByRole('link')[0]!.textContent).toContain('Red Book')
   })
 })
+
+/**
+ * Renaming, the one action on the selection bar that is not a batch.
+ *
+ * `repository.renameBook` has existed since the shelf did and had no UI, so the
+ * store side of this is already covered in `storage/repository.test.ts`. What
+ * is checked here is the guard the screen adds: exactly one book, or nothing.
+ */
+describe('renaming a book', () => {
+  it('is offered for one book and refused for two', async () => {
+    await startSelecting()
+
+    // Press-and-hold ticks the book it was held on, so one is already chosen.
+    expect(screen.getByRole('button', { name: 'Rename' }).hasAttribute('disabled')).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+
+    // Two books cannot share a new title.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Rename' }).hasAttribute('disabled')).toBe(true)
+    })
+  })
+
+  it('is refused with nothing ticked', async () => {
+    await startSelecting()
+    fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select none' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Rename' }).hasAttribute('disabled')).toBe(true)
+    })
+  })
+
+  it('opens on the current title, and writes the new one to the shelf', async () => {
+    await startSelecting()
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+
+    const field = await screen.findByLabelText('Book title')
+    // The field starts full, not empty: a rename is almost always an edit.
+    expect((field as HTMLInputElement).value).toBe('Aion')
+
+    fireEvent.change(field, { target: { value: 'Aion — Researches' } })
+    // Two buttons carry this name while the dialog is open: the one on the bar
+    // that opened it, and the one inside that confirms. The last is the submit.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Rename' }).at(-1)!)
+
+    expect(await screen.findByText('Aion — Researches')).toBeTruthy()
+    // And it is written down, not just painted: `titleOverridden` is what stops
+    // a later re-parse of the file putting the old title back.
+    const stored = await repository.getBook('a' as BookId)
+    expect(stored).toMatchObject({ title: 'Aion — Researches', titleOverridden: true })
+  })
+
+  it('refuses a blank title and an unchanged one', async () => {
+    await startSelecting()
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+
+    const field = await screen.findByLabelText('Book title')
+    const submit = () => screen.getAllByRole('button', { name: 'Rename' }).at(-1)!
+
+    // Unchanged: the store would accept it and nothing would happen, which from
+    // the shelf looks like a rename that failed.
+    expect(submit().hasAttribute('disabled')).toBe(true)
+
+    fireEvent.change(field, { target: { value: '   ' } })
+    expect(submit().hasAttribute('disabled')).toBe(true)
+
+    fireEvent.change(field, { target: { value: 'Aion II' } })
+    expect(submit().hasAttribute('disabled')).toBe(false)
+  })
+
+  it('leaves the book alone when cancelled', async () => {
+    await startSelecting()
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+
+    const field = await screen.findByLabelText('Book title')
+    fireEvent.change(field, { target: { value: 'Something else' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByText('Aion')).toBeTruthy()
+    expect(screen.queryByText('Something else')).toBe(null)
+  })
+})

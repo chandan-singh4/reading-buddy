@@ -29,11 +29,11 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,459 tests across 146 files.
-- **The Obsidian export has never met a real vault.** It was proved by unit
-  tests and by one look at the Settings card in a desktop browser. Nobody has
-  unzipped it and dropped it into Obsidian yet. Judge the note layout, the
-  links, and whether a second export really replaces rather than adds.
+  2,467 tests across 146 files.
+- **The Obsidian export is proved. It met a real vault on 2026-08-31.** The
+  reader exported, dropped the folder into Obsidian, and followed the links.
+  Still unproved: a *second* export. Nobody has read more and pressed "Export
+  what's new" yet, so the no-duplicates rule holds by test only.
 - **Waiting on the phone: the reading desk.** The book screen was rebuilt this
   session and judged in a desktop browser against a seeded book. Both states
   need a look on a device — an unfinished book and a finished one.
@@ -85,6 +85,43 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **Four changes the reader asked for, and one type system** (2026-08-31). Not
+  a waypoint. Build green: 2,467 tests across 146 files.
+  - **A day you did not read is now blank.** The bands were already an hour
+    each and a zero day already scored `level: 0` — but `--h0` was a filled
+    beige, so "I read nothing" and "I read forty minutes" drew two shades of
+    one colour. The cell is transparent now, and the key shows four swatches
+    instead of five. The blank square is not a shade; it is the absence of one.
+  - **A book can be renamed from the shelf.** `repository.renameBook` had
+    existed since the shelf did, in all three storage layers, with no UI.
+    **This cancels its line in migration `0008`** — see Open items. Rename is
+    the one action on the selection bar that is not a batch: it wants exactly
+    one book, because two cannot share a title. The field opens on the current
+    title, since a rename is nearly always an edit.
+  - **The front door says everything about the book in hand.** It used to say
+    "28% read" and stop. Now the cover carries a lit fore edge as far as the
+    reader has got, the title and author sit at the top rather than floating at
+    the cover's middle, and under it are *Continue reading*, *Chapter
+    summaries*, the estimated finish date and the daily pace. The forecast is
+    `trajectoryOf`, which already existed for the book's own details page.
+  - **The lit edge is on the fore edge, not on the artwork.** The reader chose
+    a spine-fill. Drawn over the cover it would vanish on a dark cover and read
+    as damage on a busy one. The page block down the right of every cover is
+    already six hairlines of paper; lighting the top of that block works on any
+    cover, and the book itself does the talking.
+  - **Statistics follows the reader's theme now.** It was the only screen in
+    the app with its own palette — a dozen literal hexes on `.shell`, which
+    meant warm paper in all eight themes, including Dark and High contrast. The
+    same names are kept and their source moved to `--color-*`, so several
+    hundred `var(--ink)` reads below did not have to change.
+  - **The accent claim was made good.** Statistics said "a primary action is
+    forest green, everywhere in this app". It was green on that screen and
+    warm brown on every other. It takes `--color-accent` now, like the rest.
+  - **Two type tokens, `--font-display` and `--font-figure`.** Statistics wrote
+    its heading face out nine times, Home wrote a fourth variant of it, and
+    Library used the system sans and no display face at all — three screens,
+    three ideas of what a heading is. All three now read one token.
 
 - **Your notes, as an Obsidian vault** (2026-08-30). A new `web/src/export/`.
   The zip holds one folder: a note for each book, a note for each chapter, and
@@ -234,10 +271,16 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   worker problem. Don't raise it again.
 
 ### Next up
-**Drop the export into Obsidian.** Settings → *Take your notes to Obsidian* →
-**Export everything**. Unzip it, drag the `Reading Buddy` folder to the top of
-the vault, and open a chapter note. Then read more, export **what's new**, and
-check the vault gained the new chapter and did not gain a copy of an old one.
+**Judge this session's four changes on the phone.** The blank heatmap day,
+rename on the shelf, the front door's lit fore edge and trajectory strip, and
+the one type system across the three screens. `active-task.md` lists the checks.
+Watch the Statistics accent in particular: it changed from green to your theme's
+brown, and that is a taste call only a device can settle.
+
+**Then export what's new to Obsidian.** The first export is proved. The
+no-duplicates rule is not: read more, let a chapter summary write itself, press
+**Export what's new**, and check the vault gained the new chapter and no copy of
+an old one.
 
 **Judge this session's work on the phone.** Nothing built on 2026-08-28 has been
 seen on a device: the rebuilt book screen in both states, the two summary halves
@@ -318,9 +361,12 @@ then AI.
 - **`.azw3` / `.kfx` declined** — DRM; see the note in `backlog.md`.
 
 ### Open items
-- **Migration `0008`, agreed and deferred:** drop `subject`, `type`,
-  `type_overridden`, `title_overridden`; remove `repository.renameBook` (no UI)
-  and the `healTitles` override skip. Note `subject` (the app's own tag, being
+- **Migration `0008`, agreed and deferred — and now smaller.** Drop `subject`,
+  `type` and `type_overridden`. **`title_overridden` and
+  `repository.renameBook` are no longer on the list:** rename got a UI on
+  2026-08-31, and `renameBook` sets `titleOverridden` so a later re-parse of
+  the file cannot put the old title back. The `healTitles` override skip stays
+  for the same reason. Note `subject` (the app's own tag, being
   dropped) is **not** `subjects` (Google's BISAC headings, now displayed).
 - **The live Anthropic key still sits in `Claude API/API.txt`**, on the
   reader's own machine, gitignored and never committed. `.env.example` is

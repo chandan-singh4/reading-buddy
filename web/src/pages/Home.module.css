@@ -30,7 +30,7 @@
  * one block of address, not as two stacked headings.
  */
 .greetingTitle {
-  font-family: 'Playfair Display', 'Merriweather', Georgia, serif;
+  font-family: var(--font-display);
   font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -206,6 +206,12 @@
    it is the single thing on this screen the reader is most likely to act on. */
 .heroCard {
   display: flex;
+  /* A column now, not a row: the book and its text sit on top, the actions and
+     the trajectory underneath. Two full-width strips under a hero read as part
+     of the same object; the same two squeezed into the text column beside a
+     10rem cover would have about nine characters of room each. */
+  flex-direction: column;
+  gap: var(--space-3);
   padding: var(--space-3) 0 var(--space-4);
 }
 
@@ -218,7 +224,11 @@
   width: 100%;
   display: flex;
   gap: var(--space-4);
-  align-items: center;
+  /* Title and author at the top of the cover, not floating at its middle. The
+     text column now carries only two lines on the hero — the percentage moved
+     onto the fore edge — and centring two lines against a tall cover left them
+     stranded in the middle of a large empty space. */
+  align-items: flex-start;
 }
 
 /* Holds the cover link and the info button on top of it — `.tileMedia` is
@@ -323,6 +333,50 @@
     rgb(0 0 0 / 0.08) 100%
   );
   pointer-events: none;
+}
+
+/*
+ * How far through the book you are, drawn on the fore edge.
+ *
+ * It is a lit edge, not a bar and not a ring. The page block down the right of
+ * every cover is already six hairlines of paper; this lights the top part of
+ * that block, so the book itself says how much of it has been turned. The point
+ * of putting it there rather than over the artwork is that it never has to
+ * survive the artwork: a dark cover, a busy cover and a plain one all have the
+ * same pale fore edge beside them.
+ *
+ * It reads top-down because that is the direction a page is read and a stack is
+ * worked through. It is amber because amber is time in this app, and this is
+ * the only place on the shelf that measures any.
+ *
+ * `--fill` is the percentage, set inline. A book at 0% draws nothing at all,
+ * which is handled in the markup — a one-pixel cap on an untouched book is a
+ * claim that you have started it.
+ */
+.spineFill {
+  position: absolute;
+  /* Over the page block, which the box-shadows above paint from 1px to 6px out
+     from the cover's right edge. */
+  top: 0;
+  right: -6px;
+  width: 6px;
+  height: var(--fill);
+  border-radius: 0 2px 2px 0;
+  /* Amber is time in this app, and this is the only mark on the shelf that
+     measures any. Written out rather than themed: the fore edge is part of the
+     drawn book, like the page block it sits on, and those are literal too. */
+  background: linear-gradient(180deg, #d9973f 0%, #a8641f 100%);
+  box-shadow: 0 0 4px rgb(199 125 58 / 0.45);
+  pointer-events: none;
+  /* Beats `.tileMedia > *`, which is written for the cover art and would
+     otherwise stretch this to the full width of the book. */
+  display: block;
+}
+
+/* The cover art rule sets `width: 100%` on every child. This is not art. */
+.tileMedia > .spineFill {
+  width: 6px;
+  border-radius: 0 2px 2px 0;
 }
 
 /* Pressed: the book settles onto the plank and its shadow tightens under it.
@@ -458,4 +512,122 @@
   .greetingTitle {
     font-size: 2rem;
   }
+}
+
+
+/*
+ * The rest of the book in hand: where to go, and when it ends.
+ *
+ * Two strips under the hero. They belong to the book above them and to nothing
+ * else on the screen, so they take the hero's own width and stop at the plank.
+ */
+.currentDetail {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.currentActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Both buttons take an equal share. "Continue reading" is the one the reader
+   wants nine times in ten, so it is the filled one — but a chapter summary is
+   not a lesser action, and sizing it smaller would make it look like one. */
+.currentPrimary,
+.currentSecondary {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  /* A thumb target, not a link. */
+  line-height: 1.4;
+}
+
+.currentPrimary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.currentSecondary {
+  background: transparent;
+  color: var(--color-text);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.currentPrimary:active,
+.currentSecondary:active {
+  transform: translateY(1px);
+}
+
+/* The forecast. A card rather than loose text: it is the one thing on this
+   screen that is a projection and not a record, and a boundary around it is
+   what says so without a sentence of disclaimer. */
+.trajectory {
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+}
+
+.trajectoryHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.trajectoryKicker {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.trajectoryTag {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--color-accent-wash);
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.trajectoryFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.trajectoryFacts > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.trajectoryValue {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.trajectoryLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  /* A long label ("All-time pace") must not push its neighbour out of its half
+     of the grid. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trajectoryNote {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }

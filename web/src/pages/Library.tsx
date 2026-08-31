@@ -132,6 +132,8 @@ export default function Library() {
 
   /** The "name your folder" prompt, when it is showing. */
   const [naming, setNaming] = useState<null | { forSelected: boolean }>(null)
+  /** The one book being renamed, with the title the field opens on. */
+  const [renaming, setRenaming] = useState<null | { id: BookId; title: string }>(null)
 
   /** How far into each book the reader has got, and when they last opened it. */
   const [progress, setProgress] = useState<LibraryContext['progress']>(
@@ -465,6 +467,12 @@ export default function Library() {
             )
           }}
           onNewFolder={() => setNaming({ forSelected: true })}
+          onRename={() => {
+            const id = chosen[0]
+            if (id === undefined) return
+            const book = books.find((candidate) => candidate.id === id)
+            setRenaming({ id, title: book?.title ?? '' })
+          }}
           onDelete={() => {
             void applyToSelected(
               (ids) => repository.deleteBooks(ids),
@@ -640,6 +648,18 @@ export default function Library() {
         onClose={() => setFilterOpen(false)}
       />
 
+      {renaming && (
+        <RenameBook
+          title={renaming.title}
+          onCancel={() => setRenaming(null)}
+          onName={(title) => {
+            const { id } = renaming
+            setRenaming(null)
+            void applyToSelected(() => repository.renameBook(id, title), 'Couldn’t rename it.')
+          }}
+        />
+      )}
+
       {naming && (
         <NameFolder
           moving={naming.forSelected ? chosen.length : 0}
@@ -710,6 +730,77 @@ function NameFolder({
         </div>
       </form>
     </div>
+    </Portal>
+  )
+}
+
+/**
+ * "What shall we call it instead?"
+ *
+ * A twin of `NameFolder`, and a form for the same reason: `window.prompt` is
+ * blocked outright in an installed PWA on some platforms.
+ *
+ * The field opens on the current title rather than empty. A rename is almost
+ * always an edit — a stray subtitle, a filename that came through as a title —
+ * and starting from blank would make the reader retype the part they liked.
+ */
+function RenameBook({
+  title,
+  onCancel,
+  onName,
+}: {
+  title: string
+  onCancel: () => void
+  onName: (title: string) => void
+}) {
+  const [name, setName] = useState(title)
+  const trimmed = name.trim()
+
+  return (
+    <Portal>
+      <div
+        className={libraryStyles.dialogScrim}
+        role="dialog"
+        aria-label="Rename book"
+        data-no-swipe=""
+      >
+        <form
+          className={libraryStyles.dialog}
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (trimmed) onName(name)
+          }}
+        >
+          <label className={libraryStyles.dialogLabel} htmlFor="book-title">
+            Book title
+          </label>
+          <input
+            id="book-title"
+            className={libraryStyles.dialogInput}
+            value={name}
+            autoFocus
+            // The whole title is selected on open, so typing replaces it and
+            // tapping the field still puts the caret where the reader wants it.
+            onFocus={(event) => event.currentTarget.select()}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <div className={libraryStyles.dialogActions}>
+            <button type="button" className={styles.iconButton} onClick={onCancel}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={styles.importButton}
+              // A blank title is refused here as well as in the repository. The
+              // store ignores it silently, which from the shelf looks like a
+              // rename that did nothing.
+              disabled={!trimmed || trimmed === title}
+            >
+              Rename
+            </button>
+          </div>
+        </form>
+      </div>
     </Portal>
   )
 }

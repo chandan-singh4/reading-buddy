@@ -264,7 +264,9 @@ export default function Heatmap({
           the squares whose colours it was there to name. */}
       <div className={styles.hmLegend} aria-hidden="true">
         Less
-        <span className={styles.cell} />
+        {/* Four swatches, not five. The blank square is not a shade — it is the
+            absence of one — so putting it in the key implied a day of no
+            reading was the lightest band rather than no band at all. */}
         <span className={`${styles.cell} ${styles.l1}`} />
         <span className={`${styles.cell} ${styles.l2}`} />
         <span className={`${styles.cell} ${styles.l3}`} />

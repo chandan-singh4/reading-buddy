@@ -324,3 +324,65 @@ describe('opening the app', () => {
     expect(await screen.findByText('Breath')).toBeDefined()
   })
 })
+
+/**
+ * The Current Reading hero, which is the one book the front door is about.
+ *
+ * The trajectory itself is arithmetic and is tested without a DOM in
+ * `stats/trajectory.test.ts`. What is checked here is the wiring: that the
+ * strip appears, that it says something honest when there is nothing to
+ * forecast from, and that the fore edge is drawn only where it belongs.
+ */
+describe('the book in hand', () => {
+  async function openHomeReading(percent: number) {
+    await repository.savePosition(
+      BOOKS[0]!.id,
+      { chapter: 0, block: 0 } as never,
+      percent,
+      '2026-08-30T09:00:00.000Z',
+    )
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    await screen.findByText('The Wind in the Willows')
+  }
+
+  it('offers a way into the book and into its chapter summaries', async () => {
+    await openHomeReading(28)
+
+    const summaries = await shown().findByRole('link', { name: 'Chapter summaries' })
+    expect(summaries.getAttribute('href')).toBe('/book/home-a/chapters')
+    expect(
+      shown().getByRole('link', { name: 'Continue reading' }).getAttribute('href'),
+    ).toBe('/book/home-a')
+  })
+
+  it('says so plainly when it cannot forecast a finish yet', async () => {
+    // No sessions were ever recorded against this book, so `trajectoryOf` has
+    // nothing to divide by. The strip must not print a date it would take back.
+    await openHomeReading(28)
+
+    expect(
+      await shown().findByText('Still learning how fast you read this one.'),
+    ).toBeDefined()
+  })
+
+  it('drops the percentage text from the hero and keeps it on the rest', async () => {
+    // The hero says it with the lit fore edge instead. Every other tile has no
+    // fore edge of its own, so the number is the only thing that can say it.
+    await repository.savePosition(
+      BOOKS[1]!.id,
+      { chapter: 0, block: 0 } as never,
+      7,
+      '2026-08-29T09:00:00.000Z',
+    )
+    await openHomeReading(28)
+
+    // The hero is the more recently opened book, so 28 is the hero's number and
+    // 7 belongs to the tile beside it on Up Next.
+    expect(shown().queryByText('28% read')).toBeNull()
+    expect(await shown().findByText('7% read')).toBeDefined()
+  })
+})

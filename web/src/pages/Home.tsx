@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
@@ -10,6 +10,8 @@ import { moveBooks } from '../app/shelfTransition.ts'
 import { loadCovers, useCovers, warmCovers } from '../app/useCovers.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 import { repository, unavailableBooks } from '../storage/index.ts'
+import { sessionStore } from '../stats/sessions.ts'
+import { trajectoryOf, type Trajectory } from '../stats/trajectory.ts'
 import styles from './Home.module.css'
 
 type LoadState =
@@ -308,6 +310,7 @@ function Shelves({ shelves }: { shelves: HomeShelves }) {
               coverSrc={covers.get(shelves.currentlyReading.book.id)}
               large
             />
+            <CurrentDetail entry={shelves.currentlyReading} />
           </div>
         )}
       </Shelf>
@@ -390,6 +393,111 @@ function Shelf({
   )
 }
 
+/** `Sep 24`. Local, and never near a timezone. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function shortDate(d: Date): string {
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`
+}
+
+/**
+ * Everything else about the book in hand: where to go next, and when it ends.
+ *
+ * The shelf used to say "28% read" and stop, which left the one book the reader
+ * is actually in the middle of as the book the app said least about on screen.
+ * The finish date and the daily pace already existed — `trajectoryOf` works them
+ * out for the book's own details page — and this brings them to the front door,
+ * where "am I going to finish this?" is the question actually being asked.
+ *
+ * ## Why it stays quiet about a book it cannot forecast
+ *
+ * A trajectory needs about a quarter of an hour of reading and 5% of the book
+ * before a finish date is worth printing. Until then the strip says so in one
+ * line, rather than printing a date it would have to take back or leaving a gap
+ * that reads as something which failed to load.
+ */
+function CurrentDetail({ entry }: { entry: ShelfEntry }) {
+  const { book, percent } = entry
+  const [pace, setPace] = useState<Trajectory | undefined>()
+  const [settled, setSettled] = useState(false)
+
+  useEffect(() => {
+    // Only a book in progress, matching `BookInfo`: a finished book has no
+    // finish to forecast, and one never opened has nothing to forecast from.
+    if (percent === undefined || percent <= 0 || percent >= 100) {
+      setPace(undefined)
+      setSettled(true)
+      return
+    }
+    let cancelled = false
+    setSettled(false)
+    sessionStore
+      .forBook(book.id)
+      .then((sessions) => {
+        if (cancelled) return
+        setPace(trajectoryOf(sessions, percent, new Date()))
+        setSettled(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setPace(undefined)
+        setSettled(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [book.id, percent])
+
+  const finish = pace?.finishOn
+  const forecast = pace !== undefined && !pace.calibrating && finish !== undefined
+
+  return (
+    <div className={styles.currentDetail}>
+      <div className={styles.currentActions}>
+        <Link to={`/book/${book.id}`} className={styles.currentPrimary}>
+          Continue reading
+        </Link>
+        <Link to={`/book/${book.id}/chapters`} className={styles.currentSecondary}>
+          Chapter summaries
+        </Link>
+      </div>
+
+      {/* Held back until the lookup answers. A strip that says "still learning"
+          for a moment and then prints a date is a strip that changed its mind
+          in front of the reader. */}
+      {settled && (
+        <div className={styles.trajectory}>
+          <div className={styles.trajectoryHead}>
+            <span className={styles.trajectoryKicker}>Reading trajectory</span>
+            {forecast && <span className={styles.trajectoryTag}>{pace.status}</span>}
+          </div>
+
+          {forecast ? (
+            <div className={styles.trajectoryFacts}>
+              <div>
+                <span className={styles.trajectoryValue}>{shortDate(finish)}</span>
+                <span className={styles.trajectoryLabel}>Est. finish ({pace.daysRemaining}d)</span>
+              </div>
+              <div>
+                <span className={styles.trajectoryValue}>{pace.velocity}m / day</span>
+                <span className={styles.trajectoryLabel}>
+                  {pace.velocityIsAllTime ? 'All-time pace' : '7-day pace'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className={styles.trajectoryNote}>
+              {percent !== undefined && percent > 0
+                ? 'Still learning how fast you read this one.'
+                : 'Open it once and a finish date appears here.'}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BookTile({
   entry,
   coverSrc,
@@ -408,6 +516,17 @@ function BookTile({
             steps out of the tab order rather than announcing it twice. */}
         <Link to={`/book/${book.id}`} className={styles.tileMedia} aria-hidden="true" tabIndex={-1}>
           <Cover title={book.title} src={coverSrc} bookId={book.id} />
+          {/* The fore edge, lit as far as you have read. Only on the hero: a
+              row of six small covers each with a lit edge is a row of stripes,
+              and the percentage is already printed under every one of them
+              there. Nothing is drawn at 0% — an untouched book must not carry a
+              mark that says it was started. */}
+          {large && percent !== undefined && percent > 0 && (
+            <span
+              className={styles.spineFill}
+              style={{ '--fill': `${Math.min(percent, 100)}%` } as CSSProperties}
+            />
+          )}
         </Link>
         <Link
           to={`/book/${book.id}/info`}
@@ -420,7 +539,11 @@ function BookTile({
       <Link to={`/book/${book.id}`} className={styles.tileInfo}>
         <span className={styles.tileTitle}>{book.title}</span>
         {book.author && <span className={styles.tileAuthor}>{book.author}</span>}
-        {percent !== undefined && <span className={styles.tileProgress}>{percent}% read</span>}
+        {/* On the hero the fore edge says this, and says it better. Everywhere
+            else the number is the only thing that can. */}
+        {!large && percent !== undefined && (
+          <span className={styles.tileProgress}>{percent}% read</span>
+        )}
       </Link>
     </div>
   )

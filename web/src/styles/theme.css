@@ -70,6 +70,27 @@
      `var(--face-serif)` because the `--face-*` tokens are declared further down
      this file, and a custom property can't be read before it is declared. */
   --font-reading: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  /*
+   * The two faces the app's own chrome is set in — as opposed to `--font-reading`,
+   * which is the reader's choice for the inside of a book and is theirs to change.
+   *
+   * These are tokens because they were not. Statistics wrote
+   * `'Playfair Display', Georgia, serif` out fifteen times, Home wrote a fourth
+   * variant of it with Merriweather in the middle, and Library used the system
+   * sans and no display face at all — so the same app had three different
+   * ideas of what a heading looks like, one per screen. Written here once, the
+   * three screens cannot drift again.
+   *
+   * `--font-display` is for headings and for a number that is the point of its
+   * card. `--font-figure` is the text face that sits under them: a little more
+   * bookish than the system sans, and narrow enough for a phone.
+   *
+   * Both are literal stacks for the same reason `--font-reading` is: the
+   * `--face-*` tokens are declared at the foot of this file, and a custom
+   * property cannot be read before it is declared.
+   */
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-figure: 'EB Garamond', Garamond, Georgia, serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;

@@ -2584,3 +2584,102 @@ stays beside it for a new vault or a new phone.
 The fingerprint list is a record of a download, not of the reader's vault. The
 app cannot know what they did with the zip. Losing the list is harmless: the
 next export is larger and replaces notes with the same notes.
+
+## Every screen takes its colours and faces from `theme.css`
+
+Statistics was built with its own palette: about a dozen literal hexes declared
+on `.shell`. That had a small cost and a large one.
+
+The small cost was that Statistics did not match. Its primary action was forest
+green. Every other screen used `--color-accent`, which is warm brown by default.
+A comment on the file claimed forest green was the rule "everywhere in this app".
+It was the rule on one screen.
+
+The large cost was that a hex cannot follow a theme. The app has eight themes.
+Statistics was warm paper in all of them, so a reader in Dark got a bright page
+at night, and a reader in High contrast got no extra contrast at all.
+
+The local names are kept. Only their source moved:
+
+```css
+--paper: var(--color-bg);
+--card: var(--color-surface);
+--ink: var(--color-text);
+--accent: var(--color-accent);
+```
+
+The names stay because the file below reads `var(--ink)` and `var(--card)`
+several hundred times, and those names say what the thing is on that screen. A
+rewrite would have touched every line and changed nothing the reader can see.
+
+Three colours stay literal on purpose: the heat ramp (`--h1` to `--h4`), the
+Veda violet, and the genre bars. Each is a scale or an identity, not a surface.
+A theme must not be able to make one shade of the heat ramp equal another.
+
+Two faces are now tokens as well, in `theme.css`:
+
+- `--font-display` — headings, and a number that is the point of its card.
+- `--font-figure` — the text face under them.
+
+Before this, Statistics wrote its heading stack out nine times, Home wrote a
+fourth variant of it, and Library used the system sans and no display face. The
+same app had three ideas of what a heading looks like, one per screen.
+
+## Progress on the front door is drawn on the book, not over it
+
+The Home screen's Current Reading card said "28% read" and stopped. The one book
+the reader is in the middle of was the book the app said least about.
+
+The percentage is now a **lit fore edge**: the top part of the page block down
+the right of the cover, lit as far as the reader has read.
+
+The alternative was a fill over the cover art. It was rejected because it cannot
+survive the art. A dark cover swallows it and a busy cover makes it read as
+damage. The page block is drawn by the app, is the same pale colour beside every
+cover, and is already there — so lighting part of it works on any book.
+
+It is amber because amber is time in this app. It is drawn top-down because that
+is the direction a stack of pages is worked through. **Nothing is drawn at 0%:**
+a mark on an untouched book is a claim that it was started.
+
+Only the hero carries one. A row of six small covers each with a lit edge is a
+row of stripes, and those tiles still print the number instead.
+
+The card also carries the estimated finish date and the daily pace, from
+`trajectoryOf` — the same arithmetic the book's own details page uses. When
+there is too little read to forecast, the strip says so in one line. It never
+prints a date it would have to take back.
+
+## A book is renamed one at a time
+
+`repository.renameBook` existed in all three storage layers from the start and
+had no UI. It was on the list for deletion in migration `0008`. The reader asked
+for the UI instead, so it stays.
+
+Rename sits on the selection bar with the other management actions, but it is
+the only one that is not a batch. It wants **exactly one** book: two books
+cannot share a title, and a rename that quietly applied to thirty would be
+unrecoverable. With two or more ticked the button goes grey rather than
+disappearing — a button that comes and goes as you tick is a button you cannot
+aim at.
+
+The field opens on the current title rather than empty, because a rename is
+nearly always an edit — a stray subtitle, or a filename that came through as a
+title. A blank title and an unchanged one are both refused in the dialog. The
+store already ignores a blank, which from the shelf looks like a rename that
+did nothing.
+
+`renameBook` sets `titleOverridden`, so a later re-parse of the file cannot put
+the old title back.
+
+## A day with no reading takes no shade
+
+The heatmap's bands are one hour each: under 1, under 2, under 3, and 3 or more.
+A day with no reading scored `level: 0` and was drawn in `--h0`, a pale beige.
+
+That made "I read nothing" and "I read forty minutes" two shades of one colour —
+the exact distinction the map exists to draw. A zero day is an empty square now,
+held together by a faint outline so the grid stays legible.
+
+The key shows four swatches, not five. The blank square is not the lightest
+band. It is the absence of a band, and putting it in the key said otherwise.

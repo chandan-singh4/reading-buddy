@@ -52,6 +52,12 @@ export interface SelectionBarProps {
   /** Take the ticked books out of every folder they are in. */
   onClearFolders: () => void
   onNewFolder: () => void
+  /**
+   * Rename the one ticked book. Unlike every other action on this bar, this one
+   * takes a single book and not a set: two books cannot share a new title, and
+   * a rename that quietly applied to thirty would be unrecoverable.
+   */
+  onRename: () => void
   onDelete: () => void
   onCancel: () => void
 }
@@ -70,6 +76,7 @@ export function SelectionBar({
   onToggleFolder,
   onClearFolders,
   onNewFolder,
+  onRename,
   onDelete,
   onCancel,
 }: SelectionBarProps) {
@@ -133,6 +140,19 @@ export function SelectionBar({
               doing entirely different jobs — one narrowing the shelf, one
               rewriting what is on it — is a mis-tap waiting to happen. */}
           Change folders
+        </button>
+
+        {/* The only action here that is not a batch. It is disabled with two or
+            more ticked rather than hidden, for the same reason as the rest: a
+            button that comes and goes as you tick is a button you cannot aim
+            at. */}
+        <button
+          type="button"
+          className={styles.action}
+          disabled={count !== 1}
+          onClick={onRename}
+        >
+          Rename
         </button>
 
         <button
