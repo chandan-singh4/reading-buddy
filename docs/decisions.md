@@ -2551,3 +2551,36 @@ who is doing their most engaged reading.
 
 The minutes are not lost. The day totals, the streak and the heatmap all count
 them. The trajectory card is about pace, and pace is pages an hour.
+
+## The Obsidian export writes a folder of linked notes
+
+One large Markdown file would carry the same words and lose the value. Obsidian
+works on notes and on links between them. So the export writes one note for the
+book, one note for each chapter, and one note for each concept. Every mention of
+a concept is a `[[wikilink]]`. The reader opens "archetype" and sees each chapter
+that raised it, in each book.
+
+Links are written from the vault root, such as
+`[[Reading Buddy/Books/Man and His Symbols/06 The archetype|06 The archetype]]`.
+Short links break when two books both hold a chapter called "Introduction". The
+cost is that the folder must sit at the top of the vault. The index note says
+this in its first line.
+
+## A second export must not make a second copy
+
+The reader continues to read, so the export runs again. Two rules keep the vault
+clean:
+
+1. **Fixed paths.** A note's path comes from the book title and the chapter
+   number. A later export lands on the same path, so Obsidian replaces the note.
+2. **Fixed contents.** No note says when it was exported. Every date printed
+   comes from the row it describes.
+
+Rule 2 makes an unchanged chapter produce the same bytes each time. So the app
+can remember a fingerprint of each note it exported and offer only the notes
+whose words moved. That is the "Export what's new" button. "Export everything"
+stays beside it for a new vault or a new phone.
+
+The fingerprint list is a record of a download, not of the reader's vault. The
+app cannot know what they did with the zip. Losing the list is harmless: the
+next export is larger and replaces notes with the same notes.

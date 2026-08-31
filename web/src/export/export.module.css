@@ -1,0 +1,41 @@
+/* The export card on Settings. It borrows the page's card and button; only the
+   two-button row and the small print live here. */
+
+.blurb {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-soft, #6b6459);
+  text-align: left;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+/* The second choice reads as the second choice. */
+.plain {
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-soft, #6b6459);
+  background: none;
+  border: 1px solid var(--rule, #e2d6bd);
+  border-radius: 999px;
+}
+
+.plain:disabled {
+  opacity: 0.5;
+}
+
+.said {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft, #6b6459);
+  text-align: left;
+}
