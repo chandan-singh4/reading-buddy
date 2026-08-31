@@ -5,7 +5,7 @@ import { applyUpdate, onUpdateReady } from '../app/updates.ts'
 import type { StoredAlert } from '../storage/db.ts'
 import type { BookId } from '../structure/index.ts'
 import { alertStore } from '../storage/summaries.ts'
-import { groupApprovals, readyAlerts, type BookGroup } from './bellGroups.ts'
+import { groupApprovals, groupPending, readyAlerts, type BookGroup } from './bellGroups.ts'
 import { approve } from './engine.ts'
 import styles from './bell.module.css'
 
@@ -173,6 +173,19 @@ export function Bell() {
                   >
                     Read the summary
                   </Link>
+                </li>
+              ))}
+
+              {groupPending(alerts).map((group) => (
+                <li key={`pending-${group.bookId}`} className={styles.item}>
+                  <div className={styles.book}>{group.bookTitle}</div>
+                  <div className={styles.chapter}>{countLabel(group.chapters)}</div>
+                  {/* No button. The reader has already said yes, and there is
+                      nothing left for them to do — the line is here to say the
+                      yes was not lost, not to ask for a second one. */}
+                  <p className={styles.waiting}>
+                    Waiting for a model. This carries on while the app is open.
+                  </p>
                 </li>
               ))}
 

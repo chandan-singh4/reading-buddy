@@ -517,7 +517,20 @@ export interface StoredAlert {
    * section inside it.
    */
   id: string
-  kind: 'ready' | 'approval'
+  /**
+   * `approval` is a question. `pending` is a yes the reader has already given,
+   * waiting on a model that refused. `ready` is a summary they can go and read.
+   *
+   * `pending` exists because a yes used to be spent in one attempt: if every
+   * model was busy the call threw, the line stayed a question, and nothing
+   * tried again until the reader next launched the app. The reader's answer to
+   * a busy model is not to ask them again — it is to wait and try later.
+   */
+  kind: 'ready' | 'approval' | 'pending'
+  /** ISO 8601 — when a `pending` line last tried a model. Absent until it has. */
+  triedAt?: string
+  /** How many times a `pending` line has been refused. Shown after a few. */
+  tries?: number
   bookId: BookId
   bookTitle: string
   chapterId: string

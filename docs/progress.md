@@ -29,7 +29,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,467 tests across 146 files.
+  2,479 tests across 148 files.
 - **The Obsidian export is proved. It met a real vault on 2026-08-31.** The
   reader exported, dropped the folder into Obsidian, and followed the links.
   Still unproved: a *second* export. Nobody has read more and pressed "Export
@@ -86,8 +86,19 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **A yes now waits instead of disappearing** (2026-08-31). Not a waypoint.
+  Build green: 2,479 tests across 148 files.
+  - Approving a book in the bell writes a `pending` line. The line stays and
+    says "Waiting for a model". The app tries again every hour while it is open.
+    It never gives up. Before this, a refusal lost the yes with no trace.
+  - A one-time sweep at the next launch removes every summary except *Man and
+    His Symbols*, and the `ready` lines that pointed at them. It writes a flag
+    to `localStorage` and never runs again.
+  - **Limit, not a bug:** a PWA runs nothing while it is closed. "In the
+    background" means "while the app is open". See `docs/decisions.md`.
+
 - **Four changes the reader asked for, and one type system** (2026-08-31). Not
-  a waypoint. Build green: 2,467 tests across 146 files.
+  a waypoint. Build green: 2,479 tests across 148 files.
   - **A day you did not read is now blank.** The bands were already an hour
     each and a zero day already scored `level: 0` — but `--h0` was a filled
     beige, so "I read nothing" and "I read forty minutes" drew two shades of

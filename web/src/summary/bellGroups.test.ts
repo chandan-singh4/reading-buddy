@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { StoredAlert } from '../storage/db.ts'
 import type { BookId } from '../structure/index.ts'
-import { groupApprovals, readyAlerts } from './bellGroups.ts'
+import { groupApprovals, groupPending, readyAlerts } from './bellGroups.ts'
 
 function alert(
   book: string,
@@ -54,5 +54,20 @@ describe('grouping the bell by book', () => {
 
   it('has nothing to show when nothing is waiting', () => {
     expect(groupApprovals([])).toEqual([])
+  })
+})
+
+describe('the yeses that are still waiting', () => {
+  it('gathers a book that is waiting onto one line', () => {
+    const groups = groupPending([alert('a', 2, 'pending'), alert('a', 1, 'pending')])
+    expect(groups).toHaveLength(1)
+    expect(groups[0].chapters.map((row) => row.chapter)).toEqual([1, 2])
+  })
+
+  it('keeps a waiting line out of the questions', () => {
+    const alerts = [alert('a', 1, 'pending'), alert('b', 1, 'approval')]
+    expect(groupPending(alerts).map((group) => group.bookId)).toEqual(['a'])
+    expect(groupApprovals(alerts).map((group) => group.bookId)).toEqual(['b'])
+    expect(readyAlerts(alerts)).toEqual([])
   })
 })

@@ -24,6 +24,7 @@ import {
 } from '../structure/index.ts'
 import { confusionMaterial, proseOf } from '../tutor/digest.ts'
 import { librarianResult, scribeResult } from './parse.ts'
+import { clearOldSummaries } from './cleanup.ts'
 import { plan } from './queue.ts'
 
 /**
@@ -562,8 +563,9 @@ async function proposeChapter(bookId: BookId, chapter: number, part?: Part): Pro
     : String(chapterPath(chapter))
   const id = `${bookId}:${chapterId}`
 
-  // Never overwrite a line the reader has already dealt with, and never turn a
-  // finished summary's "ready" back into a question.
+  // Never overwrite a line the reader has already dealt with: not a finished
+  // summary's "ready", and not a "pending" they already said yes to. Asking
+  // again for something already agreed is the app forgetting an answer.
   const already = (await alertStore.list()).find((row) => row.id === id)
   if (already) return
 
@@ -596,7 +598,122 @@ export async function approve(
   part?: Part,
   watch?: RunWatch,
 ): Promise<void> {
-  await runChapter(bookId, chapter, part, watch)
+  // The yes is written down before the call is made. If every model is busy the
+  // reader has still said yes, and being asked the same question again is not
+  // an answer to a busy model — see `retryPending`.
+  await markPending(bookId, chapter, part)
+  try {
+    await runChapter(bookId, chapter, part, watch)
+  } catch (error: unknown) {
+    await recordRefusal(bookId, chapter, part)
+    throw error
+  }
+}
+
+/** How long a refused summary waits before it tries again. */
+const RETRY_AFTER_MS = 60 * 60 * 1000
+
+/**
+ * Turn a question into a yes that is waiting.
+ *
+ * Built from the alert already on the bell where there is one, so the book and
+ * chapter titles carry over. There always is one when the reader answered in
+ * the bell; the chapter page can approve a chapter that was never asked about,
+ * and that path builds the line from the book instead.
+ */
+async function markPending(bookId: BookId, chapter: number, part?: Part): Promise<void> {
+  const chapterId = part ? String(sectionPath(chapter, part.section)) : String(chapterPath(chapter))
+  const id = `${bookId}:${chapterId}`
+  const existing = (await alertStore.list()).find((row) => row.id === id)
+
+  if (existing) {
+    await alertStore.save({ ...existing, kind: 'pending', seen: false })
+    return
+  }
+
+  const book = await repository.getBook(bookId)
+  if (!book) return
+  const entry = (await repository.listChapterIndexes(bookId)).find((row) => row.chapter === chapter)
+  if (!entry) return
+
+  await alertStore.save(
+    alertFor(
+      {
+        bookId,
+        chapterId,
+        chapter,
+        chapterTitle: entry.title,
+        ...(part ? { section: part.section, sectionTitle: part.title } : {}),
+      },
+      book.title,
+      'pending',
+      new Date().toISOString(),
+    ),
+  )
+}
+
+/**
+ * Note that a waiting summary was refused, so the retry knows when to try next.
+ *
+ * A successful run has already replaced this line with a `ready` one by the
+ * time this could be reached, so there is nothing to guard against.
+ */
+async function recordRefusal(bookId: BookId, chapter: number, part?: Part): Promise<void> {
+  const chapterId = part ? String(sectionPath(chapter, part.section)) : String(chapterPath(chapter))
+  const row = (await alertStore.list()).find((entry) => entry.id === `${bookId}:${chapterId}`)
+  if (!row || row.kind !== 'pending') return
+  await alertStore.save({
+    ...row,
+    triedAt: new Date().toISOString(),
+    tries: (row.tries ?? 0) + 1,
+  })
+}
+
+/**
+ * Try again on every yes that is still waiting for a model.
+ *
+ * An hour between attempts, at the reader's instruction. A summary that was
+ * refused because the free model is busy is refused for minutes at a time, not
+ * for milliseconds; hammering it would spend the reader's rate limit on being
+ * told no faster.
+ *
+ * There is no giving up. The reader said yes, and a line that quietly turned
+ * itself back into a question would be the app forgetting an answer it was
+ * given. It waits until it succeeds or until the reader takes the book away.
+ *
+ * Like `sweep`, it never rejects: it runs in the background and a rejection
+ * from here would land on whatever screen the reader is looking at.
+ */
+/**
+ * Is this waiting line ready for another go?
+ *
+ * No `triedAt` means the first attempt is still in flight — the row was written
+ * the moment the reader said yes, and asking again now would pay twice for one
+ * chapter. After that, once an hour. There is no giving up: a model that is
+ * busy today is not busy forever, and the reader already said yes.
+ */
+export function dueForRetry(row: StoredAlert, now: number): boolean {
+  if (row.kind !== 'pending') return false
+  if (row.triedAt === undefined) return false
+  return now - Date.parse(row.triedAt) >= RETRY_AFTER_MS
+}
+
+export async function retryPending(now: number = Date.now()): Promise<void> {
+  const waiting = (await alertStore.list()).filter((row) => row.kind === 'pending')
+
+  for (const row of waiting) {
+    if (!dueForRetry(row, now)) continue
+
+    const part =
+      row.section === undefined
+        ? undefined
+        : { section: row.section, title: row.sectionTitle ?? '' }
+    try {
+      await runChapter(row.bookId, row.chapter, part)
+    } catch {
+      await recordRefusal(row.bookId, row.chapter, part)
+    }
+  }
 }
 
 /**
@@ -618,15 +735,36 @@ export function startSummaries(): () => void {
   let running = false
 
   const run = () => {
-    // One sweep at a time. Two overlapping ones would pay twice for a chapter.
+    // One pass at a time. Two overlapping ones would pay twice for a chapter.
     if (running || document.visibilityState !== 'visible') return
     running = true
-    void sweep().finally(() => {
-      running = false
-    })
+    // The one-time clearing first, so the sweep never plans work for a summary
+    // that is about to be deleted. Then the sweep, then the retries: a chapter
+    // the sweep has just written is one the retry no longer has to ask for.
+    void clearOldSummaries()
+      .then(() => sweep())
+      .then(() => retryPending())
+      .finally(() => {
+        running = false
+      })
   }
 
   run()
   document.addEventListener('visibilitychange', run)
-  return () => document.removeEventListener('visibilitychange', run)
+
+  /*
+   * The clock that makes a waiting yes eventually land.
+   *
+   * The launch and foreground triggers above catch the reader who closes the
+   * app and comes back. This one catches the reader who does not: a phone left
+   * on the Home screen with a summary queued behind a busy model. It ticks
+   * every ten minutes and `retryPending` decides whether an hour has passed —
+   * a timer set to the hour itself would drift past it and wait two.
+   */
+  const clock = setInterval(run, 10 * 60 * 1000)
+
+  return () => {
+    document.removeEventListener('visibilitychange', run)
+    clearInterval(clock)
+  }
 }

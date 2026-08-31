@@ -185,3 +185,17 @@ describe('the bell', () => {
     )
   })
 })
+
+describe('a yes that is still waiting', () => {
+  it('says so, and asks the reader for nothing more', async () => {
+    await alertStore.save({ ...approval('b2', 'ch02', 2, 'Closer to Reality'), kind: 'pending' })
+    show()
+    ;(await screen.findByRole('button', { name: 'Notifications' })).click()
+
+    expect(await screen.findByText(/Waiting for a model/)).toBeTruthy()
+    // The approve button belongs to a question. This is not one any more.
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Summarise/i })).toBeNull()
+    })
+  })
+})

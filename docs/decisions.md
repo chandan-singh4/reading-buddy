@@ -2714,3 +2714,37 @@ brown, which on a card of warm paper read as a hole punched in the grid rather
 than as the most of something. Each shade moved down one rung and a new lightest
 was added at the foot, so a first hour is a tint rather than an already-strong
 colour. Four shades and four one-hour bands are unchanged.
+
+## A yes waits, and the app says so
+
+The bell asks before it summarises a book that is not in hand. Before this, a
+yes went straight to a model. If that model refused, the yes was lost. The
+reader saw the question disappear and no summary arrive.
+
+Now a yes writes a `pending` line. The line stays on the bell and says "Waiting
+for a model". The app tries again every hour while it is open. It never gives
+up, because the reader already said yes and a busy model is not busy forever.
+
+The retry clock ticks every ten minutes and the code checks if an hour passed. A
+timer set to one hour drifts past the hour and then waits two.
+
+**A limit we cannot remove.** Reading Buddy is a PWA. Nothing runs while the app
+is closed. "In the background" can only mean "while the app is open". A yes that
+you give and then close the app on resumes at the next launch.
+
+## One sweep removes the old summaries
+
+The queue used to run ahead on its own. It wrote summaries for books the reader
+never asked about. The reader wants one book kept — *Man and His Symbols* — and
+the rest gone.
+
+This is a one-time sweep, not a migration. It removes rows only. It runs at the
+next launch, writes a flag to `localStorage`, and never runs again. A summary
+written after the sweep is safe, whichever book it belongs to.
+
+The sweep also removes the `ready` lines for the deleted summaries. It keeps
+`approval` and `pending` lines, because those are still live.
+
+The title match is loose. The same book arrives with a subtitle or an editor's
+name attached. An exact match would delete the summaries the sweep exists to
+keep.

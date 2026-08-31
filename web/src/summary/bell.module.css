@@ -248,3 +248,14 @@
   /* The title wraps; the button never shrinks below a thumb. */
   min-width: 0;
 }
+
+/*
+ * The line under a book that is waiting on a model. Quieter than the chapter
+ * line above it, because it is a state and not a fact about the book.
+ */
+.waiting {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--color-text-muted);
+}

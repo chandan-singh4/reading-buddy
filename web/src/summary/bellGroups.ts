@@ -18,6 +18,23 @@ export interface BookGroup {
   at: string
 }
 
+/** The `ready` lines, untouched and still one to a chapter. */
+export function readyAlerts(alerts: readonly StoredAlert[]): StoredAlert[] {
+  return alerts.filter((alert) => alert.kind === 'ready')
+}
+
+/**
+ * The yeses that are still waiting on a model, gathered by book.
+ *
+ * Grouped the same way the questions are, and for the same reason: a reader who
+ * approved a whole book wants one line saying so, not eleven. They are not
+ * mixed in with the questions, because these two need opposite things from the
+ * reader — a question wants an answer, and this wants to be left alone.
+ */
+export function groupPending(alerts: readonly StoredAlert[]): BookGroup[] {
+  return groupBy(alerts, 'pending')
+}
+
 /**
  * Group the `approval` lines by book, newest book first.
  *
@@ -26,10 +43,14 @@ export interface BookGroup {
  * reader and a summary that is already paid for and waiting.
  */
 export function groupApprovals(alerts: readonly StoredAlert[]): BookGroup[] {
+  return groupBy(alerts, 'approval')
+}
+
+function groupBy(alerts: readonly StoredAlert[], kind: StoredAlert['kind']): BookGroup[] {
   const byBook = new Map<BookId, BookGroup>()
 
   for (const alert of alerts) {
-    if (alert.kind !== 'approval') continue
+    if (alert.kind !== kind) continue
     const group = byBook.get(alert.bookId)
     if (group) {
       group.chapters.push(alert)
@@ -47,9 +68,4 @@ export function groupApprovals(alerts: readonly StoredAlert[]): BookGroup[] {
   const groups = [...byBook.values()]
   for (const group of groups) group.chapters.sort((a, b) => a.chapter - b.chapter)
   return groups.sort((a, b) => b.at.localeCompare(a.at))
-}
-
-/** The `ready` lines, untouched and still one to a chapter. */
-export function readyAlerts(alerts: readonly StoredAlert[]): StoredAlert[] {
-  return alerts.filter((alert) => alert.kind === 'ready')
 }
