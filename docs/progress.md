@@ -29,7 +29,11 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,254 tests across 131 files.
+  2,459 tests across 146 files.
+- **The Obsidian export has never met a real vault.** It was proved by unit
+  tests and by one look at the Settings card in a desktop browser. Nobody has
+  unzipped it and dropped it into Obsidian yet. Judge the note layout, the
+  links, and whether a second export really replaces rather than adds.
 - **Waiting on the phone: the reading desk.** The book screen was rebuilt this
   session and judged in a desktop browser against a seeded book. Both states
   need a look on a device — an unfinished book and a finished one.
@@ -81,6 +85,21 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **Your notes, as an Obsidian vault** (2026-08-30). A new `web/src/export/`.
+  The zip holds one folder: a note for each book, a note for each chapter, and
+  a note for each concept, tied together with `[[wikilinks]]`. A chapter note
+  carries the recap, the section recaps, the Scribe's claims, the reader's
+  highlights and the whole conversation with Veda. Drop the folder at the top
+  of the vault; nothing else is needed.
+  - **A second export cannot make a second copy.** Paths come from the book
+    title and the chapter number, and no note prints an export date. So an
+    untouched chapter makes the same bytes each time, and the app can remember
+    a fingerprint of each note it sent. "Export what's new" carries only the
+    notes that moved; "Export everything" stays beside it.
+  - **Chapters with no summary still get a note**, when the reader highlighted
+    something in them. Their own marks must not wait on a model.
+  - Build green: 2,459 tests across 146 files.
 
 - **The Statistics screen** (2026-08-28). Built from
   `design-inspiration/reading-buddy-stats.html`. Build green: 2,312 tests
@@ -205,78 +224,6 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   - **Nothing runs while the app is closed.** A PWA has no background job. The
     sweep runs at launch and when the app returns to the front.
 
-- **The chapter summary page, cut back to two sections** (2026-08-27). Not a
-  waypoint — built from `design-inspiration/build-prompt-summary-views.md`, then
-  simplified by the reader. Build green: 2,156 tests across 119 files.
-  - **One page now, not two.** `/book/:bookId/chapters` shows a book by
-    chapter. Each chapter has two sections: **The chapter, in plain words**
-    (the Librarian's summary, with its tags under it) and **What we worked
-    through** (the Scribe's summary of the reader's questions to Veda).
-  - **The Commonplace Book is gone.** The first build also made a concept index
-    across every book. The reader cut it. It needed a controlled vocabulary, a
-    candidate state, passage anchors and two-way crossings — all to serve one
-    index. Two models and two sections do the job the reader wanted. The page
-    and its test were deleted; it is all in git.
-  - **The tags are chips, and not links.** A tag says what the chapter is
-    about. There is no page behind it, so it must not look tappable.
-  - **The way in is one link on Book Details**, "Chapter summaries". Not a
-    drawer entry: the data is sample content, and the app must not advertise a
-    feature it cannot yet do.
-  - **Neither model is built and neither is started.** `summary/dataSource.ts`
-    is the one seam — an interface, a swap function, and a labelled
-    `TODO: the Librarian and the Scribe`. A mock fixture holds the sample text.
-  - **Playfair Display is now self-hosted.** The build prompt asked for Google
-    Fonts; `fonts.css` forbids a CDN. The reader kept the rule. This also fixed
-    `Home.module.css`, which named Playfair for years without it in the bundle.
-  - **The page ignores the reader's theme** — one fixed paper palette, by
-    choice, with the night-time cost stated in `decisions.md`.
-  - **What a model wrote is parsed, never set as HTML** —
-    `summary/claimNodes.ts`. Two tags are understood and everything else is
-    text, because both summaries will one day be model-written.
-  - **A flaky Reader test, diagnosed and fixed.** Adding test files made
-    `Reader.test.tsx` fail about one run in three. The cause was in the test,
-    not the code: the neighbour section's text appearing and its pictures
-    having been asked for are two different moments, and it read the second
-    once instead of waiting for it. It waits now.
-  - **Two faults the browser found, not the tests.** A book with no summaries
-    waited forever on a load that was never started, and showed a blank page.
-    And the page opened on chapter 1, which is empty in most books. It now
-    opens on the first chapter that has something in it.
-
-- **Veda's Quotes: a kept line keeps its marks, and knows its way home**
-  (2026-08-26). Not a waypoint — the reader asked for it. Build green: 2130
-  tests across 116 files.
-  - The reader picks words inside one of Veda's answers and gets **Copy**,
-    **Save** and **Ask**. Saved lines live under a **Veda's Quotes** chip.
-  - **"By chapter" left the chip row** and became a switch beside it, so
-    grouping now applies to whichever chip is on.
-  - The chapter name sits **above** the words on every kind of note.
-  - **The marks are written back on** — `reader/pickMarkdown.ts`. A selection's
-    text is plain, so a saved line arrived flat. It now walks the picked nodes
-    and puts the bold, the bullets, the numbers and the headings back.
-  - **Four fixes changed nothing on the phone.** Two reasons, both written up in
-    `decisions.md`: a note already written is not touched by fixing the writer,
-    and this is a prompt-to-update PWA, so a deploy does not reach the device
-    until the reader accepts. Both cost the reader four rounds.
-  - **`recoverMarkdown` mends the old notes.** A kept line names its thread, the
-    thread still holds Veda's answer as markdown, so the words are found in it
-    and the marks read off around them. Confirmed on the phone.
-  - **The serializer read a copy that had lost its parents.** `cloneContents()`
-    keeps what is below the range's common ancestor and nothing above it, so a
-    pick starting inside the first list item gave bare items with no list — every
-    number became a bullet. It walks the live page now.
-  - **The tests hid both faults** by building their own HTML and selecting whole
-    nodes. A test now renders a real answer and builds the range the way a finger
-    builds one.
-  - A tap on a quote lands on the saved line, not at the top of the thread. The
-    search strips the marks off and falls back to the longest opening really
-    there, so notes saved before the plain words existed still land.
-
-> **Older entries are deleted, not archived.** Only the five newest survive —
-> see this file's own header. Git holds every earlier version of this file, so
-> nothing is lost: `git log -p docs/progress.md` brings back any entry ever
-> written. Do not build a second copy of this history anywhere in the repo.
-
 ### Blockers
 - **None.** Supabase's email allowance (a few sign-in messages an hour on the
   free mailer) bit once on 2026-08-09 and cleared itself; connect real SMTP
@@ -287,6 +234,11 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   worker problem. Don't raise it again.
 
 ### Next up
+**Drop the export into Obsidian.** Settings → *Take your notes to Obsidian* →
+**Export everything**. Unzip it, drag the `Reading Buddy` folder to the top of
+the vault, and open a chapter note. Then read more, export **what's new**, and
+check the vault gained the new chapter and did not gain a copy of an old one.
+
 **Judge this session's work on the phone.** Nothing built on 2026-08-28 has been
 seen on a device: the rebuilt book screen in both states, the two summary halves
 redoing themselves alone, and the real failure messages. `active-task.md` lists

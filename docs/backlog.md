@@ -524,7 +524,7 @@
 ### Quality of life
 - Auto-save reading position → WP-15
 - Undo an accidental highlight → WP-17
-- Export notes, export highlights → WP-25
+- Export notes, export highlights → **done 2026-08-30**, as an Obsidian vault. See `web/src/export/` and the two export sections in `decisions.md`.
 - Offline reading, with cloud sync that catches up when back online → WP-30 (offline) + WP-33 (sync). Note the ordering: the app is local-first and already works offline; the *sync* half is the new part.
 - Open multiple books at once → **NEW**, and in tension with WP-28 (books stay separate). Separate *memory* and separate *tabs* aren't the same thing, but the guard needs checking first.
 - Recently closed books → **NEW** (small)
