@@ -161,15 +161,23 @@
   color: var(--ink-soft);
 }
 
+/*
+ * The passage the question is about, set as a quotation.
+ *
+ * A rule down the left and italics, which is how a quotation has been marked
+ * since long before anyone had a stylesheet. It carried a tinted fill and a
+ * rounded right edge as well, which made it read as a callout box — a notice
+ * *from the app*, when it is in fact a line *from the book*. The fill said
+ * nothing the rule and the italics were not already saying.
+ */
 .scenario {
   font-size: var(--text-base);
   line-height: 1.55;
-  background: color-mix(in srgb, var(--bronze) 6%, transparent);
-  border-left: 3px solid var(--bronze);
-  padding: 12px 14px;
-  border-radius: 0 8px 8px 0;
+  border-left: 2px solid color-mix(in srgb, var(--bronze) 45%, transparent);
+  padding: 2px 0 2px 14px;
   margin-bottom: var(--space-3);
   font-style: italic;
+  color: var(--ink-soft);
 }
 
 .stem {
