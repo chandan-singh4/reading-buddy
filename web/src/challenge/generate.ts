@@ -18,7 +18,6 @@
 
 import { jsonFrom } from '../summary/parse.ts'
 import { watched } from '../summary/engine.ts'
-import { proseOf } from '../tutor/digest.ts'
 import { accessToken } from '../storage/cloud/client.ts'
 import { TUTOR_URL } from '../reader/tutor.ts'
 import {
@@ -31,7 +30,7 @@ import {
   type Provider,
 } from '../reader/models.ts'
 import type { Section } from '../structure/index.ts'
-import { userMessage, type Passage, type QuestionRequest } from './prompt.ts'
+import { material, userMessage, type Passage, type QuestionRequest } from './prompt.ts'
 import { screen, type Rejection } from './validate.ts'
 import type { Question } from './types.ts'
 
@@ -45,6 +44,31 @@ import type { Question } from './types.ts'
  * questions rather than spent before the first one.
  */
 export const BATCH_SIZE = 5
+
+/**
+ * How much of the chapter one call carries, in characters.
+ *
+ * ## Why the chapter is not sent whole
+ *
+ * It was, and it was sent *twice* — once as the excerpt and again as the
+ * anchored passage list, which is the same prose with addresses on it. A long
+ * chapter is thirty thousand characters, so a batch of five questions was
+ * paying for sixty thousand.
+ *
+ * Now one slice goes per call, and the next call takes the next slice. Five
+ * questions do not need a whole chapter in front of them; they need enough
+ * prose to find five seams in. Twelve thousand characters is roughly two
+ * thousand words — a long article, and more than enough.
+ *
+ * ## What this costs, honestly
+ *
+ * A question can only be grounded in prose Veda has actually been shown, so a
+ * batch drawn from the middle of a chapter cannot ask about the end of it. The
+ * slices move, so the chapter *is* covered — but across several batches, not
+ * within one. That is the right trade: the alternative is paying for the whole
+ * chapter on every refill, which is what made the reader ask about this.
+ */
+const SLICE = 12_000
 
 /**
  * How many times a batch may be rewritten before we give the reader what we
@@ -183,12 +207,19 @@ export async function writeBank(
     throw new NoQuestions('this chapter has no prose to ask about', 'nothing-to-ask')
   }
 
-  const anchors = new Set(passages.map((passage) => passage.anchor))
-  const material = sections
-    .filter((section) => section.chapter === request.chapter)
-    .sort((a, b) => a.section - b.section)
-    .map((section) => proseOf(section))
-    .join('\n\n')
+  /*
+   * Where in the chapter this batch reads.
+   *
+   * A refill starts where the last one stopped, so Veda meets prose she has not
+   * seen rather than the opening paragraphs for the fourth time. It wraps: a
+   * chapter shorter than one slice is simply read whole every time, and a long
+   * one comes round again once it has been covered.
+   */
+  const slice = sliceFrom(passages, already.length)
+
+  // The gate checks against the slice, not the chapter. Veda can only cite what
+  // she was shown, and an anchor from prose she never saw is a guess.
+  const anchors = new Set(slice.map((passage) => passage.anchor))
 
   const rejected: Rejection[] = []
   let model: string | undefined
@@ -198,10 +229,18 @@ export async function writeBank(
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     const reply = await askExaminer(
-      material,
+      /*
+       * The book's own words, sent once.
+       *
+       * They used to go twice — as the excerpt and again inside the user
+       * message as the anchored passage list, which is the same prose with
+       * addresses on it. A long chapter is thirty thousand characters, so a
+       * batch of five questions was paying for sixty thousand.
+       */
+      material(slice),
       userMessage({
         ...request,
-        passages,
+        passages: slice,
         count: BATCH_SIZE,
         avoidStems: already.map((question) => question.stem),
         avoidConcepts: [...new Set(already.map((question) => question.concept))],
@@ -251,6 +290,37 @@ export async function writeBank(
     'nothing new could be written for this chapter',
     already.length > 0 ? 'exhausted' : 'nothing-to-ask',
   )
+}
+
+/**
+ * The slice of the chapter this batch reads.
+ *
+ * `written` is how many questions the bank already holds, which is a good
+ * enough clock: five questions per batch means batch two starts one slice in.
+ * Wrapping rather than running out keeps a long chapter answerable forever
+ * without ever needing to know how many slices it has.
+ */
+export function sliceFrom(passages: readonly Passage[], written: number): Passage[] {
+  const total = passages.reduce((sum, passage) => sum + passage.text.length, 0)
+  if (total <= SLICE) return [...passages]
+
+  const slices = Math.ceil(total / SLICE)
+  const start = ((written / BATCH_SIZE) | 0) % slices
+
+  const out: Passage[] = []
+  let seen = 0
+  let taken = 0
+  for (const passage of passages) {
+    const before = seen
+    seen += passage.text.length
+    if (before < start * SLICE) continue
+    if (taken >= SLICE) break
+    out.push(passage)
+    taken += passage.text.length
+  }
+  // A slice that lands past the end of the last paragraph gives nothing back.
+  // Falling to the front is better than failing: the reader gets questions.
+  return out.length > 0 ? out : passages.slice(0, 1)
 }
 
 /** Stems match when they say the same thing, whatever the punctuation. */

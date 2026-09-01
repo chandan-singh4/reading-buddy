@@ -2937,3 +2937,48 @@ It is a sheet from the foot, not a dropdown. A book has thirty chapters, and a
 dropdown under a button at the top of the screen would open over the question.
 The list shows each chapter's own title, because a title is what a reader
 recognises. A number alone is not.
+
+## The examination reads the book, not the recap
+
+**2026-09-01.** A question must be grounded in the author's own words. The
+examiner is given the chapter's paragraphs, with their anchors. It is never
+given the Librarian's recap instead.
+
+The recap is a few hundred words. Questions written from it would be questions
+about the recap, which is the opposite of a graduate-level test.
+
+## The chapter is sent once, and in parts
+
+**2026-09-01.** The chapter's prose used to go to the model **twice** in one
+call: once as the excerpt, and again inside the message as the anchored passage
+list. That is the same text with addresses on it. A long chapter is 30,000
+characters, so five questions paid for 60,000. This was a plain mistake and it
+is fixed.
+
+The prose now goes once, anchored, as the material.
+
+One call also carries only a **slice** of the chapter, about 12,000 characters.
+Five questions do not need a whole chapter in front of them. A refill takes the
+next slice, so Veda meets prose she has not seen and the chapter is covered
+across several batches.
+
+The cost is real and worth stating: a batch drawn from the middle of a chapter
+cannot ask about the end of it. The gate in `validate.ts` checks against the
+slice, so a question citing prose Veda was never shown is dropped.
+
+**The chapter text is already on the device.** `repository.listSections` reads
+it from IndexedDB. Nothing is re-parsed and no file is read again. Saving a
+second copy for the examination would save nothing — the cost is the tokens
+sent to the model, and only sending less can lower it.
+
+## The examination opens on the chapter you last chose
+
+**2026-09-01.** The reader picks a chapter, leaves, and comes back. It opens on
+the chapter they picked.
+
+It used to open on whatever chapter they were reading. That is the right first
+answer and the wrong one every time after: it threw away the only choice the
+reader had made on that screen. Where they are reading is now the fallback, for
+a book they have never been examined on.
+
+Kept in `localStorage`, per book, like the reading settings.

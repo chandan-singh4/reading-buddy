@@ -38,6 +38,7 @@ import { TextSettings } from './TextSettings.tsx'
 import { BookmarksPanel, type BookmarkRow } from './BookmarksPanel.tsx'
 import { NotesPanel, type NoteRow, type WordRow } from './NotesPanel.tsx'
 import { ExamMark } from './ExamMark.tsx'
+import { lastChapter } from '../challenge/lastChapter.ts'
 import styles from './Chrome.module.css'
 
 /**
@@ -408,11 +409,15 @@ export function Chrome({
           violet, because that colour is hers alone and marks every door she
           is behind.
 
-          The chapter rides in the link so the sitting starts on what is under
-          the reader's thumb, not on chapter one.
+          The chapter rides in the link, but only as the fallback: the
+          examination opens on the chapter the reader last chose there, and
+          drops to where their thumb is for a book they have not been examined
+          on. See `challenge/lastChapter.ts`.
         */}
         <Link
-          to={`/book/${bookId ?? ''}/challenge?chapter=${here.chapter}`}
+          to={`/book/${bookId ?? ''}/challenge?chapter=${
+            (bookId ? lastChapter(bookId) : undefined) ?? here.chapter
+          }`}
           className={`${styles.iconControl} ${styles.examControl}`}
           aria-label="Veda's Examination"
         >

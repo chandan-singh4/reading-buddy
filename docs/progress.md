@@ -94,6 +94,10 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     reader works through them. She is told what she has already asked.
   - "You are all caught up on this chapter" ends it, when she runs dry.
   - Questions are pitched at a graduate seminar.
+  - Questions come from the book's own paragraphs, never from the recap.
+  - One call sends the chapter once, not twice, and sends about 12,000
+    characters of it. A refill reads the next part.
+  - The screen opens on the chapter the reader last chose.
   - A picker at the top opens the chapter list. Any chapter, any time.
   - Each question has one right option and three named misconceptions. A
     question is dropped unless it cites a paragraph that exists in that chapter.

@@ -48,6 +48,7 @@ import {
   type Section,
 } from '../structure/index.ts'
 import { NoQuestions, writeBank } from '../challenge/generate.ts'
+import { rememberChapter } from '../challenge/lastChapter.ts'
 import { assemble } from '../challenge/serve.ts'
 import type { Question, StoredQuestionBank } from '../challenge/types.ts'
 import { Sitting } from './ChallengeSitting.tsx'
@@ -286,6 +287,17 @@ export default function Challenge() {
     [setParams],
   )
 
+  /*
+   * Remember the chapter, so the reader comes back to it.
+   *
+   * Written on every chapter shown rather than only on a pick, because
+   * arriving from the reader on chapter two and staying there is also a
+   * choice — and one the reader would be surprised to see forgotten.
+   */
+  useEffect(() => {
+    if (id && Number.isFinite(chapter)) rememberChapter(id, chapter)
+  }, [id, chapter])
+
   const question = phase === 'sitting' ? queue[at] : undefined
   const backHref = id ? `/book/${id}` : '/'
   const answeredHere = bank.current?.answered?.length ?? 0
@@ -319,7 +331,7 @@ export default function Challenge() {
         {phase === 'loading' && (
           <div className={styles.card}>
             <p className={styles.waiting}>
-              Veda is reading {chapterTitle || `chapter ${chapter}`} and writing your questions.
+              Veda is writing your first questions on {chapterTitle || `chapter ${chapter}`}.
               This takes a moment.
             </p>
           </div>
@@ -328,8 +340,8 @@ export default function Challenge() {
         {phase === 'refilling' && (
           <div className={styles.card}>
             <p className={styles.waiting}>
-              Veda is writing more questions on this chapter. She is looking for seams she has
-              not tested yet.
+              Veda is writing more questions. She is reading a part of the chapter she has not
+              used yet, and looking for seams she has not tested.
             </p>
           </div>
         )}

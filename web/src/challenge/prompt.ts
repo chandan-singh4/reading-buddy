@@ -78,6 +78,9 @@ Hard rules:
   direct stem is cleaner.
 - Output STRICT JSON only. No prose, no markdown, no code fences.`
 
+/** A blank line between passages, kept as a constant to survive editing. */
+const SPLIT = '\n\n'
+
 /** The shape asked for, sent with the material — never written into a prompt. */
 const SCHEMA = `{
   "questions": [
@@ -93,22 +96,37 @@ const SCHEMA = `{
         { "id": "d", "text": "string", "correct": false, "misconceptionTag": "short name", "revealNote": "..." }
       ],
       "difficulty": "1-3, your own ordering hint only. 1 is the gentlest way into this chapter, not an easy question.",
-      "sourceAnchor": "an anchor copied exactly from the passages below"
+      "sourceAnchor": "an anchor copied exactly from the passages you were given"
     }
   ]
 }`
 
 /**
- * Build the user message: the material, the concepts, and the shape.
+ * The chapter's prose, with the address each paragraph must be cited by.
  *
- * The passages carry their anchors inline so the model can cite one without
- * being asked to invent an id. That is what makes the grounding check in
- * `validate.ts` something a well-behaved model passes rather than a trap.
+ * This is the material — the real text of the book, never a summary of it. A
+ * question has to be grounded in what the author actually wrote, so this is
+ * what Veda is given, and it is what `validate.ts` checks her citations
+ * against.
+ *
+ * The anchors ride inline so the model can cite one without being asked to
+ * invent an id. That is what makes the grounding check something a well-behaved
+ * model passes rather than a trap.
+ */
+export function material(passages: readonly Passage[]): string {
+  return passages
+    .map((passage) => `[${passage.anchor}] ${passage.text}`)
+    .join(SPLIT)
+}
+
+/**
+ * Build the user message: the framing, the concepts, and the shape.
+ *
+ * The passages are NOT repeated here. They go once, as the material above.
+ * Sending them in both places is how this started, and it paid for the
+ * chapter twice on every call.
  */
 export function userMessage(request: QuestionRequest): string {
-  const passages = request.passages
-    .map((passage) => `[${passage.anchor}] ${passage.text}`)
-    .join('\n\n')
 
   const concepts =
     request.concepts.length > 0
@@ -121,12 +139,17 @@ export function userMessage(request: QuestionRequest): string {
     ``,
     `CONCEPTS THIS CHAPTER TURNS ON: ${concepts}`,
     ``,
+    // The passages are one slice of the chapter, not the whole of it. Saying so
+    // stops the model writing a question about "the rest of the chapter" that
+    // it has not been shown.
+    `The passages you were given are an extract of this chapter, not all of it.`,
+    `Write only what they support.`,
+    ``,
     `WRITE ${request.count} QUESTION${request.count === 1 ? '' : 'S'}, each on a different seam.`,
     ``,
     `RETURN EXACTLY THIS SHAPE:`,
     SCHEMA,
     ``,
-    `PASSAGES (cite one anchor per question, copied exactly):`,
-    passages,
+    `Cite one anchor per question, copied exactly from the passages you were given.`,
   ].join('\n')
 }
