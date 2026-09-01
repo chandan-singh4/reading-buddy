@@ -11,6 +11,8 @@
 
 import Dexie, { type Table } from 'dexie'
 
+import type { StoredMiss, StoredQuestionBank } from '../challenge/types.ts'
+
 import type {
   Anchor,
   BookId,
@@ -750,6 +752,8 @@ export type ReadingBuddyDB = Dexie & {
   concepts: Table<StoredConcept, string>
   alerts: Table<StoredAlert, string>
   sessions: Table<StoredSession, string>
+  questionBanks: Table<StoredQuestionBank, [BookId, string]>
+  misses: Table<StoredMiss, string>
 }
 
 /**
@@ -963,7 +967,30 @@ function defineSchema(db: Dexie): void {
   })
 
   /*
-   * No v18 for `StoredSession.chapterTitle` / `sectionTitle`. Dexie only
+   * v18 — Veda's Examination.
+   *
+   * `questionBanks` is per chapter and cascades with its book, like `summaries`
+   * and `digests`. It is a cache of written work: dropping it costs money to
+   * rebuild but loses nothing the reader owns.
+   *
+   * `misses` does not cascade, and that is deliberate. It is keyed by concept
+   * name, library-wide, exactly like `concepts` — the same idea met in two
+   * books carries one name, and a reader who confuses the anima with the shadow
+   * confuses them everywhere. Deleting the book they first met it in must not
+   * clear the record that they are still working on it.
+   *
+   * `flagged` is not an index. Dexie cannot index a boolean, and the unresolved
+   * set is a filter over a handful of rows.
+   *
+   * No migration and nothing to backfill. Nobody has sat an examination yet.
+   */
+  db.version(18).stores({
+    questionBanks: '[bookId+chapterId], bookId',
+    misses: 'concept, bookId, lastSeen',
+  })
+
+  /*
+   * No v19 for `StoredSession.chapterTitle` / `sectionTitle`. Dexie only
    * declares *indexes*, and neither field is one — nothing queries by chapter.
    * A version block with an unchanged store string would migrate every install
    * to say nothing. Old rows simply have the fields missing, which is a state

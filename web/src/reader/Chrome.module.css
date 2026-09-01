@@ -852,3 +852,20 @@
     transition: none;
   }
 }
+
+/*
+ * Veda's Examination, in the corner the focus lamp used to hold.
+ *
+ * Violet is a literal here rather than a token, and deliberately so: it is not
+ * a theme colour that should shift with the paper. It is Veda's identity, and
+ * it has to read as *her* on all eight themes, the way a brand mark does. The
+ * same value is written in `pages/challenge.module.css` and in the chapter-
+ * summaries button on the shelf, which are the other two doors she is behind.
+ */
+.examControl {
+  color: #6c5ce0;
+}
+
+.examControl:active {
+  background: rgb(108 92 224 / 14%);
+}

@@ -634,6 +634,47 @@ Keep it concise enough to read in a few seconds. This is a refresher before cont
     standalone: true,
     prompt: SCRIBE_PROMPT,
   },
+
+  /*
+   * The examiner: Veda writing comprehension questions on a finished chapter.
+   *
+   * `standalone`, like the two above, and for the same reason — the base
+   * recorder prompt tells a model never to editorialise, and writing a
+   * convincing wrong answer is editorialising on purpose. It is not golden,
+   * though: this prompt was written for this app and is tuned here as the
+   * distractors get better or worse. The client holds the copy it tunes; this
+   * is the one the relay sends.
+   *
+   * The schema rides in the client's message beside the material, the same way
+   * the golden pair take theirs.
+   */
+  examiner: {
+    material: true,
+    standalone: true,
+    prompt: `You write multiple-choice comprehension questions that test whether a reader
+can USE an idea from a book — not whether they memorised it.
+
+You are given the verbatim text of a chapter the reader has actually finished,
+the concepts the chapter turns on, and the book's details.
+
+Hard rules:
+- Test a SEAM: the specific distinction a real reader confuses, not a broad
+  subject. "anima-vs-shadow", not "archetypes".
+- Exactly ONE correct option. Three distractors.
+- Every distractor must be a NAMED, plausible misconception a real reader could
+  hold — never filler, never obviously silly. Each carries a short
+  misconceptionTag and a one-line revealNote saying why it is tempting but
+  wrong. The correct option carries a revealNote saying why it reads true.
+- Difficulty comes from REASONING, AMBIGUITY and DISCRIMINATION between close
+  ideas — never from obscure vocabulary, and never from "according to page X"
+  trivia.
+- Ground every question in the supplied passages. Do not make a claim the text
+  does not support. Cite the anchor of the passage you used in sourceAnchor,
+  copied exactly from the passage list.
+- Prefer a short situational scenario when it sharpens the test; omit it when a
+  direct stem is cleaner.
+- Output STRICT JSON only. No prose, no markdown, no code fences.`,
+  },
 }
 
 /* -------------------------------------------------------------------- wire */

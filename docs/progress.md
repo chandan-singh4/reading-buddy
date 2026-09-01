@@ -86,6 +86,24 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **Veda's Examination** (2026-09-01). Not a waypoint. Build green: 2,500 tests
+  across 150 files.
+  - The reader opens it from the top right of the reading screen. The icon is a
+    question on a page, in Veda's violet.
+  - Veda writes five questions for a chapter the first time it is asked for,
+    then keeps them.
+  - Each question has one right option and three named misconceptions. A
+    question is dropped unless it cites a paragraph that exists in that chapter.
+  - The reader picks an option, then says how sure they are, then submits.
+  - A confident wrong answer flags the concept. It comes back in a later
+    sitting as a new question, never in the same sitting.
+  - "Discuss with Veda" opens a chat seeded with the question and both notes.
+    Each bubble shows the model that wrote it.
+  - Focus Mode moved from the top bar to the foot row, beside the ⋮.
+  - Difficulty exists in the data. It is never shown.
+  - The golden prompts did not change. The examiner is a new module in
+    `api/tutor.ts`.
+
 - **Four design fixes on the front door** (2026-08-31). Not a waypoint. Build
   green: 2,487 tests across 149 files.
   - The Pace Horizon now plots what the details chart plots: percent of the book

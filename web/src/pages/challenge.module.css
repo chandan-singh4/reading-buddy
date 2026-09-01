@@ -1,0 +1,661 @@
+/*
+ * Veda's Examination.
+ *
+ * ## Where the colours come from
+ *
+ * The prototype's palette is written here as local names, and most of them
+ * resolve to theme tokens so the screen follows the reader's theme the way
+ * every other screen now does. Three do not, and each is an identity rather
+ * than a surface:
+ *
+ * - **Violet** is Veda's, everywhere in this app, and is spent on nothing else.
+ *   A violet that followed the theme would stop being Veda's on seven of the
+ *   eight themes, which is the whole of what it is for.
+ * - **Forest** is semantic success. A correct answer must read as correct in
+ *   every theme.
+ * - **Wrong-red** is the same argument in the other direction.
+ *
+ * The paper, the ink and the card do follow the theme. So a reader in Midnight
+ * gets a dark examination with Veda's violet and a forest tick, which is
+ * exactly right.
+ */
+
+.page {
+  --veda: #6c5ce0;
+  --veda-ink: #5a4bc9;
+  --lilac: #ece8fb;
+  --lilac-line: #d8d0f4;
+  --forest: #3f5a38;
+  --forest-tint: #e7eee3;
+  --forest-line: #cfe0c6;
+  --wrong: #b04a3a;
+  --wrong-tint: #f3e3df;
+
+  --paper: var(--color-bg);
+  --card: var(--color-surface);
+  --card-line: var(--color-border);
+  --ink: var(--color-text);
+  --ink-soft: var(--color-text-muted);
+  --bronze: var(--color-accent);
+
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-figure);
+  padding: var(--space-4) var(--space-3) var(--space-8);
+}
+
+.wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+/* --- The examiner --------------------------------------------------------- */
+
+.examiner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.leave {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: var(--text-lg);
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+/* Veda's orb, the same mark her button on the front door carries. */
+.orb {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex: none;
+  background: radial-gradient(circle at 32% 30%, #9d90f0, var(--veda) 70%);
+  box-shadow:
+    0 4px 12px -2px rgb(108 92 224 / 0.55),
+    0 0 0 4px rgb(108 92 224 / 0.1);
+}
+
+.examinerText {
+  min-width: 0;
+}
+
+.who {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--veda-ink);
+  font-size: var(--text-lg);
+}
+
+.ctx {
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  margin: 2px 0 0;
+}
+
+.ctx b {
+  color: var(--bronze);
+  font-weight: 500;
+}
+
+/*
+ * Position, and position only.
+ *
+ * The dots say how far through the set the reader is and carry no other
+ * meaning. They are deliberately not sized, coloured or ordered by difficulty:
+ * the reader is told difficulty is Veda's to choose, and a dot that leaked it
+ * would make that line a lie.
+ */
+.dots {
+  display: flex;
+  gap: 7px;
+  justify-content: center;
+  margin-bottom: var(--space-3);
+}
+
+.dot,
+.dotOn,
+.dotDone {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--card-line);
+  transition: transform 0.2s ease;
+}
+
+.dotOn {
+  background: var(--veda);
+  transform: scale(1.25);
+}
+
+.dotDone {
+  background: var(--bronze);
+}
+
+/* --- The card ------------------------------------------------------------- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: 18px;
+  padding: var(--space-4);
+  box-shadow:
+    0 10px 18px -8px rgb(60 45 20 / 0.28),
+    inset 0 2px 0 rgb(255 255 255 / 0.06);
+  min-width: 0;
+}
+
+.waiting {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.scenario {
+  font-size: var(--text-base);
+  line-height: 1.55;
+  background: color-mix(in srgb, var(--bronze) 6%, transparent);
+  border-left: 3px solid var(--bronze);
+  padding: 12px 14px;
+  border-radius: 0 8px 8px 0;
+  margin-bottom: var(--space-3);
+  font-style: italic;
+}
+
+.stem {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  font-weight: 500;
+  margin: 0 0 var(--space-3);
+}
+
+/* --- Options -------------------------------------------------------------- */
+
+.opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--card-line);
+  border-radius: 12px;
+  padding: 13px 15px;
+  margin-bottom: 10px;
+  font-family: var(--font-figure);
+  font-size: var(--text-base);
+  line-height: 1.4;
+  color: var(--ink);
+  transition: border-color 0.14s ease, background 0.14s ease;
+  position: relative;
+  min-width: 0;
+}
+
+.opt:disabled {
+  cursor: default;
+}
+
+.optKey {
+  font-weight: 600;
+  color: var(--ink-soft);
+  flex: none;
+}
+
+.optText {
+  min-width: 0;
+}
+
+.optPicked {
+  border-color: var(--veda);
+  background: var(--lilac);
+  color: #2e2a24;
+  box-shadow: 0 0 0 3px rgb(108 92 224 / 0.12);
+}
+
+.optCorrect {
+  border-color: var(--forest);
+  background: var(--forest-tint);
+  color: #23301f;
+}
+
+.optCorrect .optKey {
+  color: var(--forest);
+}
+
+.optWrong {
+  border-color: var(--wrong);
+  background: var(--wrong-tint);
+  color: #33201b;
+}
+
+.optWrong .optKey {
+  color: var(--wrong);
+}
+
+.mark,
+.markWrong {
+  position: absolute;
+  right: 13px;
+  top: 12px;
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+
+.mark {
+  color: var(--forest);
+}
+
+.markWrong {
+  color: var(--wrong);
+}
+
+/* --- Reveal slips --------------------------------------------------------- */
+
+/*
+ * The named misconception is the whole payoff of the generation rules. A slip
+ * that said only "incorrect" would waste the one thing that took a model an
+ * adversarial pass to write.
+ */
+.slip {
+  margin: 8px 2px 12px;
+  padding: 10px 13px 11px;
+  background: var(--lilac);
+  border: 1px solid var(--lilac-line);
+  border-radius: 10px;
+  box-shadow: 0 4px 10px -6px rgb(108 92 224 / 0.4);
+  animation: rise 0.28s ease;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slip,
+  .verdict,
+  .thread {
+    animation: none;
+  }
+}
+
+.slipTag {
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--veda-ink);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+/* Veda's own hand. The reveal note is her voice, not the app's. */
+.slipNote {
+  margin: 0;
+  font-family: 'Kalam', var(--font-figure), cursive;
+  font-size: 15.5px;
+  line-height: 1.45;
+  color: #463a8f;
+}
+
+/* --- Confidence ----------------------------------------------------------- */
+
+.conf {
+  margin: var(--space-4) 0 4px;
+}
+
+.confLabel {
+  font-family: 'Caveat', var(--font-figure), cursive;
+  font-size: 21px;
+  color: var(--veda-ink);
+  margin-bottom: 8px;
+}
+
+.confRow {
+  display: flex;
+  gap: 7px;
+}
+
+.confTap {
+  flex: 1;
+  border: 1.5px solid var(--card-line);
+  background: var(--color-surface-raised);
+  border-radius: 11px;
+  padding: 9px 4px;
+  cursor: pointer;
+  font-family: var(--font-figure);
+  color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.confOn {
+  border-color: var(--veda);
+  background: var(--lilac);
+  color: var(--veda-ink);
+}
+
+.confFace {
+  font-size: 19px;
+}
+
+.confWord {
+  font-size: 12.5px;
+}
+
+/* --- Submit and verdict --------------------------------------------------- */
+
+.submit {
+  width: 100%;
+  margin-top: var(--space-3);
+  border: 0;
+  cursor: pointer;
+  background: var(--veda);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  padding: 13px;
+  border-radius: 13px;
+  box-shadow: 0 6px 16px -5px rgb(108 92 224 / 0.55);
+}
+
+/* Disabled, not hidden. A button that appears when the last tap lands gives no
+   warning that a tap is still owed. */
+.submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.verdict {
+  margin-top: var(--space-3);
+  padding: 14px 16px;
+  border-radius: 13px;
+  text-align: center;
+  animation: rise 0.3s ease;
+}
+
+.verdictGood {
+  background: var(--forest-tint);
+  border: 1px solid var(--forest-line);
+}
+
+.verdictGood .verdictHead {
+  color: var(--forest);
+}
+
+.verdictMiss {
+  background: color-mix(in srgb, var(--bronze) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--bronze) 32%, transparent);
+}
+
+.verdictMiss .verdictHead {
+  color: var(--bronze);
+}
+
+.verdictFlag {
+  background: var(--lilac);
+  border: 1px solid var(--lilac-line);
+}
+
+.verdictFlag .verdictHead {
+  color: var(--veda-ink);
+}
+
+.verdictHead {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  margin-bottom: 3px;
+}
+
+.verdictNote {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.verdictFlag .verdictNote b {
+  color: var(--veda-ink);
+}
+
+/* --- Actions -------------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: var(--space-3);
+}
+
+.discuss {
+  flex: 1 1 150px;
+  border: 1.5px solid var(--veda);
+  background: transparent;
+  color: var(--veda-ink);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  padding: 11px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.discuss:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.discussOrb {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #9d90f0, var(--veda) 70%);
+}
+
+.next {
+  flex: 1 1 150px;
+  border: 0;
+  background: var(--forest);
+  color: #fff;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  padding: 11px;
+  border-radius: 12px;
+  min-width: 0;
+}
+
+/* --- The thread ----------------------------------------------------------- */
+
+.thread {
+  margin-top: var(--space-3);
+  border: 1px solid var(--lilac-line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--veda) 5%, var(--card));
+  overflow: hidden;
+  animation: rise 0.3s ease;
+}
+
+.threadHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--lilac-line);
+  background: rgb(108 92 224 / 0.06);
+}
+
+.threadHead b {
+  font-family: var(--font-display);
+  color: var(--veda-ink);
+  font-size: var(--text-sm);
+}
+
+.msgs {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.opener {
+  align-self: flex-start;
+  border: 1px dashed var(--lilac-line);
+  background: transparent;
+  color: var(--veda-ink);
+  border-radius: 14px;
+  padding: 9px 13px;
+  font-family: var(--font-figure);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.bubbleVeda,
+.bubbleMe {
+  max-width: 82%;
+  padding: 10px 13px;
+  border-radius: 14px;
+  font-size: var(--text-sm);
+  line-height: 1.48;
+  white-space: pre-wrap;
+}
+
+.bubbleVeda {
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid var(--lilac-line);
+  border-bottom-left-radius: 5px;
+}
+
+.bubbleMe {
+  align-self: flex-end;
+  background: var(--forest-tint);
+  color: #23301f;
+  border: 1px solid var(--forest-line);
+  border-bottom-right-radius: 5px;
+}
+
+/*
+ * Whose words these are.
+ *
+ * Read off the reply, never assumed from the request — the relay walks a
+ * fallback chain, so the model that answered may be the fourth one asked. A
+ * reader judging an explanation is entitled to know who wrote it, which is the
+ * rule the reading lamp already follows.
+ */
+.model {
+  display: block;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--veda) 60%, var(--ink-soft));
+  margin-bottom: 3px;
+  letter-spacing: 0.02em;
+}
+
+.compose {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--lilac-line);
+}
+
+.composeInput {
+  flex: 1;
+  min-width: 0;
+  border: 1.5px solid var(--lilac-line);
+  border-radius: 20px;
+  padding: 9px 14px;
+  font-family: var(--font-figure);
+  font-size: var(--text-sm);
+  background: var(--card);
+  color: var(--ink);
+  outline: none;
+}
+
+.composeInput:focus {
+  border-color: var(--veda);
+}
+
+.composeSend {
+  border: 0;
+  background: var(--veda);
+  color: #fff;
+  border-radius: 20px;
+  padding: 0 16px;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  flex: none;
+}
+
+/* --- Done ----------------------------------------------------------------- */
+
+.done {
+  text-align: center;
+  padding: var(--space-4) var(--space-3);
+}
+
+.doneHead {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--forest);
+  margin-bottom: 6px;
+}
+
+.doneNote {
+  color: var(--ink-soft);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  margin: 0 0 var(--space-4);
+}
+
+.doneBack {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 12px;
+  background: var(--forest);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.footnote {
+  margin-top: var(--space-4);
+  text-align: center;
+  font-family: 'Caveat', var(--font-figure), cursive;
+  font-size: 18px;
+  color: var(--ink-soft);
+}

@@ -12,6 +12,7 @@ import StillReading from './stats/StillReading.tsx'
 import { useReadingClock } from './stats/useReadingClock.ts'
 import BookInfo from './pages/BookInfo.tsx'
 import ChapterView from './pages/ChapterView.tsx'
+import Challenge from './pages/Challenge.tsx'
 import Home from './pages/Home.tsx'
 import LastTime from './pages/LastTime.tsx'
 import Library from './pages/Library.tsx'
@@ -70,6 +71,7 @@ export function AppRoutes() {
          * way back instead.
          */}
         <Route path="book/:bookId/chapters" element={<ChapterView />} />
+        <Route path="book/:bookId/challenge" element={<Challenge />} />
         <Route path="*" element={<Home />} />
       </Routes>
     </>

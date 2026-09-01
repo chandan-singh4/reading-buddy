@@ -2813,3 +2813,75 @@ above the wood.
 
 The cover now takes `align-self: flex-end`. It drops to the row's baseline, so it
 stands on the shelf whatever the column beside it grows to.
+
+## Veda's Examination tests use, not recall
+
+**2026-09-01.** The examination asks whether the reader can *use* an idea. It
+does not ask them to remember a word.
+
+Every question is a multiple-choice card with one correct option and three
+wrong ones. Each wrong option is a named misconception a real reader could
+hold. Filler options teach nothing, so the writer must name the misconception
+for each one. After the answer, the app shows the note for the option the
+reader picked and the note for the correct one. A reader who chose B needs to
+know what pulled them to B.
+
+## The confidence tap comes between the answer and the grade
+
+**2026-09-01.** The reader picks an option. Then the app asks how sure they
+are. Only then can they submit.
+
+The order is the design. Ask before the choice, and the confidence changes the
+choice. Ask after the grade, and the grade changes the confidence. Between the
+two is the only honest moment.
+
+A wrong answer means two different things:
+
+- **Wrong and unsure** is ordinary learning. Nothing is flagged.
+- **Wrong and sure** is a belief that will not correct itself. The app flags
+  the concept and brings it back in a later sitting as a new question.
+
+The app never asks again in the same sitting. A reader who has just learned
+they were confidently wrong cannot reason about that idea well. A second
+question would test their composure, not their grasp.
+
+## A question must cite a paragraph that exists
+
+**2026-09-01.** `challenge/validate.ts` rejects a question unless its
+`sourceAnchor` is an anchor from the chapter the reader has read. The app never
+repairs a bad question. It drops it.
+
+The build prompt asked for passage ids of the form `ch2-p14`. This app has no
+such ids. Every paragraph already carries an `Anchor`, and the anchor is
+better: it resolves against the real manifest, so a question can be traced to
+the exact paragraph on the reader's own screen.
+
+## The examination does not touch the golden prompts
+
+**2026-09-01.** The build prompt asked to extend the Librarian to emit a
+concept map. The Librarian is golden and cannot change by one word.
+
+It does not need to. The Librarian already stores concepts with the chapter
+summary. The examiner reads those names and the chapter's own paragraphs. So a
+chapter summarised months ago needs no migration.
+
+The examiner is a new module in `api/tutor.ts`. It is not golden. It was
+written for this app and it is tuned here.
+
+## A bank of questions is written once, when the reader asks
+
+**2026-09-01.** The app writes a chapter's questions the first time the reader
+opens that chapter for examination. It then keeps them.
+
+Writing them when a chapter is finished would cost real money for the many
+chapters a reader completes and never tests.
+
+## Focus Mode moved to the foot, and the corner became a door
+
+**2026-09-01.** The top right of the reader used to hold the focus lamp. It now
+holds Veda's Examination. The lamp moved down beside the ⋮.
+
+Focus Mode changes how the book is *shown*. The ⋮ row is where the other such
+controls live, and a control whose job is to remove the bar does not belong in
+the bar. The examination is a place the reader goes, and "did any of that
+stay?" is asked at the moment they stop reading. That is the corner for it.
