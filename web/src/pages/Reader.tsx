@@ -75,7 +75,6 @@ import {
   pathOf,
   placeOf,
   previousSection,
-  readFocusMode,
   applyStoredTheme,
   DIM_FROM,
   dimAfterDrag,
@@ -90,7 +89,6 @@ import {
   useBackDismiss,
   useFigureImages,
   pictureOf,
-  writeFocusMode,
   DefinePanel,
   StudyLamp,
   recoverMarkdown,
@@ -431,10 +429,9 @@ function anchorOnScreen(anchors: readonly Anchor[]): Anchor | undefined {
 /**
  * The reading page: one section on screen, with Previous and Next.
  *
- * Deliberately bare. Focus Mode is a toggle that hides chrome without removing
- * it (see `backlog.md`), so the baseline is built as the quiet version and
- * WP-13's overlay arrives as a layer on top — rather than the reverse, which
- * would mean retrofitting a way back to every control once hidden.
+ * Deliberately bare. The book is on screen alone, and WP-13's overlay arrives
+ * as a layer on top — rather than the reverse, which would mean retrofitting a
+ * way back to every control once hidden.
  *
  * Never loads a book. It loads a manifest (one line per chapter), one chapter
  * index, and one section, which is the entire retrieval path the storage layer
@@ -550,7 +547,6 @@ export default function Reader() {
 
   const figureImages = useFigureImages(shownParagraphs, loadAssets)
 
-  const [focusMode, setFocusMode] = useState(readFocusMode)
 
   /** Theme, font, text size, line spacing, margins — the Aa tab's settings. */
   const [settings, setSettings] = useState<ReaderSettings>(readReaderSettings)
@@ -1596,37 +1592,6 @@ export default function Reader() {
   }, [])
 
 
-  const toggleFocus = useCallback(() => {
-    setFocusMode((on) => !on)
-  }, [])
-
-  // Saved here rather than inside the updater above. React is free to run a
-  // state updater more than once, and a *write* in there ran twice flips the
-  // stored setting back — it looked like the toggle simply didn't stick.
-  // Writing the settled value is idempotent, so repeating it costs nothing.
-  useEffect(() => {
-    writeFocusMode(focusMode)
-  }, [focusMode])
-
-  /*
-   * Focus Mode, told to the whole document.
-   *
-   * On `<html>` rather than on this page's own root, because what it changes —
-   * the warm wash over the canvas — is a property of the surface the app is
-   * drawn on, not of one component. `theme.css` holds what it does.
-   *
-   * Cleared when the reading page unmounts. The setting itself persists and
-   * comes back with the next book; the *appearance* does not follow the reader
-   * out to the library, where there would be no lamp to turn it off with.
-   */
-  useEffect(() => {
-    const root = document.documentElement
-    root.dataset.focus = focusMode ? 'on' : 'off'
-    return () => {
-      delete root.dataset.focus
-    }
-  }, [focusMode])
-
   /**
    * The same trick for the browse page.
    *
@@ -1652,8 +1617,8 @@ export default function Reader() {
    * Theme and reading font, applied to `<html>` rather than to the reader
    * screen alone — the same scope the existing dark-mode media query already
    * uses, so an explicit choice here behaves exactly like that one. Left in
-   * place when the reader navigates away, like `focusMode`: it is a setting
-   * about the app, not something that should revert on leaving the page.
+   * place when the reader navigates away: it is a setting about the app, not
+   * something that should revert on leaving the page.
    * `main.tsx` applies the same persisted value at boot, before this
    * component ever mounts — this effect is what keeps it live while the Aa
    * tab is open and being changed.
@@ -4220,11 +4185,9 @@ export default function Reader() {
             pages={pages}
             outline={outline}
             shown={chromeShown}
-            focusMode={focusMode}
             sheetOpen={sheetOpen}
             sheetTab={sheetTab}
             settings={settings}
-            onToggleFocus={toggleFocus}
             onOpenSheet={openSheet}
             onCloseSheet={closeSheet}
             onJumpTo={(chapter, section) => goTo({ chapter, section })}

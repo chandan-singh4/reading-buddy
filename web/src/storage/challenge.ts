@@ -13,7 +13,12 @@
  * summary stores are not: the cloud backend has no table for either.
  */
 
-import type { StoredMiss, StoredQuestionBank, Confidence } from '../challenge/types.ts'
+import type {
+  Confidence,
+  Question,
+  StoredMiss,
+  StoredQuestionBank,
+} from '../challenge/types.ts'
 import { db as defaultDb, type ReadingBuddyDB } from './db.ts'
 import type { BookId } from '../structure/index.ts'
 
@@ -26,6 +31,54 @@ export function createBankStore(database: ReadingBuddyDB = defaultDb) {
 
     async save(row: StoredQuestionBank): Promise<void> {
       await database.questionBanks.put(row)
+    },
+
+    /**
+     * Append a fresh batch to a chapter's bank.
+     *
+     * Read-modify-write rather than a blind put, because the reader may have
+     * answered a question while the batch was being written and that answer
+     * must not be lost. The whole row is small — a few questions — so the cost
+     * of reading it back is nothing next to the call that produced the batch.
+     */
+    async append(
+      bookId: BookId,
+      chapterId: string,
+      questions: readonly Question[],
+      model?: string,
+    ): Promise<StoredQuestionBank | undefined> {
+      const before = await database.questionBanks.get([bookId, chapterId])
+      if (!before) return undefined
+      const next: StoredQuestionBank = {
+        ...before,
+        questions: [...before.questions, ...questions],
+        model: model ?? before.model,
+        exhausted: false,
+      }
+      await database.questionBanks.put(next)
+      return next
+    },
+
+    /** Retire one question. It is never served again in this chapter. */
+    async markAnswered(
+      bookId: BookId,
+      chapterId: string,
+      questionId: string,
+    ): Promise<void> {
+      const before = await database.questionBanks.get([bookId, chapterId])
+      if (!before) return
+      if (before.answered?.includes(questionId)) return
+      await database.questionBanks.put({
+        ...before,
+        answered: [...(before.answered ?? []), questionId],
+      })
+    },
+
+    /** Remember that Veda has nothing new left for this chapter. */
+    async markExhausted(bookId: BookId, chapterId: string): Promise<void> {
+      const before = await database.questionBanks.get([bookId, chapterId])
+      if (!before) return
+      await database.questionBanks.put({ ...before, exhausted: true })
     },
 
     async forBook(bookId: BookId): Promise<StoredQuestionBank[]> {

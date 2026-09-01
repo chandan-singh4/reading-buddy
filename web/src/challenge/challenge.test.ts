@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BookId } from '../structure/index.ts'
-import { assemble, order, RESURFACE_LIMIT } from './serve.ts'
+import { assemble, order } from './serve.ts'
 import { faultIn, screen } from './validate.ts'
 import { heldFirmly } from './types.ts'
 import type { Question, StoredMiss } from './types.ts'
@@ -108,7 +108,7 @@ describe('assembling a sitting', () => {
     flagged: true,
   })
 
-  it('serves easiest first, and never shows the difficulty', () => {
+  it('serves easiest first inside a seam, and never shows the difficulty', () => {
     const list = order([
       question({ id: 'hard', difficulty: 3 }),
       question({ id: 'easy', difficulty: 1 }),
@@ -117,7 +117,7 @@ describe('assembling a sitting', () => {
     expect(list.map((q) => q.id)).toEqual(['easy', 'mid', 'hard'])
   })
 
-  it('spends a sitting on different seams, not three cards on one', () => {
+  it('never puts two questions on one seam back to back', () => {
     const { questions } = assemble(
       [
         question({ id: 'a1', concept: 'anima-vs-shadow' }),
@@ -126,15 +126,19 @@ describe('assembling a sitting', () => {
       ],
       [],
     )
-    expect(questions.map((q) => q.concept)).toEqual(['anima-vs-shadow', 'projection-vs-judgment'])
+    // All three are served. None is dropped for sharing a seam — the bank is
+    // paid for, and the reader can keep going as long as they like.
+    expect(questions.map((q) => q.id)).toEqual(['a1', 'b1', 'a2'])
   })
 
-  it('brings a flagged concept back as a fresh item, never the same card', () => {
-    const bank = [question({ id: 'fresh', concept: 'fixed-symbol' })]
-    const { questions, resurfaced } = assemble(bank, [miss('fixed-symbol')], new Set(['old-card']))
-    expect(questions.map((q) => q.id)).toEqual(['fresh'])
-    // It counts as this chapter's own coverage, so it is not double-counted.
-    expect(resurfaced.has('fixed-symbol')).toBe(false)
+  it('puts a flagged seam at the front rather than at the back of the queue', () => {
+    const bank = [
+      question({ id: 'ordinary', concept: 'ordinary-seam' }),
+      question({ id: 'fresh', concept: 'fixed-symbol' }),
+    ]
+    const { questions, resurfaced } = assemble(bank, [miss('fixed-symbol')])
+    expect(questions.map((q) => q.id)).toEqual(['fresh', 'ordinary'])
+    expect(resurfaced.has('fixed-symbol')).toBe(true)
   })
 
   it('leaves a question the reader has already answered out of the sitting', () => {
@@ -142,16 +146,50 @@ describe('assembling a sitting', () => {
     expect(questions).toEqual([])
   })
 
-  it('does not turn a sitting into a tribunal of every past mistake', () => {
+  it('never serves the same card twice, however often a concept is flagged', () => {
+    const bank = [question({ id: 'only', concept: 'fixed-symbol' })]
+    const { questions } = assemble(bank, [miss('fixed-symbol')], new Set(['only']))
+    expect(questions).toEqual([])
+  })
+})
+
+describe('a chapter that never runs out on a fixed count', () => {
+  it('keeps every question, however many share a seam', () => {
+    // The old bank served one card per seam and dropped the rest. A growing
+    // bank must not throw away work already paid for.
     const bank = [
-      question({ id: 'own', concept: 'own-seam' }),
-      question({ id: 'm1', concept: 'm1' }),
-      question({ id: 'm2', concept: 'm2' }),
-      question({ id: 'm3', concept: 'm3' }),
+      question({ id: 'a1', concept: 'seam-a' }),
+      question({ id: 'a2', concept: 'seam-a' }),
+      question({ id: 'a3', concept: 'seam-a' }),
+      question({ id: 'b1', concept: 'seam-b' }),
     ]
-    const { resurfaced } = assemble(bank, [miss('m1'), miss('m2'), miss('m3')], new Set())
-    // Every seam is already covered by the chapter's own pass, so nothing is
-    // pulled back — and the cap holds regardless.
-    expect(resurfaced.size).toBeLessThanOrEqual(RESURFACE_LIMIT)
+    const { questions } = assemble(bank, [])
+    expect(questions).toHaveLength(4)
+    expect(new Set(questions.map((q) => q.id)).size).toBe(4)
+  })
+
+  it('retires an answered question for good', () => {
+    const bank = [question({ id: 'a1' }), question({ id: 'a2', concept: 'seam-b' })]
+    const first = assemble(bank, [], new Set())
+    expect(first.questions).toHaveLength(2)
+
+    const after = assemble(bank, [], new Set(['a1', 'a2']))
+    expect(after.questions).toEqual([])
+  })
+
+  it('spreads a long run of one seam out across the others', () => {
+    const { questions } = assemble(
+      [
+        question({ id: 'a1', concept: 'seam-a' }),
+        question({ id: 'a2', concept: 'seam-a' }),
+        question({ id: 'a3', concept: 'seam-a' }),
+        question({ id: 'b1', concept: 'seam-b' }),
+        question({ id: 'c1', concept: 'seam-c' }),
+      ],
+      [],
+    )
+    // No two neighbours share a seam until seam-a is the only one left.
+    const seams = questions.map((q) => q.concept)
+    expect(seams.slice(0, 3)).toEqual(['seam-a', 'seam-b', 'seam-c'])
   })
 })

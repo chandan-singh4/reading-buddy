@@ -34,25 +34,43 @@ export interface QuestionRequest {
   passages: readonly Passage[]
   /** How many items to ask for in this call. */
   count: number
+  /**
+   * The stems already written for this chapter, so a refill does not repeat
+   * one. Sent as text rather than as ids: a model cannot avoid a question it
+   * has never seen, and the id alone tells it nothing.
+   */
+  avoidStems?: readonly string[]
+  /** The seams already covered, so a refill goes looking for new ones. */
+  avoidConcepts?: readonly string[]
 }
 
-export const SYSTEM_PROMPT = `You write multiple-choice comprehension questions that test whether a reader
-can USE an idea from a book — not whether they memorised it.
+export const SYSTEM_PROMPT = `You write GRADUATE-SEMINAR multiple-choice questions on a book. You test
+whether a reader can USE an idea — never whether they memorised a word.
+
+Pitch every question at a graduate seminar. Assume the reader has read the
+chapter closely and wants to be pushed. An undergraduate recall question is a
+failure, however well written.
 
 You are given the verbatim text of a chapter the reader has actually finished,
 the concepts the chapter turns on, and the book's details.
 
 Hard rules:
-- Test a SEAM: the specific distinction a real reader confuses, not a broad
-  subject. "anima-vs-shadow", not "archetypes".
+- Test a SEAM: the specific distinction a careful reader still confuses, not a
+  broad subject. "anima-vs-shadow", not "archetypes".
 - Exactly ONE correct option. Three distractors.
-- Every distractor must be a NAMED, plausible misconception a real reader could
-  hold — never filler, never obviously silly. Each carries a short
-  misconceptionTag and a one-line revealNote saying why it is tempting but
-  wrong. The correct option carries a revealNote saying why it reads true.
+- Every distractor must be a NAMED, plausible misconception a well-read person
+  could hold after finishing the chapter — never filler, never obviously silly.
+  If a distractor can be eliminated without understanding the idea, rewrite it.
+  Each carries a short misconceptionTag and a one-line revealNote saying why it
+  is tempting but wrong. The correct option carries a revealNote saying why it
+  reads true.
 - Difficulty comes from REASONING, AMBIGUITY and DISCRIMINATION between close
   ideas — never from obscure vocabulary, and never from "according to page X"
   trivia.
+- Reach for these forms: apply the idea to a case the book never mentions; ask
+  which of two neighbouring ideas a situation actually turns on; ask what the
+  argument would predict; ask which objection the chapter has already answered
+  and which it has not; ask where the author's claim stops holding.
 - Ground every question in the supplied passages. Do not make a claim the text
   does not support. Cite the anchor of the passage you used in sourceAnchor,
   copied exactly from the passage list.
@@ -74,7 +92,7 @@ const SCHEMA = `{
         { "id": "c", "text": "string", "correct": false, "misconceptionTag": "short name", "revealNote": "..." },
         { "id": "d", "text": "string", "correct": false, "misconceptionTag": "short name", "revealNote": "..." }
       ],
-      "difficulty": 1,
+      "difficulty": "1-3, your own ordering hint only. 1 is the gentlest way into this chapter, not an easy question.",
       "sourceAnchor": "an anchor copied exactly from the passages below"
     }
   ]

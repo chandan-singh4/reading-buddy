@@ -12,19 +12,21 @@ Judge Veda's Examination on the phone.
 
 1. Open a book you have read some of. Tap the screen to raise the top bar.
 2. Tap the question-mark page icon in the top right corner. It is violet.
-3. Wait while Veda writes the questions. She does this once for each chapter.
+3. Wait while Veda writes the first questions.
 4. Answer one question. Pick an option, then say how sure you are.
 5. Read the reveal slips and the verdict.
 6. Tap "Discuss with Veda". Check the model name shows on her bubble.
-7. Go back to the book. Check the lamp icon at the foot still turns Focus Mode
-   on and off.
+7. Tap "Next question" many times. Check Veda keeps writing new ones.
+8. Tap the chapter bar at the top. Pick another chapter. Check it changes.
 
 ## What to watch for
 
 - Questions that ask you to remember a word, not to use an idea.
 - A wrong option that no real reader could believe.
+- A question that is too easy. They must be graduate level.
 - A question about a chapter you have not read.
-- The same question twice.
+- The same question twice, or two questions that say the same thing.
+- A refill that never ends when the chapter is clearly spent.
 - A model name that is missing or wrong on a Veda bubble.
 - Difficulty shown anywhere. It must never appear.
 
@@ -38,5 +40,6 @@ Judge Veda's Examination on the phone.
 - `web/src/pages/ChallengeSitting.tsx` — one question, start to verdict.
 - `web/src/pages/challenge.module.css` — its colours.
 - `web/src/storage/challenge.ts` — the bank and the miss ledger.
-- `web/src/reader/Chrome.tsx` — the top bar and the foot row.
+- `web/src/pages/ChallengeChapters.tsx` — the chapter picker.
+- `web/src/reader/Chrome.tsx` — the top bar.
 - `api/tutor.ts` — the `examiner` module.

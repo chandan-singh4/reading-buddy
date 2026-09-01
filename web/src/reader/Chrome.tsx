@@ -16,8 +16,6 @@
  * - The book is on screen alone. Nothing overlays it until it is asked for.
  * - A tap in the middle raises **one** bar, at the top: back, search, Aa, and
  *   Veda's Examination. Four controls, all reachable, none of them furniture.
- *   The focus lamp used to hold that last corner and now sits at the foot,
- *   beside the ⋮, with the other controls that change how the book is shown.
  * - Contents, Bookmarks and Notes moved *out* of the bottom of the screen. They
  *   are a page of their own now, opened by the ⋮ beside the slider and shared
  *   by a tab row; Aa is still a sheet, straight at its own panel.
@@ -39,7 +37,6 @@ import type { HighlighterChoice } from './highlightStyle.ts'
 import { TextSettings } from './TextSettings.tsx'
 import { BookmarksPanel, type BookmarkRow } from './BookmarksPanel.tsx'
 import { NotesPanel, type NoteRow, type WordRow } from './NotesPanel.tsx'
-import { FocusLamp } from './FocusLamp.tsx'
 import { ExamMark } from './ExamMark.tsx'
 import styles from './Chrome.module.css'
 
@@ -91,12 +88,10 @@ export interface ChromeProps {
   pages: Pages | null
   /** Whether the overlay is currently on screen. */
   shown: boolean
-  focusMode: boolean
   sheetOpen: boolean
   sheetTab: SheetTab
   /** The reading-comfort settings: theme, font, text size, spacing, margins. */
   settings: ReaderSettings
-  onToggleFocus: () => void
   /** Open one panel by name — the ⋮, the Aa button, and each tab all use this. */
   onOpenSheet: (tab: SheetTab) => void
   onCloseSheet: () => void
@@ -184,7 +179,6 @@ export function Chrome({
   here,
   pages,
   shown,
-  focusMode,
   sheetOpen,
   sheetTab,
   settings,
@@ -192,7 +186,6 @@ export function Chrome({
   onHighlighterChange,
   voices,
   onTryVoice,
-  onToggleFocus,
   onOpenSheet,
   onCloseSheet,
   outline,
@@ -409,16 +402,11 @@ export function Chrome({
         </button>
 
         {/*
-          The corner is Veda's Examination. Focus Mode used to hold it and has
-          moved to the foot, beside the ⋮ — see the footer.
-
-          The trade is deliberate. Focus Mode is a *display* toggle: it belongs
-          with the other chrome controls, and a reader who wants it wants the
-          bar gone, so the bar is not where it should live. The examination is
-          a place you go, one tap from wherever you stopped reading, and the
-          question it answers — "did any of that stay?" — is asked at exactly
-          this moment. It carries Veda's violet, because that colour is hers
-          alone and marks every door she is behind.
+          The corner is Veda's Examination. It is a place you go, one tap from
+          wherever you stopped reading, and the question it answers — "did any
+          of that stay?" — is asked at exactly this moment. It carries Veda's
+          violet, because that colour is hers alone and marks every door she
+          is behind.
 
           The chapter rides in the link so the sitting starts on what is under
           the reader's thumb, not on chapter one.
@@ -779,28 +767,6 @@ export function Chrome({
             onClick={() => onOpenSheet('contents')}
           >
             <span aria-hidden="true">⋮</span>
-          </button>
-
-          {/*
-            Focus Mode, moved down from the corner rather than deleted.
-
-            It sits beside the ⋮ for the same reason the ⋮ sits here: this row
-            is the one a reader already reaches into to *change how the book is
-            presented* rather than to read it. And a control whose whole job is
-            to take the chrome away is better off at the foot than in the bar it
-            removes.
-
-            The lamp is still the control: unlit line art when Focus Mode is
-            off, lit with a halo around it when it is on. See `FocusLamp.tsx`.
-          */}
-          <button
-            type="button"
-            className={`${styles.iconControl} ${styles.focusControl}`}
-            aria-pressed={focusMode}
-            aria-label="Focus mode"
-            onClick={onToggleFocus}
-          >
-            <FocusLamp on={focusMode} />
           </button>
 
           {/*

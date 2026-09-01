@@ -131,7 +131,8 @@ function openReader(id: string = BOOK_ID) {
 }
 
 beforeEach(async () => {
-  // Focus Mode is remembered between sessions, so it leaks between tests too.
+  // Reading settings are remembered between sessions, so they leak between
+  // tests too.
   window.localStorage.clear()
   await repository.deleteBook(BOOK_ID)
   await repository.saveParsedBook(bookOf())
@@ -164,11 +165,6 @@ function swipeBrowsePage(way: 'left' | 'right') {
 
   fireEvent.touchStart(page, { touches: [{ clientX: 200, clientY: 300 }] })
   fireEvent.touchEnd(page, { changedTouches: [{ clientX: to, clientY: 300 }] })
-}
-
-/** Focus Mode has its own button on the top bar, where the ⋮ used to be. */
-function turnFocusOn() {
-  fireEvent.click(screen.getByRole('button', { name: 'Focus mode' }))
 }
 
 /**
@@ -383,8 +379,7 @@ describe('the overlay', () => {
     expect(chromeShown(container)).toBe(true)
     expect(screen.getByRole('button', { name: MENU_BUTTON })).toBeTruthy()
 
-    // Hidden, never removed — that distinction is the whole of the Focus Mode
-    // decision, and a tap has to work both ways.
+    // Hidden, never removed. A tap has to work both ways.
     fireEvent.click(text)
     expect(chromeShown(container)).toBe(false)
   })
@@ -945,53 +940,6 @@ describe('the slider', () => {
 
     fireEvent.change(slider, { target: { value: '3' } })
     expect(await screen.findByText('The second chapter begins.')).toBeTruthy()
-  })
-})
-
-describe('Focus Mode', () => {
-  it('starts with the overlay hidden once turned on', async () => {
-    const { unmount } = openReader()
-    await screen.findByText('The opening words.')
-
-    turnFocusOn()
-    unmount()
-
-    // Reopening is the real test: the setting outlives the screen.
-    const reopened = openReader()
-    await screen.findByText('The opening words.')
-    expect(chromeShown(reopened.container)).toBe(false)
-  })
-
-  it('still lets a tap bring everything back', async () => {
-    openReader()
-    await screen.findByText('The opening words.')
-    turnFocusOn()
-    cleanup()
-
-    const { container } = openReader()
-    const text = await screen.findByText('The opening words.')
-    fireEvent.click(text)
-
-    expect(chromeShown(container)).toBe(true)
-    // And the way out of Focus Mode is still there to be found — the bar's own
-    // button, saying it is on.
-    const focus = screen.getByRole('button', { name: 'Focus mode' })
-    expect(focus.getAttribute('aria-pressed')).toBe('true')
-  })
-
-  it('leaves the book turnable — reading never loses its controls', async () => {
-    openReader()
-    await screen.findByText('The opening words.')
-    turnFocusOn()
-    cleanup()
-
-    openReader()
-    await screen.findByText('The opening words.')
-
-    // Focus Mode quiets the interface around the book; it does not stop the
-    // book being read.
-    await turnForward()
-    expect(await screen.findByText('Later in the first chapter.')).toBeTruthy()
   })
 })
 

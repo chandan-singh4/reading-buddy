@@ -40,8 +40,6 @@ export interface SittingProps {
   bookTitle: string
   chapter: number
   chapterTitle: string
-  /** Whether this is the last card, which changes only the button's word. */
-  last: boolean
   onNext: () => void
 }
 
@@ -51,7 +49,6 @@ export function Sitting({
   bookTitle,
   chapter,
   chapterTitle,
-  last,
   onNext,
 }: SittingProps) {
   const [picked, setPicked] = useState<number | undefined>()
@@ -182,8 +179,11 @@ export function Sitting({
               <span className={styles.discussOrb} aria-hidden="true" />
               Discuss with Veda
             </button>
+            {/* Always "Next question". There is no last card — the bank
+                grows on demand, and a button that said "Finish" would be
+                promising an end the examination does not have. */}
             <button type="button" className={styles.next} onClick={onNext}>
-              {last ? 'Finish' : 'Next question'}
+              Next question
             </button>
           </div>
 

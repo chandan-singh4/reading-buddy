@@ -1,11 +1,10 @@
 /**
  * Reading-comfort settings: theme, font, text size, line spacing, margins.
  *
- * One object, one `localStorage` key — unlike `focusMode.ts`'s single boolean,
- * these five choices are made together in the same sheet, so they are read and
- * written together too. Same defensive pattern as `focusMode.ts`: storage can
- * throw (private browsing, locked-down settings), and a preference is never
- * worth failing to open a book over.
+ * One object, one `localStorage` key — these five choices are made together in
+ * the same sheet, so they are read and written together too. Storage can throw
+ * (private browsing, locked-down settings), and a preference is never worth
+ * failing to open a book over, so every read and write is guarded.
  *
  * Every default below matches what the reading page already looked like before
  * this existed — 'auto' theme, the existing serif stack, the existing size and
@@ -259,7 +258,7 @@ export function writeReaderSettings(settings: ReaderSettings): void {
   try {
     globalThis.localStorage?.setItem(KEY, JSON.stringify(settings))
   } catch {
-    /* Same as focusMode.ts: the setting simply won't persist. */
+    /* The setting simply won't persist. */
   }
 }
 

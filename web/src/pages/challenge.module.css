@@ -96,49 +96,174 @@
   font-size: var(--text-lg);
 }
 
-.ctx {
+/* Which book. The chapter is chosen below, in the picker, so it is not said
+   twice. */
+.of {
   font-size: var(--text-sm);
-  color: var(--ink-soft);
-  margin: 2px 0 0;
+  color: var(--bronze);
+  margin-top: 2px;
 }
 
-.ctx b {
-  color: var(--bronze);
-  font-weight: 500;
+/* --- Choosing a chapter --------------------------------------------------- */
+
+/*
+ * The picker's button: the number set small, then the chapter's own name.
+ *
+ * Full width and card-shaped rather than a chip, because it is the one control
+ * on this screen besides the question itself and it must not read as a label.
+ * The chevron says it opens; the dotted underline that a link would carry would
+ * say it navigates, which it does not.
+ */
+.pick {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--veda) 7%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--veda) 22%, transparent);
+  border-radius: 12px;
+  padding: 10px var(--space-3);
+  margin-bottom: var(--space-3);
+  cursor: pointer;
+}
+
+.pickNo {
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--veda-ink);
+}
+
+.pickName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pickChevron {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgb(0 0 0 / 35%);
 }
 
 /*
- * Position, and position only.
+ * The chapter list, rising from the foot.
  *
- * The dots say how far through the set the reader is and carry no other
- * meaning. They are deliberately not sized, coloured or ordered by difficulty:
- * the reader is told difficulty is Veda's to choose, and a dot that leaked it
- * would make that line a lie.
+ * Capped at 70% of the screen so the question stays visible behind it — the
+ * reader is choosing what to be asked about next, and seeing what they are
+ * being asked about now is the context for that choice.
  */
-.dots {
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 21;
+  max-height: 70dvh;
   display: flex;
-  gap: 7px;
+  flex-direction: column;
+  background: var(--card);
+  border-top: 1px solid var(--card-line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -12px 28px -12px rgb(0 0 0 / 35%);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.sheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--card-line);
+}
+
+.sheetTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sheetClose {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: var(--space-3);
+  font-size: var(--text-md);
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
 }
 
-.dot,
-.dotOn,
-.dotDone {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--card-line);
-  transition: transform 0.2s ease;
+.sheetList {
+  overflow-y: auto;
+  padding: var(--space-2) 0 var(--space-3);
+  -webkit-overflow-scrolling: touch;
 }
 
-.dotOn {
-  background: var(--veda);
-  transform: scale(1.25);
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  text-align: left;
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  padding: 10px var(--space-3);
+  cursor: pointer;
 }
 
-.dotDone {
-  background: var(--bronze);
+.row:active {
+  background: color-mix(in srgb, var(--veda) 10%, transparent);
+}
+
+/* Where you are, said in Veda's colour rather than with a tick. The tick would
+   read as "done", and a chapter you have been examined on is not done. */
+.rowHere {
+  color: var(--veda-ink);
+  font-weight: 600;
+}
+
+.rowNo {
+  flex: none;
+  width: 2ch;
+  text-align: right;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowHere .rowNo {
+  color: var(--veda);
+}
+
+.rowName {
+  flex: 1;
+  min-width: 0;
 }
 
 /* --- The card ------------------------------------------------------------- */

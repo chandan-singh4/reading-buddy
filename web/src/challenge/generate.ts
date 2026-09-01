@@ -35,8 +35,16 @@ import { userMessage, type Passage, type QuestionRequest } from './prompt.ts'
 import { screen, type Rejection } from './validate.ts'
 import type { Question } from './types.ts'
 
-/** How many items one chapter is worth. Enough for a sitting, not a exam. */
-export const BANK_SIZE = 5
+/**
+ * How many questions one call asks for.
+ *
+ * A batch size, not a budget. The bank grows: when the reader works through
+ * what has been written, the app asks for another batch and tells Veda what she
+ * has already asked. Five keeps the wait short and the money small per call —
+ * a reader who wants twenty questions gets four calls, spread over the twenty
+ * questions rather than spent before the first one.
+ */
+export const BATCH_SIZE = 5
 
 /**
  * How many times a batch may be rewritten before we give the reader what we
@@ -63,7 +71,12 @@ export class NoQuestions extends Error {
   }
 }
 
-export type NoQuestionsReason = 'nothing-to-ask' | 'no-model'
+export type NoQuestionsReason =
+  /** This chapter has no prose, or nothing that could be traced to it. */
+  | 'nothing-to-ask'
+  /** The bank holds questions, but Veda has nothing new left to ask. */
+  | 'exhausted'
+  | 'no-model'
 
 /**
  * The paragraphs of one chapter, each with the anchor a question must cite.
@@ -158,6 +171,12 @@ export interface Written {
 export async function writeBank(
   sections: readonly Section[],
   request: Omit<QuestionRequest, 'passages' | 'count'>,
+  /**
+   * What the bank already holds, when this is a refill rather than a first
+   * write. Their stems and seams are sent to Veda so she goes somewhere new,
+   * and any item that comes back matching a stem we already have is dropped.
+   */
+  already: readonly Question[] = [],
 ): Promise<Written> {
   const passages = passagesOf(sections, request.chapter)
   if (passages.length === 0) {
@@ -174,10 +193,19 @@ export async function writeBank(
   const rejected: Rejection[] = []
   let model: string | undefined
 
+  const seenStems = new Set(already.map((question) => normalise(question.stem)))
+  const seenIds = new Set(already.map((question) => question.id))
+
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     const reply = await askExaminer(
       material,
-      userMessage({ ...request, passages, count: BANK_SIZE }),
+      userMessage({
+        ...request,
+        passages,
+        count: BATCH_SIZE,
+        avoidStems: already.map((question) => question.stem),
+        avoidConcepts: [...new Set(already.map((question) => question.concept))],
+      }),
     )
     model = reply.model ?? model
 
@@ -192,11 +220,40 @@ export async function writeBank(
 
     const result = screen(items, anchors)
     rejected.push(...result.rejected)
-    if (result.kept.length > 0) return { questions: result.kept, rejected, model }
+
+    /*
+     * A refill that comes back with a question we already hold is not a
+     * failure of the model so much as a sign the chapter is running dry. It is
+     * dropped here rather than in `validate.ts`, which knows only about one
+     * batch and has no idea what the bank already contains.
+     */
+    const fresh = result.kept.filter((question) => {
+      if (seenStems.has(normalise(question.stem))) {
+        rejected.push({ id: question.id, reason: 'this question has already been asked' })
+        return false
+      }
+      return true
+    })
+
+    // Ids come from the model and only have to be unique within a batch, so a
+    // refill can collide with the bank. The stem is what makes it a duplicate;
+    // the id just has to stop being one.
+    for (const question of fresh) {
+      while (seenIds.has(question.id)) question.id = `${question.id}+`
+      seenIds.add(question.id)
+      seenStems.add(normalise(question.stem))
+    }
+
+    if (fresh.length > 0) return { questions: fresh, rejected, model }
   }
 
   throw new NoQuestions(
-    'nothing the examiner wrote could be traced to this chapter',
-    'nothing-to-ask',
+    'nothing new could be written for this chapter',
+    already.length > 0 ? 'exhausted' : 'nothing-to-ask',
   )
+}
+
+/** Stems match when they say the same thing, whatever the punctuation. */
+function normalise(stem: string): string {
+  return stem.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }

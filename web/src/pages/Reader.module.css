@@ -1,8 +1,8 @@
 /*
  * The reading page's frame. Block typography lives in `reader/blocks.module.css`.
  *
- * Kept sparse on purpose: this is the bare page Focus Mode reveals, and WP-13's
- * overlay will sit on top of it rather than beside it.
+ * Kept sparse on purpose: this is the bare page under the book, and WP-13's
+ * overlay sits on top of it rather than beside it.
  */
 
 .reader {

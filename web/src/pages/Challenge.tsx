@@ -6,6 +6,18 @@
  * choose, because a visible level turns a wrong answer on a hard question into
  * an excuse and a wrong answer on an easy one into a humiliation.
  *
+ * ## The sitting has no length
+ *
+ * There is no "5 of 5". The reader taps next as long as they want to, and when
+ * the written questions run out the app quietly asks Veda for more, telling her
+ * what she has already asked so she goes somewhere new. Only when a refill
+ * comes back with nothing does the sitting end — and it ends by saying the
+ * chapter is spent, not by saying the reader is finished.
+ *
+ * A fixed set of five taught the wrong lesson. It made the examination a thing
+ * you *complete*, and a chapter you have completed is a chapter you stop
+ * thinking about.
+ *
  * ## The confidence tap is the load-bearing control
  *
  * It looks like a flourish and it is the reason the feature works. A wrong
@@ -22,35 +34,101 @@
  * idea again, and asking twice would test their composure, not their grasp.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 
 import { bankStore, missStore } from '../storage/challenge.ts'
 import { repository } from '../storage/index.ts'
 import { summaryStore } from '../storage/summaries.ts'
-import { chapterPath, type BookId, type BookMeta, type Section } from '../structure/index.ts'
+import {
+  chapterPath,
+  type BookId,
+  type BookMeta,
+  type ManifestChapter,
+  type Section,
+} from '../structure/index.ts'
 import { NoQuestions, writeBank } from '../challenge/generate.ts'
 import { assemble } from '../challenge/serve.ts'
-import type { Question } from '../challenge/types.ts'
+import type { Question, StoredQuestionBank } from '../challenge/types.ts'
 import { Sitting } from './ChallengeSitting.tsx'
+import { ChapterPicker } from './ChallengeChapters.tsx'
 import styles from './challenge.module.css'
 
-type Phase = 'loading' | 'sitting' | 'empty'
+type Phase =
+  /** Writing the first batch for a chapter nobody has been examined on. */
+  | 'loading'
+  /** A question is on screen. */
+  | 'sitting'
+  /** Fetching more, with the last question still behind the notice. */
+  | 'refilling'
+  /** Veda has nothing new for this chapter. */
+  | 'caught-up'
+  /** Something went wrong, or the chapter has no prose. */
+  | 'empty'
 
 export default function Challenge() {
   const { bookId } = useParams<{ bookId: string }>()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const chapter = Number(params.get('chapter') ?? '1')
 
   const [book, setBook] = useState<BookMeta | undefined>()
-  const [questions, setQuestions] = useState<Question[]>([])
+  const [chapters, setChapters] = useState<readonly ManifestChapter[]>([])
+  const [queue, setQueue] = useState<Question[]>([])
   const [at, setAt] = useState(0)
   const [phase, setPhase] = useState<Phase>('loading')
   const [trouble, setTrouble] = useState<string | undefined>()
-  const [chapterTitle, setChapterTitle] = useState('')
+  /*
+   * What the Librarian called this chapter, when it has been summarised.
+   * Empty otherwise — see `chapterTitle` below, which decides what is shown.
+   */
+  const [summaryTitle, setSummaryTitle] = useState('')
 
   const id = bookId as BookId | undefined
+  const chapterId = chapterPath(chapter)
 
+  /*
+   * What to call this chapter, best source first.
+   *
+   * The Librarian's title is the best: it is what the reader saw on the recap.
+   * The manifest's is next, and it is the one that exists for every chapter of
+   * every book. `Chapter 7` is the floor and it must not outrank the manifest
+   * — an earlier version fell back to it too eagerly and every unsummarised
+   * chapter lost its real name.
+   */
+  const chapterTitle =
+    summaryTitle ||
+    chapters.find((entry) => entry.chapter === chapter)?.title ||
+    `Chapter ${chapter}`
+
+  /*
+   * The bank as it stands, kept in a ref as well as in the database.
+   *
+   * A refill needs to tell Veda every stem she has already written, including
+   * the ones from a batch fetched a minute ago. Reading the row back each time
+   * would work; holding it here saves the round trip on the one path where the
+   * reader is already waiting.
+   */
+  const bank = useRef<StoredQuestionBank | undefined>(undefined)
+
+  /** The book's chapter list, for the picker. Read once per book. */
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    void (async () => {
+      const [meta, manifest] = await Promise.all([
+        repository.getBook(id),
+        repository.getManifest(id),
+      ])
+      if (cancelled) return
+      setBook(meta)
+      setChapters(manifest?.chapters ?? [])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  /** The chapter's own bank, written on first arrival and kept after. */
   useEffect(() => {
     if (!id || !Number.isFinite(chapter)) return
     let cancelled = false
@@ -58,27 +136,37 @@ export default function Challenge() {
     const build = async () => {
       setPhase('loading')
       setTrouble(undefined)
-      try {
-        const meta = await repository.getBook(id)
-        if (cancelled) return
-        setBook(meta)
+      setQueue([])
+      setAt(0)
+      bank.current = undefined
 
-        const chapterId = chapterPath(chapter)
-        const summary = await summaryStore.get(id, chapterId)
-        const title = summary?.chapterTitle ?? `Chapter ${chapter}`
+      try {
+        const [summary, manifest] = await Promise.all([
+          summaryStore.get(id, chapterId),
+          repository.getManifest(id),
+        ])
         if (cancelled) return
-        setChapterTitle(title)
+        setSummaryTitle(summary?.chapterTitle ?? '')
+
+        // Read here rather than off `chapters`, which this effect must not
+        // depend on — it would re-run and rewrite the bank every time the
+        // manifest arrived.
+        const title =
+          summary?.chapterTitle ||
+          manifest?.chapters.find((entry) => entry.chapter === chapter)?.title ||
+          `Chapter ${chapter}`
 
         /*
          * Lazy, and this is the one deliberately configurable knob.
          *
-         * The bank is written the first time this chapter is opened for
-         * examination, then kept forever. Building on chapter-complete instead
-         * would spend real money writing questions for the many chapters a
-         * reader finishes and never tests.
+         * The first batch is written the first time this chapter is opened for
+         * examination, then kept. Building on chapter-complete instead would
+         * spend real money writing questions for the many chapters a reader
+         * finishes and never tests.
          */
-        let bank = await bankStore.get(id, chapterId)
-        if (!bank) {
+        let row = await bankStore.get(id, chapterId)
+        if (!row) {
+          const meta = await repository.getBook(id)
           const sections = await sectionsOf(id, chapter)
           if (cancelled) return
           const written = await writeBank(sections, {
@@ -89,36 +177,30 @@ export default function Challenge() {
             concepts: (summary?.concepts ?? []).map((entry) => entry.name),
           })
           if (cancelled) return
-          bank = {
+          row = {
             bookId: id,
             chapterId,
             chapter,
             chapterTitle: title,
             questions: written.questions,
+            answered: [],
             builtAt: new Date().toISOString(),
             model: written.model,
           }
-          await bankStore.save(bank)
+          await bankStore.save(row)
         }
 
+        bank.current = row
         const flagged = await missStore.flagged()
         if (cancelled) return
-        const list = assemble(bank.questions, flagged)
-        setQuestions(list.questions)
-        setPhase(list.questions.length === 0 ? 'empty' : 'sitting')
+        const list = assemble(row.questions, flagged, new Set(row.answered ?? []))
+        setQueue(list.questions)
+
+        if (list.questions.length > 0) setPhase('sitting')
+        else setPhase(row.exhausted ? 'caught-up' : 'refilling')
       } catch (error: unknown) {
         if (cancelled) return
-        /*
-         * The error's own message is written for a log, not for a reader. The
-         * page picks the sentence, and picks it by cause: a chapter with
-         * nothing to ask about will not improve by waiting, so it must not be
-         * offered a "try again" that cannot work.
-         */
-        setTrouble(
-          error instanceof NoQuestions && error.reason === 'nothing-to-ask'
-            ? 'Veda could not find enough of this chapter to ask about. Read a little further and come back.'
-            : 'Veda could not reach a model to write your questions. Try again in a minute.',
-        )
+        setTrouble(sentenceFor(error))
         setPhase('empty')
       }
     }
@@ -127,13 +209,86 @@ export default function Challenge() {
     return () => {
       cancelled = true
     }
-  }, [id, chapter])
+  }, [id, chapter, chapterId])
 
-  const onNext = useCallback(() => setAt((previous) => previous + 1), [])
+  /**
+   * Ask for more, and say so if there is no more to be had.
+   *
+   * Called when the reader walks off the end of the queue. It is the only
+   * place that pays for a second call, and it never pays twice for the same
+   * dry chapter — `exhausted` is written on the bank the first time.
+   */
+  const refill = useCallback(async () => {
+    const row = bank.current
+    if (!id || !row) return
+    setPhase('refilling')
+    try {
+      const summary = await summaryStore.get(id, chapterId)
+      const sections = await sectionsOf(id, chapter)
+      const written = await writeBank(
+        sections,
+        {
+          bookTitle: book?.title ?? 'this book',
+          author: book?.author,
+          chapter,
+          chapterTitle: row.chapterTitle,
+          concepts: (summary?.concepts ?? []).map((entry) => entry.name),
+        },
+        row.questions,
+      )
+      const next = await bankStore.append(id, chapterId, written.questions, written.model)
+      if (!next) return
+      bank.current = next
 
-  const question = questions[at]
+      const flagged = await missStore.flagged()
+      const list = assemble(next.questions, flagged, new Set(next.answered ?? []))
+      setQueue(list.questions)
+      setAt(0)
+      setPhase(list.questions.length > 0 ? 'sitting' : 'caught-up')
+    } catch (error: unknown) {
+      if (error instanceof NoQuestions && error.reason === 'exhausted') {
+        await bankStore.markExhausted(id, chapterId)
+        setPhase('caught-up')
+        return
+      }
+      setTrouble(sentenceFor(error))
+      setPhase('empty')
+    }
+  }, [id, chapter, chapterId, book])
+
+  /**
+   * On to the next one, and retire the one just answered.
+   *
+   * The id is written to the bank before the queue moves, so a reader who
+   * closes the app mid-sitting does not meet that question again on their way
+   * back in.
+   */
+  const onNext = useCallback(
+    (answeredId: string) => {
+      if (id) void bankStore.markAnswered(id, chapterId, answeredId)
+      bank.current = bank.current && {
+        ...bank.current,
+        answered: [...new Set([...(bank.current.answered ?? []), answeredId])],
+      }
+      setAt((previous) => {
+        const next = previous + 1
+        if (next >= queue.length) void refill()
+        return next
+      })
+    },
+    [id, chapterId, queue.length, refill],
+  )
+
+  const pickChapter = useCallback(
+    (next: number) => {
+      setParams({ chapter: String(next) }, { replace: true })
+    },
+    [setParams],
+  )
+
+  const question = phase === 'sitting' ? queue[at] : undefined
   const backHref = id ? `/book/${id}` : '/'
-  const finished = phase === 'sitting' && !question
+  const answeredHere = bank.current?.answered?.length ?? 0
 
   return (
     <div className={styles.page}>
@@ -145,35 +300,36 @@ export default function Challenge() {
           <span className={styles.orb} aria-hidden="true" />
           <div className={styles.examinerText}>
             <div className={styles.who}>Veda&rsquo;s Examination</div>
-            {/*
-              Which book, which chapter — inside the header's own text column
-              rather than in a paragraph beneath it. It used to sit outside and
-              fake the alignment with a hard-coded left indent, which only held
-              while the back arrow and the orb kept their exact widths.
-            */}
-            <p className={styles.ctx}>
-              <b>{book?.title ?? 'This book'}</b>, Ch. {chapter}
-              {chapterTitle ? ` · ${chapterTitle}` : ''}
-            </p>
+            <div className={styles.of}>{book?.title ?? 'This book'}</div>
           </div>
         </header>
 
-        {phase === 'sitting' && !finished && (
-          <div className={styles.dots} aria-hidden="true">
-            {questions.map((row, index) => (
-              <span
-                key={row.id}
-                className={index < at ? styles.dotDone : index === at ? styles.dotOn : styles.dot}
-              />
-            ))}
-          </div>
-        )}
+        {/*
+          The chapter is chosen here, not decided by where the reader happens
+          to be standing in the book. A reader who wants to test chapter two on
+          a Sunday should not have to navigate to chapter two to do it.
+        */}
+        <ChapterPicker
+          chapters={chapters}
+          chapter={chapter}
+          chapterTitle={chapterTitle}
+          onPick={pickChapter}
+        />
 
         {phase === 'loading' && (
           <div className={styles.card}>
             <p className={styles.waiting}>
               Veda is reading {chapterTitle || `chapter ${chapter}`} and writing your questions.
-              This takes a moment — she only does it once per chapter.
+              This takes a moment.
+            </p>
+          </div>
+        )}
+
+        {phase === 'refilling' && (
+          <div className={styles.card}>
+            <p className={styles.waiting}>
+              Veda is writing more questions on this chapter. She is looking for seams she has
+              not tested yet.
             </p>
           </div>
         )}
@@ -193,27 +349,25 @@ export default function Challenge() {
           </div>
         )}
 
-        {phase === 'sitting' && question && id && (
-          <Sitting
-            key={question.id}
-            question={question}
-            bookId={id}
-            bookTitle={book?.title ?? 'this book'}
-            chapter={chapter}
-            chapterTitle={chapterTitle}
-            last={at === questions.length - 1}
-            onNext={onNext}
-          />
-        )}
+        {/*
+          The end of a chapter, and it is deliberately not a score.
 
-        {finished && (
+          "You are all caught up" says the questions ran out, not that the
+          reader ran out. Nothing here counts what they got right: a tally
+          turns a sitting into a test, and the whole point of the confidence
+          tap is that a wrong answer is worth having.
+        */}
+        {phase === 'caught-up' && (
           <div className={styles.card}>
             <div className={styles.done}>
-              <div className={styles.doneHead}>Chapter check complete</div>
+              <div className={styles.doneHead}>You are all caught up on this chapter</div>
               <p className={styles.doneNote}>
-                Veda has what she needs. Anything you answered confidently wrong, she will fold
-                back into a later sitting rather than let it set.
+                Veda has no new seams left here.{' '}
+                {answeredHere > 0
+                  ? 'Anything you answered confidently wrong comes back in a later sitting, as a new question.'
+                  : ''}
               </p>
+              <p className={styles.doneNote}>Pick another chapter above to keep going.</p>
               <Link to={backHref} className={styles.doneBack}>
                 Back to the book
               </Link>
@@ -221,10 +375,36 @@ export default function Challenge() {
           </div>
         )}
 
+        {question && id && (
+          <Sitting
+            key={question.id}
+            question={question}
+            bookId={id}
+            bookTitle={book?.title ?? 'this book'}
+            chapter={chapter}
+            chapterTitle={chapterTitle}
+            onNext={() => onNext(question.id)}
+          />
+        )}
+
         <p className={styles.footnote}>Difficulty is Veda&rsquo;s to choose — you just answer.</p>
       </div>
     </div>
   )
+}
+
+/**
+ * What to tell the reader, chosen by cause rather than copied from the error.
+ *
+ * The error's own message is written for a log. A chapter with nothing to ask
+ * about will not improve by waiting, so it must not be offered a "try again"
+ * that cannot work.
+ */
+function sentenceFor(error: unknown): string {
+  if (error instanceof NoQuestions && error.reason !== 'no-model') {
+    return 'Veda could not find enough of this chapter to ask about. Read a little further and come back.'
+  }
+  return 'Veda could not reach a model to write your questions. Try again in a minute.'
 }
 
 /**

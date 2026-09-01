@@ -70,7 +70,14 @@ export interface Question {
   sourceAnchor: string
 }
 
-/** One chapter's generated bank, cached so a chapter is written for once. */
+/**
+ * One chapter's questions, and what the reader has already met.
+ *
+ * A cache that grows. The first sitting writes a batch; every time the reader
+ * works through what is here, the app asks for another and appends it. So the
+ * chapter has no fixed number of questions — it has as many as the reader asks
+ * for, until Veda runs out of new seams.
+ */
 export interface StoredQuestionBank {
   bookId: BookId
   /** `ch02`, matching `StoredChapterSummary.chapterId`. */
@@ -78,6 +85,18 @@ export interface StoredQuestionBank {
   chapter: number
   chapterTitle: string
   questions: Question[]
+  /**
+   * The ids the reader has already been shown, so a question is retired for
+   * good. Kept here rather than in a store of its own: it is meaningless apart
+   * from the bank it indexes, and it dies with it.
+   */
+  answered?: string[]
+  /**
+   * Set when a refill came back with nothing new. It means the chapter is
+   * spent, and it stops the app paying for another call each time the reader
+   * taps "next". Cleared if the chapter is ever re-read and re-written.
+   */
+  exhausted?: boolean
   /** ISO 8601. */
   builtAt: string
   /** The model that actually wrote them, for the same reason recaps carry one. */

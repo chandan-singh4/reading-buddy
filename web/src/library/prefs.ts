@@ -5,9 +5,9 @@
  * One object, one `localStorage` key — the same shape and the same defensive
  * reading as `reader/readerSettings.ts`, because these are the same kind of
  * thing: a preference about how a screen looks, not data about the books. It
- * belongs in `localStorage` rather than the database for the reason focus mode
- * does — it is about this device, it is read synchronously on first paint, and
- * losing it costs nothing.
+ * belongs in `localStorage` rather than the database because it is about this
+ * device, it is read synchronously on first paint, and losing it costs
+ * nothing.
  *
  * **Adding a filter later is meant to be cheap.** A new one is a field on
  * `LibraryPrefs`, a default, a validator below, and a clause in `filter.ts` —

@@ -145,96 +145,6 @@
 }
 
 /*
- * Focus Mode's lamp, and the light it throws.
- *
- * ## The halo
- *
- * A radial gradient laid *behind* the glyph rather than a `box-shadow` or a
- * `filter`, because a lamp does not have an edge that glows — it has a pool of
- * light around it that falls off. The gradient reaches nothing at 70% of a
- * 40px box, so the light stops inside the button's own footprint and never
- * washes over the title beside it.
- *
- * ## Why the lamp is one drawing
- *
- * Off and on are the same paths. What changes is which of them are filled, so
- * the object holds still and only the light arrives. `:global` because the
- * class names are written in `FocusLamp.tsx`, which is a plain SVG and has no
- * stylesheet of its own — scoped under the hashed button class, so they cannot
- * reach anything else.
- */
-.focusControl {
-  position: relative;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 40px 40px;
-  transition:
-    background 0.4s ease-in-out,
-    color 0.4s ease-in-out;
-}
-
-.focusControl[aria-pressed='true'] {
-  background-image: radial-gradient(
-    circle,
-    rgb(253 224 71 / 25%) 0%,
-    rgb(253 224 71 / 0%) 70%
-  );
-}
-
-/* The button's own pressed wash would sit on top of the halo and grey it out.
-   The lamp says it is on; it does not also need a box around it. */
-.focusControl[aria-pressed='true']:not(:active) {
-  background-color: transparent;
-}
-
-.focusControl :global(.lampThrow),
-.focusControl :global(.lampBulb) {
-  opacity: 0;
-  transition: opacity 0.4s ease-in-out;
-}
-
-.focusControl :global(.lampShade),
-.focusControl :global(.lampPage) {
-  transition:
-    fill 0.4s ease-in-out,
-    stroke 0.4s ease-in-out;
-}
-
-.focusControl[aria-pressed='true'] :global(.lampThrow) {
-  /* The cone. Warmer and weaker than the flame itself: this is light in the
-     air, not the source of it. */
-  fill: rgb(251 191 36 / 28%);
-  opacity: 1;
-}
-
-.focusControl[aria-pressed='true'] :global(.lampBulb) {
-  fill: #facc15;
-  opacity: 1;
-}
-
-.focusControl[aria-pressed='true'] :global(.lampShade) {
-  fill: #fbbf24;
-  stroke: #fbbf24;
-}
-
-.focusControl[aria-pressed='true'] :global(.lampPage) {
-  fill: rgb(253 224 71 / 35%);
-}
-
-/* A lamp that lights itself up is a lamp that moved. Nothing here animates for
-   a reader who asked for less of it — the states still differ, they simply
-   arrive. */
-@media (prefers-reduced-motion: reduce) {
-  .focusControl,
-  .focusControl :global(.lampThrow),
-  .focusControl :global(.lampBulb),
-  .focusControl :global(.lampShade),
-  .focusControl :global(.lampPage) {
-    transition: none;
-  }
-}
-
-/*
  * The foot's one row: the ⋮ at the left, then the slider.
  *
  * The bar itself is a column, because it once stacked a slider over a row of
@@ -854,7 +764,7 @@
 }
 
 /*
- * Veda's Examination, in the corner the focus lamp used to hold.
+ * Veda's Examination, in the top-right corner of the bar.
  *
  * Violet is a literal here rather than a token, and deliberately so: it is not
  * a theme colour that should shift with the paper. It is Veda's identity, and

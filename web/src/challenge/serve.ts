@@ -3,24 +3,16 @@
  *
  * Two sources feed one list. Most of it is this chapter's own bank. The rest is
  * *resurfacing*: concepts the reader was confidently wrong about in an earlier
- * sitting, pulled back in as fresh items on the same seam.
+ * sitting, which are moved to the front so they are met again sooner.
  *
- * The resurfaced items are never replayed questions. A question already seen is
- * a memory test — the reader recognises the shape of the right answer without
- * reasoning about the idea again, which is precisely the failure mode this
- * whole feature exists to avoid.
+ * The resurfaced items are never replayed questions. A question already
+ * answered is a memory test — the reader recognises the shape of the right
+ * answer without reasoning about the idea again, which is precisely the failure
+ * mode this whole feature exists to avoid. Answered ids are kept on the bank
+ * row, so a question is retired for good.
  */
 
 import type { Question, StoredMiss } from './types.ts'
-
-/**
- * How many resurfaced items may join one sitting.
- *
- * Small on purpose. A reader who has flagged nine concepts should not open a
- * chapter check and be handed a tribunal of their past mistakes; two is enough
- * to keep an old miss moving without turning the sitting into a reckoning.
- */
-export const RESURFACE_LIMIT = 2
 
 export interface ServeList {
   questions: Question[]
@@ -29,61 +21,90 @@ export interface ServeList {
 }
 
 /**
- * Build a sitting from this chapter's bank and the unresolved ledger.
+ * Build the queue from this chapter's bank and the unresolved ledger.
  *
- * `bank` is everything written for this chapter. `flagged` is the ledger's
- * unresolved rows, newest first. A flagged concept contributes an item only if
- * the bank actually holds a *different* question on it — there is no point
- * promising to resurface an idea and then serving the same card again.
+ * `bank` is everything written for this chapter so far. `answered` is every
+ * question id the reader has already been shown. `flagged` is the ledger's
+ * unresolved rows, newest first.
+ *
+ * Everything unanswered is served — nothing is held back. The bank grows on
+ * demand, so a cap here would only hide work already paid for.
  */
 export function assemble(
   bank: readonly Question[],
   flagged: readonly StoredMiss[],
-  seenIds: ReadonlySet<string> = new Set(),
+  answered: ReadonlySet<string> = new Set(),
 ): ServeList {
-  const unseen = bank.filter((question) => !seenIds.has(question.id))
+  const unseen = bank.filter((question) => !answered.has(question.id))
+  const flaggedConcepts = new Set(flagged.map((miss) => miss.concept))
+
   const resurfaced = new Set<string>()
-
-  // The chapter's own questions, one per seam. A bank with three items on
-  // `anima-vs-shadow` would spend a whole sitting on one distinction.
-  const chosen: Question[] = []
-  const covered = new Set<string>()
   for (const question of unseen) {
-    if (covered.has(question.concept)) continue
-    covered.add(question.concept)
-    chosen.push(question)
+    if (flaggedConcepts.has(question.concept)) resurfaced.add(question.concept)
   }
 
-  // Then the old misses, but only where a fresh item on that seam exists and
-  // this chapter has not already covered it.
-  let pulled = 0
-  for (const miss of flagged) {
-    if (pulled >= RESURFACE_LIMIT) break
-    if (covered.has(miss.concept)) continue
-    const fresh = unseen.find((question) => question.concept === miss.concept)
-    if (!fresh) continue
-    covered.add(miss.concept)
-    resurfaced.add(miss.concept)
-    chosen.push(fresh)
-    pulled += 1
-  }
-
-  return { questions: order(chosen), resurfaced }
+  return { questions: order(unseen, resurfaced), resurfaced }
 }
 
 /**
- * Easiest first.
+ * Flagged seams first, then the rest, and each group spread across its seams.
  *
- * The ordering is Veda's `difficulty`, and it is never drawn. Opening a sitting
- * on the hardest discrimination in the chapter makes a reader who could have
- * answered four of five feel they understood none of it, and they stop.
+ * Two rules, in this order.
  *
- * Ties keep the order the bank was written in, which is the order the model
- * chose to raise the seams — usually the order the chapter does.
+ * **A flagged concept comes first.** The reader was confidently wrong about it
+ * in an earlier sitting and the point of resurfacing is that they meet it
+ * again, not that it waits behind eleven other questions.
+ *
+ * **Then no two questions in a row share a seam.** A bank of twenty holds
+ * several questions per concept, and serving them together turns a sitting into
+ * a drill on one distinction. Taking one from each seam in turn — a round
+ * robin — spreads them without dropping any.
+ *
+ * Veda's `difficulty` breaks ties inside a seam, gentlest first, and it is
+ * never drawn. Opening on the hardest discrimination in the chapter makes a
+ * reader who could have answered four of five feel they understood none of it,
+ * and they stop.
  */
-export function order(questions: readonly Question[]): Question[] {
-  return [...questions]
-    .map((question, index) => ({ question, index }))
-    .sort((a, b) => a.question.difficulty - b.question.difficulty || a.index - b.index)
-    .map((row) => row.question)
+export function order(
+  questions: readonly Question[],
+  resurfaced: ReadonlySet<string> = new Set(),
+): Question[] {
+  const bySeam = new Map<string, Question[]>()
+  questions.forEach((question, index) => {
+    const seam = bySeam.get(question.concept)
+    const row = { question, index }
+    if (seam) seam.push(question)
+    else bySeam.set(question.concept, [question])
+    void row
+  })
+
+  // Gentlest first inside each seam. Ties keep the order the bank was written
+  // in, which is the order the model chose to raise them.
+  const positions = new Map(questions.map((question, index) => [question, index]))
+  for (const seam of bySeam.values()) {
+    seam.sort(
+      (a, b) => a.difficulty - b.difficulty || positions.get(a)! - positions.get(b)!,
+    )
+  }
+
+  const seams = [...bySeam.keys()].sort((a, b) => {
+    const flagged = Number(resurfaced.has(b)) - Number(resurfaced.has(a))
+    if (flagged !== 0) return flagged
+    return positions.get(bySeam.get(a)![0]!)! - positions.get(bySeam.get(b)![0]!)!
+  })
+
+  const out: Question[] = []
+  let round = 0
+  while (out.length < questions.length) {
+    let placed = false
+    for (const seam of seams) {
+      const question = bySeam.get(seam)![round]
+      if (!question) continue
+      out.push(question)
+      placed = true
+    }
+    if (!placed) break
+    round += 1
+  }
+  return out
 }

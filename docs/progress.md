@@ -90,8 +90,11 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   across 150 files.
   - The reader opens it from the top right of the reading screen. The icon is a
     question on a page, in Veda's violet.
-  - Veda writes five questions for a chapter the first time it is asked for,
-    then keeps them.
+  - The sitting has no length. Veda writes a batch, and writes more when the
+    reader works through them. She is told what she has already asked.
+  - "You are all caught up on this chapter" ends it, when she runs dry.
+  - Questions are pitched at a graduate seminar.
+  - A picker at the top opens the chapter list. Any chapter, any time.
   - Each question has one right option and three named misconceptions. A
     question is dropped unless it cites a paragraph that exists in that chapter.
   - The reader picks an option, then says how sure they are, then submits.
@@ -99,7 +102,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     sitting as a new question, never in the same sitting.
   - "Discuss with Veda" opens a chat seeded with the question and both notes.
     Each bubble shows the model that wrote it.
-  - Focus Mode moved from the top bar to the foot row, beside the ⋮.
+  - Focus Mode is deleted. It hid chrome that is already hidden.
   - Difficulty exists in the data. It is never shown.
   - The golden prompts did not change. The examiner is a new module in
     `api/tutor.ts`.

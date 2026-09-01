@@ -9,10 +9,8 @@
  * Kept apart from `Chrome.tsx` because it is the one piece here with rules
  * worth testing: the cycle, the fallbacks, and the singular/plural.
  *
- * Note the two independent switches. Focus Mode decides whether the *whole*
- * overlay is showing when you arrive; this decides what the bar says once it is.
- * A reader who wants only the percentage keeps the chrome and cycles the bar; a
- * reader who wants nothing uses Focus Mode.
+ * This decides only what the bar *says*, not whether the overlay is showing.
+ * A reader who wants only the percentage cycles the bar and leaves it there.
  */
 
 import type { Pages } from './progress.ts'

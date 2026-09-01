@@ -2876,12 +2876,64 @@ opens that chapter for examination. It then keeps them.
 Writing them when a chapter is finished would cost real money for the many
 chapters a reader completes and never tests.
 
-## Focus Mode moved to the foot, and the corner became a door
+## Focus Mode is removed
 
-**2026-09-01.** The top right of the reader used to hold the focus lamp. It now
-holds Veda's Examination. The lamp moved down beside the ⋮.
+**2026-09-01.** Focus Mode is deleted. The lamp, the setting, the warm wash and
+the `data-focus` rules are all gone.
 
-Focus Mode changes how the book is *shown*. The ⋮ row is where the other such
-controls live, and a control whose job is to remove the bar does not belong in
-the bar. The examination is a place the reader goes, and "did any of that
-stay?" is asked at the moment they stop reading. That is the corner for it.
+It hid the chrome. But the chrome is already hidden: the reading screen shows
+the book alone until the reader taps it. So the toggle removed something that
+was not there, and it cost a corner of the bar, a stored setting and a set of
+theme rules.
+
+The top right of the bar now holds Veda's Examination. That is a place the
+reader goes, and "did any of that stay?" is the question asked at the moment
+they stop reading.
+
+
+## The examination has no length
+
+**2026-09-01.** There is no "5 of 5". The reader answers as many questions as
+they want. When the written ones run out, the app asks Veda for more and tells
+her every question she has already written for that chapter.
+
+A fixed set of five taught the wrong lesson. It made a chapter a thing you
+*complete*, and a chapter you have completed is a chapter you stop thinking
+about.
+
+Only when a refill comes back with nothing new does the sitting end. It ends by
+saying the chapter is spent, not by saying the reader is finished. Nothing is
+counted: no score, no tally of right answers. A score turns a sitting into a
+test, and the confidence tap only works if a wrong answer is worth having.
+
+The bank remembers which questions the reader has answered. A question is
+retired for good. It also remembers when Veda ran dry, so the app does not pay
+for the same empty call again.
+
+## Questions are pitched at a graduate seminar
+
+**2026-09-01.** The examiner prompt asks for graduate-seminar questions. An
+undergraduate recall question is a failure, however well written.
+
+Difficulty must come from reasoning, from ambiguity, and from telling two close
+ideas apart. It must never come from rare words or from "according to page 4".
+The prompt names the forms that work: apply the idea to a case the book never
+mentions, ask which of two neighbouring ideas a situation turns on, ask what the
+argument predicts, ask which objection the chapter has already answered.
+
+The reader asked for this. They read non-fiction to learn, and an easy question
+teaches nothing.
+
+## The reader chooses the chapter, not the page they are on
+
+**2026-09-01.** A picker at the top of the examination opens the book's chapter
+list. Any chapter can be tested at any time.
+
+The examination used to test whatever chapter the reader had open. That is the
+right default and a poor rule. A reader who wants to revisit chapter two on a
+Sunday should not have to navigate to chapter two first.
+
+It is a sheet from the foot, not a dropdown. A book has thirty chapters, and a
+dropdown under a button at the top of the screen would open over the question.
+The list shows each chapter's own title, because a title is what a reader
+recognises. A number alone is not.
