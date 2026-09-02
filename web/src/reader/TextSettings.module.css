@@ -508,3 +508,17 @@
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+/*
+ * A quiet line under a row.
+ *
+ * Used by the narrator's one-time download, which is the only thing in this
+ * panel that reports on itself. Sized and coloured like `.hint` on purpose:
+ * it is the same kind of speech — the app explaining itself, not asking.
+ */
+.rowNote {
+  margin: 0.25rem 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}

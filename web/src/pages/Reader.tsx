@@ -4197,6 +4197,7 @@ export default function Reader() {
             onHighlighterChange={changeHighlighter}
             voices={aloud.voices}
             onTryVoice={aloud.sample}
+            narrator={aloud.narrator}
             bookmarks={bookmarkRows}
             onJumpToBookmark={jumpToAnchor}
             onRenameBookmark={renameBookmark}

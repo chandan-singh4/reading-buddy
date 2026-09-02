@@ -60,7 +60,95 @@ export default defineConfig({
         // Any deep link (`/book/abc`) must resolve to the app shell offline —
         // otherwise reopening an installed app on the reader screen 404s.
         navigateFallback: 'index.html',
+
+        // The narrator's worker bundles kokoro-js and is past Workbox's 2 MB
+        // default. Precaching it is the point: the *weights* are runtime-cached
+        // below, and a cached model with no code to run it is no narrator.
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+
+        /*
+         * What makes the reading voice work with no connection.
+         *
+         * The model is not part of this build. Its weights come from the
+         * Hugging Face hub and the ONNX runtime comes from a CDN, both fetched
+         * by the worker the first time a reader presses Read aloud. Precaching
+         * them is not an option — they are 86 MB, and an app install must not
+         * cost that for a feature the reader may never use.
+         *
+         * So they are cached on the way past instead. First use downloads
+         * them; every use after that, online or not, is served from here.
+         *
+         * `CacheFirst` and not `StaleWhileRevalidate`: these files are named by
+         * a fixed model revision and never change under that name. Revalidating
+         * them would be a network round trip per sentence, for an answer that
+         * is always "unchanged".
+         */
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }: { url: URL }) =>
+              url.hostname === 'huggingface.co' || url.hostname === 'cdn-lfs.huggingface.co',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'narrator-model',
+              // A year. The revision in the path is the real cache key; this is
+              // only a floor under how long the browser may keep it.
+              expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              // The hub answers with a 200 or a redirect chain ending in one.
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            /*
+             * The ONNX runtime, which Vite bundles from our own origin.
+             *
+             * 21 MB, and it must not be precached — that would put it in the
+             * app's install, so every reader would download a speech runtime
+             * whether or not they ever ask to be read to. Cached on the way
+             * past instead, like the weights: paid for once by the reader who
+             * presses Read aloud, free and offline for them ever after.
+             */
+            urlPattern: ({ url, sameOrigin }: { url: URL; sameOrigin: boolean }) =>
+              sameOrigin && url.pathname.endsWith('.wasm'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'narrator-runtime',
+              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: ({ url }: { url: URL }) => url.hostname === 'cdn.jsdelivr.net',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'narrator-runtime',
+              expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
+
+      /*
+       * ## Cross-origin isolation is deliberately NOT switched on
+       *
+       * Multithreaded wasm needs `COOP: same-origin` and `COEP`, and it would
+       * make CPU synthesis several times faster. It is still off, for two
+       * reasons that are worth writing down because the temptation to switch
+       * it on will come back.
+       *
+       * `require-corp` would make the model unreachable: under it every
+       * cross-origin response must carry a CORP header of its own, and the
+       * Hugging Face hub does not send one. `credentialless` avoids that, and
+       * is the version worth revisiting — but Safari ignores it, and switching
+       * it on changes how *every* cross-origin request in the app is made, for
+       * a speed-up that could not be measured here. The preview pane embeds the
+       * page, so COOP never applied and `crossOriginIsolated` stayed false.
+       *
+       * Until it can be measured on a real device, the app runs single-threaded
+       * wasm — which needs no headers at all — and WebGPU where the phone has
+       * it. Both work. See `docs/decisions.md` for the measurement that is
+       * still outstanding.
+       */
 
       // Off during development on purpose. A service worker that caches while
       // you are editing is a source of "why didn't my change appear?" that

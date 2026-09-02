@@ -30,7 +30,10 @@
  * progress, both of which are about this panel and nothing else.
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+
+import type { NarratorStatus } from '../narrator/NarratorEngine.ts'
+import { groupsOf, type NarratorVoice } from '../narrator/voices.ts'
 
 import {
   MAX_TEXT_STEP,
@@ -99,15 +102,18 @@ export interface TextSettingsProps {
   highlighter?: HighlighterChoice
   onHighlighterChange?: (choice: HighlighterChoice) => void
   /**
-   * The voices this device offers for reading the book out loud (WP-16).
+   * The voices the narrator offers for reading the book out loud (WP-16).
    *
-   * Optional, and for the same reason the highlighter is: the list comes from
-   * the browser's speech engine, which a caller without one — a test, a screen
-   * with no book open — has no way to supply. Left out, the row is not drawn.
+   * The same 28 on every device, because the voice is the app's own model and
+   * not the phone's. Still optional, and for the same reason the highlighter
+   * is: a caller without a reading screen — a test, a panel with no book open —
+   * has no engine to ask. Left out, the row is not drawn.
    */
-  voices?: readonly SpeechSynthesisVoice[]
+  voices?: readonly NarratorVoice[]
   /** Say a line in a voice, so a reader hears it as they pick it. */
-  onTryVoice?: (voiceName?: string) => void
+  onTryVoice?: (voiceId?: string) => void
+  /** How the narrator is doing. Drives the one-time download line. */
+  narrator?: NarratorStatus
 }
 
 export function TextSettings({
@@ -117,8 +123,12 @@ export function TextSettings({
   onHighlighterChange,
   voices,
   onTryVoice,
+  narrator,
 }: TextSettingsProps) {
   const [pane, setPane] = useState<Pane>('text')
+
+  /** The roster, split by accent. See `groupsOf` for why accent and not gender. */
+  const groups = useMemo(() => groupsOf(voices ?? []), [voices])
   const [adjusting, setAdjusting] = useState<Adjusting>(null)
 
   /**
@@ -322,11 +332,13 @@ export function TextSettings({
           {/*
             The reading voice.
 
-            A plain `<select>`, and deliberately so. A device can offer forty
-            voices, the names are the system's own — "Microsoft Zira", "Daniel"
-            — and no set of buttons makes that list better. The phone already
-            draws a good picker for a long list, and this is the one control in
-            the panel where the platform's own is the right one.
+            A plain `<select>`, and deliberately so — but for a different reason
+            than before. The old list was the phone's own, forty names deep and
+            different on every device, and the platform's picker was the only
+            thing that made it usable. This list is 28 names the app chose, in
+            two groups. A row of buttons would still be worse: the names are
+            words, not shapes, and the way you tell Heart from Bella is by
+            listening to them, which is what the preview is for.
 
             Chosen here rather than on the transport bar: it is decided once,
             and the bar has to stay small enough to use without looking.
@@ -342,23 +354,67 @@ export function TextSettings({
                   const chosen = event.target.value
                   onSettingsChange(
                     // An empty choice clears the setting rather than storing an
-                    // empty name: "this device's own voice" is the absence of a
+                    // empty id: "the app's own voice" is the absence of a
                     // choice, and it has to survive being chosen again.
                     chosen ? { aloudVoice: chosen } : { aloudVoice: undefined },
                   )
-                  // Heard, not just chosen. A list of forty system names tells a
-                  // reader nothing about how any of them sound.
+                  // Heard, not just chosen. A list of names tells a reader
+                  // nothing about how any of them sound.
                   onTryVoice?.(chosen || undefined)
                 }}
               >
-                <option value="">This device’s voice</option>
-                {voices.map((voice) => (
-                  <option key={voice.name} value={voice.name}>
-                    {voice.name}
-                  </option>
+                <option value="">Heart, the usual narrator</option>
+                {groups.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.voices.map((voice) => (
+                      <option key={voice.id} value={voice.id}>
+                        {voice.name}
+                        {voice.gender ? ` — ${voice.gender.toLowerCase()}` : ''}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
+          )}
+
+          {/*
+            What the voice is doing, and only when it is worth saying.
+
+            Silent in the ordinary case. The model is downloaded once and lives
+            in the browser's cache after that, so on every session but the first
+            this line has nothing to report and does not appear. On the first,
+            it is the difference between "the app is broken" and "86 MB is
+            arriving".
+          */}
+          {narrator && narrator.state === 'loading' && (
+            <p className={styles.rowNote} role="status">
+              Getting the reading voice ready
+              {narrator.progress === null ? '' : ` — ${Math.round(narrator.progress * 100)}%`}. This
+              happens once. After it, the voice works with no connection at all.
+            </p>
+          )}
+
+          {/*
+            Which path the voice took, said only when it is the slow one.
+
+            Not decoration and not a boast. Kokoro on the graphics chip is
+            faster than speech; on the processor alone it is several times
+            slower, which is heard as the voice stopping between sentences. A
+            reader hitting that needs to know it is the device and not the app,
+            and it is the one fact nobody can work out by listening.
+          */}
+          {narrator && narrator.state === 'ready' && narrator.device === 'wasm' && (
+            <p className={styles.rowNote} role="status">
+              This device has no graphics acceleration for the voice, so it is made on the
+              processor. It may pause between sentences on a long passage.
+            </p>
+          )}
+
+          {narrator && narrator.state === 'failed' && (
+            <p className={styles.rowNote} role="status">
+              The reading voice could not be loaded. Check the connection and try Read aloud again.
+            </p>
           )}
         </div>
       )}

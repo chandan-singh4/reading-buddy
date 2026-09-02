@@ -6,40 +6,47 @@ it.
 
 ## Task
 
-Judge Veda's Examination on the phone.
+Judge the new reading voice on the phone.
 
 ## Steps
 
-1. Open a book you have read some of. Tap the screen to raise the top bar.
-2. Tap the question-mark page icon in the top right corner. It is violet.
-3. Wait while Veda writes the first questions.
-4. Answer one question. Pick an option, then say how sure you are.
-5. Read the reveal slips and the verdict.
-6. Tap "Discuss with Veda". Check the model name shows on her bubble.
-7. Tap "Next question" many times. Check Veda keeps writing new ones.
-8. Tap the chapter bar at the top. Pick another chapter. Check it changes.
+1. Open a book. Select a sentence. Tap **Speak**.
+2. The first time only: wait. The model is 86 MB. Settings shows the percent.
+3. Listen to three or four sentences. Watch the sentence that is marked.
+4. Open **Aa → Text**. Find **Reading voice**.
+5. Read the line under the picker, if there is one. Tell me what it says.
+6. Choose a British voice. Listen to the preview.
+7. Go back to the book. Check the new voice reads the next sentence.
+8. Turn off the network. Press Speak again. It must still work.
 
 ## What to watch for
 
-- Questions that ask you to remember a word, not to use an idea.
-- A wrong option that no real reader could believe.
-- A question that is too easy. They must be graduate level.
-- A question about a chapter you have not read.
-- The same question twice, or two questions that say the same thing.
-- A refill that never ends when the chapter is clearly spent.
-- A model name that is missing or wrong on a Veda bubble.
-- Difficulty shown anywhere. It must never appear.
+- **The most important one: does the voice stop between sentences?** Say how
+  often, and say which line step 5 showed.
+- A gap or a click where two sentences meet.
+- A page that turns late, or in the middle of a word.
+- The marked sentence and the spoken sentence out of step.
+- A voice you choose that does not take effect.
+- The reading going on after you leave the book.
+
+## The open question
+
+Without graphics acceleration the voice is about five times slower than speech.
+That is measured, not guessed. A phone with WebGPU will be much faster.
+
+If your phone stops between sentences, tell me. Two answers are open:
+
+1. Turn on cross-origin isolation. This uses more than one processor core. It
+   needs a test, because it changes every cross-origin request in the app.
+2. Go back to the browser's own voice on a device with no GPU.
 
 ## Files in scope
 
-- `web/src/challenge/generate.ts` — writes a bank of questions.
-- `web/src/challenge/validate.ts` — the grounding gate.
-- `web/src/challenge/serve.ts` — picks the questions for one sitting.
-- `web/src/challenge/prompt.ts` — the schema sent with the material.
-- `web/src/pages/Challenge.tsx` — the page.
-- `web/src/pages/ChallengeSitting.tsx` — one question, start to verdict.
-- `web/src/pages/challenge.module.css` — its colours.
-- `web/src/storage/challenge.ts` — the bank and the miss ledger.
-- `web/src/pages/ChallengeChapters.tsx` — the chapter picker.
-- `web/src/reader/Chrome.tsx` — the top bar.
-- `api/tutor.ts` — the `examiner` module.
+- `web/src/narrator/kokoro.worker.ts` — the model, on its own thread.
+- `web/src/narrator/NarratorEngine.ts` — the audio clock and the lookahead.
+- `web/src/narrator/speech.ts` — the adapter under the reading rules.
+- `web/src/narrator/voices.ts` — the roster, the groups, the two defaults.
+- `web/src/reader/useReadAloud.ts` — the voice, wired to the screen.
+- `web/src/reader/readAloud.ts` — the reading rules. Unchanged but for the voice type.
+- `web/src/reader/TextSettings.tsx` — the picker and the download line.
+- `web/vite.config.ts` — the caching that makes it work offline.

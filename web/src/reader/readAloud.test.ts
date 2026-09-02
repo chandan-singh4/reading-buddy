@@ -223,7 +223,7 @@ describe('the chosen voice', () => {
   it('sets the language as well as the voice', () => {
     const fake = fakeSpeech()
     const reader = new AloudReader(fake.speech, fake.make)
-    const voice = { name: 'Daniel', lang: 'en-GB' } as SpeechSynthesisVoice
+    const voice = { id: 'bm_daniel', lang: 'en-GB' }
     reader.start(plan, 0, { voice })
     // Several engines pick a voice from the language and ignore `voice` when
     // the language is unset. That is the "I choose a voice and nothing changes"
@@ -388,7 +388,7 @@ describe('AloudReader', () => {
   it('uses the new voice and speed from the next sentence', () => {
     const fake = fakeSpeech()
     const reader = new AloudReader(fake.speech, fake.make)
-    const voice = { name: 'Daniel' } as SpeechSynthesisVoice
+    const voice = { id: 'bm_daniel' }
     reader.start(plan, 0, { rate: 1 })
     reader.revoice({ voice, rate: 1.5 })
     const last = fake.said[fake.said.length - 1]

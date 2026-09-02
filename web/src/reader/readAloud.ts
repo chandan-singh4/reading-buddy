@@ -144,9 +144,25 @@ export interface SpeechLike {
   resume(): void
 }
 
+/**
+ * The voice to say it in.
+ *
+ * A plain `{ id, lang }` rather than the browser's `SpeechSynthesisVoice`, and
+ * that is what made the engine swap possible. The reading rules never cared
+ * what a voice *was* — they only ever passed it along and read `lang` off it.
+ * Naming that little made the whole of this file work unchanged against a
+ * neural narrator that has no idea what `speechSynthesis` is.
+ */
+export interface ChosenVoice {
+  /** What the engine calls this voice. A system name, or a Kokoro id. */
+  id: string
+  /** The language of the words, as a tag like `en-GB`. May be unknown. */
+  lang?: string
+}
+
 export interface SpokenLike {
   text: string
-  voice: SpeechSynthesisVoice | null
+  voice: ChosenVoice | null
   rate: number
   /*
    * No argument. The reader ignores the event, and declaring one would make
@@ -169,7 +185,7 @@ export interface SpokenLike {
 
 /** How the voice is set up for one sentence. */
 export interface Voicing {
-  voice?: SpeechSynthesisVoice | null
+  voice?: ChosenVoice | null
   rate?: number
 }
 

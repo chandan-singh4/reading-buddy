@@ -3008,3 +3008,93 @@ the rule.
 
 **Not changed:** two back swipes in a row still leave the app from the tab
 screens. The reader confirmed this on 2026-09-02, keeping the 2026-08-07 rule.
+## The reading voice is a model on the device, not the browser's
+
+**2026-09-02.** "Read aloud" used `window.speechSynthesis`. It now uses
+Kokoro-82M, a small neural speech model. The model runs in the browser. It sends
+nothing to a server. It costs no money for each use.
+
+Reasons to change:
+
+- The browser gave a different set of voices on each device.
+- The voice names told the reader nothing. One example: "Microsoft Zira Desktop".
+- Some Android phones show many names for one voice.
+- The quality was poor for one hour of listening.
+
+Kokoro gives the same 28 voices on every device. The app can name a default and
+know it is there.
+
+**The rules did not change.** `readAloud.ts` holds the rules. It decides what to
+say and what comes next. Those rules hold three fixes that were hard to find:
+
+1. A sentence that runs off the page is cut in two. The page turns on the correct
+   word.
+2. `cancel()` starts `onend`. Each utterance carries a generation number. Without
+   it, the stop button starts the reading again.
+3. A pause cancels. It does not pause the engine. An engine that is paused on
+   Android swallows everything after it.
+
+Only the engine under the rules changed. `narrator/speech.ts` is the adapter. A
+new controller would have to find those three faults again.
+
+**The voice is a `{ id, lang }` now.** It was a `SpeechSynthesisVoice`. The rules
+never used more than those two fields.
+
+## The narrator asks for a GPU adapter, it does not look for the API
+
+**2026-09-02.** `'gpu' in navigator` is not proof that WebGPU works. The first
+run of the new worker showed this. The object was there. The adapter request
+failed. The narrator failed with "no available backend found" and did not fall
+back.
+
+The worker now asks for an adapter, and waits for the answer. It also tries wasm
+a second time if the model fails to load on the GPU. A driver can refuse the
+model after the browser has given out an adapter.
+
+Cost: one `await`, one time, for the life of the worker.
+
+## The model is cached on the way past, not at install
+
+**2026-09-02.** The weights are 86 MB. The ONNX runtime is 21 MB. Neither is in
+the app's install.
+
+The service worker caches both the first time a reader presses Read aloud.
+`CacheFirst`, for one year. The files have a fixed name for a fixed model
+version, so there is nothing to check for.
+
+A reader who never presses Read aloud downloads none of it.
+
+## Cross-origin isolation stays off, and the measurement is still open
+
+**2026-09-02.** Multi-thread wasm needs `COOP: same-origin` and a `COEP` header.
+It would make the voice several times faster on a device with no GPU.
+
+It is off. Two reasons:
+
+1. `require-corp` would break the model download. Each cross-origin answer must
+   carry its own CORP header. The Hugging Face hub does not send one.
+2. `credentialless` avoids that problem. But Safari ignores it. And it changes
+   how every cross-origin request in the app is made.
+
+**The measurement failed, it did not pass.** The preview pane puts the page in a
+frame. COOP does not apply to a framed page. `crossOriginIsolated` stayed false,
+so the speed gain could not be measured.
+
+**Open:** measure the speed on a real phone before you switch this on.
+
+## The narrator is about five times slower than speech without a GPU
+
+**2026-09-02.** Measured in the preview browser, on wasm, with no GPU:
+
+- 12 words: about 10 seconds to make.
+- 13 words: about 27 seconds to make.
+
+This is the fallback path, not the usual one. A phone with WebGPU is much
+faster. But a phone without one — an older iPhone, for example — will stop
+between sentences.
+
+The Settings panel says so when it happens. It names the processor as the cause.
+A reader must not think the app is broken.
+
+**Not settled:** whether the wasm path is good enough to keep. The answer needs
+one test on the reader's own phone. See `active-task.md`.

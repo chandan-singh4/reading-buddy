@@ -24,6 +24,8 @@
  *   paper, not in the toolbar.
  */
 
+import type { NarratorStatus } from '../narrator/NarratorEngine.ts'
+import type { NarratorVoice } from '../narrator/voices.ts'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
@@ -114,7 +116,9 @@ export interface ChromeProps {
   highlighter?: HighlighterChoice
   onHighlighterChange?: (choice: HighlighterChoice) => void
   /** The device's reading voices, for the Aa tab's voice row (WP-16). */
-  voices?: readonly SpeechSynthesisVoice[]
+  voices?: readonly NarratorVoice[]
+  /** How the narrator is doing. Passed straight through to the panel. */
+  narrator?: NarratorStatus
   /** Say a line in a voice as the reader picks it (WP-16). */
   onTryVoice?: (voiceName?: string) => void
 
@@ -187,6 +191,7 @@ export function Chrome({
   onHighlighterChange,
   voices,
   onTryVoice,
+  narrator,
   onOpenSheet,
   onCloseSheet,
   outline,
@@ -577,6 +582,7 @@ export function Chrome({
               onHighlighterChange={onHighlighterChange}
               voices={voices}
               onTryVoice={onTryVoice}
+              narrator={narrator}
             />
           </div>
         </div>

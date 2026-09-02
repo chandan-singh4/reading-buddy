@@ -2,27 +2,35 @@
  * The reading voice, wired to the page.
  *
  * `readAloud.ts` holds the rules — what to say and what comes next. This holds
- * the parts that only make sense inside a screen: the browser's engine, the
- * list of voices it offers, the sentence the page has to mark, and the move to
- * the next section when this one runs out.
+ * the parts that only make sense inside a screen: the engine that makes the
+ * sound, the voices it offers, the sentence the page has to mark, and the move
+ * to the next section when this one runs out.
+ *
+ * ## The voice is the app's now, not the phone's
+ *
+ * This used to be `window.speechSynthesis`. That was free and it was there, and
+ * both of those were the whole of its case. Against it: a different set of
+ * voices on every device, names like "Microsoft Zira Desktop" that tell a
+ * reader nothing, several Android phones listing a dozen names that are one
+ * engine underneath, and a quality that makes an hour of listening a chore.
+ *
+ * The narrator is a neural model that runs on the device (`src/narrator/`). It
+ * costs 86 MB once, and after that it is the same voice on every device, works
+ * with no network, and sends nothing anywhere. The rules below did not change
+ * to accommodate it — see `narrator/speech.ts` for why they did not have to.
  *
  * ## It stops when the reader leaves
  *
- * `speechSynthesis` belongs to the tab, not to this screen. Nothing used to
- * silence it, so closing the book left the voice reading the page that was no
- * longer there, and the only way to stop it was to close the tab. The cleanup
- * below is that fix, and it is the reason this is a hook at all.
+ * The engine outlives a render but not the screen. Nothing used to silence the
+ * old one, so closing the book left the voice reading a page that was no longer
+ * there. The cleanup below is that fix, and it is the reason this is a hook.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  AloudReader,
-  planOf,
-  startOf,
-  type SpeechLike,
-  type SpokenLike,
-  type Utterance,
-} from './readAloud.ts'
+import { AloudReader, planOf, startOf, type Utterance } from './readAloud.ts'
+import { NarratorEngine, type NarratorStatus } from '../narrator/NarratorEngine.ts'
+import { speechOf, utteranceOf } from '../narrator/speech.ts'
+import { DEFAULT_NARRATOR, resolveVoice, type NarratorVoice } from '../narrator/voices.ts'
 import type { Anchor, Paragraph } from '../structure/index.ts'
 
 export interface AloudControls {
@@ -32,8 +40,16 @@ export interface AloudControls {
   running: boolean
   /** The sentence being said, so the page can mark it. */
   saying: Utterance | null
-  /** The voices this browser offers. Empty until the engine reports them. */
-  voices: SpeechSynthesisVoice[]
+  /** The voices the narrator offers. The same list on every device. */
+  voices: NarratorVoice[]
+  /**
+   * How the narrator itself is doing: loading, ready, or unavailable.
+   *
+   * Shown to the reader once, on the first ever play, while 86 MB of weights
+   * arrive. After that it is `ready` before anyone can look at it — the model is
+   * in the browser's cache and there is nothing to wait for.
+   */
+  narrator: NarratorStatus
   /**
    * Read from here. `from` names the paragraph; `excerpt` is what the reader
    * actually picked, so the reading starts at their sentence and not at the
@@ -47,21 +63,21 @@ export interface AloudControls {
   /**
    * Say one short line in a voice, so the reader can hear it before choosing.
    *
-   * Every system voice picker does this, and here it does a second job: it is
-   * the one place a reader can tell "the app ignored my choice" apart from
-   * "this phone only really has one voice". Several Android phones list a dozen
-   * names that are all the same engine underneath.
+   * Every voice picker does this. Here it does a second job: 28 names in a list
+   * tell a reader nothing about how any of them sound, and the difference
+   * between two of them is the difference between finishing a book by ear and
+   * giving up on it.
    *
    * Does nothing while the book is being read. The change is already audible in
    * the next sentence, and two voices at once helps nobody.
    */
-  sample: (voiceName?: string) => void
+  sample: (voiceId?: string) => void
 }
 
 export interface AloudOptions {
   /** The section on screen. A new array means new words to read. */
   paragraphs: readonly Paragraph[]
-  /** The chosen voice, by name. Anything else falls back to the engine's own. */
+  /** The chosen voice, by the narrator's own id. Falls back when it is gone. */
   voiceName?: string | undefined
   rate: number
   /** Called for each sentence, so the page can turn to it. */
@@ -87,6 +103,17 @@ export interface AloudOptions {
   onSectionEnd?: () => boolean
 }
 
+/**
+ * How many sentences ahead the narrator is asked to make.
+ *
+ * Two, and the number comes from what synthesis costs. One sentence takes
+ * roughly as long to make as a short sentence takes to say, so one ahead is
+ * enough to cover an ordinary run and two absorbs a long word or a busy phone.
+ * More is wasted work: every page turn and every pause throws the lookahead
+ * away, and a reader who stops after three sentences has paid for five.
+ */
+const AHEAD = 2
+
 export function useReadAloud(options: AloudOptions): AloudControls {
   const { paragraphs, voiceName, rate, onSaying, breakAt, onCross, onStopped, onSectionEnd } =
     options
@@ -94,9 +121,21 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   const [playing, setPlaying] = useState(false)
   const [running, setRunning] = useState(false)
   const [place, setPlace] = useState<number | null>(null)
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
 
   const plan = useMemo(() => planOf(paragraphs), [paragraphs])
+
+  /*
+   * The engine, made once and kept for the life of the screen.
+   *
+   * Made, not loaded. The constructor starts no worker and downloads nothing —
+   * see `NarratorEngine.wake`. Opening a book must not cost 86 MB.
+   */
+  const engineRef = useRef<NarratorEngine | null>(null)
+  if (!engineRef.current) engineRef.current = new NarratorEngine()
+  const engine = engineRef.current
+
+  const [narrator, setNarrator] = useState<NarratorStatus>(engine.now)
+  useEffect(() => engine.watch(setNarrator), [engine])
 
   /*
    * The callbacks as refs, and the reason is the reader below.
@@ -121,79 +160,71 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   /** Set when a section ended mid-reading: the next one starts on arrival. */
   const carryOn = useRef(false)
 
-  const engine = typeof window === 'undefined' ? undefined : window.speechSynthesis
-
-  /*
-   * The one place the reader's small interface meets the browser's large one.
-   *
-   * `SpeechSynthesisUtterance` carries a dozen members the reader has no use
-   * for, and its handlers are given an event the reader ignores. Widening
-   * `SpokenLike` to match would make it a copy of the browser type and the seam
-   * would buy nothing. So the adapting happens here, once, in the file that
-   * already owns the browser.
-   */
-  const asSpeech = (one: SpeechSynthesis) => one as unknown as SpeechLike
-  const utteranceOf = (text: string) =>
-    new SpeechSynthesisUtterance(text) as unknown as SpokenLike
+  /** The voice and speed as they stand, for the lookahead to read. */
+  const voicing = useMemo(() => {
+    const chosen = resolveVoice(narrator.roster, voiceName)
+    return { voice: { id: chosen.id ?? DEFAULT_NARRATOR }, rate }
+  }, [narrator.roster, voiceName, rate])
+  const voicingNow = useRef(voicing)
+  voicingNow.current = voicing
 
   const reader = useRef<AloudReader | null>(null)
-  if (!reader.current && engine) {
-    reader.current = new AloudReader(
-      asSpeech(engine),
-      utteranceOf,
-      {
-        onPlace: (at) => {
-          setPlace(at)
-          if (at === null) {
-            // Quiet, and nothing on the page marked. Whether the book goes on
-            // is the *other* callback's business — see `onFinished` below.
-            stopped.current?.()
-            setPlaying(false)
-            setRunning(false)
-            return
-          }
-          const line = planNow.current[at]
-          if (line) saying.current?.(line)
-        },
-        onFinished: () => {
-          // The section was read to its end. This never runs when the reader
-          // presses stop, which is the whole reason it is a separate callback:
-          // stop used to be indistinguishable from "finished", so it carried
-          // the reader into the next chapter instead of ending the reading.
-          const moved = sectionEnd.current?.() ?? false
-          carryOn.current = moved
-          setPlaying(moved)
-          setRunning(moved)
-        },
-        breakAt: (line, from) => breaks.current?.(line, from) ?? null,
-        onCross: (line, at) => cross.current?.(line, at),
+  if (!reader.current) {
+    reader.current = new AloudReader(speechOf(engine), utteranceOf, {
+      onPlace: (at) => {
+        setPlace(at)
+        if (at === null) {
+          // Quiet, and nothing on the page marked. Whether the book goes on
+          // is the *other* callback's business — see `onFinished` below.
+          stopped.current?.()
+          setPlaying(false)
+          setRunning(false)
+          return
+        }
+        const line = planNow.current[at]
+        if (line) saying.current?.(line)
+
+        /*
+         * Make the next sentences while this one plays.
+         *
+         * Here rather than anywhere else because this is the one place that
+         * knows the reading moved, and it fires for every cause of a move —
+         * finishing a sentence, skipping, seeking, a new section. A lookahead
+         * hung off `start` alone would run dry the moment a reader skipped.
+         */
+        const { voice, rate: speed } = voicingNow.current
+        for (let ahead = 1; ahead <= AHEAD; ahead += 1) {
+          const next = planNow.current[at + ahead]
+          if (next) engine.prime({ text: next.text, voice: voice.id, speed })
+        }
       },
-    )
+      onFinished: () => {
+        // The section was read to its end. This never runs when the reader
+        // presses stop, which is the whole reason it is a separate callback:
+        // stop used to be indistinguishable from "finished", so it carried
+        // the reader into the next chapter instead of ending the reading.
+        const moved = sectionEnd.current?.() ?? false
+        carryOn.current = moved
+        setPlaying(moved)
+        setRunning(moved)
+      },
+      breakAt: (line, from) => breaks.current?.(line, from) ?? null,
+      onCross: (line, at) => cross.current?.(line, at),
+    })
   }
-
-  /** The engine's voices, which several browsers report a moment late. */
-  useEffect(() => {
-    if (!engine) return
-    const read = () => setVoices(engine.getVoices())
-    read()
-    engine.addEventListener?.('voiceschanged', read)
-    return () => engine.removeEventListener?.('voiceschanged', read)
-  }, [engine])
-
-  const voicing = useMemo(
-    () => ({ voice: voices.find((one) => one.name === voiceName) ?? null, rate }),
-    [voices, voiceName, rate],
-  )
 
   const start = useCallback(
     (from?: Anchor, excerpt?: string) => {
       const one = reader.current
       if (!one || plan.length === 0) return
+      // The first play is what pays for the model. Asking here means a reader
+      // who never presses play never downloads it.
+      engine.wake()
       setRunning(true)
       setPlaying(true)
       one.start(plan, startOf(plan, from, excerpt), voicing)
     },
-    [plan, voicing],
+    [engine, plan, voicing],
   )
 
   const pause = useCallback(() => {
@@ -219,19 +250,15 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   const skip = useCallback((by: number) => reader.current?.skip(by), [])
 
   const sample = useCallback(
-    (name?: string) => {
-      if (!engine || running) return
-      const voice = voices.find((one) => one.name === name) ?? null
-      engine.cancel()
-      const spoken = utteranceOf(SAMPLE)
-      spoken.voice = voice
-      spoken.rate = rate
-      if (voice?.lang) spoken.lang = voice.lang
-      asSpeech(engine).speak(spoken)
+    (id?: string) => {
+      if (running) return
+      engine.wake()
+      // Whatever was being tried a moment ago stops. A reader moving down a
+      // list of 28 voices taps faster than a sentence takes to say.
+      engine.stop()
+      engine.play({ text: SAMPLE, voice: id || DEFAULT_NARRATOR, speed: rate }, {})
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the two adapters
-    // are plain casts and are stable by construction.
-    [engine, rate, running, voices],
+    [engine, rate, running],
   )
 
   /*
@@ -251,9 +278,9 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   /*
    * A new voice or speed, without losing the place.
    *
-   * Not on the first run. The voice list arrives a moment after the screen
-   * does, so `voicing` changes identity once for reasons that have nothing to
-   * do with the reader — and re-voicing says the current sentence again.
+   * Not on the first run. The roster is corrected once when the model reports
+   * its own — so `voicing` changes identity for a reason that has nothing to do
+   * with the reader, and re-voicing says the current sentence again.
    */
   const voicedOnce = useRef(false)
   useEffect(() => {
@@ -265,13 +292,23 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   }, [voicing])
 
   /** The whole point of the hook: leaving the screen silences the voice. */
-  useEffect(() => () => reader.current?.stop(), [])
+  useEffect(
+    () => () => {
+      reader.current?.stop()
+      // The worker and the audio hardware go back too. A terminated worker is
+      // 86 MB of model released; the browser's cache keeps the *download*, so
+      // the next book pays nothing for this.
+      engine.close()
+    },
+    [engine],
+  )
 
   return {
     playing,
     running,
     saying: place === null ? null : (plan[place] ?? null),
-    voices,
+    voices: narrator.roster,
+    narrator,
     start,
     pause,
     resume,
