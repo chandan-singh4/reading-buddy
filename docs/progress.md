@@ -86,6 +86,13 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **The back swipe out of a book** (2026-09-02). Not a waypoint. Build green:
+  2,510 tests across 152 files.
+  - The toolbar's links now replace their history entry instead of pushing.
+  - Leaving a book took three back swipes, and the middle one did nothing. Each
+    trip to the examination or the About page added another dead swipe.
+  - Now: one swipe back to the book, a second out of it.
+
 - **Veda's Examination** (2026-09-01). Not a waypoint. Build green: 2,500 tests
   across 150 files.
   - The reader opens it from the top right of the reading screen. The icon is a

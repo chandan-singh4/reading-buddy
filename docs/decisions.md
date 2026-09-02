@@ -2982,3 +2982,29 @@ reader had made on that screen. Where they are reading is now the fallback, for
 a book they have never been examined on.
 
 Kept in `localStorage`, per book, like the reading settings.
+
+## Every link out of the reading toolbar replaces its entry
+
+**2026-09-02.** The three links in the reading toolbar — back to the library,
+the book's title, and Veda's Examination — all navigate with `replace`.
+
+Raising the toolbar pushes a history entry. That is how a back swipe closes the
+toolbar instead of leaving the book (`useBackDismiss`). The entry sits on top of
+the reader's own entry, and it exists only while the toolbar is up.
+
+A link that pushed from there stranded that entry underneath. Coming back from
+the examination landed on the stranded entry, which carries the reader's own
+URL. So the screen did not change and the swipe appeared to do nothing. It took
+three swipes to leave a book instead of two, and every trip stranded another
+one, so the loop grew the more the reader used it.
+
+`replace` puts the destination on that entry instead of above it. The stranded
+entry cannot exist. One swipe back to the book, a second out of it.
+
+**The invariant:** these links are inside the toolbar, so they cannot be tapped
+unless the toolbar is up, so there is always a layer entry to replace. Moving
+one of them outside the toolbar breaks this. `reader/barLinks.test.tsx` guards
+the rule.
+
+**Not changed:** two back swipes in a row still leave the app from the tab
+screens. The reader confirmed this on 2026-09-02, keeping the 2026-08-07 rule.

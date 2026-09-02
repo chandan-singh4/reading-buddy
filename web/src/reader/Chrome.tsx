@@ -351,8 +351,32 @@ export function Chrome({
         that is exactly where a reader's thumb rests while reading, and putting
         controls under it meant tapping "contents" while trying to turn a page.
       */}
+      {/*
+        ## Every link out of this bar `replace`s, and it is load-bearing
+        (2026-09-02)
+
+        Raising this toolbar pushes a history entry — that is how a back swipe
+        closes it instead of leaving the book (`useBackDismiss`). The entry sits
+        on top of the reader's own, and it exists only while the toolbar is up.
+
+        A link that *pushed* from here would therefore leave that entry stranded
+        underneath. Coming back from the About page or the examination landed on
+        the stranded entry, which has the reader's own URL — so the screen did
+        not change, the gesture appeared to do nothing, and it took three swipes
+        to get out of a book instead of two. Worse, each trip left another one,
+        so the loop grew the more the reader used it. That is the report:
+        "the back swipe keeps me in the loop of going back".
+
+        `replace` puts the destination *on* that entry rather than above it. The
+        stranded entry cannot exist, and the count is right by construction: one
+        swipe back to the book, a second out of it.
+
+        The invariant this rests on: these three links live inside the bar, so
+        they cannot be tapped unless the bar is up, so there is always a layer
+        entry on top to replace. Moving one of them outside the bar breaks it.
+      */}
       <header className={styles.bar}>
-        <Link to="/" className={styles.iconControl} aria-label="Back to library">
+        <Link to="/" replace className={styles.iconControl} aria-label="Back to library">
           <span aria-hidden="true">←</span>
         </Link>
 
@@ -364,6 +388,7 @@ export function Chrome({
         {bookId ? (
           <Link
             to={`/book/${bookId}/info`}
+            replace
             /* Tells the About page it was reached from inside the book, so its
                way out is a Back arrow to this page rather than a home icon. */
             state={{ fromReader: true }}
@@ -418,6 +443,7 @@ export function Chrome({
           to={`/book/${bookId ?? ''}/challenge?chapter=${
             (bookId ? lastChapter(bookId) : undefined) ?? here.chapter
           }`}
+          replace
           className={`${styles.iconControl} ${styles.examControl}`}
           aria-label="Veda's Examination"
         >
