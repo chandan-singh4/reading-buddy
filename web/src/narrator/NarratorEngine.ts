@@ -91,9 +91,14 @@ const LEAD = 0.02
  * primed — and the whole one is then never claimed. Uncapped, an hour of
  * listening leaves an hour of orphaned audio in memory.
  *
- * Three is two sentences of lookahead and one for the cut to land on.
+ * One more than the screen's lookahead, so an orphan has somewhere to sit until
+ * the next sentence pushes it out. It must never be *fewer* than the lookahead:
+ * that was the bug behind "an insanely long pause between every sentence". The
+ * cap evicted the oldest unplayed job, the oldest unplayed job is always the
+ * one about to be spoken, and so every sentence arrived as a cache miss and was
+ * made from scratch while the reader waited.
  */
-const KEEP = 3
+const KEEP = 4
 
 export class NarratorEngine {
   private worker: Worker | null = null
@@ -282,8 +287,18 @@ export class NarratorEngine {
    * the voice reaches them they are already made.
    */
   prime(saying: Saying): number {
-    this.evict()
+    // Already made, or already being made. The screen primes the same sentence
+    // once per sentence it reads, so without this the model is asked for every
+    // line two or three times over — work that competes with the line the
+    // reader is actually waiting for.
+    const already = this.waiting(saying)
+    if (already) return already.id
 
+    return this.make(saying, false)
+  }
+
+  /** Make a job and send it. `urgent` jumps the worker's queue. */
+  private make(saying: Saying, urgent: boolean): number {
     const id = this.nextId
     this.nextId += 1
 
@@ -302,8 +317,12 @@ export class NarratorEngine {
       text: saying.text,
       voice: saying.voice,
       speed: saying.speed,
+      urgent,
     } satisfies ToWorker)
 
+    // After the new job is in, never before it. Evicting first would throw away
+    // the sentence about to be played to make room for one three sentences off.
+    this.evict()
     return id
   }
 
@@ -315,7 +334,10 @@ export class NarratorEngine {
    */
   private evict(): void {
     const spare = [...this.jobs.values()].filter((job) => !job.playing)
-    for (const job of spare.slice(0, Math.max(0, spare.length - KEEP + 1))) {
+    // The newest `KEEP` are the lookahead and survive. Anything older is an
+    // orphan — a whole sentence that was primed and then cut in half by a page
+    // break, so the half that got spoken never claimed it.
+    for (const job of spare.slice(0, Math.max(0, spare.length - KEEP))) {
       this.jobs.delete(job.id)
       this.worker?.postMessage({ type: 'cancel', job: job.id } satisfies ToWorker)
     }
@@ -344,7 +366,10 @@ export class NarratorEngine {
    */
   play(saying: Saying, told: { onEnd?: () => void; onError?: (message: string) => void }): number {
     const existing = this.waiting(saying)
-    const job = existing ?? this.jobs.get(this.prime(saying))
+    // A miss means the reader is waiting on a sentence nobody expected — the
+    // first one, or one after a skip or a page break. It goes to the head of
+    // the queue, ahead of a lookahead that can afford to wait.
+    const job = existing ?? this.jobs.get(this.make(saying, true))
     if (!job) return 0
 
     job.onEnd = told.onEnd

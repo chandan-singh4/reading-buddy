@@ -19,7 +19,22 @@ export type ToWorker =
    * about a job before the worker has heard of it — cancelling a sentence that
    * is still sitting in the queue is the ordinary case, not the rare one.
    */
-  | { type: 'speak'; job: number; text: string; voice: string; speed: number }
+  | {
+      type: 'speak'
+      job: number
+      text: string
+      voice: string
+      speed: number
+      /**
+       * Put this at the head of the queue, not the tail.
+       *
+       * Set when the reader is waiting on this exact sentence — a first play, a
+       * skip, the half of a sentence after a page break. Without it, a sentence
+       * somebody is waiting for is made *after* the two nobody has reached yet,
+       * which is a wait of two whole sentences for no reason.
+       */
+      urgent?: boolean
+    }
   /** Drop one job, whether it is running, queued, or already finished. */
   | { type: 'cancel'; job: number }
   /** Drop everything. What a reader pressing stop means. */

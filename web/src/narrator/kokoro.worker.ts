@@ -233,7 +233,10 @@ scope.onmessage = (event: MessageEvent<ToWorker>) => {
       // A job cancelled and then re-sent under the same id would otherwise be
       // dropped on arrival. Clearing first makes re-use of an id safe.
       dropped.delete(message.job)
-      queue.push(message)
+      // The head for a sentence somebody is waiting on, the tail for the
+      // lookahead. See `ToWorker.speak.urgent`.
+      if (message.urgent) queue.unshift(message)
+      else queue.push(message)
       void drain()
       return
 

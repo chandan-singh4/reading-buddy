@@ -3098,3 +3098,42 @@ A reader must not think the app is broken.
 
 **Not settled:** whether the wasm path is good enough to keep. The answer needs
 one test on the reader's own phone. See `active-task.md`.
+
+## Three faults made the pause between sentences, and none of them was the model
+
+**2026-09-02.** The reader said there was "an insanely long pause" between
+sentences, "like the sentences are fed one at a time". They were.
+
+The lookahead was there. It destroyed itself before it could be used.
+
+1. **`prime` did not check for work it had already asked for.** The screen
+   primes the next sentences each time the reading moves. So it asked the model
+   for the same sentence two or three times. The copies competed with the
+   sentence the reader was waiting for.
+2. **The cap dropped the oldest unplayed sentence.** The oldest unplayed
+   sentence is always the next one to speak. So the cap threw away the sentence
+   that was about to be used, every time. Every sentence then arrived as a miss
+   and was made from scratch while the reader waited.
+3. **The lookahead reached the worker before the sentence being spoken.** The
+   rules report a move, then speak. So three sentences nobody had reached went
+   into the queue first. The worker takes one at a time and cannot stop in the
+   middle of one.
+
+Fixes:
+
+1. `prime` returns the job that already exists.
+2. The cap keeps the newest, and holds one more than the lookahead.
+3. A sentence the reader waits for is marked `urgent` and goes to the head of
+   the queue. The screen primes in a microtask, after the speak.
+
+Measured on the slow path, with no GPU:
+
+- First sentence: 57 seconds before, 24 seconds after.
+- A sentence that was primed and ready: about 2 seconds, which is only the time
+  it takes to say it.
+
+`narrator/engine.test.ts` guards all three.
+
+**Still true:** on a device with no GPU the model makes speech about five times
+slower than speech is spoken. No lookahead can fix that. Playback catches up
+with it. The fixes above remove waste; they do not make the model faster.

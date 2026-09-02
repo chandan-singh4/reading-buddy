@@ -106,13 +106,20 @@ export interface AloudOptions {
 /**
  * How many sentences ahead the narrator is asked to make.
  *
- * Two, and the number comes from what synthesis costs. One sentence takes
- * roughly as long to make as a short sentence takes to say, so one ahead is
- * enough to cover an ordinary run and two absorbs a long word or a busy phone.
- * More is wasted work: every page turn and every pause throws the lookahead
- * away, and a reader who stops after three sentences has paid for five.
+ * Three. Making a sentence costs about as long as saying one on a device with
+ * graphics acceleration, and several times that on one without — so the
+ * lookahead is the only thing standing between the reader and a pause at every
+ * full stop.
+ *
+ * Not more, because every page turn and every pause throws the lookahead away.
+ * A reader who stops after two sentences has paid for five, and on the slow
+ * path that wasted work is competing for the same processor as the sentence
+ * they are actually listening to.
+ *
+ * `NarratorEngine` keeps one more than this. See `KEEP` there — holding fewer
+ * than the lookahead is what caused the long pause between every sentence.
  */
-const AHEAD = 2
+const AHEAD = 3
 
 export function useReadAloud(options: AloudOptions): AloudControls {
   const { paragraphs, voiceName, rate, onSaying, breakAt, onCross, onStopped, onSectionEnd } =
@@ -191,12 +198,28 @@ export function useReadAloud(options: AloudOptions): AloudControls {
          * knows the reading moved, and it fires for every cause of a move —
          * finishing a sentence, skipping, seeking, a new section. A lookahead
          * hung off `start` alone would run dry the moment a reader skipped.
+         *
+         * ## Why this waits for the end of the turn
+         *
+         * `onPlace` runs *before* the sentence it announced is handed to the
+         * narrator — the rules report the move, then speak. So priming straight
+         * from here puts three sentences nobody is waiting for into the worker
+         * ahead of the one somebody is. The worker takes them one at a time and
+         * cannot be interrupted mid-sentence, so the reader waits for a
+         * sentence they have not reached before hearing the one they asked for.
+         *
+         * Measured, on the slow path: 57 seconds to the first word that way,
+         * against about 20 to make the sentence itself.
+         *
+         * A microtask is enough. It runs after the whole synchronous chain —
+         * including the `speak` that this move leads to — so the sentence the
+         * reader is waiting on always reaches the worker first.
          */
         const { voice, rate: speed } = voicingNow.current
-        for (let ahead = 1; ahead <= AHEAD; ahead += 1) {
-          const next = planNow.current[at + ahead]
-          if (next) engine.prime({ text: next.text, voice: voice.id, speed })
-        }
+        const ahead = planNow.current.slice(at + 1, at + 1 + AHEAD)
+        queueMicrotask(() => {
+          for (const next of ahead) engine.prime({ text: next.text, voice: voice.id, speed })
+        })
       },
       onFinished: () => {
         // The section was read to its end. This never runs when the reader

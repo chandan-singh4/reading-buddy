@@ -87,7 +87,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 ### Recently done
 
 - **A reading voice of our own** (2026-09-02). Not a waypoint. Build green:
-  2,527 tests across 154 files.
+  2,533 tests across 155 files.
   - "Read aloud" no longer uses the browser's speech engine. It uses
     Kokoro-82M, a small speech model that runs on the device.
   - The same 28 voices on every device. American and British. Each one has a
@@ -99,9 +99,14 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   - **A fault the browser found:** `'gpu' in navigator` is not proof that WebGPU
     works. The first run failed instead of falling back. The worker now asks for
     an adapter and waits for the answer.
-  - **Not proved on a phone, and one number is a worry.** Without a GPU the
-    voice is about five times slower than speech. Read the steps in
-    `active-task.md`.
+  - **Three faults made a long pause between sentences.** The reader found
+    them. The lookahead asked for the same sentence twice, the cap threw away
+    the sentence about to be spoken, and the lookahead reached the worker
+    before the sentence the reader was waiting for. All three are fixed and
+    guarded by tests. The first sentence went from 57 seconds to 24.
+  - **Still open, and it needs your phone.** Without a GPU the model makes
+    speech about five times slower than speech is spoken. No lookahead can fix
+    that. Read the steps in `active-task.md`.
 
 - **The back swipe out of a book** (2026-09-02). Not a waypoint. Build green:
   2,510 tests across 152 files.
