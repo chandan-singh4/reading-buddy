@@ -28,7 +28,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AloudReader, planOf, startOf, type Utterance } from './readAloud.ts'
-import { NarratorEngine, type NarratorStatus } from '../narrator/NarratorEngine.ts'
+import type { NarratorStatus } from '../narrator/NarratorEngine.ts'
+import { acquireNarrator, releaseNarrator } from '../narrator/shared.ts'
 import { speechOf, utteranceOf } from '../narrator/speech.ts'
 import { DEFAULT_NARRATOR, resolveVoice, type NarratorVoice } from '../narrator/voices.ts'
 import type { Anchor, Paragraph } from '../structure/index.ts'
@@ -132,17 +133,26 @@ export function useReadAloud(options: AloudOptions): AloudControls {
   const plan = useMemo(() => planOf(paragraphs), [paragraphs])
 
   /*
-   * The engine, made once and kept for the life of the screen.
+   * The narrator, shared with every other screen that speaks.
    *
-   * Made, not loaded. The constructor starts no worker and downloads nothing —
-   * see `NarratorEngine.wake`. Opening a book must not cost 86 MB.
+   * Not one per screen. Veda's answers, the chapter summaries and the notes can
+   * all be read aloud now, and an engine each would be a worker each and 86 MB
+   * of model each — on a phone. See `narrator/shared.ts`.
+   *
+   * Taking it costs nothing: no worker starts and nothing downloads until
+   * somebody presses play. See `NarratorEngine.wake`.
    */
-  const engineRef = useRef<NarratorEngine | null>(null)
-  if (!engineRef.current) engineRef.current = new NarratorEngine()
+  const engineRef = useRef(acquireNarrator())
   const engine = engineRef.current
 
   const [narrator, setNarrator] = useState<NarratorStatus>(engine.now)
-  useEffect(() => engine.watch(setNarrator), [engine])
+  useEffect(() => {
+    const stop = engine.watch(setNarrator)
+    return () => {
+      stop()
+      releaseNarrator()
+    }
+  }, [engine])
 
   /*
    * The callbacks as refs, and the reason is the reader below.
@@ -314,17 +324,14 @@ export function useReadAloud(options: AloudOptions): AloudControls {
     reader.current?.revoice(voicing)
   }, [voicing])
 
-  /** The whole point of the hook: leaving the screen silences the voice. */
-  useEffect(
-    () => () => {
-      reader.current?.stop()
-      // The worker and the audio hardware go back too. A terminated worker is
-      // 86 MB of model released; the browser's cache keeps the *download*, so
-      // the next book pays nothing for this.
-      engine.close()
-    },
-    [engine],
-  )
+  /*
+   * The whole point of the hook: leaving the screen silences the voice.
+   *
+   * Silenced, not closed. The engine is shared now, so this screen is not the
+   * one to decide the model should go — `releaseNarrator` above does that, and
+   * only when nothing else is holding it.
+   */
+  useEffect(() => () => reader.current?.stop(), [])
 
   return {
     playing,

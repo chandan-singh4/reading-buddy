@@ -21,6 +21,9 @@ import { summaryData } from '../summary/dataSource.ts'
 import { approve } from '../summary/engine.ts'
 import { finishedChapters, readSections, titledSections } from '../summary/queue.ts'
 import { Flourish, Paper, Rail, RichText, type RailItem } from '../summary/Paper.tsx'
+import { SpeakButton } from '../narrator/SpeakButton.tsx'
+import { spokenText } from '../narrator/spokenText.ts'
+import { useSpeech, type Speech } from '../narrator/useSpeech.ts'
 import styles from '../summary/summary.module.css'
 import type { ChapterListEntry, ChapterSummary } from '../summary/types.ts'
 
@@ -91,6 +94,12 @@ export default function ChapterView() {
    * is being written, or a redo of one would blank the other.
    */
   const [askingOnly, setAskingOnly] = useState<'recap' | 'items'>('recap')
+
+  /*
+   * Reading a summary out loud. One for the page, so pressing a second
+   * section's button swaps the voice over rather than talking twice at once.
+   */
+  const speech = useSpeech()
   /**
    * The named parts of this chapter the reader has finished and not summarised.
    *
@@ -475,6 +484,8 @@ export default function ChapterView() {
             <SectionHead
               label="This part, in plain words"
               of="this part's summary"
+              id="part-recap"
+              speech={speech}
               text={openPart.recapText}
               busy={asking !== undefined}
               onRedo={() => onWant(partOnScreen, true, 'recap')}
@@ -493,6 +504,8 @@ export default function ChapterView() {
             <SectionHead
               label="What we worked through"
               of="the conversation summary"
+              id="part-items"
+              speech={speech}
               text={openPart.qaText}
               busy={asking !== undefined}
               onRedo={openPart.qaText ? () => onWant(partOnScreen, true, 'items') : undefined}
@@ -523,6 +536,8 @@ export default function ChapterView() {
                 <SectionHead
                   label="The chapter, in plain words"
                   of="the chapter summary"
+                  id="chapter-recap"
+                  speech={speech}
                   text={open.recapText}
                   busy={asking !== undefined}
                   onRedo={() => onWant(undefined, true, 'recap')}
@@ -541,6 +556,8 @@ export default function ChapterView() {
                 <SectionHead
                   label="What we worked through"
                   of="the conversation summary"
+                  id="chapter-items"
+                  speech={speech}
                   text={open.qaText}
                   busy={asking !== undefined}
                   onRedo={open.qaText ? () => onWant(undefined, true, 'items') : undefined}
@@ -735,11 +752,23 @@ function Writing({ text }: { text: string }) {
 function SectionHead({
   label,
   of,
+  id,
+  speech,
   text,
   busy,
   onRedo,
 }: {
   label: string
+  /**
+   * What to call this section when it is being spoken.
+   *
+   * Explicit rather than taken from `of`, because two sections on this page are
+   * both "the conversation summary" — one for the part in hand and one for the
+   * whole chapter. They are never on screen together, but an id that is only
+   * unique by accident of layout is an id waiting to collide.
+   */
+  id: string
+  speech: Speech
   /**
    * What these two controls act on, said as a noun phrase.
    *
@@ -780,6 +809,18 @@ function SectionHead({
           >
             {copied ? <TickIcon /> : <CopyIcon />}
           </button>
+        ) : null}
+        {/* In the reader's own narrator voice, not Veda's. A summary is about
+            the book, so it is read by the voice that reads the book. Veda's
+            voice stays hers, for the answers she writes herself. */}
+        {text ? (
+          <SpeakButton
+            what="summary"
+            className={styles.tool}
+            speaking={speech.speakingId === id}
+            waiting={speech.speakingId === id && speech.narrator.state === 'loading'}
+            onPress={() => speech.toggle(id, spokenText(text))}
+          />
         ) : null}
         {onRedo ? (
           <button

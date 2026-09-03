@@ -86,6 +86,18 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **Veda, the summaries and the notes can speak** (2026-09-02). Not a waypoint.
+  Build green: 2,551 tests across 157 files.
+  - A speaker button under each of Veda's answers, beside Copy and Redo on each
+    chapter summary, and on the line above each note. Press it again to stop.
+  - Veda answers in her own voice, `bf_emma`. It is hers alone, like her violet.
+  - A summary is read in the reader's narrator voice. A note follows who wrote
+    it.
+  - **One narrator now, shared by every screen.** Four speaking screens would
+    have been four workers and four copies of the model, on a phone. The fault
+    is invisible: everything works, only the memory is wrong.
+  - Markdown is stripped first. Otherwise the model says "asterisk asterisk".
+
 - **A reading voice of our own** (2026-09-02). Not a waypoint. Build green:
   2,533 tests across 155 files.
   - "Read aloud" no longer uses the browser's speech engine. It uses

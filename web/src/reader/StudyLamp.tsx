@@ -100,6 +100,10 @@ import {
   storedEffort,
   type Effort,
 } from './effort.ts'
+import { SpeakButton } from '../narrator/SpeakButton.tsx'
+import { spokenText } from '../narrator/spokenText.ts'
+import { useSpeech } from '../narrator/useSpeech.ts'
+import { VEDA_VOICE } from '../narrator/voices.ts'
 import styles from './StudyLamp.module.css'
 
 export interface StudyLampProps {
@@ -352,6 +356,15 @@ export function StudyLamp({
   const [live, setLive] = useState<TutorProgress | undefined>(undefined)
   /** Which message just went to the clipboard, so the button can say so. */
   const [copied, setCopied] = useState<number | undefined>(undefined)
+
+  /*
+   * Reading one of Veda's answers out loud.
+   *
+   * One `useSpeech` for the whole thread, not one per bubble. It tracks which
+   * answer is being spoken, so pressing a second button swaps the voice over
+   * instead of talking twice at once.
+   */
+  const speech = useSpeech()
   /** Which chip started it — sent along with every later message. */
   const intent = useRef<TutorIntent | undefined>(undefined)
 
@@ -1319,6 +1332,22 @@ export function StudyLamp({
                 >
                   ↻
                 </button>
+                {/* In Veda's own voice, never the book's. The same rule that
+                    gives her the violet: one identity, and a tutor who sounds
+                    exactly like the narrator is a tutor the listener cannot
+                    tell from the author. */}
+                <SpeakButton
+                  what="answer"
+                  className={styles.action}
+                  speaking={speech.speakingId === String(message.ts)}
+                  waiting={
+                    speech.speakingId === String(message.ts) &&
+                    speech.narrator.state === 'loading'
+                  }
+                  onPress={() =>
+                    speech.toggle(String(message.ts), spokenText(message.text), VEDA_VOICE)
+                  }
+                />
                 {/* What this one exchange cost, beside the buttons that act on
                     it. The line under the bar adds these up; this says which
                     question the money went on, which the sum cannot. */}

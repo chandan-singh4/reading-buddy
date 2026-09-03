@@ -3137,3 +3137,61 @@ Measured on the slow path, with no GPU:
 **Still true:** on a device with no GPU the model makes speech about five times
 slower than speech is spoken. No lookahead can fix that. Playback catches up
 with it. The fixes above remove waste; they do not make the model faster.
+
+## Veda, the summaries and the notes can be read aloud
+
+**2026-09-02.** A speaker button reads out:
+
+- each of Veda's answers, under the thread;
+- each summary on the chapter page, beside Copy and Redo;
+- each note, on the line that names its chapter.
+
+Press it again to stop. One button, not two. A separate stop button would have
+to appear beside every bubble in a long thread, and then go away again. That is
+movement in the part of the screen the reader is trying to read.
+
+**Which voice speaks.** Veda's answers use Veda's voice, `bf_emma`. It is hers
+alone, like her violet. A tutor who sounds the same as the narrator is a tutor
+the listener cannot tell from the author.
+
+A summary is about the book, so the reader's own narrator voice reads it. A note
+follows who wrote it: Veda's words in her voice, the reader's highlight in the
+narrator voice.
+
+## One narrator, shared by every screen that speaks
+
+**2026-09-02.** `NarratorEngine` owns a worker. The worker owns 86 MB of
+weights. One engine for each screen was correct while only the reading screen
+spoke. With four surfaces it would be four workers and four copies of the model,
+on a phone.
+
+`narrator/shared.ts` holds one engine and counts its holders. The model stays
+while anything can still speak. It goes when the last screen goes.
+
+**Counted, not kept forever.** An engine that is never released holds the model
+for the life of the tab. Counting also keeps the model warm when the reader
+moves from a book to its chapter summaries. A new engine for each screen would
+throw it away and load it again.
+
+The fault this prevents cannot be seen. Four engines work correctly. Every
+button works. Every test passes. Only the memory is wrong.
+`narrator/shared.test.ts` guards it.
+
+## Markdown is stripped before it is spoken
+
+**2026-09-02.** Veda writes markdown. The summaries are markdown. Given to the
+speech model as they are, `**the shadow**` is spoken as "asterisk asterisk the
+shadow asterisk asterisk".
+
+`narrator/spokenText.ts` removes the marks. It keeps the words in a heading, a
+bullet and inline code. It removes a code block, a table and an image. A link is
+read by its name, never by its address: a URL spoken aloud is a minute of
+punctuation.
+
+**It adds a full stop to a line that has none.** The sentence splitter cuts on
+terminal punctuation. Without this, a heading and the paragraph under it are one
+utterance, said in one breath, with no pause where the page shows a gap.
+
+**It does not use the markdown renderer.** Reading the text back out of the DOM
+would tie speaking something to having drawn it. A summary could then not be
+spoken from a screen that had not laid it out.

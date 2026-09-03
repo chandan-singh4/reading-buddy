@@ -15,6 +15,10 @@
 import { useRef, useState } from 'react'
 
 import { Markdown } from './markdown.tsx'
+import { SpeakButton } from '../narrator/SpeakButton.tsx'
+import { spokenText } from '../narrator/spokenText.ts'
+import { useSpeech, type Speech } from '../narrator/useSpeech.ts'
+import { VEDA_VOICE } from '../narrator/voices.ts'
 import {
   canGroupByChapter,
   groupByChapter,
@@ -93,7 +97,48 @@ function whereItIs(note: NoteRow): string {
  * its own menu on the page, and a conversation from the menu inside it. This
  * list is for finding your way back to them.
  */
-function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
+/**
+ * The chapter a note came from, and the button that reads it out.
+ *
+ * One component for all three kinds of note, because the row above them is the
+ * same row. `.tagRow` already spaces its children apart, so the chapter stays
+ * left and the button arrives on the right with no new layout.
+ */
+function NoteHead({ note, speech }: { note: NoteRow; speech: Speech }) {
+  /*
+   * Whose voice a note is read in follows who wrote it.
+   *
+   * Veda's own words — an answer kept whole, or a line kept out of one — are
+   * read in Veda's voice. The reader's own highlight is the book's words, so it
+   * is read by the voice that reads the book. Same rule as her violet.
+   */
+  const hers = note.author === 'claude' || !!note.fromThread
+
+  return (
+    <span className={styles.tagRow}>
+      <span className={styles.tag}>{whereItIs(note)}</span>
+      <SpeakButton
+        what="note"
+        className={styles.bin}
+        speaking={speech.speakingId === note.id}
+        waiting={speech.speakingId === note.id && speech.narrator.state === 'loading'}
+        onPress={() =>
+          speech.toggle(note.id, spokenText(note.text), hers ? VEDA_VOICE : undefined)
+        }
+      />
+    </span>
+  )
+}
+
+function Note({
+  note,
+  onJump,
+  speech,
+}: {
+  note: NoteRow
+  onJump: () => void
+  speech: Speech
+}) {
   if (note.fromThread) {
     /*
      * A line the reader kept out of an answer, drawn as a quotation and not as
@@ -107,9 +152,7 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
       <li className={styles.note}>
         {/* The chapter first, as it is over a Quote. The reader asked for the
             two to match: where a line came from is how they find it again. */}
-        <span className={styles.tagRow}>
-          <span className={styles.tag}>{whereItIs(note)}</span>
-        </span>
+        <NoteHead note={note} speech={speech} />
         <div
           role="button"
           tabIndex={0}
@@ -132,9 +175,7 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
       <li className={styles.note}>
         {/* The chapter first, as it is over every other kind of note. Where a
             conversation happened is how the reader finds it again. */}
-        <span className={styles.tagRow}>
-          <span className={styles.tag}>{whereItIs(note)}</span>
-        </span>
+        <NoteHead note={note} speech={speech} />
         {/*
           A div wearing a button's clothes, and it has to be one. The answer is
           markdown now, so this holds headings, lists and stacked tables — and
@@ -163,9 +204,7 @@ function Note({ note, onJump }: { note: NoteRow; onJump: () => void }) {
 
   return (
     <li className={styles.note}>
-      <span className={styles.tagRow}>
-        <span className={styles.tag}>{whereItIs(note)}</span>
-      </span>
+      <NoteHead note={note} speech={speech} />
       {/* The colour the reader chose, carried through to the list. It is the
           only thing telling two highlights apart at a glance, and readers give
           their colours meanings the app is not told about. */}
@@ -214,6 +253,12 @@ export function NotesPanel({
   const shown = grouped && groupable ? chosen : inRecentOrder(chosen)
 
   /** A tutor row reopens its conversation; every other note goes to its page. */
+  /*
+   * Reading a note out loud. One for the whole panel, so pressing a second
+   * note's button swaps the voice over rather than talking twice at once.
+   */
+  const speech = useSpeech()
+
   function visit(note: NoteRow) {
     if (note.threadId && onOpenThread) {
       /*
@@ -347,7 +392,7 @@ export function NotesPanel({
                 </h3>
                 <ul className={styles.group}>
                   {group.notes.map((note) => (
-                    <Note key={note.id} note={note} onJump={() => visit(note)} />
+                    <Note key={note.id} note={note} onJump={() => visit(note)} speech={speech} />
                   ))}
                 </ul>
               </section>
@@ -355,7 +400,7 @@ export function NotesPanel({
           ) : (
             <ul className={styles.list}>
               {shown.map((note) => (
-                <Note key={note.id} note={note} onJump={() => visit(note)} />
+                <Note key={note.id} note={note} onJump={() => visit(note)} speech={speech} />
               ))}
             </ul>
           )}
