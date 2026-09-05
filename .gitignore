@@ -31,6 +31,10 @@ web/public/workbox-*.js
 /books/
 /research-paper/
 
+# Design references gathered by hand: screenshots and saved pages. Large, and
+# not ours to redistribute. Kept on disk, out of history.
+/design-inspiration/
+
 # Python scratch
 __pycache__/
 *.pyc
