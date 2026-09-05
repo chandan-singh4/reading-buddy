@@ -33,4 +33,17 @@ export { PARSER_VERSION } from '../parse/version.ts'
 
 export { dropHasDirectory, filesFromDrop } from './dropped.ts'
 
+export {
+  allowedToRead,
+  canRememberFolder,
+  chooseFolder,
+  filesInFolder,
+  forgetFolder,
+  hasImportedFolder,
+  readRememberedFolder,
+  rememberedFolder,
+  rememberFolderImport,
+} from './folder.ts'
+export type { RememberedFolder } from './folder.ts'
+
 export { shelfFor, shelfOf } from './shelf.ts'

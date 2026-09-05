@@ -26,9 +26,31 @@ export interface AddButtonProps {
   onPickFiles: (files: File[]) => void
   onPickFolder: (files: File[]) => void
   onNewFolder: () => void
+  /**
+   * Show "Check folder for new books". False until the reader has imported a
+   * folder at least once — before that the item would name a folder that does
+   * not exist.
+   */
+  canRecheck?: boolean
+  /**
+   * True where the browser cannot keep a folder handle — Firefox, iOS Safari.
+   * The item then opens the folder picker instead of scanning silently, which
+   * needs it to be a `<label>` for the file input: a file picker can only be
+   * opened by a real gesture on its own label.
+   */
+  recheckPicks?: boolean
+  onRecheck?: () => void
 }
 
-export function AddButton({ busy, onPickFiles, onPickFolder, onNewFolder }: AddButtonProps) {
+export function AddButton({
+  busy,
+  onPickFiles,
+  onPickFolder,
+  onNewFolder,
+  canRecheck = false,
+  recheckPicks = false,
+  onRecheck,
+}: AddButtonProps) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
@@ -108,6 +130,38 @@ export function AddButton({ busy, onPickFiles, onPickFolder, onNewFolder }: AddB
           </span>
           Import a folder of books
         </label>
+
+        {/* Under the folder import, because it is the same job asked a second
+            time. Hidden until there has been a first time. */}
+        {canRecheck &&
+          (recheckPicks ? (
+            <label
+              htmlFor="library-add-directory"
+              className={styles.item}
+              aria-disabled={busy}
+              onClick={() => setOpen(false)}
+            >
+              <span className={styles.itemIcon} aria-hidden="true">
+                ⟳
+              </span>
+              Check folder for new books
+            </label>
+          ) : (
+            <button
+              type="button"
+              className={styles.item}
+              disabled={busy}
+              onClick={() => {
+                setOpen(false)
+                onRecheck?.()
+              }}
+            >
+              <span className={styles.itemIcon} aria-hidden="true">
+                ⟳
+              </span>
+              Check folder for new books
+            </button>
+          ))}
 
         <button
           type="button"

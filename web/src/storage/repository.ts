@@ -34,7 +34,6 @@ import {
   type StoredSection,
   type StoredSource,
 } from './db.ts'
-
 /**
  * A picture a parser pulled out of the file, on its way to storage. The same
  * pair as `StoredAsset` minus the book, which the book itself supplies.

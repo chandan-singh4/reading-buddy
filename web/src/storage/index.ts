@@ -23,6 +23,7 @@ export type {
   StoredBookmark,
   StoredChapterIndex,
   StoredFolder,
+  StoredHandle,
   StoredNote,
   StoredQuote,
   StoredDefinition,
@@ -39,6 +40,9 @@ export { createTutorStore, findThread, tutorStore } from './tutor.ts'
 
 export { relocate, relocateMarks } from './relocate.ts'
 export type { Relocation } from './relocate.ts'
+
+export { createHandleStore, handleStore } from './handles.ts'
+export type { HandleStore } from './handles.ts'
 
 export { createWordStore, wordStore } from './words.ts'
 export type { WordFrom, WordStore } from './words.ts'

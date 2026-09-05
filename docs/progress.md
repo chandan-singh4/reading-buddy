@@ -14,10 +14,11 @@ Ask → a streamed answer works end to end. WP-17, 19, 20, 25 and 29 are closed.
 Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### In flight
-- **Nothing on this screen has been seen on a phone.** The Statistics screen was
-  built and proved in a desktop browser against 122 seeded sessions. The timer
-  is the part that needs a device: no real session has ever been recorded by a
-  real reader closing a real book.
+- **The phone has now seen all of it (2026-09-05).** The reader checked every
+  screen that was waiting: the Statistics screen and its timer, the rebuilt book
+  screen in both states, the two-row chapter rail, the model picker, the chapter
+  summary page, the bell on Home, and the new reading voice. All confirmed
+  working. The bright summary page in Dark is accepted as it is.
 - **A book left open counts.** The idle rule was removed on the reader's
   instruction, so the only guard is a six-hour cap per session. If a forgotten
   book starts inflating the numbers, the fix is a smaller cap, not a new pause
@@ -30,13 +31,9 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed; build green:
   2,487 tests across 149 files.
-- **The Obsidian export is proved. It met a real vault on 2026-08-31.** The
-  reader exported, dropped the folder into Obsidian, and followed the links.
-  Still unproved: a *second* export. Nobody has read more and pressed "Export
-  what's new" yet, so the no-duplicates rule holds by test only.
-- **Waiting on the phone: the reading desk.** The book screen was rebuilt this
-  session and judged in a desktop browser against a seeded book. Both states
-  need a look on a device — an unfinished book and a finished one.
+- **The Obsidian export is proved, both times.** The first export met a real
+  vault on 2026-08-31. The reader confirmed the second export on 2026-09-05:
+  "Export what's new" added the new chapter and made no copy of an old one.
 - **`api/tutor.ts` has no tests.** The mid-stream failover added this session is
   proved by reasoning only. There is no test harness under `api/`, and the
   client half is covered instead (`watched.test.ts`, `askMemory.test.ts`).
@@ -48,24 +45,12 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   library is in the cloud, so every summary page read an empty database and
   showed nothing. `summary/repository.test.ts` reads the imports of every file
   in `summary/`, `pages/` and `tutor/` and fails on a new offender.
-- **Waiting on the phone: the two-row rail.** A chapter with named parts now
-  shows two strips. The overflow fix was proved by reading the CSS, not by
-  looking — this dev database holds no books. Swipe both rows.
-- **Waiting on the phone: the model picker.** Settings can now name the model
-  that writes summaries. It has never been switched on a device.
 - **Not proved yet: a real call to either model.** Every part around them is
   tested — the queue, the parser, the stores, the bell. The models themselves
   have never answered. The first real proof is the reader finishing a chapter
   and seeing a summary appear. Watch for a wrong shape coming back.
 - **No ceiling on spending.** The queue skips finished work and only the most
   recently opened book runs unasked. There is no cap beyond that.
-- **Waiting on the phone: the chapter summary page and the bell.** Both were
-  judged on a desktop browser only. Open a book, then **Book details → Chapter
-  summaries**. Judge the paper, the type sizes, and the sideways rail under the
-  heading. On Home, check the bell is easy to hit with a thumb.
-- **A design question the page leaves open.** It does not follow the reader's
-  theme. A reader in Dark gets a bright page at night. This was chosen with the
-  cost known. Only a look on the phone can settle it.
 - **The update prompt now has a second door.** The reader reported that the
   prompt did not appear one time, which left the phone on old code with no way
   to move it. A waiting build is now the top line in the bell, and it keeps
@@ -85,6 +70,19 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   phone, not by a test.
 
 ### Recently done
+
+- **WP-43 — check the folder for new books** (2026-09-05). Build green: 2,564
+  tests across 158 files.
+  - A new item in the "+" menu: **Check folder for new books**. It shows only
+    after the reader has imported a folder one time.
+  - On Chrome, Edge and Android Chrome the app keeps the folder and reads it
+    again with no picker. On Firefox and iOS Safari the item opens the folder
+    picker, because those browsers cannot keep a folder.
+  - Books already on the shelf are skipped. Import did this before; the button
+    only had to use it.
+  - The report now names the new books: "Imported 2 books: The Red Book, Aion."
+  - **Not proved on a device.** Nobody has pressed this button on a phone. The
+    picker needs a real folder and a real finger.
 
 - **Veda, the summaries and the notes can speak** (2026-09-02). Not a waypoint.
   Build green: 2,551 tests across 157 files.
@@ -371,33 +369,12 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   worker problem. Don't raise it again.
 
 ### Next up
-**Judge this session's four changes on the phone.** The blank heatmap day,
-rename on the shelf, the front door's lit fore edge and trajectory strip, and
-the one type system across the three screens. `active-task.md` lists the checks.
-Watch the Statistics accent in particular: it changed from green to your theme's
-brown, and that is a taste call only a device can settle.
-
-**Then export what's new to Obsidian.** The first export is proved. The
-no-duplicates rule is not: read more, let a chapter summary write itself, press
-**Export what's new**, and check the vault gained the new chapter and no copy of
-an old one.
-
-**Judge this session's work on the phone.** Nothing built on 2026-08-28 has been
-seen on a device: the rebuilt book screen in both states, the two summary halves
-redoing themselves alone, and the real failure messages. `active-task.md` lists
-the checks.
+**WP-43 · Re-scan a folder and name what is new.** Chosen 2026-09-05, after the
+reader confirmed every screen that was waiting on a phone.
 
 **The update prompt is worth a look of its own.** A prompt-to-update PWA cost
 the reader four rounds of "still broken" on work that was already shipped. The
 prompt may be too quiet on a phone. Deciding this is a small task, not a bug.
-
-**Prove the reading voice on the phone.** WP-16 is built and tested, but three
-of its faults were only visible on a device. `active-task.md` lists eight checks.
-The voice choice is the one that still needs proof: the fix assumes the engine
-ignores a voice when no language is set.
-
-**Then choose the next waypoint with `/plan-task`.** WP-09 is the next
-foundation — WP-10, WP-18, WP-21 and WP-28 all wait on it.
 
 **Judge the parser on the phone.** Accept the rebuild to `PARSER_VERSION` 28 and
 check the Contents tab. This needs no code. It is the only way to know if the
@@ -448,9 +425,9 @@ then AI.
   search; font size, line spacing, margins, sepia and the page turn were already
   in. Notes/highlights are WP-25 and need the tutor loop's selection work first.
 - **WP-43 · Re-scan a folder + name what's new.**
-- **WP-09 · the import manifest and crossrefs** — proposed 2026-08-25.
-  WP-17, 19, 20, 25 and 29 are done: the tutor loop works end to end. Four rows
-  now wait on WP-09 alone — WP-10, WP-18, WP-21 and WP-28.
+- **WP-27 · cost and usage visibility.** Two models run unasked. Nothing tells
+  the reader what that costs. WP-09 and WP-18 are declined, so this is now the
+  largest open piece with WP-22.
 ### Known parser limits (accepted, not bugs)
 - **PDF is lossy by nature** — it stores positioned glyphs, not paragraphs.
   Publisher furniture that appears on only one or two pages (e.g. Springer's

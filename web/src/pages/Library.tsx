@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react'
 
 import {
+  canRememberFolder,
+  chooseFolder,
   dropHasDirectory,
   filesFromDrop,
+  filesInFolder,
+  hasImportedFolder,
   importBooks,
+  readRememberedFolder,
+  rememberFolderImport,
   type BatchProgress,
   type ImportOutcome,
 } from '../import/index.ts'
@@ -87,6 +93,8 @@ export default function Library() {
   )
 
   const [importing, setImporting] = useState<ImportState>({ status: 'idle' })
+  // Read once, at first paint: it is a `localStorage` flag, not a query.
+  const [canRecheck, setCanRecheck] = useState(() => hasImportedFolder())
   const [dragging, setDragging] = useState(false)
 
   /** What has been typed into the search. Empty means "show everything". */
@@ -296,6 +304,13 @@ export default function Library() {
    * hand-picked one is, a stray file swept up from a folder isn't.
    */
   async function runImport(files: File[], fromFolder: boolean) {
+    if (fromFolder) {
+      // Even an empty folder counts: the reader has now pointed at one, so the
+      // "check it again" item has something to mean.
+      rememberFolderImport()
+      setCanRecheck(true)
+    }
+
     if (files.length === 0) {
       setImporting({ status: 'done', outcomes: [] })
       return
@@ -317,6 +332,34 @@ export default function Library() {
     // should not cost the shelf every other book's art.
     const arrived = outcomes.filter((one) => one.status === 'imported').map((one) => one.meta.id)
     await reload(arrived).catch((error: unknown) => failed(error))
+  }
+
+  /**
+   * "Check folder for new books".
+   *
+   * Only reached where the browser can keep a folder handle; everywhere else
+   * the menu item is a label that opens the picker and lands in `runImport`
+   * like any other folder import.
+   *
+   * A handle that has gone stale — permission dropped, folder moved — falls
+   * back to asking for the folder once, and the answer is kept for next time.
+   */
+  async function recheckFolder() {
+    if (busy) return
+    setImporting({ status: 'scanning' })
+
+    let files = await readRememberedFolder()
+    if (!files) {
+      const folder = await chooseFolder()
+      if (!folder) {
+        // The reader closed the picker. Say nothing and change nothing.
+        setImporting({ status: 'idle' })
+        return
+      }
+      files = await filesInFolder(folder.handle)
+    }
+
+    void runImport(files, true)
   }
 
   async function onDrop(event: React.DragEvent) {
@@ -636,6 +679,11 @@ export default function Library() {
           onPickFolder={(files) => {
             void runImport(files, true)
           }}
+          canRecheck={canRecheck}
+          recheckPicks={!canRememberFolder()}
+          onRecheck={() => {
+            void recheckFolder()
+          }}
           onNewFolder={() => setNaming({ forSelected: false })}
         />
       )}
@@ -805,6 +853,26 @@ function RenameBook({
   )
 }
 
+/** How many arrivals get named before the sentence becomes a list. */
+const NAMED = 3
+
+/**
+ * "Imported 2 books: The Red Book, Aion."
+ *
+ * Naming them is the whole point of re-scanning a folder (WP-43): the reader
+ * pressed a button to find out *what* is new, and "Imported 2 books" answers a
+ * question they did not ask. Naming a hundred is a wall of text, so past three
+ * it counts the rest.
+ */
+function named(imported: readonly { status: 'imported'; meta: { title: string } }[]): string {
+  const count = imported.length
+  const word = count === 1 ? 'book' : 'books'
+  const titles = imported.slice(0, NAMED).map((one) => one.meta.title)
+  const rest = count - titles.length
+  const list = rest > 0 ? `${titles.join(', ')} and ${rest} more` : titles.join(', ')
+  return `Imported ${count} ${word}: ${list}.`
+}
+
 /**
  * What happened, per file. A batch has no single answer — "9 imported, 3
  * couldn't be opened" is the truth, and each of those three needs its own
@@ -837,9 +905,7 @@ function ImportReport({ outcomes }: { outcomes: ImportOutcome[] }) {
   return (
     <div className={failed.length > 0 ? styles.error : undefined} role="status">
       <p>
-        {imported.length > 0
-          ? `Imported ${imported.length} ${imported.length === 1 ? 'book' : 'books'}.`
-          : 'Nothing new was imported.'}
+        {imported.length > 0 ? named(imported) : 'Nothing new was imported.'}
         {duplicates.length > 0 && ` ${duplicates.length} already on your shelf.`}
         {failed.length > 0 && ` ${failed.length} couldn’t be opened:`}
       </p>

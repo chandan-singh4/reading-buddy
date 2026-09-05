@@ -724,6 +724,28 @@ export interface StoredSession {
   vedaMs?: number
 }
 
+/**
+ * A folder on this device that the reader imported books from.
+ *
+ * The `handle` is a live `FileSystemDirectoryHandle`, not a path. There is no
+ * way to turn it back into a path and no way to make one from a path — the
+ * browser gives it out once, at the picker, and it is the only key to that
+ * folder the app will ever hold. It survives here because IndexedDB stores it
+ * by structured clone; `localStorage` cannot, because a handle is not text.
+ *
+ * It is device-local by nature, so it never goes to the cloud. The same handle
+ * on the reader's other phone would point at nothing.
+ */
+export interface StoredHandle {
+  /** There is one folder, so there is one row: `'importFolder'`. */
+  id: string
+  handle: FileSystemDirectoryHandle
+  /** What to call it on screen. A handle's `name` is the last path part only. */
+  name: string
+  /** ISO 8601. When it was last read, so the button can say "last checked …". */
+  at: string
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -754,6 +776,7 @@ export type ReadingBuddyDB = Dexie & {
   sessions: Table<StoredSession, string>
   questionBanks: Table<StoredQuestionBank, [BookId, string]>
   misses: Table<StoredMiss, string>
+  handles: Table<StoredHandle, string>
 }
 
 /**
@@ -990,7 +1013,21 @@ function defineSchema(db: Dexie): void {
   })
 
   /*
-   * No v19 for `StoredSession.chapterTitle` / `sectionTitle`. Dexie only
+   * v19 — the folder the reader imports from (WP-43).
+   *
+   * One row, and no index but the key. Nothing queries this table; it is asked
+   * one question — "is there a folder?" — and the answer is a single `get`.
+   *
+   * Nothing to migrate. A reader who imported a folder before this existed did
+   * so through a file input, which hands over files and no handle. Their folder
+   * is unrecoverable and the button stays hidden until they import one again.
+   */
+  db.version(19).stores({
+    handles: 'id',
+  })
+
+  /*
+   * No schema change for `StoredSession.chapterTitle` / `sectionTitle`. Dexie only
    * declares *indexes*, and neither field is one — nothing queries by chapter.
    * A version block with an unchanged store string would migrate every install
    * to say nothing. Old rows simply have the fields missing, which is a state

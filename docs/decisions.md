@@ -3195,3 +3195,44 @@ utterance, said in one breath, with no pause where the page shows a gap.
 **It does not use the markdown renderer.** Reading the text back out of the DOM
 would tie speaking something to having drawn it. A summary could then not be
 spoken from a screen that had not laid it out.
+
+## Re-scan a folder is a button, not a watcher (WP-43)
+
+A web app cannot watch a folder. It runs only while it is open, and it may not
+read the disk without a command from the reader. So the app gives the reader a
+button: **Check folder for new books**.
+
+## The app keeps the folder where it can
+
+`showDirectoryPicker()` gives a handle to a folder. The handle goes in
+IndexedDB, in a `handles` table, one row. `localStorage` cannot hold it, because
+a handle is not text.
+
+Chrome, Edge and Android Chrome have this API. Firefox and iOS Safari do not.
+Where there is no handle, the same menu item opens the folder picker that the
+first import uses. The reader picks the folder again. Everything after that is
+the same.
+
+`canRememberFolder()` tells the screen which of the two it is showing. The
+screen must never show a button that can do nothing.
+
+## The handle is not on `Repository`
+
+`Repository` has two builds: the device and the cloud. A handle is a key to a
+folder on one device. The cloud build could do nothing honest with it. So the
+handle lives in `storage/handles.ts`, like the notes store and the word store.
+
+## Permission ends without notice
+
+A stored handle is not a standing permission. The browser drops read access on
+its own. The handle still exists and still has its name, and it fails when it is
+read. So the app asks for permission before each scan. A refusal makes the app
+forget the folder. A button that offers a folder it cannot open is worse than no
+button.
+
+## The report names what arrived
+
+"Imported 2 books: The Red Book, Aion." The reader pressed the button to find
+out **what** is new. "Imported 2 books" answers a question they did not ask.
+Three names is the limit. After that the sentence counts the rest.
+
