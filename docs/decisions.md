@@ -3236,3 +3236,25 @@ button.
 out **what** is new. "Imported 2 books" answers a question they did not ask.
 Three names is the limit. After that the sentence counts the rest.
 
+
+
+### Settled 2026-09-10 (staying signed in with no network)
+
+- **A failed token renewal is not a sign-out.** Supabase renews the access token
+  over the network about every hour. With no network the renewal fails and
+  `getSession()` answers "no session". Believing that answer put a sign-in
+  screen in front of a reader on a plane, and made every write fail as "you are
+  signed out" instead of joining the outbox. The reader who last signed in is
+  now written down in `localStorage`, and handed back when the renewal fails for
+  want of a network.
+- **Only two things count as "no network".** The browser says so
+  (`navigator.onLine === false`), or the renewal failed with a network-shaped
+  error while the browser said it was online. The second case is the train: a
+  network is joined, and it carries nothing. Anything else is believed.
+- **The refresh token is untouched.** This does not extend a session and grants
+  nothing. Offline, an identity can do one thing: read a copy this device
+  already holds. Every real request still fails and still queues.
+- **A sign-out clears the note first, then calls Supabase.** The reader asked to
+  leave. A sign-out that fails on the network must not leave an open door.
+- **A reader who never signed in on this device still sees the sign-in screen.**
+  There is nothing to remember, and a sign-in screen is then the honest answer.

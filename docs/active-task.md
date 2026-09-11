@@ -6,33 +6,51 @@ it.
 
 ## Task
 
-Judge **Check folder for new books** on the phone (WP-43).
+Read offline while travelling, and sync on return.
 
-The code is built and tested. Nobody has pressed the button on a device. The
-folder picker needs a real folder and a real finger, so a test cannot do this.
+WP-43 is closed. The reader pressed **Check folder for new books** on the phone
+on 2026-09-10. It works.
 
-## Steps
+The reader travels on 2026-09-11 and reads with no network. The app must open,
+show the shelf, open the books, and keep every page turn. The cloud must get
+that work when the signal comes back.
 
-1. Put some books in a folder on the phone.
-2. Open the Library. Tap **+**.
-3. Tap **Import a folder of books**. Pick that folder. Wait for the import.
-4. Tap **+** again. **Check folder for new books** must now be in the menu.
-5. Tap it. It must say every book is already on the shelf.
-6. Put one new book in the folder. Tap **Check folder for new books** again.
-7. The report must name the new book.
+## What was wrong, and is now fixed
 
-## What to watch for
+A sign-in token lives about one hour. The app renews it over the network. With
+no network the app could not renew it. After one hour the app said "nobody is
+signed in". It then showed the sign-in screen, which the reader cannot use with
+no signal. It also refused to queue any write.
 
-- The menu item is missing after step 3.
-- On iOS the item must open the folder picker. On Android Chrome it must not.
-- A book that is imported a second time.
-- A picker that opens where the reader did not expect it to.
-- An error after the app has been closed and opened again. The browser drops
-  permission on its own, so the app should ask again, not fail.
+The app now writes down the reader who last signed in. It gives that reader
+back **only** when the renewal fails for want of a network. A true sign-out
+still closes the app. See `web/src/storage/cloud/remembered.ts`.
+
+## Before the reader leaves
+
+1. Open the app with a signal. Let it sign in.
+2. Open every book to read on the trip. The copy holds only opened books, and
+   only 20 of them. The oldest read book is dropped first.
+3. Press **Read aloud** one time, with a signal, for each voice to use. The
+   speech model is 86 MB and arrives one time only.
+4. Take any waiting update before the trip. The bell shows it.
+
+## What works with no network
+
+- The shelf, the books, the page, the bookmarks, the saved passages, the notes.
+- Read aloud, after step 3 above.
+- Every page turn, bookmark and saved passage is queued and sent on return.
+
+## What does not work with no network
+
+- Veda, the chapter summaries and the examination. All three need the models.
+- Delete a book. The app refuses this on purpose.
+- A book that was never opened with a signal. The shelf greys it out.
 
 ## Files in scope
 
-- `web/src/import/folder.ts` — the folder the app remembers.
-- `web/src/storage/handles.ts` — the one row that holds it.
-- `web/src/library/AddButton.tsx` — the "+" menu.
-- `web/src/pages/Library.tsx` — `recheckFolder` and `ImportReport`.
+- `web/src/storage/cloud/remembered.ts` — the reader we last saw.
+- `web/src/storage/cloud/client.ts` — `currentUser`, `signOut`, `onAuthChange`.
+- `web/src/storage/cloud/cached.ts` — the offline copy and the read rules.
+- `web/src/storage/cloud/outbox.ts` — the queue and the drain.
+- `web/src/auth/useSession.ts`, `web/src/auth/AuthGate.tsx` — the gate.

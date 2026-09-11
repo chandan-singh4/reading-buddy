@@ -71,7 +71,25 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
-- **WP-43 — check the folder for new books** (2026-09-05). Build green: 2,564
+- **The app stays signed in with no network** (2026-09-10). Not a waypoint.
+  Build green: 2,575 tests across 160 files.
+  - A sign-in token lives about one hour, and the app renews it over the
+    network. With no network the renewal failed, so the app decided nobody was
+    signed in. After one hour offline it showed the sign-in screen, which no
+    reader can use with no signal.
+  - It was worse than a locked door. Every write was refused as "you are signed
+    out" instead of being queued, so the outbox never saw the page turns.
+  - The app now writes down the reader who last signed in. It gives that reader
+    back **only** when the renewal failed for want of a network.
+  - Two kinds of proof count as "no network": the browser saying so, and a
+    renewal that failed with a network error while the browser said it was
+    online. The second is the train case.
+  - A true sign-out still closes the app, offline or not.
+  - **Not proved on a device.** The tests prove the rule. Nobody has yet flown
+    with it.
+
+- **WP-43 — check the folder for new books** (2026-09-05). Closed on the phone
+  on 2026-09-10. The reader pressed the button and it works. Build green: 2,564
   tests across 158 files.
   - A new item in the "+" menu: **Check folder for new books**. It shows only
     after the reader has imported a folder one time.
@@ -81,8 +99,7 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   - Books already on the shelf are skipped. Import did this before; the button
     only had to use it.
   - The report now names the new books: "Imported 2 books: The Red Book, Aion."
-  - **Not proved on a device.** Nobody has pressed this button on a phone. The
-    picker needs a real folder and a real finger.
+  - **Proved on a device** on 2026-09-10.
 
 - **Veda, the summaries and the notes can speak** (2026-09-02). Not a waypoint.
   Build green: 2,551 tests across 157 files.
@@ -162,8 +179,9 @@ Older entries were removed. `git log -p docs/progress.md` has every one.
   worker problem. Don't raise it again.
 
 ### Next up
-**WP-43 · Re-scan a folder and name what is new.** Chosen 2026-09-05, after the
-reader confirmed every screen that was waiting on a phone.
+**The reader travels on 2026-09-11 and reads offline.** The steps to take
+before leaving are in `active-task.md`. The short form: open every book to read
+on the trip while there is a signal, and press Read aloud one time.
 
 **The update prompt is worth a look of its own.** A prompt-to-update PWA cost
 the reader four rounds of "still broken" on work that was already shipped. The

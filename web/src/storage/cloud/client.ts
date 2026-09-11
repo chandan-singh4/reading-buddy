@@ -18,6 +18,9 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
+import { knownOffline, looksOffline } from './offline.ts'
+import { rememberUser, rememberedUser } from './remembered.ts'
+
 /**
  * The project origin, however it was pasted in.
  *
@@ -155,6 +158,10 @@ export async function sendSignInLink(email: string, redirectTo?: string): Promis
 }
 
 export async function signOut(): Promise<void> {
+  // Before the call, not after: a sign-out that fails on the network still
+  // means the reader asked to leave, and a remembered reader who is signed out
+  // everywhere else would keep the offline door open for nobody.
+  rememberUser(undefined)
   await cloudClient().auth.signOut()
 }
 
@@ -171,10 +178,38 @@ export interface CloudUser {
   email?: string
 }
 
+/**
+ * The signed-in reader, with one concession to having no signal.
+ *
+ * `getSession()` renews an expired access token over the network, so with no
+ * network it reports nobody after about an hour — a reader who never signed out
+ * is thrown out of their own library mid-flight. When that happens and the
+ * browser confirms there is no connection, the last reader we actually saw is
+ * the honest answer. See `remembered.ts`.
+ *
+ * Only ever a fallback, and only ever while offline: a live session always
+ * wins, and being signed out *with* a signal is believed at once.
+ */
 export async function currentUser(): Promise<CloudUser | undefined> {
-  const { data } = await cloudClient().auth.getSession()
-  const user = data.session?.user
-  return user ? { id: user.id, email: user.email } : undefined
+  let unreachable = knownOffline()
+  try {
+    const { data, error } = await cloudClient().auth.getSession()
+    const user = data.session?.user
+    if (user) {
+      const known = { id: user.id, email: user.email }
+      rememberUser(known)
+      return known
+    }
+    // No user *and* a network-shaped complaint means the renewal never reached
+    // the server. That is a lost signal wearing a sign-out's clothes, and it is
+    // the common case on a train, where `navigator.onLine` stays true on a
+    // network that carries nothing.
+    if (error && looksOffline(error)) unreachable = true
+  } catch (error) {
+    // A throw here is the same situation as an empty answer.
+    if (looksOffline(error)) unreachable = true
+  }
+  return unreachable ? rememberedUser() : undefined
 }
 
 /** The signed-in reader's id, or undefined when signed out. */
@@ -207,7 +242,12 @@ export async function accessToken(): Promise<string | undefined> {
 export function onAuthChange(listener: (user: CloudUser | undefined) => void): () => void {
   const { data } = cloudClient().auth.onAuthStateChange((_event, session) => {
     const user = session?.user
-    listener(user ? { id: user.id, email: user.email } : undefined)
+    const known = user ? { id: user.id, email: user.email } : undefined
+    // Only a *signed-in* answer is written down here. A signed-out one may be
+    // Supabase failing to renew a token with no signal, which is the case
+    // `currentUser` exists to survive; `signOut` rubs the note out explicitly.
+    if (known) rememberUser(known)
+    listener(known ?? (knownOffline() ? rememberedUser() : undefined))
   })
   return () => data.subscription.unsubscribe()
 }
