@@ -25,8 +25,8 @@ real Supabase yet.
 ## Next
 
 - Prove the sync on the phone (step 4 above).
-- Maybe: "Restore from vault". It reads the Obsidian export of 2026-09-05 and
-  puts the lost highlights and Veda threads back.
+- Prove "Restore from vault" on the phone. Settings → "Bring your notes back
+  from Obsidian". Pick every export zip in Downloads at one time.
 
 ## Files in scope
 
@@ -35,3 +35,4 @@ real Supabase yet.
 - `web/src/storage/sync/index.ts` — when the sync runs; the restore wait.
 - `supabase/migrations/0008_user_rows.sql` — the table and its rules.
 - `web/src/main.tsx` — boot calls `startSync`.
+- `web/src/export/restore.ts`, `web/src/export/RestoreVault.tsx` — the restore.

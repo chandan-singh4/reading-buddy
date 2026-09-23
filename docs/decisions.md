@@ -3290,3 +3290,17 @@ survived, because it was in the cloud.
 - **The app asks for persistent storage** (`navigator.storage.persist()`). This
   makes a clear less likely. The sync makes a clear recoverable.
 
+## The vault can be read back (2026-09-23)
+
+- **The restore finds each mark by its words.** The vault holds no anchors. It
+  uses `relocate`, which already finds a passage by its words after a
+  re-parse. The chapter number in the front matter scopes the search.
+- **A mark whose words are not found is kept.** It goes to the first paragraph
+  of its chapter. The restore counts it and says so.
+- **A kept line of Veda's finds its thread by its words.** The restore looks for
+  the line inside the restored threads of that chapter.
+- **Nothing is written twice.** A note with the same words and text, or a
+  thread with the same passage, is skipped. The reader can pick every zip at
+  one time.
+- **A file input, not a folder picker.** Android Chrome has no folder picker.
+

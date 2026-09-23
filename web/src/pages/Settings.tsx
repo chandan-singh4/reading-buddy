@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { useSession } from '../auth/useSession.ts'
 import ExportVault from '../export/ExportVault.tsx'
+import RestoreVault from '../export/RestoreVault.tsx'
 import {
   arrange,
   lastRoster,
@@ -106,6 +107,8 @@ export default function Settings() {
       <SummaryModel />
 
       <ExportVault />
+
+      <RestoreVault />
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Coming</h2>
