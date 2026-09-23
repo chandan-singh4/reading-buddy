@@ -71,6 +71,20 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **Everything the reader makes goes to the cloud** (2026-09-23). Not a
+  waypoint. Build green: 2,583 tests across 161 files.
+  - Android Chrome cleared the app's storage when the phone was low on space.
+    Notes, highlights, Veda threads and sessions were lost. Only the shelf was
+    in the cloud.
+  - `web/src/storage/sync/` now copies eleven tables to a new Supabase table,
+    `user_rows`. An emptied device gets them back when it opens.
+  - **The reader must run `0008_user_rows.sql` in Supabase.** Until then the
+    device queues the changes.
+  - **Not proved yet:** a real sync against Supabase. The tests use a fake
+    server with the same rules.
+  - The lost data can come back only from the Obsidian export of 2026-09-05.
+    A "restore from vault" import is not built.
+
 - **The app stays signed in with no network** (2026-09-10). Not a waypoint.
   Build green: 2,575 tests across 160 files.
   - A sign-in token lives about one hour, and the app renews it over the

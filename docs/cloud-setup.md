@@ -86,6 +86,20 @@ tables: `books`, `manifests`, `chapters`, `sections`, `positions`, `sources`,
 > Supabase key in the browser at all — the key gets you as far as the front
 > desk, and the policies decide what you're allowed to take out.
 
+### 1.2a Back up notes, highlights and sessions (`0008`)
+
+Run this one time, also on a project that already has books.
+
+1. In the SQL Editor, click **New query**.
+2. Copy all of `supabase/migrations/0008_user_rows.sql`, paste it, and click
+   **Run**. You see *Success. No rows returned.*
+3. Open **Table Editor**. Make sure that `user_rows` is in the list.
+
+This table holds everything that the reader makes: notes, highlights, Veda's
+conversations, reading sessions, summaries, saved words and examinations. It
+deletes nothing. Until you run it, the app keeps these changes in a queue on
+the device. The app sends the queue after the table exists.
+
 ### 1.3 Turn on email sign-in
 
 1. Sidebar → **Authentication** → **Sign In / Providers**.

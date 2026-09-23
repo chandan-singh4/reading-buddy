@@ -6,6 +6,7 @@ import { backfill, catalogueDeps } from './catalogue/index.ts'
 import { watchForUpdates } from './app/updates.ts'
 import { applyStoredTheme } from './reader/readerSettings.ts'
 import { repository } from './storage/index.ts'
+import { askToKeepStorage, startSync } from './storage/sync/index.ts'
 import './index.css'
 
 watchForUpdates()
@@ -39,6 +40,17 @@ if (!root) throw new Error('Root element #root not found')
  * failure.
  */
 async function boot(container: HTMLElement): Promise<void> {
+  void askToKeepStorage()
+
+  // Before the first render when the device is empty, so a phone that Chrome
+  // cleared opens on the reader's notes and sessions, not on nothing. See
+  // `storage/sync/index.ts`; it returns at once on a device with rows.
+  try {
+    await startSync()
+  } catch {
+    // The app still opens. The rows arrive on the next sync.
+  }
+
   try {
     await repository.healTitles()
   } catch {

@@ -6,51 +6,32 @@ it.
 
 ## Task
 
-Read offline while travelling, and sync on return.
+Keep everything the reader makes in the cloud, so that a cleared phone loses
+nothing.
 
-WP-43 is closed. The reader pressed **Check folder for new books** on the phone
-on 2026-09-10. It works.
+On 2026-09-23 Android Chrome cleared the app's storage when the phone was low
+on space. Notes, highlights, Veda threads and sessions were lost. The sync in
+`web/src/storage/sync/` is now built and tested. It is not proved against the
+real Supabase yet.
 
-The reader travels on 2026-09-11 and reads with no network. The app must open,
-show the shelf, open the books, and keep every page turn. The cloud must get
-that work when the signal comes back.
+## What the reader must do
 
-## What was wrong, and is now fixed
+1. Open the Supabase SQL Editor.
+2. Run `supabase/migrations/0008_user_rows.sql`.
+3. Open the app on the phone with a signal. Take the update from the bell.
+4. Make one note. Open **Table Editor → user_rows** in Supabase. Make sure that
+   the note is there.
 
-A sign-in token lives about one hour. The app renews it over the network. With
-no network the app could not renew it. After one hour the app said "nobody is
-signed in". It then showed the sign-in screen, which the reader cannot use with
-no signal. It also refused to queue any write.
+## Next
 
-The app now writes down the reader who last signed in. It gives that reader
-back **only** when the renewal fails for want of a network. A true sign-out
-still closes the app. See `web/src/storage/cloud/remembered.ts`.
-
-## Before the reader leaves
-
-1. Open the app with a signal. Let it sign in.
-2. Open every book to read on the trip. The copy holds only opened books, and
-   only 20 of them. The oldest read book is dropped first.
-3. Press **Read aloud** one time, with a signal, for each voice to use. The
-   speech model is 86 MB and arrives one time only.
-4. Take any waiting update before the trip. The bell shows it.
-
-## What works with no network
-
-- The shelf, the books, the page, the bookmarks, the saved passages, the notes.
-- Read aloud, after step 3 above.
-- Every page turn, bookmark and saved passage is queued and sent on return.
-
-## What does not work with no network
-
-- Veda, the chapter summaries and the examination. All three need the models.
-- Delete a book. The app refuses this on purpose.
-- A book that was never opened with a signal. The shelf greys it out.
+- Prove the sync on the phone (step 4 above).
+- Maybe: "Restore from vault". It reads the Obsidian export of 2026-09-05 and
+  puts the lost highlights and Veda threads back.
 
 ## Files in scope
 
-- `web/src/storage/cloud/remembered.ts` — the reader we last saw.
-- `web/src/storage/cloud/client.ts` — `currentUser`, `signOut`, `onAuthChange`.
-- `web/src/storage/cloud/cached.ts` — the offline copy and the read rules.
-- `web/src/storage/cloud/outbox.ts` — the queue and the drain.
-- `web/src/auth/useSession.ts`, `web/src/auth/AuthGate.tsx` — the gate.
+- `web/src/storage/sync/sync.ts` — the watch, the queue, push and pull.
+- `web/src/storage/sync/remote.ts` — `user_rows` over Supabase.
+- `web/src/storage/sync/index.ts` — when the sync runs; the restore wait.
+- `supabase/migrations/0008_user_rows.sql` — the table and its rules.
+- `web/src/main.tsx` — boot calls `startSync`.

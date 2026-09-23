@@ -3258,3 +3258,35 @@ Three names is the limit. After that the sentence counts the rest.
   leave. A sign-out that fails on the network must not leave an open door.
 - **A reader who never signed in on this device still sees the sign-in screen.**
   There is nothing to remember, and a sign-in screen is then the honest answer.
+
+## Everything the reader makes goes to the cloud (2026-09-23)
+
+Android Chrome ran short of space and cleared the app's storage. The reader did
+nothing. All notes, highlights, Veda threads and sessions were lost. The shelf
+survived, because it was in the cloud.
+
+- **Eleven "device-local" choices are reversed together.** Notes (2026-08-15),
+  sessions, tutor threads, summaries, concepts, digests, vocabulary, question
+  banks and misses now go to the cloud. The old cost ("a cloud table, a cached
+  read and an outbox entry per kind") is avoided, as the next point shows.
+- **One generic table, not one per kind.** `user_rows` holds each Dexie row as
+  JSON, keyed by table name and primary key. The Dexie tables change shape
+  often. This table does not have to change when they do.
+- **The device stays the working copy.** Every store still writes Dexie. A Dexie
+  hook on each synced table queues the key. The sync sends the row a few
+  seconds later. No store knows about the sync. So offline reading works as
+  before.
+- **The newer change wins, by the device's `changed_at`.** The server trigger
+  skips an older update. The pull keeps a queued local change unless the cloud
+  copy is newer.
+- **The pull cursor is the server's `updated_at`, never the client's clock.**
+  Each pull reads five minutes before its cursor, because two pushes can commit
+  out of order.
+- **An empty device waits for the restore before the first screen.** The
+  screens read their tables one time when they open. Without the wait they
+  show the empty library. The wait stops after 10 seconds.
+- **Left on the device on purpose:** `definitions` (a cache), `alerts` (this
+  device's bell) and `handles` (a folder handle cannot leave the device).
+- **The app asks for persistent storage** (`navigator.storage.persist()`). This
+  makes a clear less likely. The sync makes a clear recoverable.
+
