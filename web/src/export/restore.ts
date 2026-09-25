@@ -1,6 +1,7 @@
 import { strFromU8, unzipSync } from 'fflate'
 
 import { HIGHLIGHT_COLOURS } from '../reader/highlightStyle.ts'
+import { recoverMarkdown } from '../reader/pickMarkdown.ts'
 import { db as defaultDb, type ReadingBuddyDB, type StoredNote, type StoredTutorThread } from '../storage/db.ts'
 import { placesIn, relocate } from '../storage/relocate.ts'
 import type { Anchor, BookId, BookMeta, Section } from '../structure/index.ts'
@@ -217,6 +218,8 @@ export interface RestoreReport {
   skipped: number
   /** Restored to the start of their chapter, because the words were not found. */
   unplaced: number
+  /** Kept lines of Veda's, restored earlier without their thread, now linked. */
+  linked: number
   /** Book titles in the vault that match nothing on the shelf. */
   missingBooks: string[]
 }
@@ -235,13 +238,33 @@ function sameTitle(a: string, b: string): boolean {
 
 const fold = (text: string): string => text.replace(/\s+/gu, ' ').trim().toLowerCase()
 
+/**
+ * Whether a kept line of Veda's was said in this thread.
+ *
+ * The note keeps the line twice: `quote` as the plain words the reader saw,
+ * and `text` with its Markdown marks. Veda's answer in the thread is Markdown,
+ * so the plain words are not a substring of it wherever the line held a bold
+ * word or a list marker — the first restore missed every such line. So the
+ * plain words are matched the way the reader's own screen matches them,
+ * through `recoverMarkdown`, which reads past the marks; the marked text, and
+ * then the plain words, are tried as they stand for a line too short for it.
+ */
+function saidIn(thread: StoredTutorThread, note: VaultNote): boolean {
+  return thread.messages.some((message) => {
+    if (message.role !== 'claude') return false
+    if (note.quote && recoverMarkdown(note.quote, message.text) !== null) return true
+    const said = fold(message.text)
+    return (note.text !== '' && said.includes(fold(note.text))) || said.includes(fold(note.quote ?? ''))
+  })
+}
+
 export async function restoreVault(
   files: readonly VaultFile[],
   deps: RestoreDeps,
 ): Promise<RestoreReport> {
   const database = deps.database ?? defaultDb
   const now = deps.now ?? Date.now
-  const report: RestoreReport = { notes: 0, threads: 0, skipped: 0, unplaced: 0, missingBooks: [] }
+  const report: RestoreReport = { notes: 0, threads: 0, skipped: 0, unplaced: 0, linked: 0, missingBooks: [] }
 
   const chapters = files.map(parseChapter).filter((c): c is VaultChapter => c !== undefined)
   const shelf = await deps.listBooks()
@@ -278,14 +301,18 @@ export async function restoreVault(
     const haveNotes = await database.notes.where('bookId').equals(bookId).toArray()
     const haveThreads = await database.tutor.where('bookId').equals(bookId).toArray()
     const noteKey = (quote: string | undefined, text: string) => `${fold(quote ?? '')}\u0000${fold(text)}`
-    const seenNotes = new Set(haveNotes.map((row) => noteKey(row.quote, row.text)))
+    const seenNotes = new Map(haveNotes.map((row) => [noteKey(row.quote, row.text), row]))
     const seenThreads = new Map(haveThreads.map((row) => [fold(row.excerpt), row]))
 
     const newNotes: StoredNote[] = []
+    const repairs: StoredNote[] = []
     const newThreads: StoredTutorThread[] = []
 
+    /** Every thread of the book, by the chapter its vault note was in. */
+    const threadsBy = new Map<number, StoredTutorThread[]>()
     for (const chapter of bookChapters) {
-      const threadsHere: StoredTutorThread[] = []
+      const threadsHere = threadsBy.get(chapter.chapter) ?? []
+      threadsBy.set(chapter.chapter, threadsHere)
       for (const thread of chapter.threads) {
         const known = seenThreads.get(fold(thread.excerpt))
         if (known) {
@@ -315,23 +342,33 @@ export async function restoreVault(
         threadsHere.push(row)
         newThreads.push(row)
       }
+    }
+    const allThreads = [...seenThreads.values()]
 
+    for (const chapter of bookChapters) {
+      const threadsHere = threadsBy.get(chapter.chapter) ?? []
       for (const note of chapter.notes) {
         const key = noteKey(note.quote, note.text)
-        if (seenNotes.has(key)) {
-          report.skipped += 1
+        const origin =
+          note.author === 'claude' && note.quote
+            ? (threadsHere.find((thread) => saidIn(thread, note)) ??
+              allThreads.find((thread) => saidIn(thread, note)))
+            : undefined
+
+        const have = seenNotes.get(key)
+        if (have) {
+          // Restored before this fix without the link to its thread, and so
+          // drawn as a whole conversation rather than a kept line. Mend it.
+          if (origin && have.author === 'claude' && !have.fromThread) {
+            repairs.push({ ...have, anchor: origin.anchor, fromThread: origin.id })
+          } else {
+            report.skipped += 1
+          }
           continue
         }
-        seenNotes.add(key)
 
         let anchor: Anchor
         let fromThread: string | undefined
-        const origin =
-          note.author === 'claude' && note.quote
-            ? threadsHere.find((thread) =>
-                thread.messages.some((m) => fold(m.text).includes(fold(note.quote!))),
-              )
-            : undefined
         if (origin) {
           anchor = origin.anchor
           fromThread = origin.id
@@ -341,7 +378,7 @@ export async function restoreVault(
           if (!placed.found) report.unplaced += 1
         }
 
-        newNotes.push({
+        const row: StoredNote = {
           bookId,
           id: crypto.randomUUID(),
           anchor,
@@ -353,14 +390,18 @@ export async function restoreVault(
           // a highlight carries a colour; the vault kept none, so the first.
           ...(note.author === 'you' && note.quote ? { colour: HIGHLIGHT_COLOURS[0]!.value } : {}),
           ...(fromThread ? { fromThread } : {}),
-        })
+        }
+        seenNotes.set(key, row)
+        newNotes.push(row)
       }
     }
 
     await database.transaction('rw', database.notes, database.tutor, async () => {
       if (newThreads.length > 0) await database.tutor.bulkPut(newThreads)
       if (newNotes.length > 0) await database.notes.bulkPut(newNotes)
+      if (repairs.length > 0) await database.notes.bulkPut(repairs)
     })
+    report.linked += repairs.length
     report.notes += newNotes.length
     report.threads += newThreads.length
   }

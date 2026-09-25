@@ -71,7 +71,7 @@ const thread: StoredTutorThread = {
     { role: 'you', text: 'What does he mean by this?', ts: 1 },
     {
       role: 'claude',
-      text: 'He means the mind you can account for.\n\n> A quoted line inside the answer.\n\nAnd a second paragraph.',
+      text: 'He means the mind you can account for.\n\n> A quoted line inside the answer.\n\nAnd a second paragraph.\n\nThe **conscious** mind is only a *small* island in the sea.',
       ts: 2,
     },
     { role: 'you', text: 'And the rest?', ts: 3 },
@@ -85,6 +85,14 @@ const notes: StoredNote[] = [
   note({ id: 'n2', quote: 'they only changed their names', text: 'Compare Aion.\n\nAnd The Red Book.' }),
   note({ id: 'n3', author: 'claude', quote: 'the mind you can account for', text: '', fromThread: 't1' }),
   note({ id: 'n4', quote: 'words this book does not hold', text: 'Lost place.' }),
+  // Kept the way `keepVedaLine` keeps it: marks in `text`, plain words in `quote`.
+  note({
+    id: 'n5',
+    author: 'claude',
+    quote: 'The conscious mind is only a small island',
+    text: 'The **conscious** mind is only a *small* island',
+    fromThread: 't1',
+  }),
 ]
 
 function exported(): VaultFile[] {
@@ -123,6 +131,11 @@ describe('reading a chapter note back', () => {
       { quote: 'they only changed their names', text: 'Compare Aion.\n\nAnd The Red Book.', author: 'you' },
       { quote: 'the mind you can account for', text: '', author: 'claude' },
       { quote: 'words this book does not hold', text: 'Lost place.', author: 'you' },
+      {
+        quote: 'The conscious mind is only a small island',
+        text: 'The **conscious** mind is only a *small* island',
+        author: 'claude',
+      },
     ])
   })
 
@@ -145,7 +158,7 @@ describe('reading a chapter note back', () => {
 describe('restoring', () => {
   it('puts every highlight and conversation back where it was', async () => {
     const report = await restoreVault(exported(), deps())
-    expect(report).toEqual({ notes: 4, threads: 1, skipped: 0, unplaced: 1, missingBooks: [] })
+    expect(report).toEqual({ notes: 5, threads: 1, skipped: 0, unplaced: 1, linked: 0, missingBooks: [] })
 
     const rows = await db.notes.toArray()
     const byQuote = new Map(rows.map((row) => [row.quote, row]))
@@ -165,13 +178,33 @@ describe('restoring', () => {
     expect(kept?.author).toBe('claude')
     expect(kept?.fromThread).toBe(restored?.id)
     expect(kept?.anchor).toBe(restored?.anchor)
+
+    // A line with bold inside it in the answer still finds its thread.
+    const marked = byQuote.get('The conscious mind is only a small island')
+    expect(marked?.fromThread).toBe(restored?.id)
+    expect(marked?.text).toBe('The **conscious** mind is only a *small* island')
+  })
+
+  it('links a kept line that an earlier restore left without its thread', async () => {
+    await restoreVault(exported(), deps())
+    const marked = (await db.notes.toArray()).find((row) => row.quote?.startsWith('The conscious'))!
+    // What the first, broken restore wrote: the line, with no thread.
+    const { fromThread: _, ...orphan } = marked
+    await db.notes.put({ ...orphan, anchor: a('[ch06-s01-p001]') })
+
+    const again = await restoreVault(exported(), deps())
+    expect(again).toMatchObject({ notes: 0, threads: 0, linked: 1 })
+    const mended = await db.notes.get([meta.id, marked.id])
+    expect(mended?.fromThread).toBe((await db.tutor.toArray())[0]?.id)
+    expect(mended?.anchor).toBe('[ch06-s02-p001]')
+    expect(await db.notes.count()).toBe(5)
   })
 
   it('writes nothing twice, however many times it runs', async () => {
     await restoreVault(exported(), deps())
     const again = await restoreVault(exported(), deps())
-    expect(again).toMatchObject({ notes: 0, threads: 0, skipped: 5 })
-    expect(await db.notes.count()).toBe(4)
+    expect(again).toMatchObject({ notes: 0, threads: 0, skipped: 6 })
+    expect(await db.notes.count()).toBe(5)
     expect(await db.tutor.count()).toBe(1)
   })
 

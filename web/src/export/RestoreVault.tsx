@@ -87,7 +87,14 @@ function plural(n: number, one: string): string {
 
 function describe(report: RestoreReport): string {
   const parts: string[] = []
-  if (report.notes + report.threads === 0) {
+  if (report.linked > 0) {
+    parts.push(
+      `Linked ${plural(report.linked, 'kept line')} of Veda’s back to ${report.linked === 1 ? 'its conversation' : 'their conversations'}.`,
+    )
+  }
+  if (report.notes + report.threads === 0 && report.linked > 0) {
+    // Said above. Nothing new was added, and that is right.
+  } else if (report.notes + report.threads === 0) {
     parts.push(
       report.skipped > 0
         ? 'Everything in those files is already here.'
