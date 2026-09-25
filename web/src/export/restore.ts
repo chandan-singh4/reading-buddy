@@ -218,6 +218,10 @@ export interface RestoreReport {
   skipped: number
   /** Restored to the start of their chapter, because the words were not found. */
   unplaced: number
+  /** Kept lines of Veda's the files held, whatever became of them. */
+  vedaFound: number
+  /** Of those, the ones no conversation could be found for: under "Veda", not "Veda's Quotes". */
+  vedaUnlinked: number
   /** Kept lines of Veda's, restored earlier without their thread, now linked. */
   linked: number
   /** Book titles in the vault that match nothing on the shelf. */
@@ -238,24 +242,74 @@ function sameTitle(a: string, b: string): boolean {
 
 const fold = (text: string): string => text.replace(/\s+/gu, ' ').trim().toLowerCase()
 
+/** Words only: no marks, no curly quotes, no case. What both copies share. */
+function words(text: string): string[] {
+  return text
+    .replace(/[‘’‚‛]/gu, "'")
+    .replace(/[“”„‟]/gu, '"')
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}']+/u)
+    .filter((word) => word !== '')
+}
+
 /**
- * Whether a kept line of Veda's was said in this thread.
+ * How surely a kept line of Veda's was said in this thread, from 0 to 1.
  *
  * The note keeps the line twice: `quote` as the plain words the reader saw,
  * and `text` with its Markdown marks. Veda's answer in the thread is Markdown,
  * so the plain words are not a substring of it wherever the line held a bold
- * word or a list marker — the first restore missed every such line. So the
- * plain words are matched the way the reader's own screen matches them,
- * through `recoverMarkdown`, which reads past the marks; the marked text, and
- * then the plain words, are tried as they stand for a line too short for it.
+ * word or a list marker. `recoverMarkdown` — the reader screen's own way back
+ * — reads past the marks and settles most lines outright.
+ *
+ * What it misses (a line across two list items, a curly quote, a line too
+ * short for it) is scored by its words: the share of the line's words, in
+ * order, found as one run in the answer's words. A line the reader picked out
+ * of an answer is a run of that answer, so a true match scores near 1 and a
+ * wrong thread scores low.
  */
-function saidIn(thread: StoredTutorThread, note: VaultNote): boolean {
-  return thread.messages.some((message) => {
-    if (message.role !== 'claude') return false
-    if (note.quote && recoverMarkdown(note.quote, message.text) !== null) return true
-    const said = fold(message.text)
-    return (note.text !== '' && said.includes(fold(note.text))) || said.includes(fold(note.quote ?? ''))
-  })
+function saidIn(thread: StoredTutorThread, note: VaultNote): number {
+  const line = words(note.quote || note.text)
+  if (line.length === 0) return 0
+  let best = 0
+  for (const message of thread.messages) {
+    if (message.role !== 'claude') continue
+    if (note.quote && recoverMarkdown(note.quote, message.text) !== null) return 1
+    const said = words(message.text)
+    // The longest run of the line's words found in order in the answer.
+    for (let i = 0; i < said.length; i += 1) {
+      let run = 0
+      while (i + run < said.length && run < line.length && said[i + run] === line[run]) run += 1
+      if (run > 0) best = Math.max(best, run / line.length)
+      if (best === 1) return 1
+    }
+    // A line may start part-way into its first word's run; try each start.
+    const text = ` ${said.join(' ')} `
+    if (text.includes(` ${line.join(' ')} `)) return 1
+  }
+  return best
+}
+
+/** Below this, a line is not linked: a wrong conversation is worse than none. */
+const LINKED = 0.8
+
+/** The thread a kept line came from: its own chapter's first, then the book's. */
+function originOf(
+  note: VaultNote,
+  here: readonly StoredTutorThread[],
+  all: readonly StoredTutorThread[],
+): StoredTutorThread | undefined {
+  let found: StoredTutorThread | undefined
+  let score = 0
+  for (const thread of [...here, ...all]) {
+    const s = saidIn(thread, note)
+    // Strictly better only, so a tie keeps the chapter's own thread.
+    if (s > score) {
+      found = thread
+      score = s
+    }
+    if (score === 1) break
+  }
+  return score >= LINKED ? found : undefined
 }
 
 export async function restoreVault(
@@ -264,7 +318,7 @@ export async function restoreVault(
 ): Promise<RestoreReport> {
   const database = deps.database ?? defaultDb
   const now = deps.now ?? Date.now
-  const report: RestoreReport = { notes: 0, threads: 0, skipped: 0, unplaced: 0, linked: 0, missingBooks: [] }
+  const report: RestoreReport = { notes: 0, threads: 0, skipped: 0, unplaced: 0, linked: 0, vedaFound: 0, vedaUnlinked: 0, missingBooks: [] }
 
   const chapters = files.map(parseChapter).filter((c): c is VaultChapter => c !== undefined)
   const shelf = await deps.listBooks()
@@ -351,9 +405,12 @@ export async function restoreVault(
         const key = noteKey(note.quote, note.text)
         const origin =
           note.author === 'claude' && note.quote
-            ? (threadsHere.find((thread) => saidIn(thread, note)) ??
-              allThreads.find((thread) => saidIn(thread, note)))
+            ? originOf(note, threadsHere, allThreads)
             : undefined
+        if (note.author === 'claude' && note.quote) {
+          report.vedaFound += 1
+          if (!origin && !seenNotes.get(key)?.fromThread) report.vedaUnlinked += 1
+        }
 
         const have = seenNotes.get(key)
         if (have) {

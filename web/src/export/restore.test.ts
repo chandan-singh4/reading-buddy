@@ -158,7 +158,16 @@ describe('reading a chapter note back', () => {
 describe('restoring', () => {
   it('puts every highlight and conversation back where it was', async () => {
     const report = await restoreVault(exported(), deps())
-    expect(report).toEqual({ notes: 5, threads: 1, skipped: 0, unplaced: 1, linked: 0, missingBooks: [] })
+    expect(report).toEqual({
+      notes: 5,
+      threads: 1,
+      skipped: 0,
+      unplaced: 1,
+      linked: 0,
+      vedaFound: 2,
+      vedaUnlinked: 0,
+      missingBooks: [],
+    })
 
     const rows = await db.notes.toArray()
     const byQuote = new Map(rows.map((row) => [row.quote, row]))
@@ -183,6 +192,37 @@ describe('restoring', () => {
     const marked = byQuote.get('The conscious mind is only a small island')
     expect(marked?.fromThread).toBe(restored?.id)
     expect(marked?.text).toBe('The **conscious** mind is only a *small* island')
+  })
+
+  it('links a kept line whose words match though its marks and quotes do not', async () => {
+    const curly: StoredNote = note({
+      id: 'n6',
+      author: 'claude',
+      // Curly quotes in the marked copy that the answer never had, and a line
+      // too short for `recoverMarkdown`: only the words can match it.
+      quote: 'island in the sea',
+      text: '“island in the sea”',
+      fromThread: 't1',
+    })
+    const files = buildVault({
+      books: [{ meta, summaries: [], notes: [curly], threads: [thread] }],
+      concepts: [],
+    })
+    const report = await restoreVault(files, deps())
+    expect(report).toMatchObject({ vedaFound: 1, vedaUnlinked: 0 })
+    const [row] = await db.notes.toArray()
+    expect(row?.fromThread).toBe((await db.tutor.toArray())[0]?.id)
+  })
+
+  it('does not link a kept line to a conversation that never said it', async () => {
+    const stray = note({ id: 'n7', author: 'claude', quote: 'Nothing like this was ever said here', text: 'x' })
+    const files = buildVault({
+      books: [{ meta, summaries: [], notes: [stray], threads: [thread] }],
+      concepts: [],
+    })
+    const report = await restoreVault(files, deps())
+    expect(report).toMatchObject({ vedaFound: 1, vedaUnlinked: 1 })
+    expect((await db.notes.toArray())[0]?.fromThread).toBeUndefined()
   })
 
   it('links a kept line that an earlier restore left without its thread', async () => {

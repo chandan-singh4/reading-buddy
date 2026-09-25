@@ -110,6 +110,17 @@ function describe(report: RestoreReport): string {
       `${plural(report.unplaced, 'passage')} could not be found in the book, so ${report.unplaced === 1 ? 'it is' : 'they are'} at the start of ${report.unplaced === 1 ? 'its' : 'their'} chapter.`,
     )
   }
+  // Always said, even at zero: "are my quotes of Veda's in there at all?" is
+  // the question a reader restoring from a vault cannot answer from the app.
+  parts.push(
+    report.vedaFound === 0
+      ? 'The files held no kept lines of Veda’s.'
+      : `The files held ${plural(report.vedaFound, 'kept line')} of Veda’s${
+          report.vedaUnlinked > 0
+            ? `; ${report.vedaUnlinked} could not be matched to a conversation and ${report.vedaUnlinked === 1 ? 'is' : 'are'} under Veda, not Veda’s Quotes.`
+            : '.'
+        }`,
+  )
   if (report.missingBooks.length > 0) {
     parts.push(`Not on your shelf, so skipped: ${report.missingBooks.join(', ')}.`)
   }
