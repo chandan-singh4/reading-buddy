@@ -95,6 +95,12 @@ Run this one time, also on a project that already has books.
    **Run**. You see *Success. No rows returned.*
 3. Open **Table Editor**. Make sure that `user_rows` is in the list.
 
+If the editor shows **Potential issue detected** about Row Level Security,
+click **Run without RLS**. The script turns RLS on by itself. **Run and enable
+RLS** cuts the script into pieces, and on 2026-09-25 that gave the error
+"unterminated dollar-quoted string". It is safe to run the script again after
+an error.
+
 This table holds everything that the reader makes: notes, highlights, Veda's
 conversations, reading sessions, summaries, saved words and examinations. It
 deletes nothing. Until you run it, the app keeps these changes in a queue on
