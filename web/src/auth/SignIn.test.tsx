@@ -17,17 +17,10 @@ vi.mock('../storage/cloud/index.ts', () => ({
   },
 }))
 
-const backend = vi.hoisted(() => ({ chosen: [] as string[] }))
-
-vi.mock('../storage/index.ts', () => ({
-  chooseBackend: (kind: string) => backend.chosen.push(kind),
-}))
-
 afterEach(() => {
   cleanup()
   cloud.sent.length = 0
   cloud.fail = undefined
-  backend.chosen.length = 0
 })
 
 function submit(email: string): void {
@@ -61,23 +54,12 @@ describe('SignIn', () => {
   })
 
   /**
-   * The one that matters. Without this button a reader who turns the cloud on
-   * before the accounts exist is locked away from books that are still sitting
-   * in the browser underneath this screen.
+   * The old "use the library on this device instead" button is gone on
+   * purpose: a library in the browser is one the browser may delete. See
+   * `storage/backend.ts`.
    */
-  it('always offers the way back to the device library', () => {
+  it('offers no way to a library kept only in this browser', () => {
     render(<SignIn />)
-    fireEvent.click(screen.getByRole('button', { name: /library on this device/i }))
-
-    expect(backend.chosen).toEqual(['local'])
-  })
-
-  it('offers the way back from the sent screen too', async () => {
-    render(<SignIn />)
-    submit('reader@example.com')
-    await waitFor(() => expect(cloud.sent.length).toBe(1))
-
-    fireEvent.click(screen.getByRole('button', { name: /library on this device/i }))
-    expect(backend.chosen).toEqual(['local'])
+    expect(screen.queryByRole('button', { name: /library on this device/i })).toBeNull()
   })
 })

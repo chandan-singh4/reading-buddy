@@ -1,83 +1,43 @@
 /**
- * Which library the app is looking at: the one on this device, or the one in
- * the cloud.
+ * Which library the app is looking at: the cloud, or — only on a build with no
+ * Supabase keys — the one in this browser.
  *
- * ## Why this is a reload and not a React state change
+ * ## Why there is no choice any more
  *
- * Thirty-odd modules import `repository` from `../storage` as a plain value,
- * and several of them cache what it returned — covers, shelf memory, library
- * memory, the reading position. Swapping the object underneath all of that at
- * runtime would leave one library's covers over another library's books, and
- * every cache would need its own invalidation path. Choosing at module load and
- * reloading the page costs about 300 ms and cannot be half-applied.
+ * Until 2026-10-12 the reader picked between the two in Settings. Then, on
+ * 2026-09-23, Android Chrome cleared the browser's storage to free space and
+ * took everything that lived only there. A library kept in the browser is a
+ * library the browser may delete without asking, so the reader asked for it to
+ * go. Everything the reader makes is now in the cloud (`sync/`), and the
+ * browser holds only an offline copy that can be fetched again.
  *
- * ## Why nothing is ever moved or deleted here
- *
- * Switching is a change of *view*, not a migration. The books in IndexedDB stay
- * in IndexedDB whichever way this is set, so a reader who switches to the cloud,
- * finds it empty and switches back gets their library returned to them intact.
- * That property is the whole reason it is safe to offer the toggle at all
- * before there is any way to copy books between the two.
+ * The device library survives as the fallback for a build without Supabase
+ * keys — a fork, a preview deploy, a fresh checkout — because a missing
+ * environment variable should cost you the cloud, not the app. A reader on the
+ * real deploy can no longer reach it.
  */
 
 import { isCloudConfigured } from './cloud/client.ts'
 
 export type Backend = 'local' | 'cloud'
 
-/** Where the choice is remembered. Namespaced because localStorage is global. */
-export const BACKEND_KEY = 'rb.backend'
-
 /**
- * The choice, given what was stored and whether the cloud exists on this build.
+ * The backend, given whether the cloud exists on this build. Pure, and tested.
  *
- * Pure, and tested. The `configured` argument is what makes a build with no
- * Supabase keys — a fork, a preview deploy, a colleague's checkout — fall back
- * to the local library instead of showing a sign-in screen it can never
- * satisfy. A missing environment variable should cost you the cloud, not the
- * app.
+ * The old stored choice (`rb.backend`) is ignored on purpose: a phone that was
+ * once switched to "This device" must not stay there now that the switch is
+ * gone and nothing on screen could move it back.
  */
-export function resolveBackend(stored: string | null | undefined, configured: boolean): Backend {
-  if (stored === 'cloud' && configured) return 'cloud'
-  return 'local'
-}
-
-function storedValue(): string | null {
-  try {
-    return localStorage.getItem(BACKEND_KEY)
-  } catch {
-    // Private mode, or storage disabled entirely. Local is the safe answer:
-    // it is the one that needs no network and no account.
-    return null
-  }
+export function resolveBackend(configured: boolean): Backend {
+  return configured ? 'cloud' : 'local'
 }
 
 /**
  * The backend this page load is using.
  *
- * Read once by `storage/index.ts` when it builds the repository, and again by
- * the settings screen to draw the toggle. Deliberately not memoised — it is two
- * string comparisons, and a stale copy of it is exactly the bug this file's
- * header is about.
+ * Read by `storage/index.ts` when it builds the repository, and by the screens
+ * that only make sense with an account.
  */
 export function activeBackend(): Backend {
-  return resolveBackend(storedValue(), isCloudConfigured())
-}
-
-/**
- * Remember a different choice and start again on it.
- *
- * Returns without reloading when nothing changed, so tapping the option you are
- * already on doesn't throw the screen away.
- */
-export function chooseBackend(kind: Backend): void {
-  if (kind === activeBackend()) return
-  try {
-    localStorage.setItem(BACKEND_KEY, kind)
-  } catch {
-    // Nothing useful to do: without storage the choice cannot outlive the
-    // reload that would apply it, so refuse quietly rather than reload into
-    // the same place and look broken.
-    return
-  }
-  window.location.reload()
+  return resolveBackend(isCloudConfigured())
 }

@@ -50,21 +50,8 @@ export type { WordFrom, WordStore } from './words.ts'
 export { COVER_ASSET_PATH, FETCHED_COVER_ASSET_PATH, createRepository } from './repository.ts'
 export type { BookAsset, ParsedBook, Repository } from './repository.ts'
 
-export { BACKEND_KEY, activeBackend, chooseBackend, resolveBackend } from './backend.ts'
+export { activeBackend, resolveBackend } from './backend.ts'
 export type { Backend } from './backend.ts'
-
-export { copyLibrary, countBooksToCopy } from './transfer.ts'
-export type { CopyFailure, CopyOptions, CopyProgress, CopyResult } from './transfer.ts'
-
-/**
- * The library on this device, whichever backend is switched on.
- *
- * Exported so the settings screen can say "32 books are still here" while the
- * app is looking at the cloud. Nothing else should reach for it: a screen that
- * reads this instead of `repository` is a screen that ignores the reader's
- * choice.
- */
-export { repository as deviceRepository } from './repository.ts'
 
 /**
  * The app-wide repository — the device's or the cloud's, chosen at load.

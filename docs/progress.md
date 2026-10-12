@@ -71,6 +71,12 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
 
 ### Recently done
 
+- **The cloud is the only library** (2026-10-12). Not a waypoint. Build green:
+  2,590 tests across 162 files.
+  - Settings no longer shows "Where your library lives" or the library copy.
+    The sign-in screen no longer offers the device library.
+  - The offline copy and the backup sync are unchanged.
+
 - **Restore from vault** (2026-09-23). Not a waypoint. Build green: 2,590
   tests across 162 files.
   - Settings → "Bring your notes back from Obsidian". The reader picks the

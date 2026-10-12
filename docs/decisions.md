@@ -3304,3 +3304,19 @@ survived, because it was in the cloud.
   one time.
 - **A file input, not a folder picker.** Android Chrome has no folder picker.
 
+## The cloud is the only library (2026-10-12)
+
+- **The reader can no longer choose "This device".** Settings lost "Where your
+  library lives" and "Copy your library". The sign-in screen lost "Use the
+  library on this device instead". The reader asked for this. A library in
+  the browser is one the browser may delete when space runs low.
+- **A stored choice of "This device" is ignored.** `resolveBackend` reads only
+  whether Supabase keys exist. With keys, the app uses the cloud.
+- **The device library stays only as a fallback** for a build with no Supabase
+  keys. The real deploy never reaches it.
+- **`transfer.ts` stays.** The offline copy (`cloud/cached.ts`) uses
+  `copyBook` and `copyFolders`. Its tests check them through `copyLibrary`.
+- **The offline copy stays.** It is a cache, not a library. If the browser
+  deletes it, the app fetches it again. Without it there is no reading with
+  no signal.
+

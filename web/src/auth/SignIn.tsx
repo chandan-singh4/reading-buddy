@@ -1,23 +1,12 @@
 /**
  * The door to the cloud library.
  *
- * Shown instead of the app when the cloud backend is switched on and nobody is
- * signed in. A link rather than a password: there is exactly one account, it is
+ * Shown instead of the app when nobody is signed in. A link rather than a password: there is exactly one account, it is
  * used from a phone, and a password would be one more thing to lose.
- *
- * ## The escape hatch is not optional
- *
- * The button at the bottom switches back to the library on this device. Without
- * it, a reader who turns the cloud on before their Supabase project exists —
- * or whose email simply doesn't arrive — is locked out of their own books by a
- * screen with no way past it. The device library is still sitting there
- * untouched; the only thing standing between the reader and it would be this
- * form. So this screen always offers the way back.
  */
 
 import { useState, type FormEvent } from 'react'
 
-import { chooseBackend } from '../storage/index.ts'
 import { sendSignInLink } from '../storage/cloud/index.ts'
 import styles from './SignIn.module.css'
 
@@ -107,14 +96,6 @@ export default function SignIn() {
             ) : null}
           </>
         )}
-
-        <button
-          type="button"
-          className={styles.escape}
-          onClick={() => chooseBackend('local')}
-        >
-          Use the library on this device instead
-        </button>
       </div>
     </main>
   )

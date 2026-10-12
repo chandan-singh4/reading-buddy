@@ -333,12 +333,11 @@ finding that out mid-import is confusing.
 
 ### Pass 1 — does sign-in work? (`npm run dev`)
 
-1. `npm run dev` and open the app. It starts on **the library on this device**,
-   exactly as before — the cloud is opt-in and nothing has moved.
-2. **Settings → Where your library lives → The cloud.** The page reloads onto
-   the cloud library, which is empty, and asks you to sign in. (If that card is
-   greyed out, the `VITE_SUPABASE_*` variables aren't reaching the build —
-   restart `npm run dev` after editing `.env`.)
+1. `npm run dev` and open the app.
+2. The app asks you to sign in. The cloud is the only library when the
+   `VITE_SUPABASE_*` variables are set. If the app opens with no sign-in, the
+   variables do not reach the build. Restart `npm run dev` after you edit
+   `.env`.
 3. Enter your email, open the link it sends you **on the same device**, and you
    land back in the app signed in.
 4. Now go and turn sign-ups off — Part 1.4. Your account exists, so the door can
@@ -352,14 +351,8 @@ finding that out mid-import is confusing.
    filled in and `ready` true.
 8. Cloudflare → your bucket → **Objects**. There should be
    `users/<your-id>/books/<book-id>/source/...`.
-9. Open the book, turn some pages, then switch back to **This device** in
-   Settings and confirm your original library is still all there.
-
-> **Switching backends never moves a book.** The cloud library starts empty even
-> though your device library isn't, and that is correct rather than data loss —
-> the two are separate libraries and the toggle only chooses which one you are
-> looking at. Settings shows a count under the option you're *not* using so this
-> is obvious rather than alarming. There is no "copy my library up" yet.
+9. Open the book and turn some pages. Supabase → **Table Editor** →
+   `positions`. There should be a row for the book.
 
 ### When it doesn't
 
@@ -374,10 +367,9 @@ finding that out mid-import is confusing.
 | `401` from `/api/r2/sign` | Session expired. Sign in again. |
 | `SignatureDoesNotMatch` | `R2_SECRET_ACCESS_KEY` was copied with a stray space, or `R2_ACCOUNT_ID` has the rest of the endpoint URL in it — it's just the id, not the whole address. |
 | Everything worked, now nothing does | A free Supabase project **pauses after a week of no activity**. Open the dashboard and click *Restore*. |
-| The app never asks me to sign in | Working as intended. The app always opens on the device library; sign-in only appears once you switch to the cloud in **Settings**. If that switch is greyed out, see the row below. |
-| The cloud option is greyed out | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` weren't there **when the app was built**. Locally: restart `npm run dev` after editing `.env`. On Vercel: add them in Project Settings and then **redeploy** — adding a variable does nothing to the build already live. |
-| Stuck on the sign-in screen with no email arriving | Tap **Use the library on this device instead** at the bottom. Your books are still there; the cloud is a separate library, not a replacement for that one. |
-| Signed in, but the library is empty | Expected. Switching backends copies nothing — see the note in Part 5. |
+| The app never asks me to sign in | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` were not there **when the app was built**, so the app fell back to a library in the browser. Locally: restart `npm run dev` after editing `.env`. On Vercel: add them in Project Settings and then **redeploy** — adding a variable does nothing to the build already live. |
+| Stuck on the sign-in screen with no email arriving | Wait an hour and ask again. The built-in mailer sends only a few emails each hour. The screen says so when this is the cause. |
+| Signed in, but the library is empty | You signed in with a different email address. Settings shows which account is in use. |
 | Vercel's own `404: NOT_FOUND` on a path like `/settings` | The SPA rewrite in `vercel.json` is missing or wasn't deployed. Only `/` is a real file; every other path is drawn by the app, so the server has to hand back `index.html` and let the app route it. |
 | A blank page, console shows `404` for `assets/index-<hash>.js` | A stale service worker is serving an old `index.html` that names a bundle the current deploy no longer has. DevTools → Application → **Service Workers → Unregister**, then **Cache storage → Delete**, then hard reload. Do *not* use *Clear site data* — that wipes IndexedDB, where the books are. |
 

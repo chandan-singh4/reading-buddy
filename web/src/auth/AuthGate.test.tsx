@@ -13,7 +13,6 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../storage/index.ts', () => ({
   activeBackend: () => state.backend,
-  chooseBackend: () => {},
 }))
 
 vi.mock('../storage/cloud/index.ts', () => ({

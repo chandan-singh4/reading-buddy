@@ -29,7 +29,7 @@
 
 import type { CloudUser } from './client.ts'
 
-/** Namespaced like `BACKEND_KEY`, because localStorage is global. */
+/** Namespaced (`rb.`), because localStorage is global. */
 export const REMEMBERED_USER_KEY = 'rb.user'
 
 /**
