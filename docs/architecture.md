@@ -205,19 +205,28 @@ web/src/storage/cloud/
 └─ index.ts           the only entry point other code should import from
 web/src/storage/cache.ts     the offline copy: a *second* Dexie database (WP-58)
 web/src/storage/transfer.ts  copies a book between any two repositories (WP-57)
+web/src/storage/sync/        every reader-made Dexie row ⇄ `user_rows` (2026-09-23)
 api/r2/sign.ts        mints short-lived R2 URLs, scoped to the caller's prefix
-supabase/migrations/  0001 schema + RLS · 0002 the atomic RPCs
+supabase/migrations/  0001 schema + RLS · 0002 the atomic RPCs · 0008 user_rows
 ```
 
-**There are three databases on a device, and only two are libraries.**
-`reading-buddy` is the device library. `reading-buddy-cache` is the same schema
+**The reader's own rows are mirrored, not moved.** Notes, tutor threads,
+sessions, summaries, concepts, digests, vocabulary, question banks and misses
+still live in the `reading-buddy` Dexie tables, and every store still writes
+there. `storage/sync/` hooks those tables, queues each changed key in
+`reading-buddy-sync`, and pushes the row as JSON to `user_rows`. On open it
+pulls what is new. An emptied device pulls everything before the first screen.
+
+**The cloud is the only library on the real deploy** (2026-10-12). There is no
+switch. `reading-buddy` holds the reader's own rows, mirrored to the cloud; its
+book tables are the library only on a build with no Supabase keys. `reading-buddy-cache` is the same schema
 under a different name, holding copies of cloud books you have opened — it never
 appears on any shelf, it is the one store safe to delete at any moment, and
 nothing outside `storage/` may import it. The cloud is the third.
 
 `storage/transfer.ts` is written against `Repository` on both sides, so it has
-no idea which direction it is pointing: the same function backs the Settings
-copy button (device ⇄ cloud) and the offline cache fill (cloud → cache).
+no idea which direction it is pointing. It backs the offline cache fill
+(cloud → cache). The Settings copy button it once also backed is gone.
 
 - **The parser does not move.** Bytes → `Block[]` → `assembleBook` still happens
   in the browser; only the result travels.

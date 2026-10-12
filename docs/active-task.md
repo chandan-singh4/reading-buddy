@@ -6,27 +6,26 @@ it.
 
 ## Task
 
-Keep everything the reader makes in the cloud, so that a cleared phone loses
-nothing.
+Prove that the backup reaches the cloud from the phone.
 
-On 2026-09-23 Android Chrome cleared the app's storage when the phone was low
-on space. Notes, highlights, Veda threads and sessions were lost. The sync in
-`web/src/storage/sync/` is now built and tested. It is not proved against the
-real Supabase yet.
+The sync (`web/src/storage/sync/`) is built, tested against a fake server, and
+deployed. The reader ran `0008_user_rows.sql`, and `user_rows` exists. Nobody
+has seen a row from the phone in it yet.
 
-## What the reader must do
+## Definition of done
 
-1. Open the Supabase SQL Editor.
-2. Run `supabase/migrations/0008_user_rows.sql`.
-3. Open the app on the phone with a signal. Take the update from the bell.
-4. Make one note. Open **Table Editor → user_rows** in Supabase. Make sure that
-   the note is there.
+1. The reader opens the app on the phone with a signal and waits 10 seconds.
+2. Supabase → Table Editor → `user_rows` shows rows with `tbl` = `notes` and
+   `tbl` = `tutor`.
+3. The reader makes one new highlight. A new `notes` row appears within a
+   minute.
 
-## Next
+If the table stays empty, look at `remote.ts` first: `userId()` returns
+nothing without a live session, and every push error is swallowed.
 
-- Prove the sync on the phone (step 4 above).
-- Prove "Restore from vault" on the phone. Settings → "Bring your notes back
-  from Obsidian". Pick every export zip in Downloads at one time.
+## After that
+
+- WP-27, cost and usage. See `docs/progress.md` → Next up.
 
 ## Files in scope
 
@@ -34,5 +33,3 @@ real Supabase yet.
 - `web/src/storage/sync/remote.ts` — `user_rows` over Supabase.
 - `web/src/storage/sync/index.ts` — when the sync runs; the restore wait.
 - `supabase/migrations/0008_user_rows.sql` — the table and its rules.
-- `web/src/main.tsx` — boot calls `startSync`.
-- `web/src/export/restore.ts`, `web/src/export/RestoreVault.tsx` — the restore.

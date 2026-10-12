@@ -23,14 +23,22 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   instruction, so the only guard is a six-hour cap per session. If a forgotten
   book starts inflating the numbers, the fix is a smaller cap, not a new pause
   rule.
-- **The Stats numbers do not follow the reader to a second device.** Sessions,
-  threads and summaries are all device-local; only the shelf is in the cloud.
+- **Everything the reader makes now follows them to the cloud** (2026-09-23).
+  `storage/sync/` copies notes, threads, sessions, summaries and the rest to
+  `user_rows`. The reader ran `0008_user_rows.sql`, and the table exists.
+  **Not proved yet:** rows from the phone in `user_rows`. Ask the reader to
+  look in Table Editor.
 - **Check the deploy, do not assume it.** A helper file under `api/` with no
   default export failed the Vercel build and five commits sat on `main`
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
-- **Nothing mid-edit.** Everything below is merged and pushed; build green:
-  2,487 tests across 149 files.
+- **Nothing mid-edit.** Everything below is merged and pushed. Build green:
+  2,590 tests across 162 files.
+- **One Veda's Quote stays under Veda, by the reader's choice.** The vault held
+  one kept line, and no thread matched it. Do not try to link it again.
+- **A timing flake in `Reader.test.tsx`.** "crosses into the next chapter"
+  failed one time in a full run on 2026-09-25. It passed alone three times and
+  in the next full run. Cause not found.
 - **The Obsidian export is proved, both times.** The first export met a real
   vault on 2026-08-31. The reader confirmed the second export on 2026-09-05:
   "Export what's new" added the new chapter and made no copy of an old one.
@@ -85,7 +93,9 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     back the highlights, the notes and the Veda threads. A second run adds
     nothing.
   - The vault kept no colours and no dates. Restored highlights are yellow.
-  - **Not proved yet:** a run on the phone with the real zips.
+  - Run on the phone on 2026-09-25. Kept lines of Veda's match their thread
+    through `recoverMarkdown`, then by their words. The message says how many
+    kept lines the files held.
 
 - **Everything the reader makes goes to the cloud** (2026-09-23). Not a
   waypoint. Build green: 2,583 tests across 161 files.
@@ -94,10 +104,9 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
     in the cloud.
   - `web/src/storage/sync/` now copies eleven tables to a new Supabase table,
     `user_rows`. An emptied device gets them back when it opens.
-  - **The reader must run `0008_user_rows.sql` in Supabase.** Until then the
-    device queues the changes.
-  - **Not proved yet:** a real sync against Supabase. The tests use a fake
-    server with the same rules.
+  - The reader ran `0008_user_rows.sql` on 2026-09-25. The SQL editor's "Run
+    and enable RLS" button broke the first version; the script now puts RLS
+    first and has no comments in the function body.
   - The lost data can come back only from the Obsidian exports. See
     "Restore from vault" above.
 
@@ -131,74 +140,6 @@ Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
   - The report now names the new books: "Imported 2 books: The Red Book, Aion."
   - **Proved on a device** on 2026-09-10.
 
-- **Veda, the summaries and the notes can speak** (2026-09-02). Not a waypoint.
-  Build green: 2,551 tests across 157 files.
-  - A speaker button under each of Veda's answers, beside Copy and Redo on each
-    chapter summary, and on the line above each note. Press it again to stop.
-  - Veda answers in her own voice, `bf_emma`. It is hers alone, like her violet.
-  - A summary is read in the reader's narrator voice. A note follows who wrote
-    it.
-  - **One narrator now, shared by every screen.** Four speaking screens would
-    have been four workers and four copies of the model, on a phone. The fault
-    is invisible: everything works, only the memory is wrong.
-  - Markdown is stripped first. Otherwise the model says "asterisk asterisk".
-
-- **A reading voice of our own** (2026-09-02). Not a waypoint. Build green:
-  2,533 tests across 155 files.
-  - "Read aloud" no longer uses the browser's speech engine. It uses
-    Kokoro-82M, a small speech model that runs on the device.
-  - The same 28 voices on every device. American and British. Each one has a
-    Preview button in Settings.
-  - The model costs 86 MB, one time. It arrives when the reader first presses
-    Read aloud, never at install. After that the voice works with no network.
-  - The reading rules did not change. Only the engine under them did. See
-    `docs/decisions.md`.
-  - **A fault the browser found:** `'gpu' in navigator` is not proof that WebGPU
-    works. The first run failed instead of falling back. The worker now asks for
-    an adapter and waits for the answer.
-  - **Three faults made a long pause between sentences.** The reader found
-    them. The lookahead asked for the same sentence twice, the cap threw away
-    the sentence about to be spoken, and the lookahead reached the worker
-    before the sentence the reader was waiting for. All three are fixed and
-    guarded by tests. The first sentence went from 57 seconds to 24.
-  - **Still open, and it needs your phone.** Without a GPU the model makes
-    speech about five times slower than speech is spoken. No lookahead can fix
-    that. Read the steps in `active-task.md`.
-
-- **The back swipe out of a book** (2026-09-02). Not a waypoint. Build green:
-  2,510 tests across 152 files.
-  - The toolbar's links now replace their history entry instead of pushing.
-  - Leaving a book took three back swipes, and the middle one did nothing. Each
-    trip to the examination or the About page added another dead swipe.
-  - Now: one swipe back to the book, a second out of it.
-
-- **Veda's Examination** (2026-09-01). Not a waypoint. Build green: 2,500 tests
-  across 150 files.
-  - The reader opens it from the top right of the reading screen. The icon is a
-    question on a page, in Veda's violet.
-  - The sitting has no length. Veda writes a batch, and writes more when the
-    reader works through them. She is told what she has already asked.
-  - "You are all caught up on this chapter" ends it, when she runs dry.
-  - Questions are pitched at a graduate seminar.
-  - Questions come from the book's own paragraphs, never from the recap.
-  - One call sends the chapter once, not twice, and sends about 12,000
-    characters of it. A refill reads the next part.
-  - The screen opens on the chapter the reader last chose.
-  - A picker at the top opens the chapter list. Any chapter, any time.
-  - Each question has one right option and three named misconceptions. A
-    question is dropped unless it cites a paragraph that exists in that chapter.
-  - The reader picks an option, then says how sure they are, then submits.
-  - A confident wrong answer flags the concept. It comes back in a later
-    sitting as a new question, never in the same sitting.
-  - "Discuss with Veda" opens a chat seeded with the question and both notes.
-    Each bubble shows the model that wrote it.
-  - Focus Mode is deleted. It hid chrome that is already hidden.
-  - Difficulty exists in the data. It is never shown.
-  - The golden prompts did not change. The examiner is a new module in
-    `api/tutor.ts`.
-
-Older entries were removed. `git log -p docs/progress.md` has every one.
-
 ### Blockers
 - **None.** Supabase's email allowance (a few sign-in messages an hour on the
   free mailer) bit once on 2026-08-09 and cleared itself; connect real SMTP
@@ -209,9 +150,7 @@ Older entries were removed. `git log -p docs/progress.md` has every one.
   worker problem. Don't raise it again.
 
 ### Next up
-**The reader travels on 2026-09-11 and reads offline.** The steps to take
-before leaving are in `active-task.md`. The short form: open every book to read
-on the trip while there is a signal, and press Read aloud one time.
+**Prove the backup on the phone.** See `active-task.md`.
 
 **The update prompt is worth a look of its own.** A prompt-to-update PWA cost
 the reader four rounds of "still broken" on work that was already shipped. The
@@ -265,7 +204,6 @@ then AI.
 - **Reading comfort is done.** WP-14 closed with WP-55's bookmarks and in-book
   search; font size, line spacing, margins, sepia and the page turn were already
   in. Notes/highlights are WP-25 and need the tutor loop's selection work first.
-- **WP-43 · Re-scan a folder + name what's new.**
 - **WP-27 · cost and usage visibility.** Two models run unasked. Nothing tells
   the reader what that costs. WP-09 and WP-18 are declined, so this is now the
   largest open piece with WP-22.
@@ -279,7 +217,8 @@ then AI.
 - **`.azw3` / `.kfx` declined** — DRM; see the note in `backlog.md`.
 
 ### Open items
-- **Migration `0008`, agreed and deferred — and now smaller.** Drop `subject`,
+- **Migration `0009`, agreed and deferred — and now smaller.** (`0008` is now
+  `user_rows`.) Drop `subject`,
   `type` and `type_overridden`. **`title_overridden` and
   `repository.renameBook` are no longer on the list:** rename got a UI on
   2026-08-31, and `renameBook` sets `titleOverridden` so a later re-parse of
