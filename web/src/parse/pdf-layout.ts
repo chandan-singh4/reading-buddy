@@ -101,6 +101,16 @@ const CENTRED_SLACK = 2
  */
 const MAX_HEADING_LINES = 2
 const MAX_HEADING_CHARS = 120
+/**
+ * A line that opens a list item, however large it was set.
+ *
+ * The bullet glyphs, and the lowercase "o" that a word processor writes for a
+ * second-level bullet. Deliberately not numbers or letters: "1." and "a)" open
+ * plenty of real chapter titles.
+ */
+const LIST_MARKER = /^(?:[•◦▪‣·∙*]|o)\s/
+/** Past this length, a trailing full stop means a sentence rather than a title. */
+const HEADING_SENTENCE_CHARS = 40
 /** A running header/footer must repeat on at least this share of pages. */
 const REPEAT_SHARE = 0.5
 /** …and on at least this many pages, so a 2-page document can't trigger it. */
@@ -561,11 +571,21 @@ function applyOutline(
     const start = opensPage.get(entry.page)
     const wanted = titleKey(entry.title)
 
-    // Look only at the head of the page. A title matched deep in the prose
-    // would promote a sentence that merely quotes it.
+    /*
+     * Look anywhere on the page the entry names.
+     *
+     * This used to read the first three paragraphs only, on the reasoning that
+     * a title matched deep in the prose would promote a sentence that merely
+     * quotes it. The match is on the *whole* paragraph, though, so a sentence
+     * quoting a title never matches it — it is longer. What the narrow window
+     * cost was real: where the section before it ran over onto the page, the
+     * title sat fourth or fifth, the match failed, and a heading was inserted
+     * at the top of the page instead. The reader then met a division's name
+     * standing over the tail end of the division before it.
+     */
     let promoted: Paragraph | null = null
     if (start !== undefined && wanted.length > 0) {
-      for (let at = start; at < paragraphs.length && at < start + 3; at += 1) {
+      for (let at = start; at < paragraphs.length; at += 1) {
         const paragraph = paragraphs[at]
         if (paragraph.page !== entry.page) break
         if (levels.has(paragraph)) continue
@@ -818,8 +838,38 @@ export function pdfPagesToBlocks(
     }
   })
 
+  /*
+   * A guessed heading has to read like a heading.
+   *
+   * Everything above this line judges a paragraph by its type size, and type
+   * size is the one thing a PDF reports badly. A study guide set its sub-bullets
+   * a shade larger than its prose, and three bullets a page came out as titles.
+   *
+   * Two things a heading is not, and both are read off the words:
+   *
+   * A heading is not a list item. A line that opens with a bullet — a real
+   * bullet glyph, or the lowercase "o" a word processor uses for a second-level
+   * one — is an item in a list, whatever size it was set in.
+   *
+   * A heading is not a sentence. Titles do not end in a full stop. The length
+   * test keeps the short exceptions a reader expects: "Preface." and
+   * "Chapter I." still pass, a line of a hundred characters ending in a full
+   * stop does not.
+   *
+   * This touches guesses only. Where the file carries an outline, the outline's
+   * own divisions are set before any of this and are never reconsidered.
+   */
+  const readsAsHeading = (text: string): boolean => {
+    if (LIST_MARKER.test(text)) return false
+    if (/\.$/.test(text) && text.length > HEADING_SENTENCE_CHARS) return false
+    return true
+  }
+
+  const canBeHeading = (paragraph: Paragraph): boolean =>
+    !midSentence.has(paragraph) && readsAsHeading(paragraph.text)
+
   const couldBeHeading = (paragraph: Paragraph): boolean =>
-    !midSentence.has(paragraph) &&
+    canBeHeading(paragraph) &&
     paragraph.lineCount <= MAX_HEADING_LINES &&
     paragraph.text.length <= MAX_HEADING_CHARS &&
     paragraph.fontSize > body * HEADING_RATIO
@@ -860,7 +910,7 @@ export function pdfPagesToBlocks(
       const bigger =
         couldBeHeading(paragraph) && headingSizes.includes(Math.round(paragraph.fontSize * 2) / 2)
 
-      if (bigger || (!midSentence.has(paragraph) && looksCentred(paragraph))) {
+      if (bigger || (canBeHeading(paragraph) && looksCentred(paragraph))) {
         return { kind: 'prose', label: 'subheading', text: paragraph.text }
       }
 

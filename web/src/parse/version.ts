@@ -562,4 +562,26 @@
  * Every book on a shelf re-parses on this bump. EPUB, HTML, DOCX, Markdown and
  * plain text are untouched: they carry their own paragraph marks.
  */
-export const PARSER_VERSION = 37
+/**
+ * 38 — a PDF heading has to read like a heading, and stand in the right place.
+ *
+ * Version 37 kept a sentence whole. Two faults were left, and both showed in
+ * the same study guide.
+ *
+ * A list item was still becoming a title. The file sets its second-level
+ * bullets a shade larger than its prose, and type size was the only thing the
+ * guess consulted. A guessed heading now also has to read like one: it does not
+ * open with a bullet, and it does not end in a full stop unless it is short.
+ * "Preface." and "Chapter I." still pass.
+ *
+ * A heading also stood over the wrong text. Where a book carries an outline,
+ * the parser looked for each division's title in the first three paragraphs of
+ * the page the outline named. If the section before it ran over onto that page,
+ * the title sat lower, the search missed it, and a heading was inserted at the
+ * top of the page instead — above the tail of the previous section. The search
+ * now reads the whole page. It still matches a complete paragraph, so a
+ * sentence that merely quotes a title cannot be promoted.
+ *
+ * Every book on a shelf re-parses on this bump. PDF only.
+ */
+export const PARSER_VERSION = 38

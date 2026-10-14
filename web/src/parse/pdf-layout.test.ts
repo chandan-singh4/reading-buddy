@@ -271,6 +271,47 @@ describe('pdfPagesToBlocks — headings', () => {
     expect(blocks.map((block) => block.kind)).toEqual(['prose', 'prose', 'prose'])
   })
 
+  /*
+   * The ACAMS study guide sets its second-level bullets a shade larger than its
+   * prose. Three a page came out as titles.
+   */
+  it('never promotes a list item, however large it was set', () => {
+    const blocks = pdfPagesToBlocks([
+      page([
+        line('A paragraph of ordinary prose that fills the measure to its edge.', 100),
+        line('o Criminals manipulate trade invoices to move funds.', 300, { size: 14, width: 300 }),
+        line('• Market-based money laundering (MBML):', 400, { size: 14, width: 220 }),
+        line('A closing paragraph of ordinary prose, filling the measure again.', 500),
+      ]),
+    ])
+    expect(blocks.map((block) => block.kind)).toEqual(['prose', 'prose', 'prose', 'prose'])
+  })
+
+  it('never promotes a whole sentence that ends in a full stop', () => {
+    const blocks = pdfPagesToBlocks([
+      page([
+        line('A paragraph of ordinary prose that fills the measure to its edge.', 100),
+        line('Financial instruments create chains that mask fund origins.', 300, {
+          size: 14,
+          width: 320,
+        }),
+        line('A closing paragraph of ordinary prose, filling the measure again.', 500),
+      ]),
+    ])
+    expect(blocks.map((block) => block.kind)).toEqual(['prose', 'prose', 'prose'])
+  })
+
+  it('still promotes a short title that ends in a full stop', () => {
+    const blocks = pdfPagesToBlocks([
+      page([
+        line('A paragraph of ordinary prose that fills the measure to its edge.', 100),
+        line('Chapter I.', 300, { size: 14, width: 70 }),
+        line('A closing paragraph of ordinary prose, filling the measure again.', 500),
+      ]),
+    ])
+    expect(blocks[1]).toEqual({ kind: 'heading', level: 1, text: 'Chapter I.' })
+  })
+
   it('does not promote a long large-set block, such as a pull quote', () => {
     const blocks = pdfPagesToBlocks([
       page([
@@ -470,6 +511,41 @@ describe('pdfPagesToBlocks — the PDF outline', () => {
       text: 'The Phenomenology of Spirit',
     })
     expect(blocks.filter((b) => b.text === 'The Phenomenology of Spirit')).toHaveLength(1)
+  })
+
+  /*
+   * The section before it ran over onto the page, so the title sat fourth, not
+   * first. The narrow window missed it, a heading was inserted at the top, and
+   * the reader met "Case example: Tamayo's money mules" standing over the tail
+   * of the list before it.
+   */
+  it('finds a title that sits below the previous section’s run-over', () => {
+    const blocks = pdfPagesToBlocks(
+      [
+        page([line('Volume One', 60, { size: 20, width: 200 })]),
+        page([
+          line('o The first leftover bullet of the section before this one.', 60, { width: 320 }),
+          line('o The second leftover bullet of that same earlier section.', 90, { width: 320 }),
+          line('o The third leftover bullet, still the earlier section’s.', 120, { width: 320 }),
+          line('Case example: Tamayo’s money mules', 180, { size: 16, width: 260 }),
+          line('Tamayo recruited mules through advertisements for work.', 220, { width: 300 }),
+        ]),
+      ],
+      [],
+      [
+        { title: 'Volume One', page: 1, depth: 0 },
+        { title: 'Case example: Tamayo’s money mules', page: 2, depth: 1 },
+      ],
+    )
+
+    expect(blocks.map((block) => [block.kind, block.text])).toEqual([
+      ['heading', 'Volume One'],
+      ['prose', 'o The first leftover bullet of the section before this one.'],
+      ['prose', 'o The second leftover bullet of that same earlier section.'],
+      ['prose', 'o The third leftover bullet, still the earlier section’s.'],
+      ['heading', 'Case example: Tamayo’s money mules'],
+      ['prose', 'Tamayo recruited mules through advertisements for work.'],
+    ])
   })
 
   it('nests a child under its volume', () => {
