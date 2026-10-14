@@ -23,7 +23,7 @@ vi.mock('./models.ts', async () => {
        exists for: the fallback going sideways rather than down. */
     loadModels: () =>
       Promise.resolve([
-        { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', description: '', contextLength: 1_048_576, source: 'gemini' },
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', description: '', contextLength: 1_048_576, source: 'gemini' },
         { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super', description: '', contextLength: 131_072, source: 'openrouter' },
         { id: 'google/gemma-4-31b-it:free', name: 'Gemma 4 31B', description: '', contextLength: 131_072, source: 'openrouter' },
       ]),
@@ -103,8 +103,8 @@ describe('the study lamp', () => {
     const picker = await screen.findByLabelText(/Which model answers/)
     // The preferred model, since nothing has been chosen before. It is on the
     // closed control, so the reader can read it without opening anything.
-    await waitFor(() => expect(picker.textContent).toContain('Gemini 3.7 Flash'))
-    expect(PREFERRED_MODEL).toBe('gemini-3.7-flash')
+    await waitFor(() => expect(picker.textContent).toContain('Gemini 3.8 Flash'))
+    expect(PREFERRED_MODEL).toBe('gemini-3.8-flash')
 
     fireEvent.click(picker)
     const sheet = await screen.findByRole('dialog', { name: 'Which model answers' })
@@ -117,7 +117,7 @@ describe('the study lamp', () => {
     const rows = [...sheet.querySelectorAll('[class*="_row"]')].map(
       (row) => row.getAttribute('aria-label'),
     )
-    expect(rows).toEqual(['Gemini 3.7 Flash', 'Nemotron 3 Super', 'Gemma 4 31B'])
+    expect(rows).toEqual(['Gemini 3.8 Flash', 'Nemotron 3 Super', 'Gemma 4 31B'])
   })
 
   it('offers the controls before the roster has arrived', async () => {

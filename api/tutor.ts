@@ -161,12 +161,14 @@ function cappedEffort(effort: Effort): string {
  * `TUTOR_MODELS` overrides this, and should. The free roster churns weekly, so
  * these slugs *will* go stale — but a stale named default degrades into an
  * honest "could not be reached", which is recoverable, whereas an empty
- * default is a tutor that never worked. Every entry is general-purpose,
- * instruction-tuned, and tool-capable. Coding and classifier models are
- * deliberately absent.
+ * default is a tutor that never worked. Every entry is general-purpose and
+ * instruction-tuned. Coding and classifier models are deliberately absent.
+ *
+ * Every entry is also on its provider's free tier, which rules out Gemini 4
+ * Argon however much better it is: a default nobody chose must not cost money.
  */
 const DEFAULT_MODELS: Step[] = [
-  { id: 'gemini-3.7-flash', source: 'gemini' },
+  { id: 'gemini-3.8-flash', source: 'gemini' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free', source: 'openrouter' },
   { id: 'openai/gpt-oss-120b', source: 'groq' },
 ]

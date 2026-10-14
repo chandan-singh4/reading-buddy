@@ -26,13 +26,16 @@
  *
  * **Shape**: text in, text out, big enough context. This throws away the image,
  * speech, robotics and deep-research models that share these rosters. On
- * OpenRouter it also means free (`pricing` both zero) and tool-capable, asked
- * for with `?supported_parameters=tools`.
+ * OpenRouter it also means free — `pricing` both zero.
  *
- * Tool-capability matters beyond the one feature. "Still true?" needs a model
- * that can search, but it also has to hold on *failover*. If the chain falls
- * through to a model that cannot call a tool, search silently stops happening
- * and the answer looks the same as one that searched.
+ * It used to mean tool-capable as well, on both OpenRouter and Groq. That was
+ * wrong twice over. This relay sends no `tools` at all, and the one feature the
+ * rule was written for does not need them: "Still true?" searches through
+ * OpenRouter's `plugins: [{ id: 'web' }]`, which runs the search itself and
+ * puts the results in the prompt, so a model that cannot call a tool still gets
+ * them. The filter was throwing away most of the free roster to protect a
+ * guarantee nothing needed. It is gone, and the free column is several times
+ * longer for it.
  *
  * **Free** means something different on each provider, which is worth saying
  * plainly. On OpenRouter it is a price of zero. On Groq and Gemini there is no
@@ -132,6 +135,23 @@ const CACHE_SECONDS = 3600
  */
 const PROBE_MS = 6000
 
+/**
+ * Model names we will not offer, whatever the provider still lists.
+ *
+ * Google deprecates a model long before it stops answering: the old name is
+ * quietly routed to its replacement, so it keeps passing the probe and keeps
+ * its row in the picker. The reader then has two names for one model, and the
+ * older name is the one that will break first.
+ *
+ * A list that has to be maintained by hand, and the only one in this file. It
+ * earns that by being the one thing no roster reports. Each entry says what it
+ * routes to, so the day it is deleted the replacement is already named.
+ *
+ *   - `gemini-3.5-flash`  → `gemini-3.6-flash`  (deprecated 19 May 2026)
+ *   - `gemini-3.7-flash`  → `gemini-3.8-flash`  (deprecated 13 Aug 2026)
+ */
+const RETIRED = /^(?:gemini-3\.5-flash|gemini-3\.7-flash)(?:-|$)/i
+
 /** Text in, text out, or it is not a tutor. */
 const NOT_A_TUTOR =
   /image|tts|audio|speech|whisper|orpheus|lyria|robotics|computer-use|deep-research|antigravity|nano-banana|omni|guard|embedding|rerank/i
@@ -147,7 +167,7 @@ const MIN_CONTEXT = 16_000
 
 const ENDPOINTS: Record<Source, { roster: string; chat: string }> = {
   openrouter: {
-    roster: 'https://openrouter.ai/api/v1/models?supported_parameters=tools',
+    roster: 'https://openrouter.ai/api/v1/models',
     chat: 'https://openrouter.ai/api/v1/chat/completions',
   },
   groq: {
@@ -238,7 +258,7 @@ function seesOpenRouter(row: Record<string, unknown>): boolean {
   return typeof legacy === 'string' && legacy.split('->')[0]!.includes('image')
 }
 
-/** OpenRouter: free, tool-capable, and shaped like a tutor. */
+/** OpenRouter: free, and shaped like a tutor. */
 async function openrouterRoster(key: string): Promise<Row[]> {
   const response = await fetch(ENDPOINTS.openrouter.roster, {
     headers: { authorization: `Bearer ${key}` },
@@ -262,10 +282,8 @@ async function openrouterRoster(key: string): Promise<Row[]> {
 }
 
 /**
- * Groq: tool-capable and shaped like a tutor.
+ * Groq: the models shaped like a tutor.
  *
- * `supported_features` is Groq's own answer to the question OpenRouter answers
- * with `?supported_parameters=tools`, so the same guarantee holds on failover.
  * Price is not consulted — see the note on "free" at the top of this file.
  */
 async function groqRoster(key: string): Promise<Row[]> {
@@ -278,7 +296,6 @@ async function groqRoster(key: string): Promise<Row[]> {
 
   return (payload.data ?? [])
     .filter((row) => typeof row.id === 'string' && row.active !== false)
-    .filter((row) => (row.supported_features as string[] | undefined)?.includes('tools'))
     .map((row) => ({
       id: row.id as string,
       name: typeof row.name === 'string' ? row.name : (row.id as string),
@@ -323,6 +340,7 @@ async function geminiRoster(key: string): Promise<Row[]> {
       sees: true,
     }))
     .filter((row) => !NOT_A_TUTOR.test(`${row.id} ${row.name}`))
+    .filter((row) => !RETIRED.test(row.id))
     .filter((row) => row.contextLength >= MIN_CONTEXT)
 }
 

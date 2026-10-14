@@ -66,7 +66,7 @@ describe('when the relay answers', () => {
 
     const chain = [
       { id: 'z-ai/glm-4.6:free', source: 'openrouter' },
-      { id: 'gemini-3.7-flash', source: 'gemini' },
+      { id: 'gemini-3.8-flash', source: 'gemini' },
       { id: 'openai/gpt-oss-120b', source: 'groq' },
     ]
     await askTutor({ ...request, models: chain })

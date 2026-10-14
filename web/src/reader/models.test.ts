@@ -13,6 +13,7 @@ import {
   arrange,
   arrangementOf,
   ASSUMED_SIZE,
+  strength,
   anySees,
   chainFrom,
   stepsFrom,
@@ -43,6 +44,43 @@ function model(over: Partial<TutorModel> = {}): TutorModel {
     ...over,
   }
 }
+
+const gemini = (id: string, name: string): TutorModel =>
+  model({ id, name, source: 'gemini', description: '' })
+
+describe('Google\u2019s column, as the names there changed', () => {
+  /*
+   * Google's flagship line stopped being called Pro. Nothing in the ranking
+   * knew the word "Argon", so Gemini 4 scored as an untiered model and came out
+   * a rounding error above a fast small Flash.
+   */
+  it('ranks Gemini 4 Argon above a newer Flash', () => {
+    expect(strength(gemini('gemini-4-argon', 'Gemini 4 Argon'))).toBeGreaterThan(
+      strength(gemini('gemini-3.8-flash', 'Gemini 3.8 Flash')),
+    )
+  })
+
+  it('still ranks a Flash above its own Flash-Lite', () => {
+    expect(strength(gemini('gemini-3.8-flash', 'Gemini 3.8 Flash'))).toBeGreaterThan(
+      strength(gemini('gemini-3.8-flash-lite', 'Gemini 3.8 Flash-Lite')),
+    )
+  })
+
+  it('still ranks a newer generation above an older one', () => {
+    expect(strength(gemini('gemini-3.8-flash', 'Gemini 3.8 Flash'))).toBeGreaterThan(
+      strength(gemini('gemini-3.6-flash', 'Gemini 3.6 Flash')),
+    )
+  })
+
+  /*
+   * The default is the one model a reader gets without choosing, so it must be
+   * free. Argon is the better tutor and is off the free tier; naming it here
+   * would bill every reader who never opened the picker.
+   */
+  it('opens on a model that costs nothing', () => {
+    expect(PREFERRED_MODEL).toBe('gemini-3.8-flash')
+  })
+})
 
 /** One column, already ranked. The grid the reader would see. */
 function column(source: Provider, models: TutorModel[]): Column {

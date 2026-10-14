@@ -97,13 +97,23 @@ const MODELS_URL: string =
  * reason it is written as a search rather than an assignment — the roster
  * churns and this name will eventually stop existing.
  *
- * It is Gemini's fastest current Flash. Two earlier defaults taught what to
- * avoid: `z-ai/glm-5.2:free` is rate-limited upstream most of the time, and it
- * is a reasoning model that can spend its whole budget thinking and return
- * `content: null` with the working-out in `reasoning`. An empty bubble is not
- * an answer.
+ * It is Gemini's fastest current Flash, and it is on the free tier. Both halves
+ * matter. Three earlier defaults taught what to avoid:
+ *
+ *   - `z-ai/glm-5.2:free` is rate-limited upstream most of the time, and it is
+ *     a reasoning model that can spend its whole budget thinking and return
+ *     `content: null` with the working-out in `reasoning`. An empty bubble is
+ *     not an answer.
+ *   - `gemini-3.7-flash` was deprecated on 13 August 2026. Google still routes
+ *     it to 3.8, so it kept working and kept hiding the fact that this name was
+ *     on its way out.
+ *   - Gemini 4 Argon is the better model and is deliberately *not* this. It is
+ *     off the free tier, so naming it here would hand every reader who has
+ *     never opened the picker a bill they did not ask for. It still appears in
+ *     the picker for a reader whose key can reach it; the probe drops it for
+ *     everyone else.
  */
-export const PREFERRED_MODEL = 'gemini-3.7-flash'
+export const PREFERRED_MODEL = 'gemini-3.8-flash'
 
 const PICK_KEY = 'reading-buddy:tutor-model'
 /*
@@ -218,6 +228,14 @@ export const ASSUMED_SIZE = 70
  * They only ever decide ties between models that state no size at all.
  */
 const TIERS: [RegExp, number][] = [
+  /*
+   * Google's flagship line stopped being called Pro. `gemini-4-argon` names
+   * neither a size nor a tier this list knew, so it scored as an untiered model
+   * and landed a hair above a 3.8 Flash — a dead heat between Google's best
+   * model and a fast small one, decided by a rounding difference. Named first
+   * and weighted above Pro, which is what it is.
+   */
+  [/\bargon\b/, 40],
   [/\bpro\b/, 30],
   [/flash-lite|flash lite/, -20],
   [/\blite\b/, -20],
