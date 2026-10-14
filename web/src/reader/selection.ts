@@ -9,6 +9,7 @@
  * the paragraph they came from.
  */
 
+import { bareQuote } from '../structure/index.ts'
 import type { Anchor } from '../structure/index.ts'
 
 /**
@@ -562,6 +563,30 @@ export function rangesOfQuote(anchor: Anchor, quote: string): Range[] {
  */
 const SPAN_BLOCKS = 64
 
+/**
+ * The flattened text with every space dropped, and a map from each surviving
+ * character back to its index in `flat` — which is the index into `from`, so a
+ * bare match still knows exactly which text node each end of it landed in.
+ */
+function bareOf(flat: string): { flat: string; at: number[] } {
+  let bare = ''
+  const at: number[] = []
+  for (let i = 0; i < flat.length; i += 1) {
+    if (/\s/.test(flat[i]!)) continue
+    bare += flat[i]
+    at.push(i)
+  }
+  /*
+   * `at` is a map by position, so the fold must not change the count. Latin
+   * text never does, but a lowercase form is a per-locale rule and a few
+   * characters in Unicode grow one. Where that happens the map would be a lie,
+   * so the bare pass simply stands down and the exact match is the only answer.
+   */
+  const folded = bareQuote(bare)
+  if (folded.length !== bare.length) return { flat: '', at: [] }
+  return { flat: folded, at }
+}
+
 function rangeIn(element: Element | null, quote: string): Range | null {
   if (!element) return null
 
@@ -598,6 +623,32 @@ function rangeIn(element: Element | null, quote: string): Range | null {
     if (at >= 0) {
       const start = from[at]
       const end = from[at + wanted.length - 1]
+      if (!start || !end) return null
+
+      const range = document.createRange()
+      range.setStart(start.node, start.offset)
+      range.setEnd(end.node, end.offset + 1)
+      return range
+    }
+
+    /*
+     * The same words, with the spaces taken out.
+     *
+     * A highlight dragged across two paragraphs is stored with no space at the
+     * join, because that is how the browser stringifies it. A parser that later
+     * decides those two paragraphs were one writes a space there, and the exact
+     * match above fails on it — the ink vanished from a book whose words had
+     * not changed. See `structure/quote.ts`.
+     *
+     * Second, never first: an exact match is the better answer wherever there
+     * is one, and this cannot be reached unless there is not.
+     */
+    const bare = bareOf(flat)
+    const bareWanted = bareQuote(wanted)
+    const found = bareWanted === '' ? -1 : bare.flat.indexOf(bareWanted)
+    if (found >= 0) {
+      const start = from[bare.at[found]!]
+      const end = from[bare.at[found + bareWanted.length - 1]!]
       if (!start || !end) return null
 
       const range = document.createRange()

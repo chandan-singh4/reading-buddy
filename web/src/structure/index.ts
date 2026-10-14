@@ -4,6 +4,8 @@
  * `types.ts` / `anchor.ts` directly, so the internals stay free to move.
  */
 
+export { bareQuote, softenQuote } from './quote.ts'
+
 export type {
   Anchor,
   AnchorParts,

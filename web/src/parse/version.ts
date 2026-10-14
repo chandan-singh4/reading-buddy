@@ -584,4 +584,33 @@
  *
  * Every book on a shelf re-parses on this bump. PDF only.
  */
-export const PARSER_VERSION = 38
+/**
+ * 39 — a bullet knows which rung it stands on, and a mark survives a join.
+ *
+ * Two things, and the first matters more than any parsing.
+ *
+ * **The reader's marks stopped surviving a re-parse.** A highlight dragged
+ * across two paragraphs is stored as the browser stringifies it, and the
+ * browser puts no space between block elements — so the stored words read
+ * "…generateillegal funds…". Version 37 then decided those two blocks were one
+ * paragraph and wrote a space at the join. Every exact match failed on that one
+ * space: the search could not find the paragraph, and the page could not paint
+ * the ink. The words had not changed, and the reader marked the book again.
+ *
+ * Both searches now fall back to a match with the spaces taken out, which
+ * forgives a join in either direction and cannot hide a difference in the words
+ * themselves. See `structure/quote.ts`. Nothing was ever deleted, so the marks
+ * stranded by versions 37 and 38 are found again by this re-parse.
+ *
+ * **A bullet now carries its level.** A PDF has no lists, only lines that open
+ * with a bullet character. The parser reads the character — a filled bullet,
+ * the lowercase "o" a word processor writes for the second rung, a square for
+ * the third — and labels the line. The reading screen gives it a hanging
+ * indent, so a list reads on the phone as it reads in a browser.
+ *
+ * Deliberately a label and not a heading. A heading divides the book, so a page
+ * of bullets would become a page of sections.
+ *
+ * Every book on a shelf re-parses on this bump.
+ */
+export const PARSER_VERSION = 39

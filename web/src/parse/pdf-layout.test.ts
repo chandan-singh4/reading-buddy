@@ -287,6 +287,30 @@ describe('pdfPagesToBlocks — headings', () => {
     expect(blocks.map((block) => block.kind)).toEqual(['prose', 'prose', 'prose', 'prose'])
   })
 
+  /*
+   * The reader's ask: "dark bullets are the main heading and light bullets are
+   * the contents within it". A filled bullet stands over the hollow ones under
+   * it, and the app should show that the way the file does.
+   */
+  it('says which rung of a list each bullet stands on', () => {
+    const blocks = pdfPagesToBlocks([
+      page([
+        line('A paragraph of ordinary prose that fills the measure to its edge.', 40),
+        line('• Structuring, microstructuring, smurfing:', 100, { width: 220 }),
+        line('o Large illicit funds are split into small transactions.', 130, { width: 300 }),
+        line('▪ A third rung, which a word processor writes as a square.', 160, { width: 310 }),
+        line('An ordinary paragraph that carries no bullet at all, and runs on.', 190),
+      ]),
+    ])
+    expect(blocks.map((block) => block.label)).toEqual([
+      undefined,
+      'bullet-1',
+      'bullet-2',
+      'bullet-3',
+      undefined,
+    ])
+  })
+
   it('never promotes a whole sentence that ends in a full stop', () => {
     const blocks = pdfPagesToBlocks([
       page([

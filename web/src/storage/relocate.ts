@@ -2,7 +2,7 @@ import type { ReadingBuddyDB } from './db.ts'
 import { db as defaultDb } from './db.ts'
 import type { ParsedBook } from './repository.ts'
 import type { Anchor, BookId, Section } from '../structure/index.ts'
-import { sectionPath, tryParseAnchor } from '../structure/index.ts'
+import { bareQuote, sectionPath, tryParseAnchor } from '../structure/index.ts'
 
 /**
  * Carry the reader's marks across a re-parse.
@@ -62,6 +62,13 @@ interface Place {
   section: number
   paragraph: number
   text: string
+  /**
+   * The same text with every space removed — what a quote is matched against
+   * when the exact match fails. See `structure/quote.ts`: a highlight dragged
+   * across two blocks is stored with no space at the join, so it stops matching
+   * the moment the parser decides those blocks were one paragraph.
+   */
+  bare: string
 }
 
 /** Every paragraph in the book, folded once and kept for every mark to search. */
@@ -71,7 +78,8 @@ export function placesIn(sections: readonly Section[]): Place[] {
     for (const paragraph of section.paragraphs) {
       const parts = tryParseAnchor(paragraph.anchor)
       if (!parts) continue
-      places.push({ anchor: paragraph.anchor, ...parts, text: fold(paragraph.text) })
+      const text = fold(paragraph.text)
+      places.push({ anchor: paragraph.anchor, ...parts, text, bare: bareQuote(text) })
     }
   }
   return places
@@ -107,7 +115,17 @@ export function relocate(
   if (wanted === '') return undefined
 
   const from = tryParseAnchor(anchor)
-  const candidates = places.filter((place) => place.text.includes(wanted))
+  /*
+   * Exactly, or failing that with the spaces taken out.
+   *
+   * The second pass is what carries a highlight across a parser that joins two
+   * blocks into one — see `structure/quote.ts`. It only ever finds more, never
+   * fewer: a passage that matches exactly matches bare as well.
+   */
+  const bare = bareQuote(wanted)
+  const candidates = places.filter(
+    (place) => place.text.includes(wanted) || (bare !== '' && place.bare.includes(bare)),
+  )
   const scoped =
     wanted.length < SHORT_QUOTE && from
       ? candidates.filter((place) => place.chapter === from.chapter)

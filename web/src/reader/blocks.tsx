@@ -38,6 +38,17 @@ export type AskAboutFigure = (block: Paragraph) => void
 function display(block: Paragraph): string {
   if (block.label === 'dedication') return ` ${styles.dedication}`
   if (block.label === 'epigraph') return ` ${styles.epigraph}`
+  /*
+   * A bullet, on the rung the parser put it on.
+   *
+   * PDF only, so far: the formats with real markup keep a list as a `list`
+   * block and this never fires for them. A bullet is still an ordinary
+   * paragraph — one anchor, one highlight, one question to Veda — it is only
+   * set like a list item.
+   */
+  if (block.label === 'bullet-1') return ` ${styles.bullet}`
+  if (block.label === 'bullet-2') return ` ${styles.bullet} ${styles.bulletTwo}`
+  if (block.label === 'bullet-3') return ` ${styles.bullet} ${styles.bulletThree}`
   return ''
 }
 

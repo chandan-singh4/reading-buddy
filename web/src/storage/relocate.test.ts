@@ -30,6 +30,58 @@ const after = placesIn([
   section(6, 8, ['What we call civilized consciousness.'], 'The soul of man'),
 ])
 
+/*
+ * The PDF parser joined two blocks into one. Version 37 stopped a bulleted
+ * sentence breaking at its hanging indent, so a paragraph the reader had
+ * highlighted became the first half of a longer one.
+ */
+const BEFORE_JOIN = '• Common predicate crimes, such as drug trafficking and fraud, generate'
+const AFTER_JOIN = `${BEFORE_JOIN} illegal funds that are subject to laundering.`
+
+const joined = placesIn([
+  section(2, 1, ['Money laundering techniques allow criminals to obscure proceeds.', AFTER_JOIN]),
+])
+
+describe('relocate — a parser that joins two blocks into one', () => {
+  /*
+   * The one that cost the reader their highlights, twice.
+   *
+   * A selection dragged across two blocks is stored as the browser stringifies
+   * it, and the browser puts no space between block elements. So the stored
+   * quote reads "…generateillegal funds…". The parser then joined those two
+   * blocks with a space, and every exact match failed on it.
+   */
+  it('keeps a highlight dragged across the join, stored with no space in it', () => {
+    const across = `${BEFORE_JOIN}illegal funds that are subject to laundering.`
+    expect(relocate(joined, formatAnchor({ chapter: 2, section: 1, paragraph: 2 }), across)).toBe(
+      formatAnchor({ chapter: 2, section: 1, paragraph: 2 }),
+    )
+  })
+
+  it('still says nothing when the words themselves are not there', () => {
+    const across = `${BEFORE_JOIN}lawful funds that are subject to nothing.`
+    expect(
+      relocate(joined, formatAnchor({ chapter: 2, section: 1, paragraph: 2 }), across),
+    ).toBeUndefined()
+  })
+
+  it('keeps a highlight made on the first half', () => {
+    expect(relocate(joined, formatAnchor({ chapter: 2, section: 1, paragraph: 2 }), BEFORE_JOIN)).toBe(
+      formatAnchor({ chapter: 2, section: 1, paragraph: 2 }),
+    )
+  })
+
+  it('keeps a highlight made on the second half, now a later paragraph', () => {
+    expect(
+      relocate(
+        joined,
+        formatAnchor({ chapter: 2, section: 1, paragraph: 3 }),
+        'illegal funds that are subject to laundering.',
+      ),
+    ).toBe(formatAnchor({ chapter: 2, section: 1, paragraph: 2 }))
+  })
+})
+
 describe('relocate', () => {
   it('finds a highlight the split moved into another section', () => {
     // The reader marked this in ch06-s06-p050. The parser now calls it

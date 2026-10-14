@@ -109,6 +109,16 @@ const MAX_HEADING_CHARS = 120
  * plenty of real chapter titles.
  */
 const LIST_MARKER = /^(?:[•◦▪‣·∙*]|o)\s/
+/**
+ * Which rung of a list a line stands on, by the mark it opens with.
+ *
+ * A word processor writes a filled bullet for the first level, a lowercase "o"
+ * for the second and a filled square for the third, and it writes them as plain
+ * characters in the text. The PDF keeps the characters and loses the list, so
+ * the characters are all there is to read the list back from. Unknown marks
+ * count as the first level, which is the one that costs least if it is wrong.
+ */
+const BULLET_LEVELS: ReadonlyArray<RegExp> = [/^[•·∙*]\s/, /^(?:o|◦)\s/, /^[▪‣]\s/]
 /** Past this length, a trailing full stop means a sentence rather than a title. */
 const HEADING_SENTENCE_CHARS = 40
 /** A running header/footer must repeat on at least this share of pages. */
@@ -887,6 +897,30 @@ export function pdfPagesToBlocks(
     return { ...block, ...(links ? { links } : {}), ...(ids ? { ids } : {}) }
   }
 
+  /*
+   * A bullet keeps its place in the list it came from.
+   *
+   * The reader asked for the app to read like the file: a filled bullet stands
+   * over the hollow ones under it. Making those lines *headings* was the wrong
+   * tool — a heading divides the book, so a page of bullets would become a page
+   * of sections and shred the chapter rail. A label changes how a line is set
+   * and nothing else, which is exactly the amount of structure a bullet has.
+   *
+   * The marker itself stays in the text. It is the book's own character, the
+   * file prints it, and taking it out would alter the words every stored
+   * highlight is matched against.
+   */
+  const bulletLabel = (text: string): string | undefined => {
+    if (!LIST_MARKER.test(text)) return undefined
+    const level = BULLET_LEVELS.findIndex((mark) => mark.test(text))
+    return `bullet-${level < 0 ? 1 : level + 1}`
+  }
+
+  const asProse = (paragraph: Paragraph): Block => {
+    const label = bulletLabel(paragraph.text)
+    return label ? { kind: 'prose', label, text: paragraph.text } : { kind: 'prose', text: paragraph.text }
+  }
+
   const blockOf = (paragraph: Paragraph): Block => {
     if (fromOutline) {
       const level = fromOutline.get(paragraph)
@@ -914,7 +948,7 @@ export function pdfPagesToBlocks(
         return { kind: 'prose', label: 'subheading', text: paragraph.text }
       }
 
-      return { kind: 'prose', text: paragraph.text }
+      return asProse(paragraph)
     }
 
     const size = Math.round(paragraph.fontSize * 2) / 2
@@ -930,7 +964,7 @@ export function pdfPagesToBlocks(
     // either: `pdfFigures.ts` finds a tall band of the page with no text in it
     // and photographs it, which is a fact about the page rather than a judgment
     // about its contents. They arrive here already found and already drawn.
-    return { kind: 'prose', text: paragraph.text }
+    return asProse(paragraph)
   }
 
   return withFigures(paragraphs, figures, (paragraph) => dress(paragraph, blockOf(paragraph)))

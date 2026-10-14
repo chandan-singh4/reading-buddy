@@ -420,3 +420,47 @@
   color: var(--color-text-muted);
   opacity: 0.8;
 }
+
+/*
+ * A bullet carried out of a PDF.
+ *
+ * A PDF has no lists, only lines that happen to start with a bullet character.
+ * The parser reads the character and says which rung the line stands on; this
+ * sets it. The marker is part of the text, so the indent has to hang — the
+ * first line starts at the margin with its bullet, and the rest of the sentence
+ * lines up under the words rather than under the bullet. That hanging indent is
+ * the whole of what makes a list look like a list.
+ *
+ * Ragged-right rather than justified. A list item is short, and justifying two
+ * or three words across the measure opens rivers of white space in them.
+ */
+.bullet {
+  margin-top: var(--space-2);
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+  text-align: left;
+}
+
+/* Beats `.prose + .prose`, which would put a first-line indent on the marker. */
+.prose + .prose.bullet {
+  margin-top: var(--space-2);
+  text-indent: -1.4em;
+}
+
+.bullet.bulletTwo {
+  padding-left: 3.1em;
+  text-indent: -1.4em;
+}
+
+.prose + .prose.bullet.bulletTwo {
+  text-indent: -1.4em;
+}
+
+.bullet.bulletThree {
+  padding-left: 4.8em;
+  text-indent: -1.4em;
+}
+
+.prose + .prose.bullet.bulletThree {
+  text-indent: -1.4em;
+}

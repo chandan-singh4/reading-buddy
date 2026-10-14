@@ -228,6 +228,39 @@ describe('a quote that covers more than one paragraph', () => {
   })
 
   /*
+   * The report: "I had to redo the highlights, twice." A highlight dragged
+   * across two blocks is stored with no space at the join, because that is how
+   * the browser stringifies it. The PDF parser then learned that those two
+   * blocks were one paragraph all along and wrote a space there. The words had
+   * not changed, and every highlight over a join went dark.
+   */
+  it('finds a quote whose join the parser has since filled with a space', () => {
+    document.body.innerHTML =
+      '<main id="strip"><p id="ch01-s01-p001">One one one. Two two two.</p></main>'
+
+    const range = rangeOfQuote('[ch01-s01-p001]' as Anchor, 'one one.Two two')
+
+    expect(range).not.toBeNull()
+    expect(range?.toString()).toBe('one one. Two two')
+  })
+
+  it('prefers an exact match over a match that ignores the spaces', () => {
+    document.body.innerHTML =
+      '<main id="strip"><p id="ch01-s01-p001">Two two two. One one one.</p></main>'
+
+    expect(rangeOfQuote('[ch01-s01-p001]' as Anchor, 'One one one.')?.toString()).toBe(
+      'One one one.',
+    )
+  })
+
+  it('does not invent a match when the words differ', () => {
+    document.body.innerHTML =
+      '<main id="strip"><p id="ch01-s01-p001">One one one. Two two two.</p></main>'
+
+    expect(rangeOfQuote('[ch01-s01-p001]' as Anchor, 'one one.Six six')).toBeNull()
+  })
+
+  /*
    * Read-aloud's use: the speech engine reports its progress as a character
    * offset, and the page has to turn to the character that offset names.
    */
