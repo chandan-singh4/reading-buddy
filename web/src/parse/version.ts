@@ -540,4 +540,26 @@
  * Every book on a shelf re-parses on this bump. The text is untouched again;
  * only the kept lines move.
  */
-export const PARSER_VERSION = 36
+/**
+ * 37 — a sentence in a PDF stops where the sentence stops.
+ *
+ * A PDF holds no paragraphs, so this parser reads the margins to find them. A
+ * bulleted list defeats that. The first line of an item starts at the bullet
+ * and every line after it hangs further right, which the indent test reads as a
+ * new paragraph. The reader met sentences cut in half, and the leftover half,
+ * judged on its own, was sometimes set in heading type.
+ *
+ * Three changes, each small:
+ *
+ * 1. A line now takes the size most of its characters are set in, not the size
+ *    of its tallest fragment. One list bullet in a symbol font could re-size a
+ *    whole line of body text into a title.
+ * 2. Where one line ends with no sentence-ending mark and the next opens with a
+ *    lowercase letter, they are one sentence. The words overrule the margins,
+ *    and the sentence survives a page turn.
+ * 3. A paragraph that begins in the middle of a sentence is never a heading.
+ *
+ * Every book on a shelf re-parses on this bump. EPUB, HTML, DOCX, Markdown and
+ * plain text are untouched: they carry their own paragraph marks.
+ */
+export const PARSER_VERSION = 37

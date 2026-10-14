@@ -148,6 +148,38 @@ function joinItems(items: PdfTextItem[]): { text: string; spans: Span[] } {
   return { text: text.trim(), spans }
 }
 
+/**
+ * The size most of a line's characters are set in.
+ *
+ * The largest fragment used to win, which was wrong in a way that showed. A
+ * line carries more than its prose: a list bullet in a symbol font, a drop cap,
+ * a superscript marker, a stray run left behind by a word processor. Any one of
+ * those, reported a shade taller, re-sized the whole line — and the heading
+ * test downstream then read a line of body text as a title, mid-sentence.
+ *
+ * Weighting by character count puts the prose back in charge: the bullet is one
+ * character and the sentence is seventy. Ties go to the larger size, which is
+ * what a line of genuinely mixed sizes should be judged on.
+ */
+function dominantSize(items: PdfTextItem[]): number {
+  const weights = new Map<number, number>()
+  for (const item of items) {
+    const length = item.str.trim().length
+    if (length === 0) continue
+    weights.set(item.height, (weights.get(item.height) ?? 0) + length)
+  }
+
+  let best = 0
+  let bestWeight = -1
+  for (const [size, weight] of weights) {
+    if (weight > bestWeight || (weight === bestWeight && size > best)) {
+      best = size
+      bestWeight = weight
+    }
+  }
+  return best > 0 ? best : Math.max(...items.map((item) => item.height))
+}
+
 /** Group a set of items into lines, in reading order. */
 function toLines(items: PdfTextItem[], pageNumber: number): Line[] {
   if (items.length === 0) return []
@@ -182,7 +214,7 @@ function toLines(items: PdfTextItem[], pageNumber: number): Line[] {
         // Both filled in below, once every line in this column is known.
         measure: 0,
         columnLeft: 0,
-        fontSize: Math.max(...ordered.map((item) => item.height)),
+        fontSize: dominantSize(ordered),
         page: pageNumber,
       } satisfies Line
     })
@@ -342,6 +374,42 @@ interface Paragraph {
   parts: { line: Line; offset: number }[]
 }
 
+/**
+ * A sentence does not stop in the middle.
+ *
+ * Every test below this comment is geometric, and geometry lies on a page with
+ * lists on it. A bulleted item hangs its continuation lines further right than
+ * its first line, so the indent test calls the second line a new paragraph. An
+ * item whose first line falls short of the measure trips the short-line test
+ * the same way. The sentence then arrives at the reader cut in half, and the
+ * half that was left over gets judged on its own as a possible heading.
+ *
+ * The words themselves settle it. A line that ends with no sentence-ending mark
+ * has not finished, and a line that opens with a lowercase letter has not
+ * started. Where both hold, the two lines are one sentence whatever the margins
+ * say, and the geometric tests are overruled.
+ *
+ * Deliberately narrow. It reads only the characters at the join, so a line that
+ * ends in a full stop, a colon or a bullet's own punctuation still breaks, and
+ * so does a next line that opens with a capital, a numeral or a bullet glyph.
+ */
+const ENDS_SENTENCE = /[.!?…:;»"”'’)\]]$/
+const OPENS_LOWER = /^\p{Ll}/u
+
+/** Did this line stop before its sentence did? */
+function runsOn(text: string): boolean {
+  return text.length > 0 && !ENDS_SENTENCE.test(text)
+}
+
+/**
+ * How far apart two lines may sit and still be read as one sentence.
+ *
+ * A ceiling, not a rule of its own. Without it a line could be welded to text
+ * halfway up the page — a caption, a stranded footnote — on nothing but a
+ * missing full stop.
+ */
+const CONTINUATION_REACH = PARAGRAPH_GAP * 2
+
 /** Join a wrapped line onto the paragraph, healing hyphenation across breaks. */
 function appendLine(text: string, next: string): string {
   if (/[-‐]$/.test(text)) return `${text.slice(0, -1)}${next}`
@@ -354,19 +422,33 @@ function toParagraphs(lines: Line[]): Paragraph[] {
   let previous: Line | null = null
 
   for (const line of lines) {
+    // Near enough to be read as one run of text. Across a page break there is
+    // no distance to measure, and a sentence carried over a page is still one
+    // sentence, so the page turn counts as near.
+    const within =
+      previous !== null &&
+      (line.page !== previous.page ||
+        previous.y - line.y <= previous.fontSize * CONTINUATION_REACH)
+
+    // The words say these two lines are one sentence. See `runsOn` above.
+    const continues =
+      previous !== null && within && runsOn(previous.text) && OPENS_LOWER.test(line.text)
+
     const breaks =
       previous === null ||
-      line.page !== previous.page ||
-      // A markedly different size is a different kind of text entirely.
+      // A markedly different size is a different kind of text entirely, and no
+      // reading of the words can argue with it.
       Math.abs(line.fontSize - previous.fontSize) > previous.fontSize * 0.15 ||
-      // Extra leading between lines.
-      previous.y - line.y > previous.fontSize * PARAGRAPH_GAP ||
-      // A first-line indent.
-      line.x > previous.x + previous.fontSize * INDENT ||
-      // The previous line stopped well short of the column edge, so it ended a
-      // paragraph rather than wrapping. The edge is the column's own measure —
-      // see `Line.measure`.
-      previous.right < previous.measure * SHORT_LINE
+      (!continues &&
+        (line.page !== previous.page ||
+          // Extra leading between lines.
+          previous.y - line.y > previous.fontSize * PARAGRAPH_GAP ||
+          // A first-line indent.
+          line.x > previous.x + previous.fontSize * INDENT ||
+          // The previous line stopped well short of the column edge, so it
+          // ended a paragraph rather than wrapping. The edge is the column's
+          // own measure — see `Line.measure`.
+          previous.right < previous.measure * SHORT_LINE))
 
     if (breaks || current === null) {
       current = {
@@ -714,7 +796,30 @@ export function pdfPagesToBlocks(
   // Rank the heading sizes present, largest first, so the biggest text in the
   // document becomes level 1 and the next size down level 2. The assembler then
   // maps whatever it finds onto chapters and sections.
+  /*
+   * A heading does not begin in the middle of a sentence.
+   *
+   * The last defence, and it reads the words rather than the page. Where a
+   * paragraph break survives everything above — a page turn, a size the file
+   * reports wrongly — the leftover half of a sentence still arrives here as a
+   * paragraph of its own, and the size test will happily set it in heading
+   * type. The reader then meets a sentence that turns into a title halfway
+   * through, which is the one thing no real book does.
+   *
+   * So: a paragraph that opens with a lowercase letter, after a paragraph that
+   * ended with no sentence-ending mark, is prose. Nothing else about it is
+   * changed — it stays its own paragraph, it just stops pretending.
+   */
+  const midSentence = new Set<Paragraph>()
+  paragraphs.forEach((paragraph, index) => {
+    const before = index > 0 ? paragraphs[index - 1] : null
+    if (before && runsOn(before.text) && OPENS_LOWER.test(paragraph.text)) {
+      midSentence.add(paragraph)
+    }
+  })
+
   const couldBeHeading = (paragraph: Paragraph): boolean =>
+    !midSentence.has(paragraph) &&
     paragraph.lineCount <= MAX_HEADING_LINES &&
     paragraph.text.length <= MAX_HEADING_CHARS &&
     paragraph.fontSize > body * HEADING_RATIO
@@ -755,7 +860,7 @@ export function pdfPagesToBlocks(
       const bigger =
         couldBeHeading(paragraph) && headingSizes.includes(Math.round(paragraph.fontSize * 2) / 2)
 
-      if (bigger || looksCentred(paragraph)) {
+      if (bigger || (!midSentence.has(paragraph) && looksCentred(paragraph))) {
         return { kind: 'prose', label: 'subheading', text: paragraph.text }
       }
 

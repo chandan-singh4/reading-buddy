@@ -109,6 +109,84 @@ describe('pdfPagesToBlocks — paragraphs', () => {
     ).toEqual(['the story was uninterrupted by anything at all'])
   })
 
+  /*
+   * A bulleted list, as a word processor writes one into a PDF.
+   *
+   * The first line of an item starts at the bullet; every line after it hangs
+   * further right, under the text. Geometry alone reads that as a new paragraph
+   * each time, so the ACAMS study guide arrived with its sentences cut in half.
+   */
+  it('keeps a bullet together when its lines hang under the bullet', () => {
+    expect(
+      textsOf([
+        page([
+          line('A full line of ordinary prose that reaches the right edge.', 40),
+          line('• Common predicate crimes, such as drug trafficking and fraud, generate', 100),
+          line('illegal funds that are subject to laundering.', 112, { x: 70, width: 200 }),
+        ]),
+      ]),
+    ).toEqual([
+      'A full line of ordinary prose that reaches the right edge.',
+      '• Common predicate crimes, such as drug trafficking and fraud, generate illegal funds that are subject to laundering.',
+    ])
+  })
+
+  it('joins a line that runs on from one ending in an acronym', () => {
+    expect(
+      textsOf([
+        page([
+          line('A full line of ordinary prose that reaches the right edge.', 40),
+          line('o Large illicit funds are split to avoid triggering AML', 100, { width: 300 }),
+          line('reporting thresholds.', 112, { x: 70, width: 90 }),
+        ]),
+      ]),
+    ).toEqual([
+      'A full line of ordinary prose that reaches the right edge.',
+      'o Large illicit funds are split to avoid triggering AML reporting thresholds.',
+    ])
+  })
+
+  it('carries a sentence over a page turn', () => {
+    expect(
+      textsOf([
+        page([line('Layering conceals the origin of the dirty', 700)]),
+        page([line('money, such as through a holding company.', 100)]),
+      ]),
+    ).toEqual(['Layering conceals the origin of the dirty money, such as through a holding company.'])
+  })
+
+  it('still breaks after a line that ends its sentence', () => {
+    expect(
+      textsOf([
+        page([
+          line('A full line of ordinary prose that reaches the right edge.', 40),
+          line('• Structuring, microstructuring, smurfing:', 100, { width: 200 }),
+          line('o large illicit funds are split up.', 112, { x: 70, width: 160 }),
+        ]),
+      ]),
+    ).toEqual([
+      'A full line of ordinary prose that reaches the right edge.',
+      '• Structuring, microstructuring, smurfing:',
+      'o large illicit funds are split up.',
+    ])
+  })
+
+  it('does not weld a line to text far up the page', () => {
+    expect(
+      textsOf([
+        page([
+          line('A full line of ordinary prose that reaches the right edge.', 40),
+          line('The caption of a picture', 100, { width: 120 }),
+          line('far below it continues nothing.', 300, { width: 150 }),
+        ]),
+      ]),
+    ).toEqual([
+      'A full line of ordinary prose that reaches the right edge.',
+      'The caption of a picture',
+      'far below it continues nothing.',
+    ])
+  })
+
   it('starts a new paragraph on a new page', () => {
     expect(
       textsOf([
@@ -153,6 +231,44 @@ describe('pdfPagesToBlocks — headings', () => {
       level: 1,
       text: 'Introduction to the Special Issue on Non-duality and Cross-Cultural Philosophy',
     })
+  })
+
+  /*
+   * One tall fragment used to re-size its whole line. A list bullet set in a
+   * symbol font was enough, and a line of body text came out as a title.
+   */
+  it('judges a line by the size most of it is set in, not its tallest glyph', () => {
+    const blocks = pdfPagesToBlocks([
+      page([
+        {
+          str: 'o',
+          x: LEFT,
+          y: PAGE_HEIGHT - 100,
+          width: 8,
+          height: BODY * 1.4,
+        },
+        {
+          str: 'Large illicit funds are split into small transactions.',
+          x: LEFT + 12,
+          y: PAGE_HEIGHT - 100,
+          width: 300,
+          height: BODY,
+        },
+        line('A second line of ordinary prose, to give the page a body size.', 120),
+      ]),
+    ])
+    expect(blocks.every((block) => block.kind === 'prose')).toBe(true)
+  })
+
+  it('never sets the leftover half of a sentence in heading type', () => {
+    const blocks = pdfPagesToBlocks([
+      page([
+        line('A paragraph of ordinary prose that fills the measure and then', 100),
+        line('and this half runs on from it', 300, { size: 18, width: 260 }),
+        line('A closing paragraph of ordinary prose, filling the measure again.', 500),
+      ]),
+    ])
+    expect(blocks.map((block) => block.kind)).toEqual(['prose', 'prose', 'prose'])
   })
 
   it('does not promote a long large-set block, such as a pull quote', () => {
