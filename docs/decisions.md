@@ -3320,3 +3320,53 @@ survived, because it was in the cloud.
   deletes it, the app fetches it again. Without it there is no reading with
   no signal.
 
+
+## A mark must survive a re-parse (2026-10-16)
+
+- **One rule matches a quote, and both sides use it.** `structure/quote.ts`
+  holds it. `softenQuote` folds curly quotes, apostrophes and dashes.
+  `bareQuote` also drops every space. Two copies of the rule is how the
+  highlights stranded two times.
+- **The finder falls back to the bare form.** A selection across two
+  paragraphs is stored with no space at the join, because that is what the
+  browser's `range.toString()` returns. An exact match then fails. The bare
+  match finds it.
+- **A mark that is still not found keeps its old anchor.** Nothing is deleted.
+  A later re-parse can find it again.
+- **A bare match is refused when folding changed the length.** A fold that is
+  not one character for one character cannot map an index back to the page.
+
+## PDF bullets are labels, not headings (2026-10-16)
+
+- **A dark bullet is `bullet-1`, a light `o` is `bullet-2`.** They are `prose`
+  blocks with a `label`, like every other fine distinction.
+- **Why not a heading.** A heading divides the book. A page of bullets would
+  become a page of sections, which shreds the chapter rail and moves every
+  anchor after it. An anchor is what a highlight is pinned to.
+- **The marker characters stay in the text.** A stored highlight quote holds
+  them, so removing them would lose the mark.
+- **This is fitted to one PDF, and the reader accepted that.** A book with
+  other marks gets one flat level.
+
+## A line's font size is the size most of it is set in (2026-10-16)
+
+- **Not the tallest glyph.** The tallest glyph made one parenthesis or one
+  capital letter stand for the whole line, so body text looked like a heading.
+  `dominantSize` weights each size by how many characters carry it.
+- **Three more guards kill the symptom even if the size is still wrong.** A
+  heading cannot start with a list marker, cannot be a long sentence that ends
+  in a full stop, and cannot be the second half of a sentence that the line
+  above did not finish.
+
+## The model roster asks for no tool support (2026-10-16)
+
+- **The relay sends no tools.** The filter cut OpenRouter's free column to six
+  rows and bought nothing.
+- **"Still true?" needs no tool-calling model.** It uses OpenRouter's `web`
+  plugin, which runs the search and puts the results in the prompt.
+- **A deprecated model is dropped by name.** Google still routes
+  `gemini-3.5-flash` and `gemini-3.7-flash`, so the probe cannot see that they
+  are gone. A short maintained list holds them.
+- **The default model must be free.** `gemini-3.8-flash` is the default. Gemini
+  4 Argon is off the free tier, so it is never the default; the `limit: 0`
+  probe already drops a model the reader's key cannot reach.

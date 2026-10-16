@@ -105,7 +105,11 @@ is a heading or one of nine content kinds (`prose`, `quote`, `list`, `code`,
   itself is discarded — so without this, every link pointing at a chapter
   heading resolved to nothing and was dropped.
 - **PDF emits only `heading` and `prose`.** It has no structural markup — tables
-  and figures there are geometry, not tags.
+  and figures there are geometry, not tags. It does set `label`:
+  `bullet-1`, `bullet-2` and `bullet-3` carry a list's depth, read from the
+  marker character (`•` then `o` or `◦` then `▪` or `‣`). A bullet is not a
+  heading, for the reason above — a heading would divide the book and move
+  every anchor after it.
 
 ### UI (WP-04)
 

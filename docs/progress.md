@@ -11,232 +11,212 @@
 **Current leg:** Leg 3 — The Tutor
 **The walking skeleton is standing (2026-08-25).** Import → render → select →
 Ask → a streamed answer works end to end. WP-17, 19, 20, 25 and 29 are closed.
-Breadth is now allowed. The next foundation is WP-09, which four rows wait on.
+Breadth is now allowed.
 
 ### In flight
-- **The phone has now seen all of it (2026-09-05).** The reader checked every
-  screen that was waiting: the Statistics screen and its timer, the rebuilt book
-  screen in both states, the two-row chapter rail, the model picker, the chapter
-  summary page, the bell on Home, and the new reading voice. All confirmed
-  working. The bright summary page in Dark is accepted as it is.
-- **A book left open counts.** The idle rule was removed on the reader's
-  instruction, so the only guard is a six-hour cap per session. If a forgotten
-  book starts inflating the numbers, the fix is a smaller cap, not a new pause
-  rule.
-- **Everything the reader makes now follows them to the cloud** (2026-09-23).
-  `storage/sync/` copies notes, threads, sessions, summaries and the rest to
-  `user_rows`. The reader ran `0008_user_rows.sql`, and the table exists.
-  **Not proved yet:** rows from the phone in `user_rows`. Ask the reader to
-  look in Table Editor.
+
+- **The reader's marks now survive a re-parse (2026-10-16).** They did not
+  before. Two parser updates stranded the highlights two times, and the reader
+  redid them by hand two times. The cause was not the anchors: it was the
+  quote match. See "Recently done" below.
+  **One chore is left:** run **Library → Update** one time. It moves the shelf
+  to `PARSER_VERSION` 39 and brings back the marks that versions 37 and 38
+  stranded. Nothing was ever deleted.
+- **Not proved yet: rows from the phone in `user_rows`.** `storage/sync/` copies
+  eleven tables to Supabase. The reader ran `0008_user_rows.sql` and the table
+  exists. Nobody has seen one row from the phone in it. This is the oldest open
+  proof in the build.
+- **Not proved yet: a longer free model list.** The roster asked each provider
+  for tool-capable models only, which cut OpenRouter's free column to six rows.
+  The filter is gone. This container has no provider keys, so only the phone can
+  show whether the list grew.
+- **OpenRouter has deprecated the `web` plugin.** "Still true?" uses
+  `plugins: [{ id: 'web' }]`. The replacement is the `openrouter:web_search`
+  server tool, which *does* need a tool-capable model. Nothing is broken today.
+  It is a real ticking item and it is its own task, not a filter change.
 - **Check the deploy, do not assume it.** A helper file under `api/` with no
   default export failed the Vercel build and five commits sat on `main`
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed. Build green:
-  2,590 tests across 162 files.
+  2,613 tests across 162 files.
+- **No ceiling on spending.** Two models run unasked. The queue skips finished
+  work and only the most recently opened book runs by itself. There is no cap
+  beyond that. This is the reason WP-27 is next.
+- **A book left open counts.** The idle rule was removed on the reader's
+  instruction, so the only guard is a six-hour cap per session. If a forgotten
+  book starts inflating the numbers, the fix is a smaller cap, not a new pause
+  rule.
 - **One Veda's Quote stays under Veda, by the reader's choice.** The vault held
   one kept line, and no thread matched it. Do not try to link it again.
-- **A timing flake in `Reader.test.tsx`.** "crosses into the next chapter"
-  failed one time in a full run on 2026-09-25. It passed alone three times and
-  in the next full run. Cause not found.
-- **The Obsidian export is proved, both times.** The first export met a real
-  vault on 2026-08-31. The reader confirmed the second export on 2026-09-05:
-  "Export what's new" added the new chapter and made no copy of an old one.
-- **`api/tutor.ts` has no tests.** The mid-stream failover added this session is
-  proved by reasoning only. There is no test harness under `api/`, and the
-  client half is covered instead (`watched.test.ts`, `askMemory.test.ts`).
-- **Every already-summarised chapter will re-run the Scribe once.** The
-  staleness test now counts the reader's questions rather than the passages, so
-  every stored summary looks stale one time. It settles after that.
 - **A screen must import `repository` from `storage/index.ts`.** Four screens
   imported `storage/repository.ts`, which is the device store only. The reader's
   library is in the cloud, so every summary page read an empty database and
   showed nothing. `summary/repository.test.ts` reads the imports of every file
   in `summary/`, `pages/` and `tutor/` and fails on a new offender.
-- **Not proved yet: a real call to either model.** Every part around them is
-  tested — the queue, the parser, the stores, the bell. The models themselves
-  have never answered. The first real proof is the reader finishing a chapter
-  and seeing a summary appear. Watch for a wrong shape coming back.
-- **No ceiling on spending.** The queue skips finished work and only the most
-  recently opened book runs unasked. There is no cap beyond that.
+- **`api/tutor.ts` has no tests.** There is no test harness under `api/`. The
+  client half is covered instead (`watched.test.ts`, `askMemory.test.ts`).
 - **The update prompt now has a second door.** The reader reported that the
   prompt did not appear one time, which left the phone on old code with no way
   to move it. A waiting build is now the top line in the bell, and it keeps
   counting until the update is taken.
-- **A flaky test teardown, not ours to blame on WP-16.** `vitest run` reports one
-  unhandled error from `HandDrawn.tsx` — a coalesced measure fires after jsdom
-  has been torn down and the stored range can no longer be measured. Every test
-  passes. It reproduces on the untouched commit before WP-16, so it is older
-  than this work. It makes `npm test` exit non-zero. Worth a small task of its
-  own.
 - **Define needs its keys wherever it runs.** `MW_COLLEGIATE_KEY` (required) and
   `MW_THESAURUS_KEY` (optional) are set locally and on Vercel. A new machine, or
   a new deploy target, needs them again. Two free and separate registrations at
   <https://dictionaryapi.com>. Never prefix either with `VITE_`.
-- **Not proved from this machine: a live MW answer under test.** Every parser is
-  tested against captured JSON. The network path was proved by hand on the
-  phone, not by a test.
+- **Two test flakes, neither ours.** `HandDrawn.tsx` reports one unhandled error
+  at jsdom teardown in a full run; it makes `npm test` exit non-zero although
+  every test passes, and it reproduces on the commit before WP-16, so it is
+  older than the work that found it. `Reader.test.tsx` → "crosses into the next
+  chapter" failed one time on 2026-09-25 and has passed since. Cause not found
+  for either. The first is worth a small task of its own.
 
 ### Recently done
 
-- **The cloud is the only library** (2026-10-12). Not a waypoint. Build green:
-  2,590 tests across 162 files.
+- **The reader's marks survive a re-parse, and PDF bullets keep their level**
+  (2026-10-16). Not a waypoint. Build green: 2,613 tests across 162 files.
+  - **The real cause of the lost highlights.** A mark is stored as its words,
+    not as an offset, so `relocate` can find it again after a re-parse. But a
+    selection that crossed two paragraphs was stored with **no space at the
+    join**, because that is what the browser's `range.toString()` gives. The
+    stored words then matched nothing and the mark stranded.
+  - `structure/quote.ts` is now the one rule both sides use. `softenQuote`
+    folds curly quotes and dashes; `bareQuote` also drops every space. The
+    finder falls back to the bare form, so a missing space no longer loses a
+    mark.
+  - `relocate.ts` and `reader/selection.ts` both use it. Nothing was ever
+    deleted: `relocate` keeps the old anchor when the words are not found.
+  - **PDF bullets are labels, not headings.** A dark bullet is a `bullet-1`
+    prose block, a light `o` is `bullet-2`. A heading would divide the book,
+    turn a page of bullets into a page of sections, and move every anchor.
+    The marker characters stay in the text so stored quotes still match.
+
+- **PDF headings read like headings (2026-10-16).** Not a waypoint.
+  - **Mid-sentence text stopped becoming a heading.** The line's font size was
+    the tallest glyph in it, so one parenthesis or one capital made a body line
+    look big. `dominantSize` now weights each size by how many characters carry
+    it.
+  - **A sentence stays whole.** A hanging indent in a bulleted list looked like
+    a new paragraph. A line that opens lower-case after a line that does not
+    end a sentence now joins it.
+  - **A heading stands over its own content.** `applyOutline` searched three
+    paragraphs for the outline's title and gave up; it now searches to the end
+    of the page.
+
+- **Open the model roster up (2026-10-16).** Not a waypoint.
+  - The rosters are fetched live, every hour. Nothing is hardcoded.
+  - **Why only six free OpenRouter models:** both OpenRouter and Groq were
+    asked for tool-capable models. The relay sends no tools, and "Still true?"
+    uses a plugin that needs none. Both filters are gone.
+  - `gemini-3.5-flash` and `gemini-3.7-flash` are deprecated but Google still
+    routes them, so they kept passing the probe and showed a second name for
+    one model. A short maintained list drops them.
+  - The default moved to `gemini-3.8-flash`. **Gemini 4 Argon is not the
+    default on purpose:** it is off the free tier ($2/$10 per million). The
+    `limit: 0` probe already drops a model the key cannot reach, so it appears
+    only for a key that can pay. Its rank now sits above Pro.
+
+- **The cloud is the only library** (2026-10-12). Not a waypoint.
   - Settings no longer shows "Where your library lives" or the library copy.
     The sign-in screen no longer offers the device library.
   - The offline copy and the backup sync are unchanged.
 
-- **Restore from vault** (2026-09-23). Not a waypoint. Build green: 2,590
-  tests across 162 files.
+- **Restore from vault** (2026-09-23). Not a waypoint.
   - Settings → "Bring your notes back from Obsidian". The reader picks the
     export zips or the chapter `.md` files.
-  - The app finds each passage in its book by its words (`relocate`). It puts
-    back the highlights, the notes and the Veda threads. A second run adds
-    nothing.
+  - The app finds each passage by its words (`relocate`) and puts back the
+    highlights, the notes and the Veda threads. A second run adds nothing.
   - The vault kept no colours and no dates. Restored highlights are yellow.
-  - Run on the phone on 2026-09-25. Kept lines of Veda's match their thread
-    through `recoverMarkdown`, then by their words. The message says how many
-    kept lines the files held.
+  - Run on the phone on 2026-09-25.
 
 - **Everything the reader makes goes to the cloud** (2026-09-23). Not a
-  waypoint. Build green: 2,583 tests across 161 files.
+  waypoint.
   - Android Chrome cleared the app's storage when the phone was low on space.
     Notes, highlights, Veda threads and sessions were lost. Only the shelf was
     in the cloud.
-  - `web/src/storage/sync/` now copies eleven tables to a new Supabase table,
-    `user_rows`. An emptied device gets them back when it opens.
-  - The reader ran `0008_user_rows.sql` on 2026-09-25. The SQL editor's "Run
-    and enable RLS" button broke the first version; the script now puts RLS
-    first and has no comments in the function body.
-  - The lost data can come back only from the Obsidian exports. See
-    "Restore from vault" above.
-
-- **The app stays signed in with no network** (2026-09-10). Not a waypoint.
-  Build green: 2,575 tests across 160 files.
-  - A sign-in token lives about one hour, and the app renews it over the
-    network. With no network the renewal failed, so the app decided nobody was
-    signed in. After one hour offline it showed the sign-in screen, which no
-    reader can use with no signal.
-  - It was worse than a locked door. Every write was refused as "you are signed
-    out" instead of being queued, so the outbox never saw the page turns.
-  - The app now writes down the reader who last signed in. It gives that reader
-    back **only** when the renewal failed for want of a network.
-  - Two kinds of proof count as "no network": the browser saying so, and a
-    renewal that failed with a network error while the browser said it was
-    online. The second is the train case.
-  - A true sign-out still closes the app, offline or not.
-  - **Not proved on a device.** The tests prove the rule. Nobody has yet flown
-    with it.
-
-- **WP-43 — check the folder for new books** (2026-09-05). Closed on the phone
-  on 2026-09-10. The reader pressed the button and it works. Build green: 2,564
-  tests across 158 files.
-  - A new item in the "+" menu: **Check folder for new books**. It shows only
-    after the reader has imported a folder one time.
-  - On Chrome, Edge and Android Chrome the app keeps the folder and reads it
-    again with no picker. On Firefox and iOS Safari the item opens the folder
-    picker, because those browsers cannot keep a folder.
-  - Books already on the shelf are skipped. Import did this before; the button
-    only had to use it.
-  - The report now names the new books: "Imported 2 books: The Red Book, Aion."
-  - **Proved on a device** on 2026-09-10.
+  - `web/src/storage/sync/` now copies eleven tables to `user_rows`. An emptied
+    device gets them back when it opens.
+  - The lost data can come back only from the Obsidian exports.
 
 ### Blockers
 - **None.** Supabase's email allowance (a few sign-in messages an hour on the
   free mailer) bit once on 2026-08-09 and cleared itself; connect real SMTP
   under Authentication → Emails if it ever gets in the way again.
-- The `autoUpdate` → `prompt` crossing that stranded installed clients
-  is closed: the reader confirmed on 2026-08-05 that the phone is on the current
-  build and that the stale client was a desktop-app session, not a deploy or
-  worker problem. Don't raise it again.
 
 ### Next up
-**Prove the backup on the phone.** See `active-task.md`.
+
+**WP-27 · cost and usage visibility.** The largest open piece, with WP-22.
+Written out in `active-task.md`. Two models run unasked and nothing tells the
+reader what that costs.
+
+**Three chores for the reader. None needs code, and none blocks WP-27.**
+1. Run **Library → Update**. It takes the shelf to `PARSER_VERSION` 39 and
+   recovers the marks that 37 and 38 stranded.
+2. Prove the backup on the phone. Supabase → Table Editor → `user_rows` must
+   show rows with `tbl` = `notes` and `tbl` = `tutor`. If the table stays
+   empty, look at `remote.ts` first: `userId()` returns nothing without a live
+   session, and every push error is swallowed.
+3. Open the model picker and say whether the free list grew past six.
+
+Then, still open:
+
+**The `HandDrawn.tsx` teardown flake.** `npm test` exits non-zero although
+every test passes. A small task of its own.
+
+**Stats — the last step of the Google Books arc.** `finishedAt`, the OPF
+fields and the catalogue lookup are all done. Pages read = finished books ×
+the print edition's page count — the reader's own simplification, and the
+reason there is no reading-events log. A part-read book shows percent × page
+count.
 
 **The update prompt is worth a look of its own.** A prompt-to-update PWA cost
 the reader four rounds of "still broken" on work that was already shipped. The
 prompt may be too quiet on a phone. Deciding this is a small task, not a bug.
 
-**Judge the parser on the phone.** Accept the rebuild to `PARSER_VERSION` 28 and
-check the Contents tab. This needs no code. It is the only way to know if the
-four parser rounds have landed.
+**Then drop caps**, parked and waiting on the reader's screenshot.
 
-**Then drop caps**, parked this thread and waiting on the reader's screenshot.
+**Offered, not yet answered (2026-08-14): "More by this author."** Google Books
+has **no author entity** — `volumeInfo.authors` is a plain `string[]`. But a
+shelf of the author's other books is one query away on the endpoint that
+already exists (`q=inauthor:"…"`). A *biography* would need Wikidata or Open
+Library — a second source, worth doing second if at all.
 
-**Finish WP-25: something that writes a note.** The Notes tab reads a table that
-nothing fills. Written out in `active-task.md`, with one question to settle
-first: device-local or cloud. Device-local is the smaller step.
+**Cheap follow-ons the redesign made cheap**, if the reader wants them:
+favourites (a boolean, one filter clause, one chip) and renaming or deleting a
+folder from the filter sheet — `repository.renameFolder` and `deleteFolder`
+both exist and have no UI yet.
 
-Then, still open:
-
-**Google Books metadata, then the Stats tab** — the arc the reader chose on
-2026-08-10, written out step by step in `active-task.md`. Import reads only
-**title and author** today; everything Stats wants (page count, categories,
-average rating) comes from a catalogue.
-1. `finishedAt` — **done** (`4f9175c`).
-2. ISBN, publisher and subtitle out of the EPUB's own OPF — **done**.
-3. The Google Books lookup through `api/`, with the match guard, the shelf
-   backfill and a per-book Refresh — **done** (`fbea9ad` → `a1cce60`). The key
-   is server-side only; never a `VITE_` variable.
-4. **Stats — the only step left.** Pages read = finished books × the print edition's page count — the
-   reader's own simplification, and the reason there is no reading-events log.
-   A part-read book shows an approximation: percent × page count.
-
-**Then back to the reader's order, set 2026-08-02:** a proper reading app first,
-then AI.
-- **The reader's eye is no longer the blocker — signed off 2026-08-10.** The
-  launch tempo, the 85% page scale, the gestures, the library's list and grid
-  were all carried open for days and are now called good. Left as facts rather
-  than questions: 557 ms is the measured splash, 85% clears both bars with
-  budget to 90%, and **gestures are still verifiable on a phone or not at all** —
-  a synthetic click is not a finger, so that stays true of any future change to
-  them. One chore survives, unrelated to taste: run **Library → Update** to pull
-  covers forward to `PARSER_VERSION` 9.
-- **Offered, not yet answered (2026-08-14): "More by this author."** Google
-  Books has **no author entity** — `volumeInfo.authors` is a plain `string[]`,
-  with no bio, nationality or bibliography anywhere in the API. But a shelf of
-  the author's other books is one query away on the endpoint that already
-  exists (`q=inauthor:"…"`). A *biography* would need Wikidata/Wikipedia or
-  Open Library — a second source, worth doing second if at all.
-- **Cheap follow-ons the redesign made cheap**, if the reader wants them:
-  favourites (a boolean, one filter clause, one chip) and renaming/deleting a
-  folder from the filter sheet — `repository.renameFolder` and `deleteFolder`
-  both exist and have no UI yet.
-- **Reading comfort is done.** WP-14 closed with WP-55's bookmarks and in-book
-  search; font size, line spacing, margins, sepia and the page turn were already
-  in. Notes/highlights are WP-25 and need the tutor loop's selection work first.
-- **WP-27 · cost and usage visibility.** Two models run unasked. Nothing tells
-  the reader what that costs. WP-09 and WP-18 are declined, so this is now the
-  largest open piece with WP-22.
 ### Known parser limits (accepted, not bugs)
 - **PDF is lossy by nature** — it stores positioned glyphs, not paragraphs.
   Publisher furniture that appears on only one or two pages (e.g. Springer's
   `Vol.:(0123456789)` sidebar) survives the repeat-based filter, which needs 3+
   pages to act. Not worth over-fitting to one publisher.
+- **The bullet levels are fitted to one PDF.** `BULLET_LEVELS` maps `•` to
+  level 1 and `o` or `◦` to level 2. A book that uses other marks, or the same
+  mark at two depths, gets one flat level. The reader accepted this.
 - **Scanned PDFs yield nothing.** No text layer, and OCR is out of scope — this
   surfaces as an empty book, so WP-11 should catch and explain it.
 - **`.azw3` / `.kfx` declined** — DRM; see the note in `backlog.md`.
 
 ### Open items
-- **Migration `0009`, agreed and deferred — and now smaller.** (`0008` is now
-  `user_rows`.) Drop `subject`,
-  `type` and `type_overridden`. **`title_overridden` and
+- **Migration `0009`, agreed and deferred.** (`0008` is now `user_rows`.) Drop
+  `subject`, `type` and `type_overridden`. **`title_overridden` and
   `repository.renameBook` are no longer on the list:** rename got a UI on
-  2026-08-31, and `renameBook` sets `titleOverridden` so a later re-parse of
-  the file cannot put the old title back. The `healTitles` override skip stays
-  for the same reason. Note `subject` (the app's own tag, being
-  dropped) is **not** `subjects` (Google's BISAC headings, now displayed).
+  2026-08-31, and `renameBook` sets `titleOverridden` so a later re-parse
+  cannot put the old title back. The `healTitles` override skip stays for the
+  same reason. Note `subject` (the app's own tag, being dropped) is **not**
+  `subjects` (Google's BISAC headings, now displayed).
 - **The live Anthropic key still sits in `Claude API/API.txt`**, on the
-  reader's own machine, gitignored and never committed. `.env.example` is
-  ready at the repo root; the key itself still needs a manual copy into a
-  local `.env` for dev, and into Vercel's Environment Variables for
-  production. **More urgent now than "someday"** — the app has a real public
-  URL as of 2026-08-03, not just a home LAN.
+  reader's own machine, gitignored and never committed. `.env.example` is ready
+  at the repo root; the key itself still needs a manual copy into a local
+  `.env` for dev, and into Vercel's Environment Variables for production.
 - **A garbled-diacritics report is open, waiting on the reader.** A book's
-  title-page text was missing accented letters and a word-space; traced to
-  the source epub's own SVG `<title>` markup (nothing in `web/src/parse/`
-  strips non-ASCII), but unconfirmed without seeing the actual file or its
-  title-page markup.
+  title-page text was missing accented letters and a word-space; traced to the
+  source epub's own SVG `<title>` markup (nothing in `web/src/parse/` strips
+  non-ASCII), but unconfirmed without the file.
 - **Pictures need a re-import to appear.** Fixed 2026-08-02 for new imports;
-  books already on the shelf have no bytes stored, so the shelf's "Update"
-  (kept source file, `PARSER_VERSION` 3) is what fills them in. Storage grows by
-  roughly the images again — the Jung epub's 141 plates are most of its 15 MB.
+  books already on the shelf have no bytes stored, so "Update" fills them in.
+  Storage grows by roughly the images again.
+- **Not proved from this machine: a live MW answer under test.** Every parser
+  is tested against captured JSON. The network path was proved by hand on the
+  phone, not by a test.
