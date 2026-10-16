@@ -40,9 +40,13 @@ Breadth is now allowed.
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed. Build green:
   2,613 tests across 162 files.
-- **No ceiling on spending.** Two models run unasked. The queue skips finished
-  work and only the most recently opened book runs by itself. There is no cap
-  beyond that. This is the reason WP-27 is next.
+- **No ceiling on spending — accepted, because every model is free.** Two
+  models run unasked (the Scribe and the digest). The queue skips finished work
+  and only the most recently opened book runs by itself. There is no cap beyond
+  that. The reader deferred WP-27 on 2026-10-16 for this reason. **Watch two
+  things:** Gemini 4 Argon is a paid model and it sits in the picker for a key
+  that can pay, and a free tier caps requests, not money. If a quota starts to
+  bite, reopen WP-27.
 - **A book left open counts.** The idle rule was removed on the reader's
   instruction, so the only guard is a six-hour cap per session. If a forgotten
   book starts inflating the numbers, the fix is a smaller cap, not a new pause
@@ -145,9 +149,17 @@ Breadth is now allowed.
 
 ### Next up
 
-**WP-27 · cost and usage visibility.** The largest open piece, with WP-22.
-Written out in `active-task.md`. Two models run unasked and nothing tells the
-reader what that costs.
+**A reading + journaling app — in design, not yet built (2026-10-16).** The
+reader wants to speak a thought, and the app writes it down. A free model then
+gives the words a shape to read later. The raw words stay. We are settling the
+design first; nothing is built. **The app has never listened:** `narrator/` and
+`readAloud.ts` only speak. There is no microphone code.
+
+**WP-22 · `learner.md` adaptive model.** Held, by the reader's choice, while
+the journaling design settles.
+
+**WP-27 · cost and usage visibility — deferred, see `backlog.md`.** Every model
+is free, so the screen would show zero and a price table would go stale.
 
 **Three chores for the reader. None needs code, and none blocks WP-27.**
 1. Run **Library → Update**. It takes the shelf to `PARSER_VERSION` 39 and

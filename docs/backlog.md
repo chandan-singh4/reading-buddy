@@ -428,7 +428,12 @@
   `vocabulary` table (Dexie v15), and the Notes panel's **Words** tab lists them
   across every book. The learner.md half, and anything that *practises* a word,
   is still to come
-- [ ] **WP-27 Cost / usage visibility** — per-book/session/model-tier screen · *after 19*
+- [-] **WP-27 Cost / usage visibility** — **deferred 2026-10-16, not declined.**
+  The reader runs free models only, so a cost screen shows zero and a price
+  table goes stale. The original reason for this waypoint was a move to the
+  Claude API. Reopen it when a paid model becomes the default, or when a free
+  tier's quota starts to bite. **Token counts are not stored**, so a screen
+  built later starts from that day with no history.
 - [-] **WP-28 Books-stay-separate guard** — **declined 2026-08-25, moot.** It
   guards cross-book retrieval, and there is no retrieval to guard. Reopen it
   with WP-09 if that is ever reopened.

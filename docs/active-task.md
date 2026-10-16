@@ -6,7 +6,24 @@ it.
 
 ## Task
 
-**WP-27 — show the reader what the models cost.**
+**Design a reading + journaling app. Nothing is built yet.**
+
+The reader wants to speak a thought and keep it. The app records the words, and
+a free model gives them a shape to read later. The raw words stay readable.
+
+We are in design. Do not build until the reader settles the open questions. The
+chat holds the current options. **The app has never listened:** `narrator/` and
+`reader/readAloud.ts` only speak. There is no microphone code in `web/src`.
+
+**No files are in scope yet.** Add them when the design settles.
+
+---
+
+## Deferred — kept for the day it reopens
+
+**WP-27 — show the reader what the models cost. Deferred 2026-10-16.**
+Every model the reader uses is free, so the screen shows zero, and a price
+table goes stale. The notes below stay accurate and cost nothing to keep.
 
 Two models run without the reader asking: the Scribe writes a chapter summary
 when a chapter ends (`summary/engine.ts`), and the digest runs by itself
