@@ -1,0 +1,822 @@
+<title>Reading Buddy Journal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+  /* Layout: a phone frame holding one screen at a time, with a switcher strip
+     under it. Tokens below are copied from web/src/styles/theme.css so the
+     mockup wears the app's own skin, light and dark. */
+  :root {
+    --color-bg: #fbfaf8;
+    --color-surface: #ffffff;
+    --color-surface-raised: #f2f0ec;
+    --color-text: #1a1815;
+    --color-text-muted: #6b6660;
+    --color-border: #e2ded7;
+    --color-accent: #7a5c3e;
+    --color-accent-contrast: #ffffff;
+    --color-focus: #3b6ea5;
+    --color-accent-wash: color-mix(in srgb, var(--color-accent) 8%, transparent);
+    --color-live: #a8432f;
+    --page-bg: #e8e4dd;
+
+    --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-reading: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    --font-figure: 'EB Garamond', Garamond, Georgia, serif;
+
+    --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+    --space-4: 1rem; --space-5: 1.5rem; --space-6: 2rem;
+    --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem;
+    --text-lg: 1.125rem; --text-xl: 1.375rem; --text-2xl: 1.75rem;
+    --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+    --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.08), 0 1px 2px rgb(0 0 0 / 0.04);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --color-bg: #14130f;
+      --color-surface: #1c1a16;
+      --color-surface-raised: #26231e;
+      --color-text: #ece7df;
+      --color-text-muted: #9a938a;
+      --color-border: #33302a;
+      --color-accent: #c9a227;
+      --color-accent-contrast: #14130f;
+      --color-focus: #7fb0e8;
+      --color-live: #e0765c;
+      --page-bg: #0b0a08;
+      --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --color-bg: #14130f;
+    --color-surface: #1c1a16;
+    --color-surface-raised: #26231e;
+    --color-text: #ece7df;
+    --color-text-muted: #9a938a;
+    --color-border: #33302a;
+    --color-accent: #c9a227;
+    --color-accent-contrast: #14130f;
+    --color-focus: #7fb0e8;
+    --color-live: #e0765c;
+    --page-bg: #0b0a08;
+    --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--color-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: var(--space-6);
+  }
+
+  .wrap { max-width: 44rem; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-5); }
+
+  .masthead { display: flex; flex-direction: column; gap: var(--space-2); }
+  .masthead h1 {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .masthead p {
+    margin: 0;
+    font-family: var(--font-figure);
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    max-width: 34rem;
+  }
+  .masthead .caveat {
+    font-family: var(--font-ui);
+    font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  /* ---- the switcher ---- */
+  .switcher { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .switcher button {
+    font: inherit;
+    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+  .switcher button[aria-selected="true"] {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-accent-contrast);
+    font-weight: 600;
+  }
+  .switcher button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+  /* ---- the phone ---- */
+  .phone {
+    width: 100%;
+    max-width: 24rem;
+    margin: 0 auto;
+    border: 1px solid var(--color-border);
+    border-radius: 28px;
+    background: var(--color-bg);
+    box-shadow: 0 18px 40px rgb(0 0 0 / 0.18);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 40rem;
+  }
+
+  .screen { display: none; flex-direction: column; flex: 1; min-height: 0; }
+  .screen[data-on="true"] { display: flex; }
+
+  /* ---- top bar, as AppShell draws it ---- */
+  .topbar {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-3) var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+    flex: 0 0 auto;
+  }
+  .iconbtn {
+    width: 36px; height: 36px; flex: 0 0 auto;
+    display: grid; place-items: center;
+    border: none; background: none; cursor: pointer;
+    color: var(--color-text); font-size: var(--text-lg);
+    border-radius: var(--radius-sm);
+  }
+  .brand {
+    flex: 1; min-width: 0; text-align: center;
+    font-family: var(--font-display);
+    font-size: var(--text-base); font-weight: 600;
+  }
+
+  /* the mode switch — the one new control in the chrome */
+  .modeswitch {
+    flex: 0 0 auto;
+    display: inline-flex; align-items: center; gap: 0.3em;
+    font: inherit; font-size: var(--text-xs); font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--color-accent);
+    border-radius: 999px;
+    background: var(--color-accent-wash);
+    color: var(--color-accent);
+    cursor: pointer;
+  }
+  .modeswitch:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+  .body {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: var(--space-4) var(--space-4) var(--space-6);
+    display: flex; flex-direction: column; gap: var(--space-4);
+  }
+
+  .daymark {
+    font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--color-text-muted);
+    display: flex; align-items: center; gap: var(--space-2);
+  }
+  .daymark::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
+
+  /* ---- an entry card ---- */
+  .entry {
+    display: flex; flex-direction: column; gap: var(--space-2);
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-raised);
+  }
+  .entry h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-lg); font-weight: 600; line-height: 1.3;
+    text-wrap: balance;
+  }
+  .entry p {
+    margin: 0;
+    font-family: var(--font-figure);
+    font-size: var(--text-base); line-height: 1.55;
+    color: var(--color-text-muted);
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+    font-size: var(--text-xs); color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .dot { width: 3px; height: 3px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+
+  /* a book-linked entry is tinted, not railed: the book tag already names it,
+     so this only has to be enough to tell the two kinds apart at a glance */
+  .entry.linked {
+    background:
+      linear-gradient(to right, var(--color-accent-wash), transparent 55%),
+      var(--color-surface);
+  }
+  .booktag {
+    display: inline-flex; align-items: center; gap: 0.35em;
+    font-size: var(--text-xs); font-weight: 600;
+    color: var(--color-accent);
+  }
+  .tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+  .tag {
+    font-size: var(--text-xs);
+    padding: 0.1em 0.5em;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text-muted);
+    background: var(--color-surface-raised);
+  }
+
+  /* ---- the passage a linked entry hangs from ---- */
+  .passage {
+    font-family: var(--font-reading);
+    font-size: var(--text-sm); line-height: 1.6;
+    font-style: italic;
+    color: var(--color-text-muted);
+    padding-left: var(--space-3);
+    border-left: 2px solid var(--color-border);
+  }
+
+  /* ---- the microphone dock ---- */
+  .dock {
+    flex: 0 0 auto;
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface);
+    display: flex; align-items: center; gap: var(--space-3);
+  }
+  .mic {
+    width: 56px; height: 56px; flex: 0 0 auto;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-accent);
+    color: var(--color-accent-contrast);
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: grid; place-items: center;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+  .mic:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+  .dockhint { font-size: var(--text-sm); color: var(--color-text-muted); min-width: 0; }
+  .dockhint strong { color: var(--color-text); font-weight: 600; display: block; }
+
+  /* ---- the speaking screen ---- */
+  .live {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    padding: var(--space-4);
+    gap: var(--space-3);
+  }
+  .livehead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+  .rec {
+    display: inline-flex; align-items: center; gap: 0.45em;
+    font-size: var(--text-sm); font-weight: 600; color: var(--color-live);
+    font-variant-numeric: tabular-nums;
+  }
+  .recdot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-live); }
+  .awake {
+    display: inline-flex; align-items: center; gap: 0.35em;
+    font-size: var(--text-xs); color: var(--color-text-muted);
+    padding: 0.15em 0.6em;
+    border: 1px solid var(--color-border); border-radius: 999px;
+    background: var(--color-surface-raised);
+  }
+
+  .transcript {
+    flex: 1; min-height: 0; overflow-y: auto;
+    font-family: var(--font-figure);
+    font-size: var(--text-lg); line-height: 1.6;
+  }
+  .transcript .settled { color: var(--color-text); }
+  .transcript .guess { color: var(--color-text-muted); font-style: italic; }
+  .transcript .caret {
+    display: inline-block; width: 2px; height: 1.05em;
+    vertical-align: text-bottom;
+    background: var(--color-accent);
+  }
+  .transcript .placeholder { color: var(--color-text-muted); font-style: italic; }
+
+  /* the waveform: bars that only move while the mic is open */
+  .wave { display: flex; align-items: flex-end; gap: 2px; height: 28px; flex: 0 0 auto; }
+  .wave span {
+    flex: 1; min-width: 0;
+    background: var(--color-accent);
+    border-radius: 1px;
+    height: 12%;
+    opacity: 0.35;
+  }
+  .wave[data-moving="true"] span { animation: bob 900ms ease-in-out infinite alternate; opacity: 1; }
+  @keyframes bob { from { height: 10%; } to { height: 100%; } }
+
+  .livefoot { display: flex; gap: var(--space-2); flex: 0 0 auto; }
+  .btn {
+    font: inherit; font-size: var(--text-sm); font-weight: 600;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+    flex: 1;
+  }
+  .btn.primary {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-accent-contrast);
+  }
+  .btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+  /* ---- the entry screen, raw against tidied ---- */
+  .seg {
+    display: flex; gap: 2px; flex: 0 0 auto;
+    padding: 3px;
+    background: var(--color-surface-raised);
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+  }
+  .seg button {
+    flex: 1; font: inherit; font-size: var(--text-sm);
+    padding: var(--space-2);
+    border: none; border-radius: 999px;
+    background: none; color: var(--color-text-muted);
+    cursor: pointer;
+  }
+  .seg button[aria-selected="true"] {
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: 600;
+    box-shadow: var(--shadow-raised);
+  }
+  .seg button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+
+  .prose { font-family: var(--font-figure); font-size: var(--text-lg); line-height: 1.65; }
+  .prose h4 {
+    font-family: var(--font-display);
+    font-size: var(--text-base); margin: var(--space-4) 0 var(--space-1);
+  }
+  .prose p { margin: 0 0 var(--space-3); }
+  .prose ul { margin: 0 0 var(--space-3); padding-left: 1.2em; }
+  .prose li { margin-bottom: var(--space-1); }
+  .rawnote {
+    font-family: var(--font-ui); font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-accent-wash);
+    border-radius: var(--radius-sm);
+  }
+
+  /* ---- the reader screen ---- */
+  .page {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: var(--space-5) var(--space-4);
+    font-family: var(--font-reading);
+    font-size: var(--text-base); line-height: 1.7;
+  }
+  .page p { margin: 0 0 var(--space-4); }
+  .page mark {
+    background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+    color: inherit;
+    border-radius: 2px;
+  }
+  .popup {
+    position: sticky; bottom: var(--space-3);
+    display: flex; gap: var(--space-1);
+    padding: var(--space-2);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+    font-family: var(--font-ui);
+  }
+  .popup button {
+    flex: 1; font: inherit; font-size: var(--text-xs);
+    padding: var(--space-2) var(--space-1);
+    border: none; border-radius: var(--radius-sm);
+    background: none; color: var(--color-text);
+    cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .popup button.on { background: var(--color-accent); color: var(--color-accent-contrast); font-weight: 600; }
+  .popup .ico { font-size: var(--text-base); }
+
+  /* ---- notes under the phone ---- */
+  .notes {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    display: flex; flex-direction: column; gap: var(--space-3);
+  }
+  .notes h2 {
+    font-family: var(--font-display); font-size: var(--text-xl);
+    margin: 0; font-weight: 600;
+  }
+  .notes h3 {
+    font-family: var(--font-ui); font-size: var(--text-sm);
+    margin: var(--space-2) 0 0; font-weight: 600;
+  }
+  .notes p, .notes li {
+    margin: 0; font-family: var(--font-figure);
+    font-size: var(--text-base); line-height: 1.55;
+    color: var(--color-text-muted);
+  }
+  .notes ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: var(--space-1); }
+  .notes strong { color: var(--color-text); }
+  .caption {
+    text-align: center; font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    font-family: var(--font-figure);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wave[data-moving="true"] span { animation: none; height: 40%; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <span class="caveat">Design mockup &middot; not working code</span>
+    <h1>The journal, as it would look</h1>
+    <p>Five screens, wearing the app's own theme tokens. Tap through them. The
+      speaking screen types out a transcript the way the real one would.</p>
+  </header>
+
+  <div class="switcher" role="tablist" aria-label="Screens">
+    <button role="tab" aria-selected="true" data-go="list">The journal</button>
+    <button role="tab" aria-selected="false" data-go="speak">Speaking</button>
+    <button role="tab" aria-selected="false" data-go="entry">One entry</button>
+    <button role="tab" aria-selected="false" data-go="linked">Tied to a book</button>
+    <button role="tab" aria-selected="false" data-go="reader">In the book</button>
+  </div>
+
+  <div class="phone">
+
+    <!-- 1. the journal -->
+    <section class="screen" data-screen="list" data-on="true">
+      <div class="topbar">
+        <button class="iconbtn" aria-label="Open menu">&#9776;</button>
+        <span class="brand">Journal</span>
+        <button class="modeswitch" data-go="reader">&#9638; Reading</button>
+      </div>
+      <div class="body">
+        <span class="daymark">Today</span>
+
+        <article class="entry linked">
+          <span class="booktag">&#9638; The Shallows &middot; ch. 4</span>
+          <h3>Attention as a muscle I have been letting go slack</h3>
+          <p>He says the skimming is not laziness, it is training. That lands
+            badly, because I have been training it for fifteen years&hellip;</p>
+          <div class="tags"><span class="tag">attention</span><span class="tag">habits</span></div>
+          <div class="meta"><span>08:42</span><span class="dot"></span><span>2 min 10 s spoken</span><span class="dot"></span><span>Tidied</span></div>
+        </article>
+
+        <article class="entry">
+          <h3>Why I start books and do not finish them</h3>
+          <p>Three on the go again. I think the honest reason is that starting
+            feels like progress and the middle does not&hellip;</p>
+          <div class="tags"><span class="tag">reading habits</span></div>
+          <div class="meta"><span>07:15</span><span class="dot"></span><span>58 s spoken</span><span class="dot"></span><span>Raw</span></div>
+        </article>
+
+        <span class="daymark">Yesterday</span>
+
+        <article class="entry linked">
+          <span class="booktag">&#9638; Range &middot; ch. 2</span>
+          <h3>The bit about early specialisation bothered me</h3>
+          <p>I agree with the argument and I still think he picked the examples
+            that suit it. Tiger and Roger is a story, not evidence&hellip;</p>
+          <div class="tags"><span class="tag">disagreement</span><span class="tag">evidence</span></div>
+          <div class="meta"><span>21:30</span><span class="dot"></span><span>3 min 44 s spoken</span><span class="dot"></span><span>Tidied</span></div>
+        </article>
+
+        <article class="entry">
+          <h3>Walk, and the thing about my father</h3>
+          <p>Not about a book. Just wanted it written down before it went&hellip;</p>
+          <div class="meta"><span>19:04</span><span class="dot"></span><span>1 min 36 s spoken</span><span class="dot"></span><span>Raw only</span></div>
+        </article>
+      </div>
+      <div class="dock">
+        <button class="mic" data-go="speak" aria-label="Speak a thought">&#127908;</button>
+        <span class="dockhint"><strong>Speak a thought</strong>Hold, or tap once to keep going</span>
+      </div>
+    </section>
+
+    <!-- 2. speaking -->
+    <section class="screen" data-screen="speak">
+      <div class="topbar">
+        <button class="iconbtn" data-go="list" aria-label="Back">&#8592;</button>
+        <span class="brand">Speaking</span>
+        <span style="width:36px"></span>
+      </div>
+      <div class="live">
+        <div class="livehead">
+          <span class="rec"><span class="recdot"></span><span id="clock">0:00</span></span>
+          <span class="awake">&#9728; Screen stays awake</span>
+        </div>
+
+        <div class="transcript" id="transcript">
+          <span class="placeholder">Tap Start and the words appear as you speak.</span>
+        </div>
+
+        <div class="wave" id="wave" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+
+        <div class="livefoot">
+          <button class="btn" id="reset">Start again</button>
+          <button class="btn primary" id="toggle">Start</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. one entry -->
+    <section class="screen" data-screen="entry">
+      <div class="topbar">
+        <button class="iconbtn" data-go="list" aria-label="Back">&#8592;</button>
+        <span class="brand">Entry</span>
+        <button class="iconbtn" aria-label="More">&#8943;</button>
+      </div>
+      <div class="body">
+        <div class="seg" role="tablist" aria-label="How to read this entry">
+          <button role="tab" aria-selected="false" data-view="raw">Raw</button>
+          <button role="tab" aria-selected="true" data-view="tidy">Tidied</button>
+        </div>
+
+        <div class="meta"><span>Today, 07:15</span><span class="dot"></span><span>58 s spoken</span><span class="dot"></span><span>gemini-3.8-flash</span></div>
+
+        <div class="prose" data-pane="tidy">
+          <h4>Why I start books and do not finish them</h4>
+          <p>I have three books on the go again. The honest reason is that
+            starting a book feels like progress, and the middle of one does not.</p>
+          <p>The first thirty pages give me the shape of the argument. After that
+            the work is holding it, and holding it is not the part I enjoy. So I
+            go and find another shape.</p>
+          <h4>What I might do about it</h4>
+          <ul>
+            <li>Finish one before opening the next. Dull, and probably right.</li>
+            <li>Ask whether I actually wanted the whole book, or only its first chapter.</li>
+          </ul>
+          <p class="rawnote">Tidied by a free model. Your own words are kept
+            under Raw and are never changed.</p>
+        </div>
+
+        <div class="prose" data-pane="raw" hidden>
+          <p>okay so i've got three books on the go again and um i think the
+            honest reason is that starting a book feels like progress and the
+            middle of one doesn't you know the first thirty pages give me the
+            shape of the argument and after that the work is just holding it and
+            holding it isn't the bit i enjoy so i go and find another shape i
+            suppose the answer is finish one before you open the next which is
+            dull but it's probably right or maybe ask whether i wanted the whole
+            book or just the first chapter of it</p>
+          <p class="rawnote">Exactly what the microphone heard. Nothing added,
+            nothing removed.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. tied to a book -->
+    <section class="screen" data-screen="linked">
+      <div class="topbar">
+        <button class="iconbtn" data-go="list" aria-label="Back">&#8592;</button>
+        <span class="brand">Entry</span>
+        <button class="modeswitch" data-go="reader">&#9638; Open</button>
+      </div>
+      <div class="body">
+        <span class="booktag">&#9638; The Shallows &middot; chapter 4</span>
+
+        <div class="passage">&ldquo;We are evolving from being cultivators of
+          personal knowledge to being hunters and gatherers in the electronic
+          data forest.&rdquo;</div>
+
+        <div class="meta"><span>Today, 08:42</span><span class="dot"></span><span>2 min 10 s spoken</span><span class="dot"></span><span>Tidied</span></div>
+
+        <div class="prose">
+          <h4>Attention as a muscle I have been letting go slack</h4>
+          <p>He says the skimming is not laziness, it is training. That lands
+            badly, because I have been training it for fifteen years and I did
+            not know that was what I was doing.</p>
+          <p>What I notice reading this book: I keep reaching for the phone at the
+            end of a paragraph. Not at the end of a chapter. At the end of a
+            paragraph.</p>
+        </div>
+
+        <div class="tags"><span class="tag">attention</span><span class="tag">habits</span></div>
+
+        <p class="rawnote">Tied to the passage by its words, not by a page
+          number. Re&shy;parse the book and the tie holds.</p>
+      </div>
+    </section>
+
+    <!-- 5. in the book -->
+    <section class="screen" data-screen="reader">
+      <div class="topbar">
+        <button class="iconbtn" data-go="list" aria-label="Back">&#8592;</button>
+        <span class="brand">The Shallows</span>
+        <button class="modeswitch" data-go="list">&#9998; Journal</button>
+      </div>
+      <div class="page">
+        <p>The Net's cacophony of stimuli short&#8209;circuits both conscious and
+          unconscious thought, preventing our minds from thinking either deeply
+          or creatively.</p>
+        <p><mark>We are evolving from being cultivators of personal knowledge to
+          being hunters and gatherers in the electronic data forest.</mark></p>
+        <p>Our brains become adept at forgetting, inept at remembering. Our
+          growing dependence on the Net's information stores may in fact be
+          the product of a self&#8209;perpetuating loop.</p>
+        <div class="popup">
+          <button><span class="ico">&#9906;</span>Define</button>
+          <button><span class="ico">&#10022;</span>Ask Veda</button>
+          <button><span class="ico">&#9646;</span>Highlight</button>
+          <button class="on"><span class="ico">&#127908;</span>Speak</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <p class="caption">The two round&#8209;trip buttons sit in the top bar: <strong>Reading</strong>
+    on the journal, <strong>Journal</strong> in the book. Same place, both ways.</p>
+
+  <section class="notes">
+    <h2>What the screens decide</h2>
+
+    <h3>The microphone dock, not a floating button</h3>
+    <p>A thought dies in about twenty seconds, so capture is one tap from the
+      journal's front door. Hold to speak a short thought, or tap once for a
+      long ramble and tap again to stop.</p>
+
+    <h3>Grey words are guesses, black words are kept</h3>
+    <p>The speaking screen shows the tail of the sentence in grey italic while
+      the recogniser is still deciding, then settles it in full black with its
+      punctuation. That is exactly how the browser hands the words over, and
+      showing it is honest about what the app knows.</p>
+
+    <h3>The screen stays awake, and says so</h3>
+    <p>A phone dims after about thirty seconds of no touching, which is fatal
+      for a two&#8209;minute ramble. The app asks the browser for a wake lock
+      while the microphone is open and shows the small chip so you can see it
+      holding.</p>
+
+    <h3>Raw is a peer of Tidied, not a hidden detail</h3>
+    <p>The two sit in one switch at the top of the entry. Raw is never
+      rewritten. Tidied can be regenerated or deleted and nothing is lost.</p>
+
+    <h3>A book&#8209;linked entry keeps its passage</h3>
+    <p>The entry shows the lines it grew from, and a faint warm tint marks it as
+      belonging to a book. The tie is stored as the words of the passage, so a
+      re&#8209;parse cannot strand it.</p>
+
+    <h3>Spoken notes join the selection popup</h3>
+    <p>Define, Ask Veda and Highlight already live there. Speak is the fourth,
+      and it is the only one that writes a journal entry.</p>
+  </section>
+</div>
+
+<script>
+  (function () {
+    /* ---- screen switching ---- */
+    var screens = document.querySelectorAll('[data-screen]');
+    var tabs = document.querySelectorAll('.switcher button');
+
+    function show(name) {
+      screens.forEach(function (s) {
+        s.dataset.on = String(s.dataset.screen === name);
+      });
+      tabs.forEach(function (t) {
+        t.setAttribute('aria-selected', String(t.dataset.go === name));
+      });
+      if (name !== 'speak') stop();
+    }
+
+    document.querySelectorAll('[data-go]').forEach(function (el) {
+      el.addEventListener('click', function () { show(el.dataset.go); });
+    });
+
+    /* ---- raw against tidied ---- */
+    document.querySelectorAll('.seg button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var want = b.dataset.view;
+        document.querySelectorAll('.seg button').forEach(function (o) {
+          o.setAttribute('aria-selected', String(o.dataset.view === want));
+        });
+        document.querySelectorAll('[data-pane]').forEach(function (p) {
+          p.hidden = p.dataset.pane !== want;
+        });
+      });
+    });
+
+    /* ---- the live transcript ----
+       Each sentence arrives word by word as a grey guess, then settles in
+       black with its punctuation. That is the real shape of the browser's
+       speech events: interim results, then one final result. */
+    var SENTENCES = [
+      'Okay, so I have three books on the go again.',
+      'And I think the honest reason is that starting a book feels like progress, and the middle of one does not.',
+      'The first thirty pages give me the shape of the argument.',
+      'After that the work is holding it — and holding it is not the bit I enjoy.',
+      'So I go and find another shape.',
+      'I suppose the answer is: finish one before you open the next.',
+      'Which is dull. But it is probably right.'
+    ];
+
+    var transcript = document.getElementById('transcript');
+    var wave = document.getElementById('wave');
+    var clock = document.getElementById('clock');
+    var toggle = document.getElementById('toggle');
+    var reset = document.getElementById('reset');
+
+    var settled = [];
+    var sentence = 0;
+    var word = 0;
+    var running = false;
+    var timer = null;
+    var ticker = null;
+    var seconds = 0;
+
+    function bare(text) {
+      /* the recogniser's guess has no punctuation and no capital */
+      return text.replace(/[.,:;!?—]/g, '').toLowerCase();
+    }
+
+    function paint() {
+      var html = '';
+      if (settled.length) {
+        html += '<span class="settled">' + settled.join(' ') + ' </span>';
+      }
+      if (running && sentence < SENTENCES.length) {
+        var words = bare(SENTENCES[sentence]).split(' ').slice(0, word).join(' ');
+        if (words) html += '<span class="guess">' + words + '</span>';
+      }
+      if (running) html += '<span class="caret"></span>';
+      if (!html) html = '<span class="placeholder">Tap Start and the words appear as you speak.</span>';
+      transcript.innerHTML = html;
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+
+    function step() {
+      if (sentence >= SENTENCES.length) { stop(); return; }
+      var words = SENTENCES[sentence].split(' ');
+      word += 1;
+      if (word > words.length) {
+        /* the final result lands: punctuation and capitals appear */
+        settled.push(SENTENCES[sentence]);
+        sentence += 1;
+        word = 0;
+      }
+      paint();
+      timer = setTimeout(step, 150 + Math.random() * 140);
+    }
+
+    function start() {
+      if (running) return;
+      if (sentence >= SENTENCES.length) clear();
+      running = true;
+      toggle.textContent = 'Stop';
+      wave.dataset.moving = 'true';
+      ticker = setInterval(function () {
+        seconds += 1;
+        clock.textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+      }, 1000);
+      step();
+    }
+
+    function stop() {
+      running = false;
+      toggle.textContent = sentence >= SENTENCES.length ? 'Start' : 'Resume';
+      wave.dataset.moving = 'false';
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (ticker) { clearInterval(ticker); ticker = null; }
+      paint();
+    }
+
+    function clear() {
+      settled = []; sentence = 0; word = 0; seconds = 0;
+      clock.textContent = '0:00';
+    }
+
+    toggle.addEventListener('click', function () { running ? stop() : start(); });
+    reset.addEventListener('click', function () { stop(); clear(); toggle.textContent = 'Start'; paint(); });
+
+    paint();
+  })();
+</script>
