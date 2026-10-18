@@ -14,6 +14,7 @@ import BookInfo from './pages/BookInfo.tsx'
 import ChapterView from './pages/ChapterView.tsx'
 import Challenge from './pages/Challenge.tsx'
 import Home from './pages/Home.tsx'
+import Journal from './pages/Journal.tsx'
 import LastTime from './pages/LastTime.tsx'
 import Library from './pages/Library.tsx'
 import Reader from './pages/Reader.tsx'
@@ -57,6 +58,13 @@ export function AppRoutes() {
           <Route path="stats" element={<Stats />} />
           <Route path="settings" element={<Settings />} />
         </Route>
+        {/*
+         * The journal, outside `AppShell` and full-bleed, for the reason the
+         * reading screen is: it is half the app rather than a fifth tab. The
+         * split front door (WP-65) is how both halves will be reached; for now
+         * Home carries a link.
+         */}
+        <Route path="journal" element={<Journal />} />
         <Route path="book/:bookId" element={<Reader />} />
         <Route path="book/:bookId/info" element={<BookInfo />} />
         <Route path="book/:bookId/last-time" element={<LastTime />} />

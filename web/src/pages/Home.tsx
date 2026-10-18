@@ -260,6 +260,11 @@ export default function Home() {
             which the shelf was already doing for itself. This one asks the
             reader something instead, so it earns its place. */}
         <p className={styles.greetingAsk}>What book are you picking up today?</p>
+        {/* The one way into the journal until the split front door (WP-65)
+            replaces this screen with both doors. */}
+        <Link to="/journal" className={styles.toJournal}>
+          Or speak a thought →
+        </Link>
       </header>
 
       {state.status === 'failed' && (

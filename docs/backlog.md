@@ -454,8 +454,11 @@
 > dated that day. The mockups are `docs/mockups/journal.html` and
 > `docs/mockups/inhale-exhale.html`.
 
-- [ ] **WP-60 Speak an entry** — microphone, live transcript, screen stays
-  awake, raw transcript saved · *first*
+- [~] **WP-60 Speak an entry** — microphone, live transcript, screen stays
+  awake, raw transcript saved · *first* — **built 2026-10-18.** `journal/`
+  holds the sheet and the two hooks. Dexie v20 holds `entries`. Open it at
+  `/journal`, or from the link under the greeting on Home. Waiting on the
+  reader to try it on the phone.
 - [ ] **WP-61 The journal screen** — the entry list, one entry, raw and shaped
   as an equal pair · *after 60*
 - [ ] **WP-62 Give the words a shape** — Tidy, Shape and Unpack, on a free

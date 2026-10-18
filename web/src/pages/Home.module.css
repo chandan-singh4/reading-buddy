@@ -644,3 +644,20 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+/* The way into the journal (WP-60).
+   A quiet link rather than a second button: the shelf below is still what this
+   screen is for, and a filled button here would argue with it. The split front
+   door (WP-65) replaces this with two halves of equal weight. */
+.toJournal {
+  display: inline-block;
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.toJournal:hover,
+.toJournal:focus-visible {
+  text-decoration: underline;
+}

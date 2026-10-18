@@ -746,6 +746,73 @@ export interface StoredHandle {
   at: string
 }
 
+/**
+ * How a model was asked to shape an entry, and what it wrote.
+ *
+ * A second copy, never a replacement. `StoredEntry.raw` is the reader's own
+ * voice; this is made from it, and can be made again or thrown away. The model
+ * and the level are kept because a re-shape a month later will not be the same
+ * model, and the reader is owed the means to tell.
+ */
+export interface EntryShaped {
+  /** How hard the model was asked to work — see `docs/decisions.md`. */
+  level: 'tidy' | 'shape' | 'unpack'
+  /** The OpenRouter slug that wrote it. */
+  model: string
+  /** ISO 8601 — when it was written, not when the entry was spoken. */
+  at: string
+  text: string
+}
+
+/**
+ * The passage an entry grew out of.
+ *
+ * Stores the book's own words rather than an offset, for the reason set out on
+ * `StoredNote.quote`: a re-parse moves offsets and does not move words.
+ * `relocate` carries this across a parser fix exactly as it carries a
+ * highlight.
+ */
+export interface EntryLink {
+  bookId: BookId
+  anchor: Anchor
+  /** The selected words, copied. Never edited. */
+  quote: string
+}
+
+/**
+ * One journal entry — spoken, transcribed, kept.
+ *
+ * Not keyed by a book, and usually not about one. An entry about a dream
+ * belongs to nobody but the reader, and even an entry that *did* grow from a
+ * passage outlives the book: deleting a book clears `link` and keeps the
+ * thought. A highlight dies with its book because a highlight is part of the
+ * book. A thought the reader had while reading is not.
+ *
+ * One table rather than two. An entry is a couple of kilobytes, written once
+ * and then read — unlike a reading position, which is written every few
+ * seconds, or an asset, which can be a megabyte. Both of those earned a table
+ * of their own; this has not.
+ */
+export interface StoredEntry {
+  id: string
+  /** ISO 8601 — when the reader started speaking. The archive's own order. */
+  at: string
+  /**
+   * The transcript, as the recogniser settled it.
+   *
+   * **Only the reader ever rewrites this.** It is the whole promise of the
+   * feature: their words stay theirs. Everything a model produces goes into
+   * `shaped`, beside it.
+   */
+  raw: string
+  shaped?: EntryShaped
+  /** Theirs, and a model's proposals once they have kept them (WP-64). */
+  tags: string[]
+  /** Theirs, or one `shaped` proposed and they kept. */
+  title?: string
+  link?: EntryLink
+}
+
 export const DB_NAME = 'reading-buddy'
 
 /**
@@ -777,6 +844,7 @@ export type ReadingBuddyDB = Dexie & {
   questionBanks: Table<StoredQuestionBank, [BookId, string]>
   misses: Table<StoredMiss, string>
   handles: Table<StoredHandle, string>
+  entries: Table<StoredEntry, string>
 }
 
 /**
@@ -1024,6 +1092,24 @@ function defineSchema(db: Dexie): void {
    */
   db.version(19).stores({
     handles: 'id',
+  })
+
+  /*
+   * v20 — the journal (WP-60).
+   *
+   * `at` is indexed because the archive is drawn newest first, and that is the
+   * only order it is ever asked for. `*tags` is multiEntry: an entry wears
+   * several tags, and the saved filters (WP-64) ask which entries wear one.
+   * `link.bookId` is a dotted path, so a book can show the thoughts it started
+   * without reading every entry in the journal.
+   *
+   * The indexes for WP-63 and WP-64 are declared now although nothing reads
+   * them yet. A field costs a line; a second migration costs every install.
+   *
+   * Nothing to migrate. No entry has ever been written.
+   */
+  db.version(20).stores({
+    entries: 'id, at, *tags, link.bookId',
   })
 
   /*

@@ -33,19 +33,22 @@ speak. There is no microphone code in `web/src`.
 2026-10-18, and `architecture.md` at "The journal (WP-60 onward)". Do not
 re-open those choices.
 
-### Files in scope
+### Files in scope — as built, 2026-10-18
 
-| Path | Why |
+| Path | What it does |
 |---|---|
-| `web/src/journal/useDictation.ts` | **new.** Wraps the Web Speech API. Holds the settled text and the current guess. |
-| `web/src/journal/useWakeLock.ts` | **new.** Holds the screen awake, and asks again when the page returns. |
-| `web/src/journal/SpeakSheet.tsx` | **new.** The circle, the live transcript, the timer. |
+| `web/src/journal/useDictation.ts` | **new.** Wraps the Web Speech API. Keeps the settled words apart from the guess, and starts the recogniser again after a silence. |
+| `web/src/journal/useWakeLock.ts` | **new.** Holds the screen awake, and asks again when the page comes back. |
+| `web/src/journal/SpeakSheet.tsx` | **new.** The sheet: circle, live transcript, timer, Keep and Discard. |
 | `web/src/journal/SpeakSheet.module.css` | **new.** Its styles, on the theme tokens. |
-| `web/src/storage/journal.ts` | **new.** Declares `Entry`, `Shaped` and `EntryLink`, and reads and writes `entries`. `notes.ts` declares its own types the same way. |
-| `web/src/storage/db.ts` | Add `db.version(20)` with the `entries` store. |
-| `web/src/structure/types.ts` | Read only, for the `Anchor` type that `EntryLink` reuses. |
-| `web/src/storage/index.ts` | Export the new journal functions. The door stays `./storage`. |
-| `docs/mockups/journal.html` | The target. Screen 2 shows the live transcript. |
+| `web/src/storage/journal.ts` | **new.** `addEntry`, `listEntries`, `getEntry`, `deleteEntry`. |
+| `web/src/storage/db.ts` | `StoredEntry`, `EntryShaped`, `EntryLink`, the `entries` table and `db.version(20)`. |
+| `web/src/storage/index.ts` | Exports the new store and types. |
+| `web/src/pages/Journal.tsx` | **new.** The `/journal` route. Almost nothing: a way in, and the list. WP-61 replaces the body. |
+| `web/src/pages/Journal.module.css` | **new.** Its styles. |
+| `web/src/App.tsx` | The `journal` route, outside `AppShell`. |
+| `web/src/pages/Home.tsx` | One link, "Or speak a thought". WP-65 replaces it with both doors. |
+| `web/src/pages/Home.module.css` | `.toJournal`. |
 
 Add a path here with a one-line reason before you open anything else.
 

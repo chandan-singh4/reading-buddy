@@ -16,12 +16,15 @@ import { repository as deviceRepository, type Repository } from './repository.ts
 
 export { DB_NAME, createDb } from './db.ts'
 export type {
+  EntryLink,
+  EntryShaped,
   NoteAuthor,
   ReadingBuddyDB,
   ReadingPosition,
   StoredAsset,
   StoredBookmark,
   StoredChapterIndex,
+  StoredEntry,
   StoredFolder,
   StoredHandle,
   StoredNote,
@@ -35,6 +38,9 @@ export type {
 
 export { createNoteStore, noteStore } from './notes.ts'
 export type { NewNote } from './notes.ts'
+
+export { createEntryStore, entryStore } from './journal.ts'
+export type { NewEntry } from './journal.ts'
 
 export { createTutorStore, findThread, tutorStore } from './tutor.ts'
 

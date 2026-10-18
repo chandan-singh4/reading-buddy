@@ -161,9 +161,17 @@ to WP-66.
 Three mockups hold the look: `docs/mockups/journal.html`,
 `docs/mockups/front-door.html` and `docs/mockups/inhale-exhale.html`.
 
-**In flight: WP-60, speak an entry.** The circle, the live transcript, the
-screen that stays awake, and the raw transcript saved. See `active-task.md`.
-**The app has never listened:** `narrator/` and `readAloud.ts` only speak.
+**WP-60, speak an entry — built 2026-10-18, not yet tried on the phone.** The
+app can now listen. `journal/useDictation.ts` wraps the browser's recogniser and
+keeps the settled words apart from the guess. `journal/useWakeLock.ts` holds the
+screen awake and asks again after the page hides. `journal/SpeakSheet.tsx` is
+the sheet. Dexie v20 holds `entries`, and only the raw transcript is saved.
+
+Reach it at `/journal`, or by the link under the greeting on Home. **The reader
+must try it on the phone**, because the recogniser needs a signal and asks for
+the microphone the first time.
+
+**Next: WP-61, the journal screen.** `pages/Journal.tsx` is a stub on purpose.
 
 **WP-22 · `learner.md` adaptive model.** Held, by the reader's choice, while
 the journal is built.

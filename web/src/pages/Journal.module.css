@@ -1,0 +1,62 @@
+/* The journal's first slice (WP-60). WP-61 replaces most of this. */
+
+.page {
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: var(--space-4);
+  padding-top: calc(var(--space-4) + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.back {
+  align-self: flex-start;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.back:hover,
+.back:focus-visible {
+  color: var(--color-text);
+}
+
+.speak {
+  margin-top: var(--space-5);
+  width: 100%;
+  font: inherit;
+  font-weight: 600;
+  padding: var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  cursor: pointer;
+}
+
+.speak:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.list {
+  list-style: none;
+  margin: var(--space-5) 0 0;
+  padding: 0;
+}
+
+/* The reader's own words, set in the reading face — they are what the screen
+   is for, and they are read, not scanned. `pre-wrap` keeps the paragraphs a
+   shaping model will later put in. */
+.raw {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-reading);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
