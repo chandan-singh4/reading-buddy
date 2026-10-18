@@ -171,6 +171,14 @@ Reach it at `/journal`, or by the link under the greeting on Home. **The reader
 must try it on the phone**, because the recogniser needs a signal and asks for
 the microphone the first time.
 
+The first try on the phone found a bug, fixed on 2026-10-18. The transcript
+repeated every part of the sentence: "hey, hey how's, hey how's it going".
+Chrome on Android sends a phrase again each time it revises it, and marks the
+revisions final. The first code added each one to the text. Now each event
+rebuilds the session's text in full and replaces it, so a phrase that comes
+twice writes over itself. `useDictation.ts` explains this at the top, under
+"Why nothing here is appended".
+
 **Next: WP-61, the journal screen.** `pages/Journal.tsx` is a stub on purpose.
 
 **WP-22 · `learner.md` adaptive model.** Held, by the reader's choice, while

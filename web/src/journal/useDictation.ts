@@ -23,6 +23,24 @@
  * the settled text accumulates in a ref of our own rather than being read back
  * off the event.
  *
+ * ## Why nothing here is appended
+ *
+ * The obvious reading of `onresult` — walk from `event.resultIndex` and add
+ * what you find to the text so far — is wrong, and wrong in a way that only
+ * shows on a phone. Chrome on Android re-delivers a result as it revises it,
+ * and it flags those revisions final: "hey", "hey how's", "hey how's it
+ * going". Append those and you get every prefix of the sentence, one after the
+ * other, which is exactly what the reader saw.
+ *
+ * So this hook never appends within a session. Every event rebuilds the
+ * session's text from `results` in full, and the rebuilt text *replaces* the
+ * session's share of `settled`. Re-delivering a result can then do no harm,
+ * because the second delivery overwrites the first instead of following it.
+ * `absorb` handles the same revision arriving as separate entries in one list.
+ *
+ * A session's text is only frozen into `keptRef` when that session ends, which
+ * is the one moment the recogniser guarantees it will not revise it again.
+ *
  * None of these types are in TypeScript's DOM library. The shapes this file
  * needs are declared at the bottom, structurally, rather than as a global
  * augmentation that would collide the day they are added.
@@ -78,8 +96,10 @@ export function useDictation(): Dictation {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   /** What the reader wants, which is not what the recogniser is doing. */
   const wantedRef = useRef(false)
-  /** The settled words, kept here because a restart empties `event.results`. */
-  const settledRef = useRef('')
+  /** Text from sessions that have ended. A restart empties `event.results`. */
+  const keptRef = useRef('')
+  /** This session's settled text. Rebuilt whole on every event, never added to. */
+  const sessionRef = useRef('')
   const lastStartRef = useRef(0)
   const quickRestartsRef = useRef(0)
 
@@ -101,19 +121,20 @@ export function useDictation(): Dictation {
       let settledNow = ''
       let guessNow = ''
 
-      // From `resultIndex`, not from zero: everything before it was handed over
-      // in an earlier event and is already in `settledRef`.
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      // From zero, not from `event.resultIndex`. The index says which result
+      // this event is about, not which results are new, and a result Chrome has
+      // already handed over can come back revised. Reading the list whole and
+      // replacing is the only reading that survives that.
+      for (let i = 0; i < event.results.length; i += 1) {
         const result = event.results[i]
         if (!result) continue
         const words = result[0]?.transcript ?? ''
-        if (result.isFinal) settledNow += words
-        else guessNow += words
+        if (result.isFinal) settledNow = absorb(settledNow, words)
+        else guessNow = absorb(guessNow, words)
       }
-      if (settledNow) {
-        settledRef.current = join(settledRef.current, settledNow)
-        setSettled(settledRef.current)
-      }
+
+      sessionRef.current = settledNow.trim()
+      setSettled(join(keptRef.current, sessionRef.current))
       // Whatever is left is the phrase after the settled one, or nothing. The
       // loop has already taken the settled words out of it, so the screen never
       // shows the same phrase twice, once black and once grey.
@@ -135,6 +156,12 @@ export function useDictation(): Dictation {
 
     recognition.onend = () => {
       setListening(false)
+      // The session is over, so it can no longer revise what it said. Freeze
+      // its text and start the next one with an empty share, or the next
+      // session's first event would wipe this one's words off the screen.
+      keptRef.current = join(keptRef.current, sessionRef.current)
+      sessionRef.current = ''
+      setSettled(keptRef.current)
       if (!wantedRef.current) return
 
       const now = Date.now()
@@ -208,7 +235,8 @@ export function useDictation(): Dictation {
   }, [])
 
   const reset = useCallback(() => {
-    settledRef.current = ''
+    keptRef.current = ''
+    sessionRef.current = ''
     setSettled('')
     setGuess('')
     setFault(null)
@@ -225,6 +253,31 @@ export function useDictation(): Dictation {
  * "I wentto the shops". It does not add a space before punctuation, which some
  * recognisers return as a chunk of its own.
  */
+/**
+ * Take one result into the text being rebuilt for this session.
+ *
+ * Usually a plain join: two results are two phrases. But Chrome on Android
+ * revises a phrase by restating the whole of it, and sometimes leaves both the
+ * old wording and the new one in `results` as separate entries. When the new
+ * entry opens with everything the old one said, it is that restatement and not
+ * a second phrase, so it replaces rather than follows.
+ *
+ * The comparison ignores case, punctuation and spacing, because a restatement
+ * is where the recogniser adds those. The cost is that a reader who says a
+ * phrase and then says it again with more on the end — "I was wrong", "I was
+ * wrong about that" — keeps only the longer one. That is a rare sentence and a
+ * small loss; the duplication it prevents made the journal unusable.
+ */
+function absorb(before: string, addition: string): string {
+  const next = addition.trim()
+  if (!next) return before
+  if (!before) return next
+  const bare = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '')
+  const seen = bare(before)
+  if (seen && bare(next).startsWith(seen)) return next
+  return join(before, next)
+}
+
 function join(before: string, addition: string): string {
   const next = addition.trim()
   if (!next) return before
