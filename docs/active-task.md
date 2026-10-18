@@ -6,16 +6,49 @@ it.
 
 ## Task
 
-**Design a reading + journaling app. Nothing is built yet.**
+**WP-60 — speak an entry.** The first slice of the journal.
 
-The reader wants to speak a thought and keep it. The app records the words, and
-a free model gives them a shape to read later. The raw words stay readable.
+The reader holds a circle and talks. The words appear as they speak. The screen
+stays awake. The app saves the raw transcript and nothing else.
 
-We are in design. Do not build until the reader settles the open questions. The
-chat holds the current options. **The app has never listened:** `narrator/` and
-`reader/readAloud.ts` only speak. There is no microphone code in `web/src`.
+**Done when all five are true.**
 
-**No files are in scope yet.** Add them when the design settles.
+1. A circle starts and stops the recogniser.
+2. The words appear live. A guess shows grey. A settled phrase turns black and
+   gains its punctuation.
+3. The screen does not go dark while the reader speaks.
+4. The recogniser starts again by itself after a silence, until the reader
+   stops it.
+5. The entry saves to Dexie v20 `entries`, with `raw`, `at` and `id`. No audio
+   is stored.
+
+**Out of this slice.** The shaping models (WP-62), the book link (WP-63), tags
+(WP-64) and the front door (WP-65). The journal list screen is WP-61. For now,
+one saved entry may be proved from the console.
+
+**The app has never listened.** `narrator/` and `reader/readAloud.ts` only
+speak. There is no microphone code in `web/src`.
+
+**The design is settled.** Read `decisions.md` at the seven headings dated
+2026-10-18, and `architecture.md` at "The journal (WP-60 onward)". Do not
+re-open those choices.
+
+### Files in scope
+
+| Path | Why |
+|---|---|
+| `web/src/journal/useDictation.ts` | **new.** Wraps the Web Speech API. Holds the settled text and the current guess. |
+| `web/src/journal/useWakeLock.ts` | **new.** Holds the screen awake, and asks again when the page returns. |
+| `web/src/journal/SpeakSheet.tsx` | **new.** The circle, the live transcript, the timer. |
+| `web/src/journal/SpeakSheet.module.css` | **new.** Its styles, on the theme tokens. |
+| `web/src/storage/journal.ts` | **new.** Declares `Entry`, `Shaped` and `EntryLink`, and reads and writes `entries`. `notes.ts` declares its own types the same way. |
+| `web/src/storage/db.ts` | Add `db.version(20)` with the `entries` store. |
+| `web/src/structure/types.ts` | Read only, for the `Anchor` type that `EntryLink` reuses. |
+| `web/src/storage/index.ts` | Export the new journal functions. The door stays `./storage`. |
+| `docs/mockups/journal.html` | The target. Screen 2 shows the live transcript. |
+
+Add a path here with a one-line reason before you open anything else.
+
 
 ---
 
@@ -61,7 +94,7 @@ token count, so a tokens-to-money table has to live somewhere and will go
 stale; prefer showing tokens plainly over showing a wrong price. Settle this
 with the reader before building the money half.
 
-## Definition of done
+### Definition of done
 
 1. A new Veda answer stores its input and output token counts.
 2. A chapter summary written by the Scribe stores its counts too.
@@ -70,14 +103,14 @@ with the reader before building the money half.
 4. One screen shows totals per book and per model.
 5. `npm run build` is green.
 
-## Open question for the reader — settle before step 2
+### Open question for the reader — settle before step 2
 
 Tokens only, or tokens and an estimated cost? A price table is the only way to
 show money, and it goes stale every time a provider changes its rates. Most
 of the reader's models are free, so the honest number may be zero most of the
 time.
 
-## Files in scope
+### Files in scope
 
 - `api/tutor.ts` — `counted()`, the `Usage` interface, the `{ t: 'usage' }`
   packet. Read-only for step 1; the counts already leave here.

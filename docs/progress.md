@@ -149,14 +149,24 @@ Breadth is now allowed.
 
 ### Next up
 
-**A reading + journaling app — in design, not yet built (2026-10-16).** The
-reader wants to speak a thought, and the app writes it down. A free model then
-gives the words a shape to read later. The raw words stay. We are settling the
-design first; nothing is built. **The app has never listened:** `narrator/` and
-`readAloud.ts` only speak. There is no microphone code.
+**The journal — designed 2026-10-18, building now.** The reader speaks a
+thought. The app writes the words down and keeps them. A free model can then
+give the words a shape to read later. The raw words always stay.
+
+The design is settled. `decisions.md` holds it under seven headings dated
+2026-10-18. `architecture.md` holds the `entries` table and the `Entry` shape
+under "The journal (WP-60 onward)". `backlog.md` holds Leg 6, waypoints WP-60
+to WP-66.
+
+Three mockups hold the look: `docs/mockups/journal.html`,
+`docs/mockups/front-door.html` and `docs/mockups/inhale-exhale.html`.
+
+**In flight: WP-60, speak an entry.** The circle, the live transcript, the
+screen that stays awake, and the raw transcript saved. See `active-task.md`.
+**The app has never listened:** `narrator/` and `readAloud.ts` only speak.
 
 **WP-22 · `learner.md` adaptive model.** Held, by the reader's choice, while
-the journaling design settles.
+the journal is built.
 
 **WP-27 · cost and usage visibility — deferred, see `backlog.md`.** Every model
 is free, so the screen would show zero and a price table would go stale.

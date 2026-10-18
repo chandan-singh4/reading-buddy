@@ -265,6 +265,53 @@ no idea which direction it is pointing. It backs the offline cache fill
 - **Book metadata set at import:** type (`light-fiction` | `dense/technical`),
   subject/domain tag, and per-chapter concepts / vocabulary / themes.
 
+### The journal (WP-60 onward)
+
+`web/src/journal/` holds the screens. `web/src/storage/journal.ts` holds the
+rows, beside `notes.ts`.
+
+Dexie version 20 adds one table:
+
+| Table | Primary key | Holds | Since |
+|---|---|---|---|
+| `entries` | `id` | one journal entry, indexed on `at`, `*tags` and `bookId` | v20 |
+
+```ts
+type Entry = {
+  id: string
+  at: number          // when the speaking started
+  raw: string         // the transcript, as the recogniser settled it
+  shaped?: Shaped     // derived from raw; the reader may remake or delete it
+  tags: string[]
+  title?: string
+  link?: EntryLink    // set when the entry grew from a passage
+}
+
+type Shaped = {
+  level: 'tidy' | 'shape' | 'unpack'
+  model: string
+  at: number
+  text: string
+}
+
+type EntryLink = {
+  bookId: string
+  anchor: Anchor      // the same grammar a highlight uses
+  quote: string       // the passage's own words, for relocate
+}
+```
+
+- **One table, not two.** An entry is about 2 kB. The app writes it once and
+  then reads it. It is not a reading position, which is written every few
+  seconds. It is not a picture, which can be a megabyte.
+- **`raw` is never written twice.** `shaped` is a separate field, so a model can
+  never take the reader's own words away.
+- **A link stores the passage's words, not an offset.** `structure/quote.ts` and
+  `relocate.ts` already carry a mark across a re-parse. An entry tied to a book
+  rides the same rule, so a parser fix cannot strand it.
+- **`deleteBook` clears `link`. It does not delete the entry.** A thought
+  outlives the book that started it.
+
 ### Other top-level items (not part of the target build)
 - `books/`, `research-paper/` — source files used to test parsing; not shipped.
 - `prototypes/` — throwaway prototype code, not the real implementation.

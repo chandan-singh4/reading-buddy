@@ -3370,3 +3370,80 @@ survived, because it was in the cloud.
 - **The default model must be free.** `gemini-3.8-flash` is the default. Gemini
   4 Argon is off the free tier, so it is never the default; the `limit: 0`
   probe already drops a model the reader's key cannot reach.
+
+## The journal keeps your words, not the model's (2026-10-18)
+
+- **The raw transcript is canonical.** The reader speaks, the recogniser writes,
+  and the app saves those words. Nothing overwrites them.
+- **The shaped version is derived.** A model reads the raw words and writes a
+  second copy. The reader can make it again, or delete it. The raw words stay.
+- **Three strengths.** *Tidy* adds punctuation and paragraphs, and no new words.
+  *Shape* adds a title, topic paragraphs and tags. *Unpack* adds headings,
+  actions and questions.
+- **Why.** A journal is the reader's own voice. A model that rewrites it takes
+  away the one thing the journal is for.
+
+## The app stores no audio (2026-10-18)
+
+- **Text only.** A 3-minute entry is about 2 kB of text. The same entry as Opus
+  audio is about 350 kB. Text is about 200 times smaller.
+- **This closes the free-plan worry.** Supabase gives 500 MB of database on the
+  free plan. 500 MB of text holds centuries of daily entries.
+- **There is nothing to keep.** The recogniser returns words, not a file.
+
+## Speaking uses the browser's own recogniser (2026-10-18)
+
+- **The Web Speech API is free and needs no key.** The app stays free.
+- **It returns two kinds of result.** An *interim* result is a guess, with no
+  punctuation. A *final* result is settled and punctuated. The screen shows the
+  guess in grey, then the settled words in black.
+- **It sends the audio to the browser maker's servers.** The reader accepted
+  this. A later option can tidy on the device and send nothing.
+- **It needs a network, and it stops on a long silence.** The app must start it
+  again while the reader still speaks.
+- **The screen must stay awake.** The Screen Wake Lock API holds it. The browser
+  drops the lock when the page hides, so the app must ask again on return.
+
+## One stream, with tags and saved filters (2026-10-18)
+
+- **The reader does not choose a notebook before speaking.** A thought stays
+  fragile for about twenty seconds. A menu in those seconds costs more than it
+  gives.
+- **Tags come after.** The model proposes them. The reader edits them.
+- **A saved filter looks like a notebook.** Dreams, Finance, Trading and Life are
+  filters over one stream. They are not separate stores.
+
+## The front door is a split, and it does not guess (2026-10-18)
+
+- **Both doors show at once.** The top half reads. The bottom half journals.
+- **The split is even at every hour.** A lean by the clock was considered and
+  declined. A wrong guess costs more than no guess.
+- **The folded half stays as a lip.** A 52 px strip holds the screen edge, so
+  the reader is never shut inside one mode.
+- **The bridge sits on the seam.** It carries the last mark into a new entry.
+- **There is no streak.** A streak turns a journal into a duty. The night the
+  reader skips is the night the reader stops.
+- The mockup is `docs/mockups/inhale-exhale.html`. The five doors that lost are
+  in `docs/mockups/front-door.html`.
+
+## A tap goes straight through (2026-10-18)
+
+- **Each half is a surface with zones, not one button.**
+- **Reading continues.** The cover and the Resume button open the page the
+  reader stopped on.
+- **The journal begins.** The prompt and the circle open a new entry. There is
+  no entry to resume, because every entry is new.
+- **The lists stay one tap away.** Library and Archive sit in each half's
+  footer.
+- **The opened half is the home page.** The shelf fills the reading half.
+  Today's entries fill the journal half. The app gains no screen for the choice.
+- **With no book in progress, the reading half shows the shelf.** It does not
+  presume a page to resume.
+
+## The book's journal action is not called "speak" (2026-10-18)
+
+- **`speak` already means Read aloud** in `reader/SelectionMenu.tsx`.
+- **The action is "Tell the Scribe".** It sits beside "Ask Veda", set apart in
+  the same way. One asks a question. The other makes a statement.
+- **A sheet rises over the page.** The entry saves, the sheet drops, and reading
+  carries on. A book is where an entry is born. The journal is where it is read.

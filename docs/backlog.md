@@ -448,6 +448,27 @@
 - [ ] **WP-33 Google Drive backup/restore** — opt-in Settings toggle, off by default · *after 25*
 - [ ] **WP-34 Retire the Tauri shell** — drop the disposable harness · *last, after 32*
 
+### Leg 6 — The Journal (speak a thought, keep it)
+
+> Designed 2026-10-18. The design is in `decisions.md` under the seven headings
+> dated that day. The mockups are `docs/mockups/journal.html` and
+> `docs/mockups/inhale-exhale.html`.
+
+- [ ] **WP-60 Speak an entry** — microphone, live transcript, screen stays
+  awake, raw transcript saved · *first*
+- [ ] **WP-61 The journal screen** — the entry list, one entry, raw and shaped
+  as an equal pair · *after 60*
+- [ ] **WP-62 Give the words a shape** — Tidy, Shape and Unpack, on a free
+  model, raw untouched · *after 61*
+- [ ] **WP-63 Tell the Scribe, from the book** — a selection-menu action, a
+  sheet over the page, the entry tied to the passage · *after 61*
+- [ ] **WP-64 Tags and saved filters** — one stream, tags from the model,
+  filters that read like notebooks · *after 62*
+- [ ] **WP-65 The split front door** — inhale and exhale, the lip, the bridge on
+  the seam · *after 61 and 63*
+- [ ] **WP-66 The journal in the backup** — Supabase rows and the Drive export ·
+  *after 61*
+
 ---
 
 ## Reader's feature wishlist — captured 2026-08-02
