@@ -107,4 +107,5 @@ Run from the repo root (`web/` is the only npm workspace):
 - **dev:** `npm run dev` → Vite on <http://localhost:5173>
 - **typecheck:** `npm run typecheck` → `tsc -b`, no emit
 - **build:** `npm run build` → typecheck + production build to `web/dist/`
-- **test:** none yet — no runner installed.
+- **test:** `npm test` → Vitest, 2600+ tests. `npm run test:watch` to keep it
+  running. Each page has a `.test.tsx` beside it. New work follows that.

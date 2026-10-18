@@ -1,4 +1,4 @@
-/* The journal's first slice (WP-60). WP-61 replaces most of this. */
+/* The journal stream (WP-61) and the entry screen's page frame. */
 
 .page {
   min-height: 100dvh;
@@ -45,18 +45,95 @@
   outline-offset: 2px;
 }
 
-.list {
-  list-style: none;
-  margin: var(--space-5) 0 0;
-  padding: 0;
+/* ---- the stream ---- */
+
+.day {
+  margin-top: var(--space-5);
 }
 
-/* The reader's own words, set in the reading face — they are what the screen
-   is for, and they are read, not scanned. `pre-wrap` keeps the paragraphs a
-   shaping model will later put in. */
-.raw {
-  margin: var(--space-2) 0 0;
+/* A date, not a heading: it files the cards below it and should not compete
+   with them for the eye. Sticky so a long scroll always says which day. */
+.dayMark {
+  position: sticky;
+  /* Not 0: the page is drawn under the status bar, so a day mark stuck to the
+     top of the viewport would sit behind the clock. */
+  top: env(safe-area-inset-top, 0px);
+  z-index: 1;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.entry {
+  display: block;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.entry:hover,
+.entry:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.entry:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.entryTitle {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: 1.25;
+}
+
+/* Three lines and then stop. A card is a way back into a thought, not the
+   thought itself; the entry screen is where it is read. */
+.snippet {
+  margin: 0;
   font-family: var(--font-reading);
   line-height: 1.55;
-  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
 }

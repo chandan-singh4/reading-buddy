@@ -1,18 +1,24 @@
 /**
- * The journal, at its first slice (WP-60).
+ * The journal — every thought the reader has spoken, newest first (WP-61).
  *
- * Deliberately almost nothing: a way in to the sheet, and enough of a list to
- * prove an entry was kept. The real journal screen — entries, the raw and
- * shaped pair, filters — is WP-61 and replaces the body of this file.
+ * One stream, cut by day. Not notebooks: `decisions.md` settled that a
+ * notebook is a saved filter over this one list, and WP-64 adds the filters.
+ * Until then the stream is the whole screen, which is also the honest shape
+ * for a journal with four entries in it.
+ *
+ * A card shows the shaped words when a shape exists, because that is the
+ * readable copy, and says so on the card. The raw words are never gone — the
+ * entry screen keeps both, side by side.
  *
  * Outside `AppShell`, like the reading screen, and not a fifth tab in the swipe
  * row. The journal is half the app rather than a sibling of Settings, and the
  * split front door (WP-65) is how both halves will be reached.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
+import { shapeMark } from '../journal/shapeMark.ts'
 import SpeakSheet from '../journal/SpeakSheet.tsx'
 import { entryStore, type StoredEntry } from '../storage/index.ts'
 import styles from './page.module.css'
@@ -39,6 +45,8 @@ export default function Journal() {
     setEntries((rows) => [entry, ...(rows ?? [])])
   }, [])
 
+  const days = useMemo(() => byDay(entries ?? []), [entries])
+
   return (
     <div className={journal.page}>
       <header className={journal.head}>
@@ -60,33 +68,76 @@ export default function Journal() {
         </div>
       )}
 
-      {entries !== null && entries.length > 0 && (
-        <ul className={journal.list}>
-          {entries.map((entry) => (
-            <li key={entry.id} className={styles.card}>
-              <time className={styles.pending} dateTime={entry.at}>
-                {when(entry.at)}
-              </time>
-              <p className={journal.raw}>{entry.raw}</p>
-            </li>
-          ))}
-        </ul>
-      )}
+      {days.map((day) => (
+        <section key={day.key} className={journal.day}>
+          <h2 className={journal.dayMark}>{day.mark}</h2>
+          <ul className={journal.list}>
+            {day.entries.map((entry) => (
+              <li key={entry.id}>
+                <Link to={`/journal/${entry.id}`} className={journal.entry}>
+                  {entry.title && <span className={journal.entryTitle}>{entry.title}</span>}
+                  <p className={journal.snippet}>{entry.shaped?.text ?? entry.raw}</p>
+                  <span className={journal.meta}>
+                    <time dateTime={entry.at}>{clock(entry.at)}</time>
+                    <span className={journal.dot} aria-hidden="true" />
+                    <span>{shapeMark(entry)}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
 
       <SpeakSheet open={speaking} onClose={() => setSpeaking(false)} onSaved={onSaved} />
     </div>
   )
 }
 
+/** Entries under the day they were spoken on, in the order they arrived. */
+interface Day {
+  key: string
+  mark: string
+  entries: StoredEntry[]
+}
+
+/**
+ * The list is already newest-first, so a day break is simply a card whose day
+ * differs from the one before it. No sorting, no map of arrays.
+ */
+function byDay(entries: StoredEntry[]): Day[] {
+  const days: Day[] = []
+  for (const entry of entries) {
+    const key = dayKey(new Date(entry.at))
+    const last = days[days.length - 1]
+    if (last && last.key === key) last.entries.push(entry)
+    else days.push({ key, mark: dayMark(new Date(entry.at)), entries: [entry] })
+  }
+  return days
+}
+
+/**
+ * The local calendar day, not the ISO date. A thought spoken at 23:40 belongs
+ * to the reader's evening; in UTC it may already be tomorrow.
+ */
+function dayKey(at: Date): string {
+  if (Number.isNaN(at.getTime())) return 'unknown'
+  return `${at.getFullYear()}-${at.getMonth()}-${at.getDate()}`
+}
+
+function dayMark(at: Date): string {
+  if (Number.isNaN(at.getTime())) return 'Undated'
+  const today = new Date()
+  if (dayKey(at) === dayKey(today)) return 'Today'
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  if (dayKey(at) === dayKey(yesterday)) return 'Yesterday'
+  return at.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
 /** The reader's own locale, because this is the only clock they think in. */
-function when(iso: string): string {
+function clock(iso: string): string {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return ''
-  return at.toLocaleString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return at.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }

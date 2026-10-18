@@ -1,0 +1,118 @@
+/* One entry: the raw words and the shaped words, as a pair (WP-61). */
+
+.when {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Two halves of one control, not two buttons. Neither is the default and
+   neither is styled as the stronger choice: the raw words and the shaped
+   words are an equal pair, which is the whole decision this screen carries. */
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin-top: var(--space-5);
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.side {
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: calc(var(--radius-md) - 3px);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.side[aria-pressed='true'] {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.side:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The reader's own words, set in the reading face — they are what the screen
+   is for, and they are read, not scanned. `pre-wrap` keeps the paragraph
+   breaks a shaping model puts in, and the raw transcript has none to lose. */
+.prose {
+  display: block;
+  margin-top: var(--space-5);
+  font-family: var(--font-reading);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.note {
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.quiet,
+.danger {
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.quiet {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.quiet:hover,
+.quiet:focus-visible {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+/* Only the second press is solid. Deleting a thought the reader spoke cannot
+   be undone, and there is no bin to fish it back out of — so the safety is the
+   two presses, not the colour.
+
+   The accent, not a red: there is no danger token, and the theme file carries
+   seven themes that would each have to agree on one. Inventing a red here
+   would put a colour on the screen that belongs to no theme. */
+.danger {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+}
+
+.quiet:focus-visible,
+.danger:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

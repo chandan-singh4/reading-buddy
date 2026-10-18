@@ -13,6 +13,7 @@ import { useReadingClock } from './stats/useReadingClock.ts'
 import BookInfo from './pages/BookInfo.tsx'
 import ChapterView from './pages/ChapterView.tsx'
 import Challenge from './pages/Challenge.tsx'
+import Entry from './pages/Entry.tsx'
 import Home from './pages/Home.tsx'
 import Journal from './pages/Journal.tsx'
 import LastTime from './pages/LastTime.tsx'
@@ -65,6 +66,7 @@ export function AppRoutes() {
          * Home carries a link.
          */}
         <Route path="journal" element={<Journal />} />
+        <Route path="journal/:entryId" element={<Entry />} />
         <Route path="book/:bookId" element={<Reader />} />
         <Route path="book/:bookId/info" element={<BookInfo />} />
         <Route path="book/:bookId/last-time" element={<LastTime />} />

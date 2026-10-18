@@ -459,8 +459,12 @@
   holds the sheet and the two hooks. Dexie v20 holds `entries`. Open it at
   `/journal`, or from the link under the greeting on Home. Waiting on the
   reader to try it on the phone.
-- [ ] **WP-61 The journal screen** — the entry list, one entry, raw and shaped
-  as an equal pair · *after 60*
+- [~] **WP-61 The journal screen** — the entry list, one entry, raw and shaped
+  as an equal pair · *after 60* — **built 2026-10-18.** `pages/Journal.tsx`
+  holds the stream, cut by day. `pages/Entry.tsx` holds one entry at
+  `/journal/:entryId`, with the pair switch and a two-press delete. The switch
+  shows only when a shape exists, so WP-62 lights it up with no more layout
+  work. Waiting on the reader to try it on the phone.
 - [ ] **WP-62 Give the words a shape** — Tidy, Shape and Unpack, on a free
   model, raw untouched · *after 61*
 - [ ] **WP-63 Tell the Scribe, from the book** — a selection-menu action, a

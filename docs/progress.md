@@ -179,7 +179,24 @@ rebuilds the session's text in full and replaces it, so a phrase that comes
 twice writes over itself. `useDictation.ts` explains this at the top, under
 "Why nothing here is appended".
 
-**Next: WP-61, the journal screen.** `pages/Journal.tsx` is a stub on purpose.
+**WP-61, the journal screen — built 2026-10-18, not yet tried on the phone.**
+`pages/Journal.tsx` is now the stream: every entry, newest first, cut by the
+day the reader spoke on. A card shows the shaped words when a shape exists and
+says which copy it is showing. `pages/Entry.tsx` is one entry, at
+`/journal/:entryId`. It holds the raw words and the shaped words as an equal
+pair, opens on the shaped copy when there is one, and says under each copy what
+it is. Delete asks twice. `journal/shapeMark.ts` names the state in one word,
+so the two screens cannot disagree.
+
+The pair switch appears only when a shape exists, so today it never appears.
+WP-62 writes the first shape and the switch lights up on its own.
+
+Tests: `pages/Journal.test.tsx` and `pages/Entry.test.tsx`, 11 of them. Note
+that this repo *does* have a test runner — Vitest, 2600+ tests. `CLAUDE.md`
+said it did not; that line is now corrected.
+
+**Next: WP-62, give the words a shape.** Tidy, Shape and Unpack, on a free
+model, with the raw words untouched.
 
 **WP-22 · `learner.md` adaptive model.** Held, by the reader's choice, while
 the journal is built.
