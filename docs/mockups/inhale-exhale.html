@@ -153,10 +153,6 @@
   [data-state="write"] .write { flex-basis: 100%; flex-grow: 9; }
   [data-state="write"] .read { flex-basis: 52px; flex-grow: 0; }
 
-  /* Argon's circadian lean, only while both halves are open */
-  [data-state="balanced"][data-lean="morning"] .write { flex-grow: 1.85; }
-  [data-state="balanced"][data-lean="evening"] .read { flex-grow: 1.85; }
-
   .face { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: var(--space-3) var(--space-4); gap: var(--space-2); }
   .lip { display: none; height: 52px; align-items: center; gap: var(--space-2); padding-inline: var(--space-4); flex: 0 0 auto; }
   [data-state="read"] .write .face, [data-state="write"] .read .face { display: none; }
@@ -246,9 +242,6 @@
   .micword b { font-size: 0.82rem; }
   .micword span { font-size: 0.68rem; color: var(--color-text-muted); }
 
-  .streak { display: none; align-items: center; gap: 0.3em; }
-  .phone[data-streak="on"] .streak { display: inline-flex; }
-
   /* ---- what each half adds once it is opened ---- */
   .more { display: none; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
   [data-state="read"] .read .more, [data-state="write"] .write .more { display: flex; }
@@ -323,20 +316,9 @@
       </section>
 
       <section>
-        <h2>What it leans towards</h2>
-        <div class="seg" role="group" aria-label="Lean">
-          <button type="button" data-lean-set="balanced" aria-pressed="true">Even</button>
-          <button type="button" data-lean-set="morning" aria-pressed="false">Morning</button>
-          <button type="button" data-lean-set="evening" aria-pressed="false">Evening</button>
-        </div>
-        <p>Argon's circadian weighting. A lean, not a decision.</p>
-      </section>
-
-      <section>
         <h2>Switches</h2>
         <label class="check"><input type="checkbox" id="bridge" checked> The bridge on the seam</label>
         <label class="check"><input type="checkbox" id="zones"> Mark the tap&#8209;through zones</label>
-        <label class="check"><input type="checkbox" id="streak"> The streak counter</label>
       </section>
 
       <div class="readout" id="readout">
@@ -346,7 +328,7 @@
       </div>
     </div>
 
-    <div class="phone" id="phone" data-state="balanced" data-lean="balanced" data-bridge="on" data-zones="off" data-streak="off">
+    <div class="phone" id="phone" data-state="balanced" data-bridge="on" data-zones="off">
       <span class="bars" aria-hidden="true">&#9776;</span>
 
       <!-- ============ INHALE ============ -->
@@ -409,7 +391,6 @@
           <div class="fhead">
             <span class="chip">Exhale &middot; Journal</span>
             <span class="spacer"></span>
-            <span class="chip plain streak"><span aria-hidden="true">&#9679;</span> 5 days</span>
             <span class="chip plain">Sat 18 Oct</span>
           </div>
 
@@ -503,19 +484,36 @@
       night, and your geometric glyphs in place of emoji. <strong>Same ideas,
       your materials.</strong></p>
 
-    <h3>Left out, on purpose: the streak</h3>
-    <p>Argon shows a 5&#8209;day streak with a flame. Turn the third switch on to
-      see it. My advice is to leave it off. <strong>A streak turns a journal
-      into a duty.</strong> On the night you do not feel like writing, a streak
-      tells you that you failed, and that is the night people stop. The entry
-      count and yesterday's line give you the same sense of continuity without
-      the threat.</p>
+    <h3>Settled: no streak</h3>
+    <p>Argon shows a 5&#8209;day streak with a flame. It is out. <strong>A streak
+      turns a journal into a duty.</strong> On the night you do not feel like
+      writing, a streak tells you that you failed, and that is the night people
+      stop. The entry count and yesterday's line carry the same sense of
+      continuity with none of the threat.</p>
 
-    <h3>Still my one disagreement: the clock</h3>
-    <p>Argon leans the split by the hour. I would lean it by <strong>what you did
-      last</strong>. Your own habit is better evidence than the time of day, and
-      a wrong guess from your behaviour corrects itself the next time you use the
-      app.</p>
+    <h3>Settled: an even split, at every hour</h3>
+    <p>Argon tilts the split by the time of day. That is out too. The halves stay
+      equal, morning and night. <strong>The app does not guess what you came
+      for.</strong> It opens both doors and lets you choose.</p>
+
+    <h3>Settled: what a tap does</h3>
+    <p>Each half is a surface with zones, not one large button. The common act is
+      direct, and the wider view is one deliberate tap away.</p>
+    <ul>
+      <li><strong>Cover, or Resume.</strong> Page 142. No list in between.</li>
+      <li><strong>Prompt, or the circle.</strong> A new entry, typed or spoken.</li>
+      <li><strong>Library (14), or Archive (42).</strong> The full list.</li>
+      <li><strong>Anywhere else in a half.</strong> The half opens, and the shelf
+        or today's entries fill the room it gains.</li>
+    </ul>
+    <p>Reading and journalling mean different things by &ldquo;direct&rdquo;.
+      You almost always carry on the same book, so reading resumes. Every entry
+      is new, so the journal begins. <strong>One side continues, the other
+      starts.</strong></p>
+    <p>This also means the opened half <strong>is</strong> the home page. The app
+      gains no screen to hold the choice. It loses one.</p>
+    <p>One edge to handle in the build: with no book on the go, the reading half
+      shows the shelf instead of presuming a page to resume.</p>
   </section>
 </div>
 
@@ -554,15 +552,6 @@
       b.addEventListener('click', function () { setState(b.dataset.stateSet); });
     });
 
-    document.querySelectorAll('[data-lean-set]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        phone.dataset.lean = b.dataset.leanSet;
-        document.querySelectorAll('[data-lean-set]').forEach(function (o) {
-          o.setAttribute('aria-pressed', String(o === b));
-        });
-      });
-    });
-
     /* a tap-through zone answers first, then the half behind it */
     document.querySelectorAll('[data-tap]').forEach(function (el) {
       el.addEventListener('click', function (e) { e.stopPropagation(); say(el.dataset.tap); });
@@ -582,7 +571,7 @@
       });
     });
 
-    [['bridge', 'bridge'], ['zones', 'zones'], ['streak', 'streak']].forEach(function (pair) {
+    [['bridge', 'bridge'], ['zones', 'zones']].forEach(function (pair) {
       document.getElementById(pair[0]).addEventListener('change', function (e) {
         phone.dataset[pair[1]] = e.target.checked ? 'on' : 'off';
       });
