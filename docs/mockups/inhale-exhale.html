@@ -2,10 +2,10 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap">
 <style>
-  /* Layout: one large phone, controls beside it on a wide screen and above it
-     on a narrow one, with the notes last. Tokens are copied from
-     web/src/styles/theme.css — the ideas here are Argon's, the clothes are the
-     app's own. */
+  /* Argon's split front door, rebuilt on the app's own tokens. Every half is
+     filled with real status, not filler: where you are in the book, what you
+     marked, how long you read, what the journal is asking. Tokens below are
+     copied from web/src/styles/theme.css. */
   :root {
     --color-bg: #fbfaf8;
     --color-surface: #ffffff;
@@ -19,11 +19,14 @@
     --color-accent-wash: color-mix(in srgb, var(--color-accent) 8%, transparent);
     --page-bg: #e8e4dd;
 
-    /* the reading half is the book's own dark board; the journal half is paper */
-    --read-board: #2f3b46;
-    --read-ink: #f2ece1;
+    /* the reading half is the book's night board; the journal half is paper */
+    --board: #2a333c;
+    --board-ink: #f2ece1;
+    --board-dim: rgb(242 236 225 / 0.58);
+    --board-faint: rgb(242 236 225 / 0.14);
+    --board-gold: #c9a227;
     --leaf: #faf7f0;
-    --leaf-rule: #e6e0d2;
+    --leaf-dot: #e3dccd;
 
     --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --font-reading: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
@@ -39,7 +42,7 @@
 
     /* one curve and one duration, borrowed from the app's own page slide */
     --ease: cubic-bezier(0.32, 0.72, 0, 1);
-    --move: 300ms;
+    --move: 320ms;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -48,8 +51,7 @@
       --color-text: #ece7df; --color-text-muted: #9a938a; --color-border: #33302a;
       --color-accent: #c9a227; --color-accent-contrast: #14130f; --color-focus: #7fb0e8;
       --page-bg: #0b0a08;
-      --read-board: #1b232b; --read-ink: #e4ddd1;
-      --leaf: #221f1a; --leaf-rule: #322d25;
+      --board: #1b222a; --leaf: #221f1a; --leaf-dot: #342f26;
       --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
       color-scheme: dark;
     }
@@ -60,8 +62,7 @@
     --color-text: #ece7df; --color-text-muted: #9a938a; --color-border: #33302a;
     --color-accent: #c9a227; --color-accent-contrast: #14130f; --color-focus: #7fb0e8;
     --page-bg: #0b0a08;
-    --read-board: #1b232b; --read-ink: #e4ddd1;
-    --leaf: #221f1a; --leaf-rule: #322d25;
+    --board: #1b222a; --leaf: #221f1a; --leaf-dot: #342f26;
     --shadow-raised: 0 1px 3px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.3);
     color-scheme: dark;
   }
@@ -79,245 +80,221 @@
     padding-block: var(--space-6);
   }
 
-  .wrap { max-width: 60rem; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-5); }
+  .wrap { max-width: 62rem; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-5); }
 
   .masthead { display: flex; flex-direction: column; gap: var(--space-2); max-width: 38rem; }
-  .eyebrow {
-    font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-  .masthead h1 {
-    font-family: var(--font-display); font-size: var(--text-2xl);
-    font-weight: 600; margin: 0; text-wrap: balance;
-  }
-  .masthead p {
-    margin: 0; font-family: var(--font-figure); font-size: var(--text-lg);
-    color: var(--color-text-muted);
-  }
+  .eyebrow { font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-muted); }
+  .masthead h1 { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 600; margin: 0; text-wrap: balance; }
+  .masthead p { margin: 0; font-family: var(--font-figure); font-size: var(--text-lg); color: var(--color-text-muted); }
 
   .stage { display: flex; flex-wrap: wrap; gap: var(--space-5); align-items: flex-start; }
 
-  /* ---- controls ---- */
+  /* ---------- controls ---------- */
   .panel {
-    flex: 1 1 16rem; min-width: 0;
+    flex: 1 1 15rem; min-width: 0;
     display: flex; flex-direction: column; gap: var(--space-4);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-4);
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: var(--space-4);
   }
   .panel section { display: flex; flex-direction: column; gap: var(--space-2); }
-  .panel h2 {
-    font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--color-text-muted); margin: 0; font-weight: 600;
-  }
-  .panel p {
-    margin: 0; font-family: var(--font-figure); font-size: var(--text-sm);
-    color: var(--color-text-muted);
-  }
-  .seg {
-    display: flex; gap: 2px; padding: 3px;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border); border-radius: 999px;
-  }
+  .panel h2 { font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); margin: 0; font-weight: 600; }
+  .panel p { margin: 0; font-family: var(--font-figure); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  .seg { display: flex; gap: 2px; padding: 3px; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: 999px; }
   .seg button {
     flex: 1; min-width: 0; font: inherit; font-size: var(--text-sm);
-    padding: var(--space-2) var(--space-1);
-    border: none; border-radius: 999px; background: none;
-    color: var(--color-text-muted); cursor: pointer;
+    padding: var(--space-2) var(--space-1); border: none; border-radius: 999px;
+    background: none; color: var(--color-text-muted); cursor: pointer;
   }
-  .seg button[aria-pressed="true"] {
-    background: var(--color-surface); color: var(--color-text);
-    font-weight: 600; box-shadow: var(--shadow-raised);
-  }
+  .seg button[aria-pressed="true"] { background: var(--color-surface); color: var(--color-text); font-weight: 600; box-shadow: var(--shadow-raised); }
   .seg button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
 
   .check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); cursor: pointer; }
-  .check input { width: 1.1em; height: 1.1em; accent-color: var(--color-accent); }
+  .check input { width: 1.1em; height: 1.1em; accent-color: var(--color-accent); flex: 0 0 auto; }
 
-  .readout {
-    font-family: var(--font-figure); font-size: var(--text-base);
-    padding: var(--space-3);
-    background: var(--color-accent-wash);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-  }
+  .readout { font-family: var(--font-figure); font-size: var(--text-base); padding: var(--space-3); background: var(--color-accent-wash); border-radius: var(--radius-sm); }
   .readout b { display: block; font-family: var(--font-ui); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 3px; }
 
-  /* ---- the phone ---- */
+  /* ---------- the phone ---------- */
   .phone {
-    flex: 0 0 auto;
-    width: min(100%, 22rem); aspect-ratio: 9 / 18;
-    margin: 0 auto;
-    border: 1px solid var(--color-border); border-radius: 30px;
-    background: var(--color-bg);
-    box-shadow: 0 20px 44px rgb(0 0 0 / 0.2);
-    overflow: hidden; position: relative;
-    display: flex; flex-direction: column;
+    flex: 0 0 auto; width: min(100%, 23rem); aspect-ratio: 9 / 17.5;
+    margin: 0 auto; border: 1px solid var(--color-border); border-radius: 30px;
+    background: var(--color-bg); box-shadow: 0 20px 44px rgb(0 0 0 / 0.22);
+    overflow: hidden; position: relative; display: flex; flex-direction: column;
   }
 
-  /* a floating hamburger, since the split is full-bleed and has no top bar */
+  /* a floating hamburger, since the split is full-bleed and carries no top bar */
   .bars {
-    position: absolute; z-index: 6;
-    top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
-    left: var(--space-3);
-    width: 30px; height: 30px; border-radius: var(--radius-sm);
-    display: grid; place-items: center;
-    background: rgb(0 0 0 / 0.28); color: #fff;
-    font-size: var(--text-base);
-    backdrop-filter: blur(4px);
+    position: absolute; z-index: 7; top: var(--space-3); left: var(--space-3);
+    width: 28px; height: 28px; border-radius: var(--radius-sm);
+    display: grid; place-items: center; background: rgb(0 0 0 / 0.3); color: #fff;
+    font-size: var(--text-sm); backdrop-filter: blur(4px);
   }
 
   .half {
     position: relative; min-height: 0; overflow: hidden;
-    display: flex; flex-direction: column;
-    cursor: pointer;
+    display: flex; flex-direction: column; cursor: pointer;
     transition: flex-grow var(--move) var(--ease), flex-basis var(--move) var(--ease);
   }
   .half:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -4px; }
 
-  .read { background: var(--read-board); color: var(--read-ink); flex: 1 1 50%; }
+  .read { background: var(--board); color: var(--board-ink); flex: 1 1 50%; }
   .write {
-    background: var(--leaf); color: var(--color-text);
-    background-image: linear-gradient(to bottom, transparent 27px, var(--leaf-rule) 28px);
-    background-size: 100% 28px;
-    flex: 1 1 50%;
+    background: var(--leaf); color: var(--color-text); flex: 1 1 50%;
+    background-image: radial-gradient(var(--leaf-dot) 1px, transparent 1px);
+    background-size: 15px 15px;
   }
 
   /* the three states of the split */
-  [data-state="read"] .read { flex-basis: 100%; flex-grow: 8; }
-  [data-state="read"] .write { flex-basis: 54px; flex-grow: 0; }
-  [data-state="write"] .write { flex-basis: 100%; flex-grow: 8; }
-  [data-state="write"] .read { flex-basis: 54px; flex-grow: 0; }
+  [data-state="read"] .read { flex-basis: 100%; flex-grow: 9; }
+  [data-state="read"] .write { flex-basis: 52px; flex-grow: 0; }
+  [data-state="write"] .write { flex-basis: 100%; flex-grow: 9; }
+  [data-state="write"] .read { flex-basis: 52px; flex-grow: 0; }
 
-  [data-lean="morning"] .write { flex-grow: 1.9; }
-  [data-lean="evening"] .read { flex-grow: 1.9; }
-  [data-state="read"] [data-lean] , [data-state="write"] [data-lean] { }
+  /* Argon's circadian lean, only while both halves are open */
+  [data-state="balanced"][data-lean="morning"] .write { flex-grow: 1.85; }
+  [data-state="balanced"][data-lean="evening"] .read { flex-grow: 1.85; }
 
-  /* the full face of a half, and the lip it becomes */
-  .face { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--space-2); padding: var(--space-4); }
-  .lip { display: none; height: 54px; align-items: center; gap: var(--space-2); padding-inline: var(--space-4); flex: 0 0 auto; }
-
+  .face { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: var(--space-3) var(--space-4); gap: var(--space-2); }
+  .lip { display: none; height: 52px; align-items: center; gap: var(--space-2); padding-inline: var(--space-4); flex: 0 0 auto; }
   [data-state="read"] .write .face, [data-state="write"] .read .face { display: none; }
   [data-state="read"] .write .lip, [data-state="write"] .read .lip { display: flex; }
 
-  .tagline {
-    font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase;
-    display: inline-flex; align-items: center; gap: 0.5em;
-    align-self: flex-start;
-    padding: 0.2em 0.6em; border-radius: 999px;
-  }
-  .read .tagline { background: rgb(242 236 225 / 0.12); color: rgb(242 236 225 / 0.85); }
-  .write .tagline { background: var(--color-accent-wash); color: var(--color-accent); }
+  /* reading content settles towards the seam; journal content starts at it */
+  .read .fbody { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: var(--space-2); }
+  .write .fbody { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-start; gap: var(--space-2); }
 
-  .title { font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; line-height: 1.1; margin: 0; }
-  .sub { font-size: 0.7rem; font-variant-numeric: tabular-nums; }
-  .read .sub { color: rgb(242 236 225 / 0.7); }
-  .write .sub { color: var(--color-text-muted); }
-
-  /* the quote the reader last marked, set faintly behind the reading half */
-  .watermark {
-    position: absolute; inset-block-start: 14%; inset-inline-end: -6%;
-    width: 78%; pointer-events: none;
-    font-family: var(--font-reading); font-style: italic;
-    font-size: 1.3rem; line-height: 1.25;
-    color: rgb(242 236 225 / 0.07);
+  /* ---- the status row at the far edge of each half ---- */
+  .fhead { display: flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; padding-left: 34px; }
+  .write .fhead { padding-left: 0; }
+  .chip {
+    font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 0.25em 0.6em; border-radius: 999px; white-space: nowrap;
   }
+  .read .chip { background: var(--board-faint); color: var(--board-ink); }
+  .write .chip { background: var(--color-accent-wash); color: var(--color-accent); }
+  .chip.plain { background: none; padding-inline: 0; }
+  .read .chip.plain { color: var(--board-dim); }
+  .write .chip.plain { color: var(--color-text-muted); }
+  .spacer { flex: 1; min-width: 0; }
 
-  /* the cover: the primary tap zone in the reading half */
-  .cover {
-    width: 74px; aspect-ratio: 2 / 3; flex: 0 0 auto;
-    background: #141c23; color: #f2ece1;
-    border-radius: 2px 4px 4px 2px;
-    padding: var(--space-2);
-    display: flex; flex-direction: column; justify-content: space-between;
-    font-family: var(--font-display); line-height: 1.15;
-    box-shadow: -3px 4px 12px rgb(0 0 0 / 0.5), inset 2px 0 4px rgb(255 255 255 / 0.12);
+  /* the minutes-read ring */
+  .ring {
+    width: 26px; height: 26px; flex: 0 0 auto; border-radius: 50%;
+    background: conic-gradient(var(--board-gold) 0 80%, var(--board-faint) 80% 100%);
+    display: grid; place-items: center; position: relative;
   }
-  .cover .t { font-size: 0.62rem; font-weight: 600; }
-  .cover .a { font-size: 0.5rem; opacity: 0.7; font-family: var(--font-ui); }
+  .ring::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--board); }
+  .ring span { position: relative; z-index: 1; font-size: 0.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* ---- reading half ---- */
+  .locline {
+    font-size: 0.6rem; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--board-dim); font-variant-numeric: tabular-nums;
+  }
+  .locline b { color: var(--board-gold); font-weight: 600; }
+  .title { font-family: var(--font-display); font-size: 1.45rem; font-weight: 600; line-height: 1.08; margin: 0; }
+  .marked {
+    font-family: var(--font-reading); font-style: italic; font-size: 0.82rem;
+    line-height: 1.4; color: var(--board-dim); margin: 0;
+    border-left: 0; padding: 0;
+  }
   .readrow { display: flex; align-items: flex-end; gap: var(--space-3); }
-  .readrow .txt { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .cover {
+    width: 62px; aspect-ratio: 2 / 3; flex: 0 0 auto; position: relative;
+    background: #11181f; color: #f2ece1; border-radius: 2px 4px 4px 2px;
+    padding: 7px; display: flex; flex-direction: column; gap: 4px;
+    box-shadow: -3px 4px 13px rgb(0 0 0 / 0.55), inset 2px 0 4px rgb(255 255 255 / 0.13);
+  }
+  .cover .a { font-size: 0.42rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(242 236 225 / 0.55); }
+  .cover .t { font-family: var(--font-display); font-size: 0.58rem; font-weight: 600; line-height: 1.15; }
+  .cover .rule { margin-top: auto; height: 2px; width: 60%; background: var(--board-gold); opacity: 0.8; }
 
-  .prog { height: 3px; background: rgb(242 236 225 / 0.2); border-radius: 2px; overflow: hidden; width: 100%; }
-  .prog i { display: block; height: 100%; width: 38%; background: var(--color-accent); }
+  .resume {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums;
+    padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+    background: var(--board-faint); color: var(--board-ink);
+    border: 1px solid rgb(242 236 225 / 0.18);
+  }
+  .ffoot {
+    flex: 0 0 auto; display: flex; align-items: center; gap: var(--space-2);
+    padding-top: var(--space-2); font-size: 0.68rem;
+  }
+  .read .ffoot { border-top: 1px solid var(--board-faint); color: var(--board-dim); }
+  .write .ffoot { border-top: 1px solid var(--color-border); color: var(--color-text-muted); }
+  .ffoot .lnk { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .read .ffoot .lnk { color: var(--board-gold); }
+  .write .ffoot .lnk { color: var(--color-accent); }
+  .ffoot .ylast { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-reading); font-style: italic; }
 
-  /* the mic: the primary tap zone in the journal half */
-  .mic {
-    width: 52px; height: 52px; flex: 0 0 auto; border-radius: 50%;
-    background: var(--color-accent); color: var(--color-accent-contrast);
-    display: grid; place-items: center; font-size: 1.35rem;
-    box-shadow: 0 2px 12px color-mix(in srgb, var(--color-accent) 40%, transparent);
-  }
-  .writerow { display: flex; align-items: center; gap: var(--space-3); }
-  .ortype {
-    font-family: var(--font-figure); font-style: italic;
-    font-size: 0.78rem; color: var(--color-text-muted);
-  }
-  .caret {
-    display: inline-block; width: 2px; height: 0.95em;
-    background: var(--color-accent); vertical-align: text-bottom;
-    animation: blink 1.05s steps(1, end) infinite;
-  }
+  /* ---- journal half ---- */
+  .prompt { font-family: var(--font-display); font-size: 1.22rem; font-weight: 500; line-height: 1.15; margin: 0; }
+  .caret { display: inline-block; width: 2px; height: 0.9em; background: var(--color-accent); vertical-align: text-bottom; margin-left: 2px; animation: blink 1.05s steps(1, end) infinite; }
   @keyframes blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+  .hint { font-family: var(--font-figure); font-style: italic; font-size: 0.82rem; color: var(--color-text-muted); margin: 0; }
+  .writerow { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-1); }
+  .mic {
+    width: 46px; height: 46px; flex: 0 0 auto; border-radius: 50%;
+    background: var(--color-accent); color: var(--color-accent-contrast);
+    display: grid; place-items: center; font-size: 1.15rem;
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--color-accent) 38%, transparent);
+  }
+  .micword { display: flex; flex-direction: column; min-width: 0; }
+  .micword b { font-size: 0.82rem; }
+  .micword span { font-size: 0.68rem; color: var(--color-text-muted); }
 
-  /* ---- the bridge, at the seam ---- */
+  .streak { display: none; align-items: center; gap: 0.3em; }
+  .phone[data-streak="on"] .streak { display: inline-flex; }
+
+  /* ---- what each half adds once it is opened ---- */
+  .more { display: none; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+  [data-state="read"] .read .more, [data-state="write"] .write .more { display: flex; }
+  .shelf { display: flex; gap: var(--space-2); }
+  .mini {
+    width: 38px; aspect-ratio: 2 / 3; border-radius: 2px 3px 3px 2px;
+    background: #11181f; box-shadow: -2px 2px 7px rgb(0 0 0 / 0.45), inset 1px 0 3px rgb(255 255 255 / 0.1);
+    padding: 5px; font-family: var(--font-display); font-size: 0.4rem; line-height: 1.1; color: rgb(242 236 225 / 0.75);
+  }
+  .recent { display: flex; flex-direction: column; gap: var(--space-1); }
+  .recent div { display: flex; gap: var(--space-2); font-size: 0.72rem; align-items: baseline; }
+  .recent time { font-variant-numeric: tabular-nums; color: var(--color-text-muted); font-size: 0.62rem; flex: 0 0 auto; }
+  .recent p { margin: 0; font-family: var(--font-reading); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- the bridge, on the seam ---------- */
   .bridge {
-    position: absolute; z-index: 5;
-    left: 50%; top: 50%; transform: translate(-50%, -50%);
-    width: calc(100% - var(--space-5) * 2);
+    position: absolute; z-index: 6; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100% - var(--space-4) * 2);
     display: flex; align-items: center; gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    box-shadow: 0 6px 20px rgb(0 0 0 / 0.3);
-    cursor: pointer;
-    transition: opacity 200ms ease, transform var(--move) var(--ease);
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: 999px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.32);
+    cursor: pointer; transition: opacity 180ms ease;
   }
   .bridge .ico { color: var(--color-accent); font-size: var(--text-base); flex: 0 0 auto; }
   .bridge .txt { min-width: 0; display: flex; flex-direction: column; }
-  .bridge .lab { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
-  .bridge .quote {
-    font-family: var(--font-reading); font-style: italic; font-size: 0.78rem;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    color: var(--color-text);
-  }
-  .bridge .go { color: var(--color-text-muted); flex: 0 0 auto; }
+  .bridge .lab { font-size: 0.55rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); }
+  .bridge .quote { font-family: var(--font-reading); font-style: italic; font-size: 0.76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-text); }
+  .bridge .go { color: var(--color-text-muted); flex: 0 0 auto; font-size: 0.8rem; }
   [data-state="read"] .bridge, [data-state="write"] .bridge { opacity: 0; pointer-events: none; }
   .phone[data-bridge="off"] .bridge { display: none; }
 
-  /* ---- the tap-zone overlay ---- */
-  .phone[data-zones="on"] .cover,
-  .phone[data-zones="on"] .mic {
-    outline: 2px dashed var(--color-accent); outline-offset: 4px;
-  }
-  .zone {
-    display: none;
-    font-size: 0.58rem; letter-spacing: 0.06em;
-    padding: 0.15em 0.5em; border-radius: var(--radius-sm);
-    background: var(--color-accent); color: var(--color-accent-contrast);
-    align-self: flex-start;
-  }
+  /* ---------- the tap-zone reveal ---------- */
+  .phone[data-zones="on"] [data-tap] { outline: 2px dashed var(--color-accent); outline-offset: 4px; border-radius: var(--radius-sm); }
+  .zone { display: none; font-size: 0.55rem; letter-spacing: 0.06em; padding: 0.15em 0.5em; border-radius: var(--radius-sm); background: var(--color-accent); color: var(--color-accent-contrast); align-self: flex-start; }
   .phone[data-zones="on"] .zone { display: inline-block; }
 
-  /* ---- notes ---- */
-  .notes {
-    background: var(--color-surface); border: 1px solid var(--color-border);
-    border-radius: var(--radius-md); padding: var(--space-4);
-    display: flex; flex-direction: column; gap: var(--space-3); max-width: 42rem;
-  }
+  /* ---------- notes ---------- */
+  .notes { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); max-width: 44rem; }
   .notes h2 { font-family: var(--font-display); font-size: var(--text-xl); margin: 0; font-weight: 600; }
   .notes h3 { font-family: var(--font-ui); font-size: var(--text-sm); margin: var(--space-2) 0 0; font-weight: 600; }
-  .notes p, .notes li {
-    margin: 0; font-family: var(--font-figure); font-size: var(--text-base);
-    line-height: 1.55; color: var(--color-text-muted);
-  }
+  .notes p, .notes li { margin: 0; font-family: var(--font-figure); font-size: var(--text-base); line-height: 1.55; color: var(--color-text-muted); }
   .notes ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: var(--space-1); }
   .notes strong { color: var(--color-text); }
 
   @media (prefers-reduced-motion: reduce) {
-    .half, .bridge { transition: none; }
+    .half { transition: none; }
     .caret { animation: none; }
   }
 </style>
@@ -326,9 +303,9 @@
   <header class="masthead">
     <span class="eyebrow">Design mockup &middot; not working code</span>
     <h1>Inhale, exhale</h1>
-    <p>Argon's idea, wearing Reading Buddy's own theme. Tap either half: the
-      other folds down to a lip at the screen edge instead of disappearing. Tap
-      the lip to come back.</p>
+    <p>Argon's split door, wearing Reading Buddy's theme. Every half carries real
+      status, so neither sits empty. Tap a half: the other folds to a lip at the
+      screen edge and the open half shows more.</p>
   </header>
 
   <div class="stage">
@@ -340,7 +317,7 @@
           <button type="button" data-state-set="read" aria-pressed="false">Read</button>
           <button type="button" data-state-set="write" aria-pressed="false">Journal</button>
         </div>
-        <p>Or just tap a half on the phone.</p>
+        <p>Or tap a half on the phone. Tap the lip to come back.</p>
       </section>
 
       <section>
@@ -350,84 +327,134 @@
           <button type="button" data-lean-set="morning" aria-pressed="false">Morning</button>
           <button type="button" data-lean-set="evening" aria-pressed="false">Evening</button>
         </div>
-        <p>Argon's circadian weighting: journal in the morning, read at night.
-          A lean, not a decision.</p>
+        <p>Argon's circadian weighting. A lean, not a decision.</p>
       </section>
 
       <section>
-        <h2>Mechanics</h2>
-        <label class="check">
-          <input type="checkbox" id="bridge" checked>
-          Show the bridge at the seam
-        </label>
-        <label class="check">
-          <input type="checkbox" id="zones">
-          Mark the straight&#8209;through tap zones
-        </label>
+        <h2>Switches</h2>
+        <label class="check"><input type="checkbox" id="bridge" checked> The bridge on the seam</label>
+        <label class="check"><input type="checkbox" id="zones"> Mark the tap&#8209;through zones</label>
+        <label class="check"><input type="checkbox" id="streak"> The streak counter</label>
       </section>
 
       <div class="readout" id="readout">
         <b>Both halves</b>
-        Nothing is chosen yet. Tap a half, the cover, the microphone, or the
-        bridge.
+        Nothing is chosen. The book names its chapter and your last mark. The
+        journal asks a question.
       </div>
     </div>
 
-    <div class="phone" id="phone" data-state="balanced" data-lean="balanced" data-bridge="on" data-zones="off">
+    <div class="phone" id="phone" data-state="balanced" data-lean="balanced" data-bridge="on" data-zones="off" data-streak="off">
       <span class="bars" aria-hidden="true">&#9776;</span>
 
-      <!-- INHALE -->
+      <!-- ============ INHALE ============ -->
       <section class="half read" data-half="read" role="button" tabindex="0" aria-label="Read">
-        <div class="watermark">&ldquo;We are evolving from being cultivators of
-          personal knowledge to being hunters and gatherers in the electronic
-          data forest.&rdquo;</div>
         <div class="face">
-          <span class="tagline">Inhale &middot; Read</span>
-          <div class="readrow">
-            <span class="cover" data-tap="book">
-              <span class="t">The Shallows</span>
-              <span class="a">Nicholas Carr</span>
-            </span>
-            <span class="txt">
-              <span class="zone">Cover &rarr; straight to page 142</span>
-              <h2 class="title">Carry on</h2>
-              <span class="sub">Chapter 4 &middot; 38% &middot; 2 days ago</span>
-              <span class="prog"><i></i></span>
-            </span>
+          <div class="fhead">
+            <span class="chip">Inhale &middot; Read</span>
+            <span class="spacer"></span>
+            <span class="chip plain">24 of 30 min</span>
+            <span class="ring" aria-hidden="true"><span>80</span></span>
+          </div>
+
+          <div class="fbody">
+            <span class="locline">Ch.&nbsp;4 &middot; The Individual &middot; <b>68%</b></span>
+            <h2 class="title">The Undiscovered Self</h2>
+            <p class="marked">&ldquo;Self&#8209;knowledge is an adventure that carries us
+              unexpectedly far and deep.&rdquo;</p>
+
+            <div class="readrow">
+              <span class="cover" data-tap="book">
+                <span class="a">Jung</span>
+                <span class="t">The Undiscovered Self</span>
+                <span class="rule"></span>
+              </span>
+              <span style="display:flex;flex-direction:column;gap:5px;min-width:0">
+                <span class="zone">Cover &rarr; page 142</span>
+                <span class="resume" data-tap="resume">Resume p.&nbsp;142 <span aria-hidden="true">&rarr;</span></span>
+                <span class="zone">Button &rarr; same page</span>
+              </span>
+            </div>
+
+            <div class="more">
+              <span class="locline">Next on the shelf</span>
+              <span class="shelf">
+                <span class="mini">The Shallows</span>
+                <span class="mini">Thinking, Fast and Slow</span>
+                <span class="mini">Letters to a Young Poet</span>
+                <span class="mini">Meditations</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="ffoot">
+            <span>3 marks in this chapter</span>
+            <span class="spacer"></span>
+            <span class="lnk" data-tap="library">Library (14) &rarr;</span>
           </div>
         </div>
+
         <div class="lip">
-          <span class="tagline">Inhale</span>
-          <span class="sub" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">The Shallows &middot; ch. 4</span>
+          <span class="chip">Inhale</span>
+          <span class="spacer" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.68rem;color:var(--board-dim)">The Undiscovered Self &middot; p.&nbsp;142</span>
+          <span class="locline"><b>68%</b></span>
         </div>
       </section>
 
-      <!-- EXHALE -->
+      <!-- ============ EXHALE ============ -->
       <section class="half write" data-half="write" role="button" tabindex="0" aria-label="Journal">
         <div class="face">
-          <span class="tagline">Exhale &middot; Journal</span>
-          <div class="writerow">
-            <span class="mic" data-tap="mic" aria-hidden="true">&#127908;</span>
-            <span class="txt" style="min-width:0;display:flex;flex-direction:column;gap:4px">
-              <span class="zone">Mic &rarr; recording, no menu</span>
-              <h2 class="title">Say something</h2>
-              <span class="sub">4 entries today &middot; last at 19:04</span>
-            </span>
+          <div class="fhead">
+            <span class="chip">Exhale &middot; Journal</span>
+            <span class="spacer"></span>
+            <span class="chip plain streak"><span aria-hidden="true">&#9679;</span> 5 days</span>
+            <span class="chip plain">Sat 18 Oct</span>
           </div>
-          <span class="ortype">or type it instead<span class="caret"></span></span>
+
+          <div class="fbody">
+            <span class="chip plain" style="letter-spacing:0.13em">Evening prompt</span>
+            <h2 class="prompt" data-tap="prompt">What stood out to you today?<span class="caret"></span></h2>
+            <span class="zone">Prompt &rarr; editor, keyboard up</span>
+            <p class="hint">Tap to write, or hold the circle and just talk.</p>
+
+            <div class="writerow">
+              <span class="mic" data-tap="mic" aria-hidden="true">&#9679;</span>
+              <span class="micword">
+                <b>Speak it instead</b>
+                <span>The screen stays awake while you talk</span>
+              </span>
+            </div>
+            <span class="zone">Circle &rarr; recording at once</span>
+
+            <div class="more">
+              <span class="chip plain" style="letter-spacing:0.13em">Earlier today</span>
+              <span class="recent">
+                <div><time>19:04</time><p>The bit about solitude landed harder than I expected.</p></div>
+                <div><time>13:20</time><p>Rough morning. Wrote it out and felt lighter.</p></div>
+                <div><time>08:11</time><p>Dream: the long corridor again, but no doors this time.</p></div>
+              </span>
+            </div>
+          </div>
+
+          <div class="ffoot">
+            <span class="ylast">Yesterday: &ldquo;On Jung and the crowd&hellip;&rdquo;</span>
+            <span class="spacer"></span>
+            <span class="lnk" data-tap="archive">Archive (42) &rarr;</span>
+          </div>
         </div>
+
         <div class="lip">
-          <span class="tagline">Exhale</span>
-          <span class="sub" style="flex:1;min-width:0">4 entries today</span>
+          <span class="chip">Exhale</span>
+          <span class="spacer" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.68rem;color:var(--color-text-muted)">4 entries today &middot; last at 19:04</span>
         </div>
       </section>
 
-      <!-- THE BRIDGE -->
+      <!-- ============ THE BRIDGE ============ -->
       <div class="bridge" data-tap="bridge" role="button" tabindex="0">
         <span class="ico" aria-hidden="true">&#10022;</span>
         <span class="txt">
-          <span class="lab">Your last mark</span>
-          <span class="quote">&ldquo;hunters and gatherers in the electronic data forest&rdquo;</span>
+          <span class="lab">The bridge &middot; your last mark</span>
+          <span class="quote">&ldquo;an adventure that carries us unexpectedly far&rdquo;</span>
         </span>
         <span class="go" aria-hidden="true">&rarr;</span>
       </div>
@@ -435,47 +462,58 @@
   </div>
 
   <section class="notes">
-    <h2>What I kept, and what I left behind</h2>
+    <h2>What fills each half, and why</h2>
+    <p>Your note was that the first version had empty space. It did. Everything
+      below earns its place by telling you something you would otherwise have to
+      go and find.</p>
 
-    <h3>Kept: inhale and exhale</h3>
-    <p>The best thing in Argon's design. It says <strong>why</strong> the two
-      halves belong in one app, which none of my five doors did. Reading takes
-      words in. Journaling lets them out.</p>
+    <h3>The reading half</h3>
+    <ul>
+      <li><strong>Chapter, name and percent.</strong> Where you stopped, without opening the book.</li>
+      <li><strong>Your last mark, in reading serif.</strong> The book speaks on the front door.</li>
+      <li><strong>The minutes ring.</strong> 24 of 30 today. One glance, no screen to visit.</li>
+      <li><strong>Cover and Resume.</strong> Two targets for one job, because thumbs differ.</li>
+      <li><strong>&ldquo;3 marks in this chapter&rdquo; and Library (14).</strong> A reason to go wider.</li>
+    </ul>
 
-    <h3>Kept: the living lip</h3>
-    <p>The folded half stays on screen as a 54&#8239;px strip. This fixes the
-      worry I had about my own door&nbsp;3 — that the front door would become the
-      only way in. <strong>You are never shut inside one mode.</strong></p>
+    <h3>The journal half</h3>
+    <ul>
+      <li><strong>A written prompt.</strong> This is Argon's best small idea. A blank page is a wall. A question is a door.</li>
+      <li><strong>The microphone, named.</strong> Speaking is the main way in, so it is large and it says what it does.</li>
+      <li><strong>Yesterday's first line, and 42 entries.</strong> The journal remembers you.</li>
+    </ul>
 
-    <h3>Kept: the bridge</h3>
-    <p>The pill at the seam carries your last highlight into a new entry. It is
-      the book&#8209;linked journaling we already designed, pulled onto the front
-      door. It is also the one element that makes the halves read as one app
-      rather than two.</p>
+    <h3>What opening a half adds</h3>
+    <p>The accordion is not only stretch. Open the reading half and the shelf
+      appears. Open the journal and today's entries appear. <strong>The extra
+      room carries extra content</strong>, so the fold has a purpose.</p>
 
-    <h3>Kept: tap straight through</h3>
-    <p>The cover goes to page 142. The microphone starts recording. No menu in
-      between. Turn on the second switch to see both marked.</p>
+    <h3>Kept from Argon</h3>
+    <p>The inhale and exhale names, which say why both halves live in one app.
+      The living lip, so you are never shut inside one mode. The bridge on the
+      seam, which carries your last mark into a new entry. Tapping straight
+      through, with no menu between you and the page.</p>
 
-    <h3>Changed: the clothes</h3>
-    <p>Argon dressed this in Instrument Serif, Inter and amber on slate. Your app
-      wears Playfair Display, EB Garamond and a warm brown that turns to gold at
-      night. <strong>Same ideas, your skin.</strong> The dark theme here is the
-      app's real dark theme, not a second design.</p>
+    <h3>Changed</h3>
+    <p>Argon used Instrument Serif, Inter, JetBrains Mono and amber on slate,
+      loaded through Tailwind from a CDN. This uses your Playfair Display, EB
+      Garamond and system font, your accent that turns from brown to gold at
+      night, and your geometric glyphs in place of emoji. <strong>Same ideas,
+      your materials.</strong></p>
 
-    <h3>Dropped: Tailwind, and the emoji</h3>
-    <p>Your <code>theme.css</code> says no hard&#8209;coded colours or sizes in
-      components, so the themes stay one change. Tailwind's utility classes work
-      the other way, and a CDN script would also weigh on an offline app. The
-      emoji labels were swapped for the geometric glyphs your chrome already
-      uses.</p>
+    <h3>Left out, on purpose: the streak</h3>
+    <p>Argon shows a 5&#8209;day streak with a flame. Turn the third switch on to
+      see it. My advice is to leave it off. <strong>A streak turns a journal
+      into a duty.</strong> On the night you do not feel like writing, a streak
+      tells you that you failed, and that is the night people stop. The entry
+      count and yesterday's line give you the same sense of continuity without
+      the threat.</p>
 
-    <h3>My one disagreement: the clock</h3>
-    <p>Argon tilts the split by time of day. I would tilt it by
-      <strong>what you did last</strong> instead. Your own habit is better
-      evidence than the hour, and a wrong guess from the clock is annoying in a
-      way that a wrong guess from your own behaviour is not. Try both switches
-      and see whether you agree.</p>
+    <h3>Still my one disagreement: the clock</h3>
+    <p>Argon leans the split by the hour. I would lean it by <strong>what you did
+      last</strong>. Your own habit is better evidence than the time of day, and
+      a wrong guess from your behaviour corrects itself the next time you use the
+      app.</p>
   </section>
 </div>
 
@@ -485,18 +523,21 @@
     var readout = document.getElementById('readout');
 
     var WORDS = {
-      balanced: ['Both halves', 'Nothing is chosen yet. Tap a half, the cover, the microphone, or the bridge.'],
-      read: ['Reading', 'The journal folded to a lip at the bottom. It is one tap away, and it still tells you the day’s count.'],
-      write: ['Journaling', 'The book folded to a lip at the top, still naming the book and the chapter you left.'],
-      book: ['Straight to the book', 'Tapping the cover skips the front door and the library. You land on page 142.'],
-      mic: ['Straight to recording', 'Tapping the microphone starts listening at once. The thought does not wait for a menu.'],
-      bridge: ['Across the bridge', 'A new entry opens, already tied to the passage you marked. Speak, and it is filed under the book.']
+      balanced: ['Both halves', 'Nothing is chosen. The book names its chapter and your last mark. The journal asks a question.'],
+      read: ['Reading', 'The journal folded to a lip, still counting the day. The shelf appeared in the room the fold freed.'],
+      write: ['Journaling', 'The book folded to a lip, still naming the page you left. Today’s entries appeared below the prompt.'],
+      book: ['Straight to the book', 'The cover skips the front door and the library. You land on page 142.'],
+      resume: ['Straight to the book', 'The same place as the cover. Two targets, because thumbs reach differently.'],
+      library: ['The shelf', 'All 14 books, with the three you are part way through at the top.'],
+      prompt: ['Straight to writing', 'The editor opens with the keyboard up and the question as the title.'],
+      mic: ['Straight to recording', 'It listens at once. The screen stays awake while you talk.'],
+      archive: ['The archive', 'All 42 entries, with filters for dreams, finance, trading and books.'],
+      bridge: ['Across the bridge', 'A new entry opens, already tied to the passage you marked. Speak, and it files under the book.']
     };
 
     function say(key) {
       var w = WORDS[key];
-      if (!w) return;
-      readout.innerHTML = '<b>' + w[0] + '</b>' + w[1];
+      if (w) readout.innerHTML = '<b>' + w[0] + '</b>' + w[1];
     }
 
     function setState(state) {
@@ -520,12 +561,9 @@
       });
     });
 
-    /* the three straight-through zones answer first, then the half behind them */
+    /* a tap-through zone answers first, then the half behind it */
     document.querySelectorAll('[data-tap]').forEach(function (el) {
-      el.addEventListener('click', function (e) {
-        e.stopPropagation();
-        say(el.dataset.tap);
-      });
+      el.addEventListener('click', function (e) { e.stopPropagation(); say(el.dataset.tap); });
       el.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); say(el.dataset.tap); }
       });
@@ -542,11 +580,10 @@
       });
     });
 
-    document.getElementById('bridge').addEventListener('change', function (e) {
-      phone.dataset.bridge = e.target.checked ? 'on' : 'off';
-    });
-    document.getElementById('zones').addEventListener('change', function (e) {
-      phone.dataset.zones = e.target.checked ? 'on' : 'off';
+    [['bridge', 'bridge'], ['zones', 'zones'], ['streak', 'streak']].forEach(function (pair) {
+      document.getElementById(pair[0]).addEventListener('change', function (e) {
+        phone.dataset[pair[1]] = e.target.checked ? 'on' : 'off';
+      });
     });
   })();
 </script>
