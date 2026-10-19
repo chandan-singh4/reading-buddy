@@ -76,10 +76,11 @@ export function createEntryStore(database: ReadingBuddyDB = defaultDb) {
     /**
      * Store a shape beside the reader's words (WP-62).
      *
-     * Note what this cannot do: there is no path through it that writes `raw`.
-     * `decisions.md` settles that the raw transcript is canonical and a shape
-     * is derived from it, and the cheapest way to keep a promise like that is
-     * to leave no function that could break it.
+     * Note what this cannot do: it cannot write `raw`. `decisions.md` settles
+     * that the raw transcript is canonical and a shape is derived from it, so
+     * no shaping path may touch the reader's own words. The one function that
+     * writes `raw` is `setRaw`, and it is only ever called by the reader's own
+     * hand on the keyboard.
      *
      * A second call replaces the shape. The reader asked for a different
      * strength, or asked again for the same one, and two shapes of one entry
@@ -92,6 +93,23 @@ export function createEntryStore(database: ReadingBuddyDB = defaultDb) {
         // reader has just replaced must not outlive it.
         ...(title ? { title } : { title: undefined }),
       })
+    },
+
+    /**
+     * The reader corrected their own words (2026-10-19).
+     *
+     * The only function in this file that writes `raw`, and the rule it sits
+     * under is "a model may not overwrite the reader", not "nobody may". The
+     * recogniser mishears, and a transcript the reader cannot fix is not their
+     * words either.
+     *
+     * The shape is deliberately left alone here. It is now derived from words
+     * that no longer exist, and the caller is the one that knows whether it can
+     * make a new one — see `Entry.tsx`, which re-shapes at the same strength
+     * and says so when it cannot.
+     */
+    async setRaw(id: string, raw: string): Promise<void> {
+      await database.entries.update(id, { raw })
     },
 
     /** Throw the shape away. The reader's own words are untouched. */

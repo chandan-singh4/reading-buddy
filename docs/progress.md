@@ -263,9 +263,20 @@ every phrase it settled and the next event would rebuild it over the top of
 the correction. `SpeakSheet.test.tsx` is new and holds the order that matters:
 the correction is handed over *before* the recogniser starts again.
 
-Editing an entry that is already **saved** is still not possible. That one
-needs the reader's decision first, because a shaped copy made from the old
-words would go stale. See `decisions.md`, 2026-10-19.
+**A saved entry can be corrected, and re-shapes itself — 2026-10-19.** Under
+the reader's own words there is now "Correct it". `storage/journal.ts` gains
+`setRaw`, the one function in it that writes `raw`. When the entry has a shape,
+the same strength is asked for again from the corrected words. The order is the
+promise: the words are saved first, the model second. A model that will not
+answer cannot cost the reader their edit, and the screen says plainly that the
+shaped copy still comes from the older words.
+
+**The entry screen is the entry now — 2026-10-19.** The raw/shaped switch stood
+between the title and the first line, where it was read before the words were.
+It is now one quiet line *under* the entry: the mark, "Tidied by <model>", and
+the way to the other copy. The three shape cards are a drawer that opens on
+"Give it a different shape", and they stay open only while the entry has no
+shape at all.
 
 Tags are **not** in this waypoint. `decisions.md` says Shape proposes tags, and
 WP-64 is where they land, with the saved filters that make them useful.

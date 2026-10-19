@@ -3485,6 +3485,23 @@ survived, because it was in the cloud.
   rule stops a *model* overwriting the reader. Here no entry exists yet, and
   the hand on the keyboard is the reader's own. What Keep saves is still the
   one canonical copy, and no model may change it.
-- **Still open: editing an entry that is already saved.** That one does touch
-  the rule, because a shaped copy made from the old words would go stale. Ask
-  the reader before building it.
+- **An entry that is already saved can be corrected too (settled 2026-10-19).**
+  The reader presses "Correct it" under their own words. `setRaw` is the one
+  function that writes `raw`, and only the reader's hand reaches it.
+- **A correction re-shapes automatically, at the same strength.** A shape built
+  from a sentence that no longer exists is worse than no shape. The words are
+  saved first and the model is asked second, so a model that will not answer
+  cannot cost the reader their edit — the screen then says the shaped copy is
+  still made from the older words.
+
+## The entry is the screen (2026-10-19)
+
+- **Nothing stands between the title and the first line.** The raw/shaped
+  switch was a two-up control there. A control in that position is read before
+  the words are, which is the wrong way round on a screen whose whole content
+  is the words.
+- **Which copy, who wrote it, and the way to the other one are one quiet line
+  under the entry.** "Tidied by NVIDIA: Nemotron 3 Super · Your words".
+- **The three shapes are a drawer once a shape exists.** Three cards and a
+  paragraph is the right size for the one decision on a new entry, and far too
+  much room for a decision already made.

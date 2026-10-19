@@ -50,14 +50,14 @@ function openEntry(entryId: string) {
 }
 
 describe('Entry', () => {
-  it('shows the raw words, and offers no switch, when nothing has shaped them', async () => {
+  it('shows the raw words, and offers no other copy, when nothing has shaped them', async () => {
     const entry = await entryStore.addEntry({ raw: 'um so the thing is i was thinking' })
 
     openEntry(entry.id)
 
     expect(await screen.findByText('um so the thing is i was thinking')).toBeTruthy()
-    expect(screen.queryByRole('group', { name: 'How to read this entry' })).toBeNull()
-    expect(screen.getByText(/Exactly what the microphone heard/)).toBeTruthy()
+    expect(screen.getByText('Exactly what you said')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Tidied' })).toBeNull()
   })
 
   it('opens on the shaped copy, and keeps the raw words one press away', async () => {
@@ -69,12 +69,75 @@ describe('Entry', () => {
     expect(await screen.findByText('So the thing is, I was thinking.')).toBeTruthy()
     // The slug is said the way a person would say it, not printed as a
     // package id. See `modelName` in `reader/tutor.ts`.
-    expect(screen.getByText('Written by NVIDIA: Nemotron 3 Super')).toBeTruthy()
+    expect(screen.getByText('Tidied by NVIDIA: Nemotron 3 Super')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Your words' }))
 
     expect(screen.getByText('um so the thing is i was thinking')).toBeTruthy()
-    expect(screen.getByText(/Exactly what the microphone heard/)).toBeTruthy()
+    expect(screen.getByText('Exactly what you said')).toBeTruthy()
+  })
+
+  it('keeps the three shapes shut once the entry has one', async () => {
+    const entry = await entryStore.addEntry({ raw: 'a thought to shape' })
+    await db.entries.update(entry.id, { shaped: TIDY })
+
+    openEntry(entry.id)
+
+    // The entry is the screen. A decision already made does not get three
+    // cards and a paragraph of it.
+    expect(await screen.findByRole('button', { name: 'Give it a different shape' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Unpack/ })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Give it a different shape' }))
+
+    expect(screen.getByRole('button', { name: /Unpack/ })).toBeTruthy()
+  })
+
+  it('corrects the words, and makes the shape again from them', async () => {
+    const entry = await entryStore.addEntry({ raw: 'trying to say the word umm' })
+    await db.entries.update(entry.id, { shaped: TIDY })
+    asked.mockResolvedValue({ text: 'Trying to say the word Om.', model: 'a-free-model' })
+
+    openEntry(entry.id)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Your words' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Correct it' }))
+    fireEvent.change(screen.getByLabelText('Your words'), {
+      target: { value: 'trying to say the word Om' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep the change' }))
+
+    await waitFor(async () => {
+      expect((await db.entries.get(entry.id))?.raw).toBe('trying to say the word Om')
+    })
+    // The shape was made from words that no longer exist, so it is made again
+    // at the same strength, from the corrected ones.
+    expect(asked).toHaveBeenCalledWith('tidy', 'trying to say the word Om')
+    await waitFor(async () => {
+      expect((await db.entries.get(entry.id))?.shaped?.text).toBe('Trying to say the word Om.')
+    })
+  })
+
+  it('keeps the correction even when the model will not answer', async () => {
+    const entry = await entryStore.addEntry({ raw: 'the word umm' })
+    await db.entries.update(entry.id, { shaped: TIDY })
+    asked.mockRejectedValue(new Error('The free models are busy.'))
+
+    openEntry(entry.id)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Your words' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Correct it' }))
+    fireEvent.change(screen.getByLabelText('Your words'), {
+      target: { value: 'the word Om' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep the change' }))
+
+    // The words are saved before the model is asked, so a model that will not
+    // answer cannot cost the reader their edit.
+    await waitFor(async () => {
+      expect((await db.entries.get(entry.id))?.raw).toBe('the word Om')
+    })
+    expect(await screen.findByText(/still comes from the older words/)).toBeTruthy()
   })
 
   it('draws a heading in the shaped copy as a heading', async () => {

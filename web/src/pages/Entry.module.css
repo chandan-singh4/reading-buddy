@@ -10,51 +10,91 @@
   color: var(--color-text-muted);
 }
 
-/* Two halves of one control, not two buttons. Neither is the default and
-   neither is styled as the stronger choice: the raw words and the shaped
-   words are an equal pair, which is the whole decision this screen carries. */
-.pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  margin-top: var(--space-5);
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
-}
-
-.side {
-  display: inline-flex;
+/*
+ * The line under the entry: which copy this is, who wrote it, and the way to
+ * the other one.
+ *
+ * This replaced a two-up switch that sat between the title and the first
+ * sentence. A control there is read before the words are, which is the wrong
+ * way round on a screen whose whole content is the words.
+ */
+.credit {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  font: inherit;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
-  padding: var(--space-2) var(--space-3);
-  border: none;
-  border-radius: calc(var(--radius-md) - 3px);
-  background: transparent;
   color: var(--color-text-muted);
-  cursor: pointer;
 }
 
-.sideMark {
-  width: 18px;
-  height: 18px;
+.creditMark {
+  width: 16px;
+  height: 16px;
   flex: none;
 }
 
-.side[aria-pressed='true'] {
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-weight: 600;
+/* A word, not a button: it is the quietest thing on the screen that can still
+   be pressed, which is what a second copy one press away should feel like. */
+.swap {
+  font: inherit;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
-.side:focus-visible {
+.swap:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+/* ---- correcting the words ---- */
+
+.editing {
+  margin-top: var(--space-5);
+}
+
+/* The same face and size as the prose it replaces. The reader is fixing one
+   misheard word, not filling in a form. */
+.editor {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 12rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-reading);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.editor:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.editActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.aside {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
 /* The reader's own words, set in the reading face — they are what the screen
@@ -86,6 +126,7 @@
 }
 
 .quiet,
+.strong,
 .danger {
   font: inherit;
   font-family: var(--font-ui);
@@ -99,6 +140,18 @@
   border: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-text-muted);
+}
+
+.strong {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+}
+
+.strong:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .quiet:hover,
@@ -131,8 +184,32 @@
 
 .give {
   margin-top: var(--space-6);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--color-border);
+}
+
+/* Shut, once the entry has a shape. Three cards and a paragraph is the right
+   size for the one decision on a blank entry, and far too much room for a
+   decision the reader has already made. */
+.giveToggle {
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.giveToggle:hover,
+.giveToggle:focus-visible {
+  color: var(--color-text);
+}
+
+.giveToggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
 }
 
 .giveHead {
@@ -213,6 +290,10 @@
 .levelName {
   font-family: var(--font-ui);
   font-weight: 600;
+}
+
+.give .giveToggle:last-child {
+  margin-top: var(--space-3);
 }
 
 .levelBlurb {
