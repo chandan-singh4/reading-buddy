@@ -89,6 +89,10 @@ export function createEntryStore(database: ReadingBuddyDB = defaultDb) {
     async setShaped(id: string, shaped: EntryShaped, title?: string): Promise<void> {
       await database.entries.update(id, {
         shaped,
+        // The shape has caught up with the words, so the "older words" mark
+        // comes off. See `editedAt` on `StoredEntry` for why this is a flag
+        // and not a date the screen compares.
+        editedAt: undefined,
         // Only the two stronger levels write one, and a title from a shape the
         // reader has just replaced must not outlive it.
         ...(title ? { title } : { title: undefined }),
@@ -107,9 +111,13 @@ export function createEntryStore(database: ReadingBuddyDB = defaultDb) {
      * that no longer exist, and the caller is the one that knows whether it can
      * make a new one — see `Entry.tsx`, which re-shapes at the same strength
      * and says so when it cannot.
+     *
+     * `editedAt` is stamped so that "cannot" is never silent. A re-shape can
+     * fail, and a reader on an older build never had one, so the screen has to
+     * be able to see for itself that a shape is older than the words under it.
      */
     async setRaw(id: string, raw: string): Promise<void> {
-      await database.entries.update(id, { raw })
+      await database.entries.update(id, { raw, editedAt: new Date().toISOString() })
     },
 
     /** Throw the shape away. The reader's own words are untouched. */

@@ -24,6 +24,10 @@
  * shape exists it is made again at the same strength straight afterwards,
  * because a shape built from a sentence that no longer exists is worse than no
  * shape at all.
+ *
+ * When that re-shape fails — or never ran, because an installed app is still on
+ * an older build — the entry carries `editedAt` and the credit line says the
+ * shaped copy comes from earlier words. One press makes it again.
  */
 
 import { useEffect, useState } from 'react'
@@ -202,6 +206,13 @@ export default function Entry() {
   const showing: Side = shaped ? side : 'raw'
   const words = showing === 'shaped' && shaped ? shaped.text : entry.raw
   const reshaping = remaking
+  /*
+   * The shape was made from words the reader has since corrected. The screen
+   * says so rather than hoping: the re-shape after a correction can fail, and
+   * an installed app that has not taken a new build may never have tried. A
+   * stale copy that looks current is the one failure the reader cannot see.
+   */
+  const stale = Boolean(shaped && entry.editedAt)
 
   return (
     <div className={journal.page}>
@@ -272,8 +283,24 @@ export default function Entry() {
             <>
               <LevelMark level={shaped.level} className={entryStyles.creditMark} />
               <span>
-                {reshaping ? 'Making it again…' : `${shapeMark(entry)} by ${modelName(shaped.model)}`}
+                {reshaping
+                  ? 'Making it again…'
+                  : stale
+                    ? `${shapeMark(entry)} from your earlier words`
+                    : `${shapeMark(entry)} by ${modelName(shaped.model)}`}
               </span>
+              {stale && !reshaping && (
+                <button
+                  type="button"
+                  className={entryStyles.swap}
+                  disabled={working !== null}
+                  onClick={() => {
+                    void give(shaped.level)
+                  }}
+                >
+                  {working === shaped.level ? 'Making it again…' : 'Make it again'}
+                </button>
+              )}
               <button
                 type="button"
                 className={entryStyles.swap}
@@ -285,7 +312,13 @@ export default function Entry() {
           ) : (
             <>
               <VoiceMark className={entryStyles.creditMark} />
-              <span>{reshaping ? 'Making the shape again…' : 'Exactly what you said'}</span>
+              <span>
+                {reshaping
+                  ? 'Making the shape again…'
+                  : stale
+                    ? 'Exactly what you said — the shaped copy is older'
+                    : 'Exactly what you said'}
+              </span>
               <button
                 type="button"
                 className={entryStyles.swap}

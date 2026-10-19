@@ -805,6 +805,18 @@ export interface StoredEntry {
    * `shaped`, beside it.
    */
   raw: string
+  /**
+   * ISO 8601 — set when the reader corrects `raw`, and cleared again when a
+   * shape is made from the corrected words. Absent on an entry nobody has
+   * corrected, which is most of them.
+   *
+   * So its presence *beside* a `shaped` is the fact that the shape is older
+   * than the words under it. Deliberately a flag that is set and cleared,
+   * rather than two dates the screen compares: `shaped.at` and this one come
+   * from different moments on a phone whose clock may move, and a shape that
+   * is current must never read as stale because of a clock.
+   */
+  editedAt?: string
   shaped?: EntryShaped
   /** Theirs, and a model's proposals once they have kept them (WP-64). */
   tags: string[]

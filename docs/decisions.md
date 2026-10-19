@@ -3493,6 +3493,18 @@ survived, because it was in the cloud.
   saved first and the model is asked second, so a model that will not answer
   cannot cost the reader their edit — the screen then says the shaped copy is
   still made from the older words.
+- **A stale shape says so on the screen, not only in a failure message.**
+  `setRaw` sets `editedAt`. `setShaped` clears it. So `editedAt` beside a
+  `shaped` is the fact that the shape is older than the words, and the credit
+  line reads "Unpacked from your earlier words" with one press to make it
+  again. The message after a failed re-shape is gone the moment the reader
+  leaves the screen; this mark stays until the shape catches up.
+- **`editedAt` is a flag, not a date to compare.** Two dates written at two
+  moments on one phone can cross if the clock moves. A current shape must
+  never read as stale because of a clock.
+- **An installed app can be an old build.** Updates wait behind a panel
+  (`app/updates.ts`), so a reader who has not accepted one runs code from
+  before the auto re-shape. The mark serves them too, with no new build.
 
 ## The entry is the screen (2026-10-19)
 

@@ -286,6 +286,16 @@ three-line preview and says less than the sentence it labels — unless headings
 are all there is, when it keeps them. It is not a parser and must not become
 one: `reader/markdown.tsx` renders markdown everywhere there is room.
 
+**A stale shape says so — 2026-10-19.** The reader corrected an entry and the
+Unpacked copy did not change. The auto re-shape works; the test proves it at
+every level. What failed was that nothing on the screen could say when it had
+*not* run — after a model refused, or on an installed app still running a build
+from before it. `setRaw` now sets `editedAt` and `setShaped` clears it, so
+`editedAt` beside a `shaped` is the fact that the shape is older than the
+words. The credit line reads "Unpacked from your earlier words", with one press
+to make it again. A flag, not two dates: a phone's clock can move, and a
+current shape must never read as stale because of it.
+
 Tags are **not** in this waypoint. `decisions.md` says Shape proposes tags, and
 WP-64 is where they land, with the saved filters that make them useful.
 

@@ -140,6 +140,31 @@ describe('Entry', () => {
     expect(await screen.findByText(/still comes from the older words/)).toBeTruthy()
   })
 
+  it('says the shaped copy is older than the words, and makes it again on one press', async () => {
+    // The state a failed re-shape leaves behind — and the state an installed
+    // app that never took the auto-re-shape build was always in.
+    const entry = await entryStore.addEntry({ raw: 'i had a vivid dream last night' })
+    await db.entries.update(entry.id, {
+      shaped: { ...TIDY, level: 'unpack', text: '## What you said\n\nFrom the older words.' },
+      editedAt: '2026-10-19T09:00:00.000Z',
+    })
+    asked.mockResolvedValue({ text: '## What you said\n\nFrom the corrected words.', model: 'a/b:free' })
+
+    openEntry(entry.id)
+
+    expect(await screen.findByText('Unpacked from your earlier words')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Make it again' }))
+
+    // Made again at the same strength, from the words as they now stand.
+    expect(asked).toHaveBeenCalledWith('unpack', 'i had a vivid dream last night')
+    await waitFor(async () => {
+      expect((await db.entries.get(entry.id))?.shaped?.text).toContain('From the corrected words.')
+    })
+    // And once it is current again the line stops warning about it.
+    expect(screen.queryByText('Unpacked from your earlier words')).toBeNull()
+  })
+
   it('draws a heading in the shaped copy as a heading', async () => {
     const entry = await entryStore.addEntry({ raw: 'a thought with parts' })
     await db.entries.update(entry.id, {
