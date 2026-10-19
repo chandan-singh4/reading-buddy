@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, type EntryShaped } from '../storage/db.ts'
 import { shapeEntry } from '../journal/shape.ts'
+import { askCounsel } from '../journal/counsel.ts'
 import { entryStore } from '../storage/index.ts'
 import Entry from './Entry.tsx'
 
@@ -22,14 +23,30 @@ vi.mock('../journal/shape.ts', async () => {
   return { ...real, shapeEntry: vi.fn() }
 })
 
+vi.mock('../journal/counsel.ts', async () => {
+  const real = await vi.importActual<typeof import('../journal/counsel.ts')>(
+    '../journal/counsel.ts',
+  )
+  return { ...real, askCounsel: vi.fn() }
+})
+
 const asked = vi.mocked(shapeEntry)
+const counselled = vi.mocked(askCounsel)
 
 afterEach(cleanup)
 
 beforeEach(async () => {
   await db.entries.clear()
   asked.mockReset()
+  counselled.mockReset()
 })
+
+const READING = {
+  angle: 'A decision already made, looking for permission',
+  model: 'nvidia/nemotron-3-super-120b-a12b:free',
+  at: '2026-10-19T10:00:00.000Z',
+  text: '## One opinion\n\nYou are rehearsing a defence of it.',
+}
 
 const TIDY: EntryShaped = {
   level: 'tidy',
@@ -265,6 +282,99 @@ describe('Entry', () => {
 
     await screen.findByText('a thought from nowhere')
     expect(screen.queryByLabelText('The passage this came from')).toBeNull()
+  })
+
+  // WP-67 — the Counsel.
+  describe('a reading of the entry', () => {
+    it('asks about the reader’s own words, not the shaped copy', async () => {
+      const entry = await entryStore.addEntry({ raw: 'i already booked it' })
+      await db.entries.update(entry.id, { shaped: TIDY })
+      counselled.mockResolvedValue(READING)
+
+      openEntry(entry.id)
+
+      fireEvent.click(await screen.findByRole('button', { name: /Read it back to me/ }))
+
+      // An opinion on a model's rewrite of what the reader said is an opinion
+      // on the wrong text.
+      await waitFor(() => {
+        expect(counselled).toHaveBeenCalledWith('i already booked it')
+      })
+      await waitFor(async () => {
+        expect((await db.entries.get(entry.id))?.counsel?.text).toBe(READING.text)
+      })
+    })
+
+    it('shows the angle the model chose, and opens the body on a press', async () => {
+      const entry = await entryStore.addEntry({ raw: 'i already booked it' })
+      await db.entries.update(entry.id, { counsel: READING })
+
+      openEntry(entry.id)
+
+      // The frame is the opinion, so it shows whether or not the body is open.
+      const head = await screen.findByRole('button', {
+        name: /A decision already made, looking for permission/,
+      })
+      expect(head.getAttribute('aria-expanded')).toBe('false')
+      expect(screen.queryByText('You are rehearsing a defence of it.')).toBeNull()
+
+      fireEvent.click(head)
+
+      expect(screen.getByText('You are rehearsing a defence of it.')).toBeTruthy()
+      // Who wrote it, and what it is not — under every reading, not once in a
+      // settings screen.
+      expect(
+        screen.getByText(/NVIDIA: Nemotron 3 Super\. One reading, not advice from a professional\./),
+      ).toBeTruthy()
+    })
+
+    it('says a reading came from earlier words, and never remakes it by itself', async () => {
+      const entry = await entryStore.addEntry({ raw: 'i already booked it' })
+      await db.entries.update(entry.id, { counsel: { ...READING, stale: true } })
+
+      openEntry(entry.id)
+
+      fireEvent.click(
+        await screen.findByRole('button', { name: /A decision already made/ }),
+      )
+
+      expect(screen.getByText(/comes from your earlier words/)).toBeTruthy()
+      // An opinion costs a model call the reader did not ask for twice, so it
+      // waits to be asked again.
+      expect(counselled).not.toHaveBeenCalled()
+    })
+
+    it('removes the reading without touching the words', async () => {
+      const entry = await entryStore.addEntry({ raw: 'i already booked it' })
+      await db.entries.update(entry.id, { counsel: READING })
+
+      openEntry(entry.id)
+
+      fireEvent.click(
+        await screen.findByRole('button', { name: /A decision already made/ }),
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Remove this reading' }))
+
+      await waitFor(async () => {
+        expect((await db.entries.get(entry.id))?.counsel).toBeUndefined()
+      })
+      expect((await db.entries.get(entry.id))?.raw).toBe('i already booked it')
+      expect(await screen.findByRole('button', { name: /Read it back to me/ })).toBeTruthy()
+    })
+
+    it('says so when no model will answer, and stores nothing', async () => {
+      const entry = await entryStore.addEntry({ raw: 'i already booked it' })
+      counselled.mockRejectedValue(new Error('The free models are busy.'))
+
+      openEntry(entry.id)
+
+      fireEvent.click(await screen.findByRole('button', { name: /Read it back to me/ }))
+
+      expect(await screen.findByText('The free models are busy.')).toBeTruthy()
+      // An apology stored as an opinion would be read a month later as
+      // something the model actually thought.
+      expect((await db.entries.get(entry.id))?.counsel).toBeUndefined()
+    })
   })
 
   it('says so when the entry is not there', async () => {

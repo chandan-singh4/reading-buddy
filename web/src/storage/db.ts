@@ -765,6 +765,41 @@ export interface EntryShaped {
 }
 
 /**
+ * A model's considered opinion on an entry (WP-67).
+ *
+ * Stored beside the reader's words and beside `shaped`, and the reason is the
+ * same one: it is a second thing, never a replacement. The difference from a
+ * shape is what it is allowed to do. Tidy, Shape and Unpack reorganise the
+ * reader's own words and add nothing. This *adds* — so it is named apart, it
+ * is drawn apart, and it never touches `raw`.
+ */
+export interface EntryCounsel {
+  /**
+   * How the model chose to read the entry, in its own words. Absent when it
+   * wrote no heading, which is a model that disobeyed and costs nothing.
+   *
+   * Kept because the frame is the opinion: the same entry read as a dream and
+   * read as a decision gives two different answers, and a reader who is not
+   * told the frame cannot weigh what sits inside it.
+   */
+  angle?: string
+  /** The OpenRouter slug that wrote it. */
+  model: string
+  /** ISO 8601 — when it was written, not when the entry was spoken. */
+  at: string
+  text: string
+  /**
+   * True when the reader has corrected `raw` since this was written.
+   *
+   * Set by `setRaw`, and absent on a reading that is current. A shape is made
+   * again by itself after a correction; a reading is not, because an opinion
+   * costs a model call the reader did not ask for. So it is marked instead,
+   * and the reader decides.
+   */
+  stale?: boolean
+}
+
+/**
  * The passage an entry grew out of.
  *
  * Stores the book's own words rather than an offset, for the reason set out on
@@ -818,6 +853,7 @@ export interface StoredEntry {
    */
   editedAt?: string
   shaped?: EntryShaped
+  counsel?: EntryCounsel
   /** Theirs, and a model's proposals once they have kept them (WP-64). */
   tags: string[]
   /** Theirs, or one `shaped` proposed and they kept. */

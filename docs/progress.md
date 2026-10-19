@@ -332,8 +332,43 @@ Three things worth knowing about how it is built.
 URL, so the entry links to the book and does not promise the passage. Giving
 the reader route a deep link is its own piece of work.
 
-**Next: WP-67, a professional opinion on an entry.** Then WP-65, the split
-front door, which WP-63 has now unblocked.
+**WP-67 · a professional opinion on an entry — shipped 2026-10-19.** The
+Counsel.
+
+The reader asked for a professional opinion, and then asked for the role to be
+all-round rather than a niche. Both are the same answer, because **there is no
+specialist model to call: the specialisation is the prompt.** A shelf of named
+lenses would be one model wearing hats, and would make the reader pick a frame
+before they know which frame fits.
+
+So the model picks the frame, and then **says which frame it picked**. That is
+the whole honesty of the feature. The same entry read as a dream and read as a
+decision gives two different answers, and a reader who is not told the frame
+cannot weigh what sits inside it. The angle is the first line of the reply,
+lifted off an H1 exactly as a shape's title is.
+
+Four choices worth keeping.
+
+1. **A fourth persona, not the Scribe.** Tidy, Shape and Unpack reorganise the
+   reader's own words and add nothing. This adds. Two different acts need two
+   different names, so the reader can tell them apart at a glance.
+2. **It reads `raw`, never `shaped`.** An opinion on a model's rewrite of what
+   the reader said is an opinion on the wrong text.
+3. **A correction marks a reading stale and never remakes it.** A shape is
+   remade automatically, because it is the same words in an order the reader
+   already asked for. An opinion is not the same words.
+4. **The guard rails are the feature, not the trim.** The prompt forbids
+   diagnosis and any claim of credentials, requires a qualified person wherever
+   health, money, law or safety are in the entry, and requires an actual view —
+   a reading that only reflects the entry back is of no use.
+
+`journal/relay.ts` is new: the stream reader, the failover rule and the failure
+wording, extracted from `shape.ts` so two callers do not hold two copies. The
+second copy is the one that goes stale.
+
+**Next: WP-65, the split front door.** WP-63 unblocked it. WP-64 (tags and
+saved filters) and WP-66 (the journal in the backup) are the other two open
+journal pieces — a reading is not in the backup or the export yet.
 
 **WP-22 · `learner.md` adaptive model.** Held, by the reader's choice, while
 the journal is built.

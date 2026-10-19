@@ -3526,6 +3526,43 @@ survived, because it was in the cloud.
   (`app/updates.ts`), so a reader who has not accepted one runs code from
   before the auto re-shape. The mark serves them too, with no new build.
 
+## A professional opinion is one all-round role, and it names its frame (2026-10-19)
+
+- **There is no specialist model. The specialisation is the prompt.** A shelf
+  of named lenses would be one model wearing hats, so the reader asked for one
+  all-round role instead. The model picks its own angle from the entry.
+- **It says which angle it picked.** This is the whole honesty of the feature.
+  The frame *is* the opinion: a dream read as an image and read as a decision
+  give two different answers, and a reader who is not told the frame cannot
+  weigh what sits inside it. The angle is the first line, lifted off an H1
+  exactly as a shape's title is.
+- **It is a fourth persona: the Counsel.** Tidy, Shape and Unpack reorganise
+  the reader's own words and add nothing; the Scribe speaks for all three. This
+  *adds*. Two different acts, so two different names — the reader must be able
+  to tell them apart without reading closely.
+- **It reads `raw`, never `shaped`.** An opinion on a model's rewrite of what
+  the reader said is an opinion on the wrong text.
+- **One reading per entry.** A second angle is the same button again. A shelf
+  of saved readings would turn an entry into a thread.
+- **It is shut by default, and dressed as a second voice.** A wash, a border
+  and its own type, under everything else on the screen. The entry is still
+  the screen.
+- **The model's name and "not advice from a professional" sit under every
+  reading**, not once in a settings screen. A reader opening this in a month
+  has to be able to see what wrote it.
+- **The prompt forbids diagnosis and credentials, and requires a view.** A
+  reading that only reflects the entry back is of no use, so it may disagree
+  with the reader. It may not name a condition, claim a profession, or send
+  the reader off to act alone on health, money, law or safety.
+- **A correction marks a reading stale. It never remakes it.** A shape is
+  remade automatically — the same words in an order the reader already asked
+  for. An opinion is not the same words: remaking it spends a call the reader
+  did not ask for twice, and may come back saying something else. `setRaw`
+  marks; the reader decides.
+- **One journal call, not two.** `journal/relay.ts` holds the stream reader,
+  the failover rule and the failure wording; `shape.ts` and `counsel.ts` both
+  use it. Two copies of a stream reader means one of them goes stale.
+
 ## The entry is the screen (2026-10-19)
 
 - **Nothing stands between the title and the first line.** The raw/shaped

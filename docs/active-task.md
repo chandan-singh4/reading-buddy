@@ -6,54 +6,72 @@ it.
 
 ## Task
 
-**WP-63 — Tell the Scribe, from the book.** The passage becomes an entry.
+**WP-67 — a professional opinion on an entry.** One all-round reader, not a
+shelf of specialists.
 
-The reader holds a passage. The selection menu offers "Tell the Scribe" beside
-"Ask Veda". A sheet rises over the page, they speak, and the entry saves with
-the passage tied to it. The sheet drops and reading carries on.
+The reader asks for an opinion on an entry. One model reads it, decides for
+itself how the entry wants to be read, **says which way it chose**, and gives a
+view. The reading is stored beside the entry and can be made again or thrown
+away.
 
-**The design is settled.** `decisions.md` → "The book's journal action is not
-called 'speak'" (2026-10-18). Do not re-open it.
+### Settled before building
 
-- The action is **"Tell the Scribe"**, not "speak" — `speak` already means Read
-  aloud in the selection menu.
-- It sits **beside "Ask Veda"**, set apart in the same way. One asks a
-  question. The other makes a statement.
-- A **sheet over the page**, not a screen. A book is where an entry is born.
-  The journal is where it is read.
+- **One role, all-round.** The reader asked for a role that is not a niche. So
+  there is no lens list and no router: the model picks its own angle from the
+  content, the way you would get a different answer from one thoughtful person
+  depending on what you brought them.
+- **It names the angle it chose.** This is the whole honesty of the feature.
+  The frame *is* the opinion — a dream read as a decision and read as an image
+  give two different answers — so the reader is told which one they are
+  holding. The angle is the first line, lifted exactly as `shape.ts` lifts a
+  title out of an H1.
+- **It is a fourth persona, not the Scribe.** Tidy, Shape and Unpack
+  reorganise the reader's words and add nothing; the Scribe speaks for all
+  three. This *adds*. The reader must be able to tell those two acts apart at
+  a glance, so it gets its own name: **the Counsel**.
+- **It reads `raw`, never `shaped`.** An opinion must be on what the reader
+  said, not on a model's rewrite of what the reader said.
+- **It is not a clinician.** The reader's real entries are dreams and
+  feelings. The prompt forbids diagnosis and any claim of credentials, and
+  requires it to name a qualified person where health, money, law or safety
+  are in the entry.
+- **It is collapsed by default.** "The entry is the screen" (2026-10-19). The
+  angle line shows; the body opens on a press.
 
-**Done when all four are true.**
+**Done when all five are true.**
 
-1. The selection menu shows "Tell the Scribe" in the same block as "Ask Veda".
-2. It opens the speak sheet over the page, with the held passage shown in it.
-3. The saved row carries `link` — `bookId`, `anchor` and the `quote`, copied.
-4. The entry screen shows the passage the entry grew from, and names the book.
+1. An entry with no reading offers one quiet way to ask for it.
+2. The reading stores `angle`, `model`, `at` and `text`, beside the entry.
+3. The screen shows the angle, and opens the body on a press.
+4. Correcting the words marks the reading as made from earlier words, and
+   offers to make it again. It is never silently re-run: an opinion costs a
+   model call the reader did not ask for.
+5. The reading can be removed without touching the words or the shape.
 
 **Out of this slice.**
 
-- **Jumping back to the exact passage.** `Reader.tsx` reads no anchor off the
-  URL, and giving it one is its own piece of work. The entry links to the book;
-  it does not promise the line.
-- The journal card's book mark (every card would need a book read).
-- Tags (WP-64), the front door (WP-65), the backup (WP-66), readings (WP-67).
+- A second reading per entry, or a shelf of named lenses. One role, one
+  reading. If the reader wants a second angle they press Make it again.
+- Readings on the journal list, in the backup (WP-66) or in the export.
+- Tags (WP-64), the front door (WP-65).
 
 ### Files in scope
 
 | Path | What it does |
 |---|---|
-| `web/src/reader/SelectionMenu.tsx` | `SelectionAction` gains `scribe`; the button goes in the `.ask` block. |
-| `web/src/reader/SelectionMenu.module.css` | `.ask` holds two rows now, not one. |
-| `web/src/journal/SpeakSheet.tsx` | Takes an optional `link`, shows the passage, saves the tie. |
-| `web/src/journal/SpeakSheet.module.css` | `.quote`. |
-| `web/src/pages/Reader.tsx` | `case 'scribe'`, the `telling` state, and the sheet. Follows `composing`/`NoteComposer` exactly — the sheet must outlive the selection. |
-| `web/src/pages/Entry.tsx` | Shows `entry.link` under the entry. |
+| `api/tutor.ts` | A `counsel` module: `material`, `standalone`, and the prompt. |
+| `web/src/journal/relay.ts` | **new.** The one call to the journal's models, extracted from `shape.ts` so two callers do not hold two copies of the stream reader. |
+| `web/src/journal/shape.ts` | Uses `relay.ts`. Keeps `titleOf`. |
+| `web/src/journal/counsel.ts` | **new.** `askCounsel`, and the angle lifted off the H1. |
+| `web/src/journal/marks.tsx` | `CounselMark` — spectacles. A second look. |
+| `web/src/storage/db.ts` | `EntryCounsel`, and `StoredEntry.counsel`. No index, so no version block — read the `db.version(19)` comment. |
+| `web/src/storage/journal.ts` | `setCounsel`, `clearCounsel`, and `setRaw` marking an existing reading stale. |
+| `web/src/storage/index.ts` | Exports the new type. |
+| `web/src/pages/Entry.tsx` | The drawer under the entry. |
 | `web/src/pages/Entry.module.css` | Its styles. |
-| `web/src/storage/journal.ts` | Read-only — `addEntry` already takes `link`. |
-| `web/src/storage/db.ts` | Read-only — `EntryLink` already exists. |
-| `web/src/storage/repository.ts` | Read-only — `getBook`, for the book's name. |
 
-Tests beside each: `SelectionMenu.test.tsx`, `SpeakSheet.test.tsx`,
-`Entry.test.tsx`.
+Tests beside each: `counsel.test.ts`, `journal.test.ts`, `Entry.test.tsx`,
+`shape.test.ts` (unchanged behaviour through the new relay).
 
 Add a path here with a one-line reason before you open anything else.
 

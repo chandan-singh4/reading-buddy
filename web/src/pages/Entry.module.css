@@ -408,3 +408,120 @@
   color: var(--color-text);
   text-decoration-color: var(--color-accent);
 }
+
+/*
+ * The Counsel (WP-67) — a second voice on the entry.
+ *
+ * Set apart from everything above it by a rule and a wash, because what is in
+ * here is the only thing on this screen the reader did not say. A shape is
+ * their own words reordered and sits in their own type; this is someone else
+ * talking, and it is dressed as someone else talking.
+ */
+.counsel {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+/* The one line that shows while the drawer is shut: the angle the model chose.
+   A whole-width button, because the angle itself is the thing to press. */
+.counselHead,
+.counselAsk {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.counselHead:disabled,
+.counselAsk:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.counselAngle {
+  flex: 1 1 auto;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.counselMore {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-lg);
+  text-align: right;
+}
+
+.counselLede {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-family: var(--font-figure);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+/*
+ * The reading itself. The `--md-*` block is re-named for the same reason
+ * `.shapedProse` re-names it: `reader/markdown.module.css` is written for the
+ * tutor's dark lamp, and a caller on light paper gets pale cream headings
+ * without this.
+ */
+.counselProse {
+  --md-strong: var(--color-text);
+  --md-quiet: var(--color-text);
+  --md-faint: var(--color-text-muted);
+  --md-mark: var(--color-accent);
+  --md-link: var(--color-accent);
+  --md-code: var(--color-text);
+  --md-edge: var(--color-border);
+  --md-wash: var(--color-surface);
+  display: block;
+  margin-top: var(--space-3);
+  font-family: var(--font-reading);
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.counselProse [data-md='heading'] {
+  margin: 1.4em 0 0.4em;
+  font-family: var(--font-display);
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.counselProse [data-md='heading']:first-child { margin-top: 0; }
+.counselProse [data-md='paragraph'] { margin-bottom: 0.8em; }
+
+/* Who wrote it, and what it is not. Under every reading, not once in a
+   settings screen: a reader a month from now opens this and has to be able to
+   see what wrote it. */
+.counselFoot {
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-family: var(--font-figure);
+  font-size: var(--text-xs);
+}
+
+.counselActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}

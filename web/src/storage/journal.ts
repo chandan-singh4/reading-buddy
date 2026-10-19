@@ -15,6 +15,7 @@
 
 import {
   db as defaultDb,
+  type EntryCounsel,
   type EntryLink,
   type EntryShaped,
   type ReadingBuddyDB,
@@ -117,7 +118,40 @@ export function createEntryStore(database: ReadingBuddyDB = defaultDb) {
      * be able to see for itself that a shape is older than the words under it.
      */
     async setRaw(id: string, raw: string): Promise<void> {
-      await database.entries.update(id, { raw, editedAt: new Date().toISOString() })
+      /*
+       * Read first, because a reading has to be marked and Dexie's `update`
+       * cannot write a field that depends on the row it is writing to.
+       *
+       * The shape and the reading go stale in the same moment and are treated
+       * differently on purpose. `Entry.tsx` makes the shape again by itself:
+       * it is the same words in a better order, and the reader already asked
+       * for that order. An opinion is not the same words — remaking it spends
+       * a model call on an answer the reader did not ask for twice, and may
+       * come back saying something different. So it is marked, and the reader
+       * decides.
+       */
+      const row = await database.entries.get(id)
+      await database.entries.update(id, {
+        raw,
+        editedAt: new Date().toISOString(),
+        ...(row?.counsel ? { counsel: { ...row.counsel, stale: true } } : {}),
+      })
+    },
+
+    /**
+     * Keep a model's reading of the entry (WP-67).
+     *
+     * Beside the words, never over them, exactly as `setShaped` is. Writing a
+     * reading clears `stale`: this one was made from the words as they now
+     * stand.
+     */
+    async setCounsel(id: string, counsel: EntryCounsel): Promise<void> {
+      await database.entries.update(id, { counsel })
+    },
+
+    /** Throw the reading away. The words and the shape are untouched. */
+    async clearCounsel(id: string): Promise<void> {
+      await database.entries.update(id, { counsel: undefined })
     },
 
     /** Throw the shape away. The reader's own words are untouched. */

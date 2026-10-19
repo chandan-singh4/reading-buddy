@@ -17,6 +17,7 @@ import { repository as deviceRepository, type Repository } from './repository.ts
 export { DB_NAME, createDb } from './db.ts'
 export type {
   EntryLink,
+  EntryCounsel,
   EntryShaped,
   NoteAuthor,
   ReadingBuddyDB,

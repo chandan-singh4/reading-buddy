@@ -477,8 +477,13 @@
   shows the passage under the words and names the book by reading it. Jumping
   back to the exact line is not here: `Reader.tsx` reads no anchor off the
   URL, and that is its own piece of work.
-- [ ] **WP-67 A professional opinion on an entry** — one model, all the lens
-  briefs, and it says which lens it chose · *after 63*
+- [x] **WP-67 A professional opinion on an entry** — shipped 2026-10-19. One
+  all-round role, the Counsel, chosen over a shelf of lenses at the reader's
+  request. It picks its own angle from the entry and says which it picked,
+  because the frame is the opinion. Reads `raw`, never the shaped copy. Shut
+  by default under the entry, with the model's name and "not advice from a
+  professional" under every reading. A correction marks it stale and never
+  remakes it.
 - [ ] **WP-64 Tags and saved filters** — one stream, tags from the model,
   filters that read like notebooks · *after 62*
 - [ ] **WP-65 The split front door** — inhale and exhale, the lip, the bridge on

@@ -25,6 +25,14 @@
  * because a shape built from a sentence that no longer exists is worse than no
  * shape at all.
  *
+ * ## The Counsel is a second voice, and is drawn as one
+ *
+ * A shape is the reader's own words in a better order. A reading (WP-67) adds
+ * something they did not say, so it is never mixed into the entry: it sits in
+ * a drawer under everything else, shut until they open it, with the model's
+ * name and a plain line saying it is not professional advice under every
+ * reading rather than once in a settings screen.
+ *
  * ## Where it came from
  *
  * An entry told to the Scribe from a page carries the passage (WP-63). It is
@@ -44,7 +52,8 @@ import { entryStore, repository, type StoredEntry } from '../storage/index.ts'
 import { Markdown } from '../reader/markdown.tsx'
 import { modelName } from '../reader/tutor.ts'
 import { shapeMark } from '../journal/shapeMark.ts'
-import { LevelMark, VoiceMark } from '../journal/marks.tsx'
+import { CounselMark, LevelMark, VoiceMark } from '../journal/marks.tsx'
+import { askCounsel, COUNSEL_BLURB, COUNSEL_LABEL } from '../journal/counsel.ts'
 import {
   shapeEntry,
   SHAPE_BLURB,
@@ -77,6 +86,9 @@ export default function Entry() {
   const [draft, setDraft] = useState('')
   /** The name of the book an entry grew out of, when it grew out of one. */
   const [book, setBook] = useState('')
+  /** The reading is shut until the reader opens it — the entry is the screen. */
+  const [reading, setReading] = useState(false)
+  const [asking, setAsking] = useState(false)
 
   useEffect(() => {
     if (!entryId) {
@@ -150,6 +162,42 @@ export default function Entry() {
     } finally {
       setWorking(null)
     }
+  }
+
+  /**
+   * Ask for one reading of the entry, and store it beside the words (WP-67).
+   *
+   * It reads `raw` and not the shaped copy. An opinion on a model's rewrite of
+   * what the reader said is an opinion on the wrong text.
+   */
+  async function read() {
+    if (!entry || asking) return
+    setFailure('')
+    setAsking(true)
+    try {
+      const read = await askCounsel(entry.raw)
+      await entryStore.setCounsel(entry.id, {
+        ...(read.angle ? { angle: read.angle } : {}),
+        model: read.model,
+        at: new Date().toISOString(),
+        text: read.text,
+      })
+      const saved = await entryStore.getEntry(entry.id)
+      if (saved) setEntry(saved)
+      setReading(true)
+    } catch (error: unknown) {
+      setFailure(error instanceof Error ? error.message : 'That didn’t work just now.')
+    } finally {
+      setAsking(false)
+    }
+  }
+
+  async function dropCounsel() {
+    if (!entry) return
+    await entryStore.clearCounsel(entry.id)
+    const saved = await entryStore.getEntry(entry.id)
+    if (saved) setEntry(saved)
+    setReading(false)
   }
 
   /**
@@ -245,6 +293,7 @@ export default function Entry() {
    * stale copy that looks current is the one failure the reader cannot see.
    */
   const stale = Boolean(shaped && entry.editedAt)
+  const counsel = entry.counsel
 
   return (
     <div className={journal.page}>
@@ -453,6 +502,89 @@ export default function Entry() {
                   Not now
                 </button>
               )}
+            </>
+          )}
+        </section>
+      )}
+
+      {/*
+        * The Counsel (WP-67). Shut by default, and the angle is the one line
+        * that shows — the entry is the screen, and this is a second voice on
+        * it. The angle is what the model says it is doing, and it is shown
+        * whether or not the body is open, because the frame is the opinion.
+        */}
+      {!editing && (
+        <section className={entryStyles.counsel} aria-label="A reading of this entry">
+          {counsel ? (
+            <>
+              <button
+                type="button"
+                className={entryStyles.counselHead}
+                onClick={() => setReading((open) => !open)}
+                aria-expanded={reading}
+              >
+                <CounselMark className={entryStyles.creditMark} />
+                <span className={entryStyles.counselAngle}>
+                  {counsel.angle ?? 'One reading of your words'}
+                </span>
+                <span className={entryStyles.counselMore} aria-hidden="true">
+                  {reading ? '−' : '+'}
+                </span>
+              </button>
+              {reading && (
+                <>
+                  {counsel.stale && (
+                    <p className={entryStyles.aside}>
+                      This reading comes from your earlier words.
+                    </p>
+                  )}
+                  <Markdown text={counsel.text} className={entryStyles.counselProse} />
+                  {/*
+                    * Said every time the body is open, not once in a settings
+                    * screen. A reader a month from now opens this and has to
+                    * be able to see what wrote it.
+                    */}
+                  <p className={entryStyles.counselFoot}>
+                    {modelName(counsel.model)}. One reading, not advice from a professional.
+                  </p>
+                  <div className={entryStyles.counselActions}>
+                    <button
+                      type="button"
+                      className={entryStyles.quiet}
+                      disabled={asking}
+                      onClick={() => {
+                        void read()
+                      }}
+                    >
+                      {asking ? 'Reading…' : 'Read it again'}
+                    </button>
+                    <button
+                      type="button"
+                      className={entryStyles.quiet}
+                      onClick={() => {
+                        void dropCounsel()
+                      }}
+                    >
+                      Remove this reading
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={entryStyles.counselAsk}
+                disabled={asking}
+                onClick={() => {
+                  void read()
+                }}
+              >
+                <CounselMark className={entryStyles.creditMark} />
+                <span>{asking ? 'Reading your words…' : COUNSEL_LABEL}</span>
+              </button>
+              <p className={entryStyles.counselLede}>{COUNSEL_BLURB}</p>
             </>
           )}
         </section>

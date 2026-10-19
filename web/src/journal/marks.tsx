@@ -91,6 +91,26 @@ export function VoiceMark({ className }: MarkProps) {
   )
 }
 
+/**
+ * A second look at the words: spectacles.
+ *
+ * Deliberately not an eye and not a brain. An eye reads as surveillance, and a
+ * brain reads as a machine that knows better. Spectacles are a thing a person
+ * puts on to look again, which is the most this does.
+ */
+export function CounselMark({ className }: MarkProps) {
+  return frame(
+    <>
+      <circle cx="7" cy="14" r="3.5" />
+      <circle cx="17" cy="14" r="3.5" />
+      <path d="M10.5 14h3" />
+      <path d="M3.5 13 5 7.5h3" />
+      <path d="M20.5 13 19 7.5h-3" />
+    </>,
+    className,
+  )
+}
+
 /** The mark for one shape level. */
 export function LevelMark({ level, className }: MarkProps & { level: ShapeLevel }) {
   switch (level) {
