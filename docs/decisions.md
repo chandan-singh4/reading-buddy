@@ -3526,6 +3526,20 @@ survived, because it was in the cloud.
   (`app/updates.ts`), so a reader who has not accepted one runs code from
   before the auto re-shape. The mark serves them too, with no new build.
 
+## The three shapes live in a drawer, always (2026-10-19)
+
+- **REVERSAL.** The drawer used to stand open on an entry with no shape. The
+  reasoning was that three cards and a paragraph are the right size for the one
+  decision a blank entry offers.
+- **Reported from the phone:** on a new entry the block fills the screen and
+  there is nothing to close. The reader asked for the drawer twice, once for
+  each state, which is the same ask.
+- **So it is one code path: shut until the reader opens it.** The button says
+  "Give it a shape" before there is one and "Give it a different shape" after.
+- **"The entry is the screen" holds hardest on the entry just spoken.** That is
+  the moment the reader wants to read what they said, not choose a treatment
+  for it.
+
 ## A professional opinion is one all-round role, and it names its frame (2026-10-19)
 
 - **There is no specialist model. The specialisation is the prompt.** A shelf

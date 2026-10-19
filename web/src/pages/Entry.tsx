@@ -449,19 +449,24 @@ export default function Entry() {
       {failure && <p className={styles.error}>{failure}</p>}
 
       {/*
-        * A drawer once a shape exists, and open before one does. Three cards
-        * and two paragraphs is the right size for the one decision on a blank
-        * entry, and far too much room for a decision already made.
+        * A drawer, always, shut until the reader opens it.
+        *
+        * It used to stand open on an entry with no shape, on the reasoning
+        * that three cards and a paragraph were the right size for the one
+        * decision a blank entry offers. Reported from the phone: on a new
+        * entry the block fills the screen and there is nothing to close. The
+        * entry is the screen, and that holds hardest on the entry that has
+        * just been spoken.
         */}
       {!editing && (
         <section className={entryStyles.give} aria-label="Give these words a shape">
-          {shaped && !choosing ? (
+          {!choosing ? (
             <button
               type="button"
               className={entryStyles.giveToggle}
               onClick={() => setChoosing(true)}
             >
-              Give it a different shape
+              {shaped ? 'Give it a different shape' : 'Give it a shape'}
             </button>
           ) : (
             <>
@@ -493,15 +498,13 @@ export default function Entry() {
                   </button>
                 ))}
               </div>
-              {shaped && (
-                <button
-                  type="button"
-                  className={entryStyles.giveToggle}
-                  onClick={() => setChoosing(false)}
-                >
-                  Not now
-                </button>
-              )}
+              <button
+                type="button"
+                className={entryStyles.giveToggle}
+                onClick={() => setChoosing(false)}
+              >
+                Not now
+              </button>
             </>
           )}
         </section>

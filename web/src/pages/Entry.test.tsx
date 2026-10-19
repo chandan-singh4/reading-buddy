@@ -389,7 +389,10 @@ describe('Entry', () => {
 
     openEntry(entry.id)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Tidy/ }))
+    // The three cards live in a drawer now, on an unshaped entry too — the
+    // entry is the screen, and a new entry is the one that most needs it.
+    fireEvent.click(await screen.findByRole('button', { name: 'Give it a shape' }))
+    fireEvent.click(screen.getByRole('button', { name: /Tidy/ }))
 
     await waitFor(async () => {
       expect((await db.entries.get(entry.id))?.shaped?.level).toBe('tidy')
@@ -407,7 +410,8 @@ describe('Entry', () => {
     })
 
     openEntry(entry.id)
-    fireEvent.click(await screen.findByRole('button', { name: /Shape/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Give it a shape' }))
+    fireEvent.click(screen.getByRole('button', { name: /Shape/ }))
 
     await waitFor(async () => {
       expect((await db.entries.get(entry.id))?.shaped).toBeTruthy()
@@ -422,11 +426,30 @@ describe('Entry', () => {
     asked.mockRejectedValue(new Error('The free models are busy. Try again in a minute.'))
 
     openEntry(entry.id)
-    fireEvent.click(await screen.findByRole('button', { name: /Unpack/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Give it a shape' }))
+    fireEvent.click(screen.getByRole('button', { name: /Unpack/ }))
 
     expect(await screen.findByText(/The free models are busy/)).toBeTruthy()
     expect((await db.entries.get(entry.id))?.shaped).toBeUndefined()
     expect((await db.entries.get(entry.id))?.raw).toBe('a thought to shape')
+  })
+
+  it('keeps the three shapes shut on a new entry too', async () => {
+    // Reported from the phone: on a new entry the block filled the screen and
+    // there was nothing to close. The entry is the screen.
+    const entry = await entryStore.addEntry({ raw: 'a thought spoken a minute ago' })
+
+    openEntry(entry.id)
+
+    expect(await screen.findByRole('button', { name: 'Give it a shape' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Unpack/ })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Give it a shape' }))
+    expect(screen.getByRole('button', { name: /Unpack/ })).toBeTruthy()
+
+    // And it shuts again, which it never did before.
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    expect(screen.queryByRole('button', { name: /Unpack/ })).toBeNull()
   })
 
   it('removes a shape without touching the words', async () => {

@@ -484,6 +484,9 @@
   by default under the entry, with the model's name and "not advice from a
   professional" under every reading. A correction marks it stale and never
   remakes it.
+- [ ] **WP-68 Steer the Counsel, once** — a one-line nudge beside "Read it
+  again" ("from a Jungian angle"), used for that reading only and never stored
+  as a standing preference · *after 67*
 - [ ] **WP-64 Tags and saved filters** — one stream, tags from the model,
   filters that read like notebooks · *after 62*
 - [ ] **WP-65 The split front door** — inhale and exhale, the lip, the bridge on
@@ -601,3 +604,32 @@ all of it, on demand. Focus Mode quiets the interface; it doesn't amputate it.
 > "everything is still one gesture away" fall out naturally instead of needing to
 > be retrofitted per control. **The goal: less a content platform, more a quiet
 > reading desk.**
+
+## WP-68 — steer the Counsel, once
+
+Raised by the reader 2026-10-19, after using WP-67 on a real dream entry:
+
+> "Definitely was looking from a Carl Jung psychology perspective but that's
+> the thing — I don't want each journal entry to be analyzed from the same
+> perspective."
+
+Both halves of that are right, and together they rule out the two obvious
+builds. A fixed lens list makes every entry wear the same frame. Pure
+auto-choice gives the reader no say on the entry where they *do* know what they
+want.
+
+**The shape this should take.** The angle stays automatic by default, because
+most of the time the reader does not know what they are looking for — that is
+why they are writing. Beside "Read it again" there is one optional line the
+reader can type into: "from a Jungian angle", "as a decision", "tell me what I
+am avoiding". It is sent with that one request and is **not** stored as a
+standing preference, because a stored frame is the fixed lens list again,
+arrived at by accident.
+
+**What this is not.** Not a persona picker. Not a settings screen. One text
+field, used once, empty again next time.
+
+**Open question for the reader.** Should the angle the model chose be
+offered back as a starting point for the nudge — prefilled and editable — or
+should the field always start empty? Prefilling teaches the reader what kind
+of line works; an empty field does not steer them.
