@@ -47,6 +47,12 @@ function openSheet() {
   return render(<SpeakSheet open onClose={() => {}} />)
 }
 
+const LINK = {
+  bookId: 'book-1' as never,
+  anchor: 'c1/p4' as never,
+  quote: 'The map is not the territory.',
+}
+
 describe('SpeakSheet', () => {
   it('offers a box to type in before anything has been spoken', () => {
     openSheet()
@@ -98,5 +104,48 @@ describe('SpeakSheet', () => {
     openSheet()
 
     expect(screen.getByRole('button', { name: 'Keep' }).hasAttribute('disabled')).toBe(true)
+  })
+
+  // WP-63 — the same sheet, told to the Scribe from a page.
+  describe('from a book', () => {
+    it('shows the passage, so the reader can see what they are answering', () => {
+      render(<SpeakSheet open onClose={() => {}} link={LINK} />)
+
+      // The sheet covers the page the passage is on. Without this the reader
+      // is speaking about a sentence they can no longer see.
+      expect(screen.getByText('The map is not the territory.')).toBeTruthy()
+      expect(screen.getByRole('dialog', { name: 'Tell the Scribe' })).toBeTruthy()
+    })
+
+    it('ties the saved entry to the passage', async () => {
+      heard.settled = 'this is the thing i keep forgetting'
+      render(<SpeakSheet open onClose={() => {}} link={LINK} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+
+      await waitFor(async () => {
+        expect(await db.entries.count()).toBe(1)
+      })
+      const [row] = await db.entries.toArray()
+      expect(row?.raw).toBe('this is the thing i keep forgetting')
+      // The book's own words, copied — a re-parse moves offsets and does not
+      // move words.
+      expect(row?.link).toEqual(LINK)
+    })
+
+    it('keeps an entry spoken from the journal free of a book', async () => {
+      heard.settled = 'a thought from nowhere'
+      openSheet()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+
+      await waitFor(async () => {
+        expect(await db.entries.count()).toBe(1)
+      })
+      const [row] = await db.entries.toArray()
+      // Absent, not present-and-empty: `link.bookId` is an index, and a row
+      // whose indexed field holds nothing is a row in that index.
+      expect(row && 'link' in row).toBe(false)
+    })
   })
 })

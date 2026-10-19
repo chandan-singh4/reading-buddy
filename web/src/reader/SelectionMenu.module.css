@@ -325,6 +325,13 @@ body:has([data-page-sheet]) .card {
   background: var(--color-accent-wash);
 }
 
+/* Two rows in the block now — Veda, then the Scribe — so they need a line
+   between them. Hairline rather than a full border: they are two doors out of
+   the same wall, not two sections. */
+.ask > button + button {
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
 /*
  * One row, bronze and letterspaced — the study lamp's own colour, on purpose:
  * the entry previews the room it opens, whatever theme the page is wearing.

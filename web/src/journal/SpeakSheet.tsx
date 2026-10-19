@@ -6,8 +6,18 @@
  * down is the friction this feature exists to remove.
  *
  * What is saved is the raw transcript and nothing else. No audio is stored —
- * there is none to store, because the recogniser returns words. The shaping
- * models are WP-62; a tie to a passage is WP-63.
+ * there is none to store, because the recogniser returns words.
+ *
+ * ## Told to the Scribe, from a book (WP-63)
+ *
+ * The same sheet serves both doors. Given a `link` it rises over the page the
+ * reader is holding, shows the passage above the circle, and ties it to the
+ * entry — so the one difference between a thought from nowhere and a thought
+ * about a sentence is the sentence.
+ *
+ * The passage is shown because the reader is about to speak about it and will
+ * have lost the words behind the sheet. It is not editable: the book's words
+ * are the book's, and `EntryLink.quote` is a copy that is never edited.
  *
  * ## The words are editable the moment the reader stops
  *
@@ -24,8 +34,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
-import { entryStore, type StoredEntry } from '../storage/index.ts'
+import { entryStore, type EntryLink, type StoredEntry } from '../storage/index.ts'
 import { useDictation, type DictationFault } from './useDictation.ts'
 import { useWakeLock } from './useWakeLock.ts'
 import styles from './SpeakSheet.module.css'
@@ -41,14 +52,31 @@ const FAULT_WORDS: Record<DictationFault, string> = {
 
 const BAR_COUNT = 9
 
+/** As much of the passage as is a reminder rather than a second page. */
+const QUOTE_LIMIT = 220
+
+function elide(quote: string): string {
+  const words = quote.trim().replace(/\s+/g, ' ')
+  if (words.length <= QUOTE_LIMIT) return words
+  // Cut at a word, not mid-word. A hard slice reads as a bug.
+  const cut = words.slice(0, QUOTE_LIMIT)
+  const space = cut.lastIndexOf(' ')
+  return `${(space > QUOTE_LIMIT - 40 ? cut.slice(0, space) : cut).trimEnd()}…`
+}
+
 export interface SpeakSheetProps {
   open: boolean
   onClose: () => void
   /** Called with the saved row, so a list can show it without re-reading. */
   onSaved?: (entry: StoredEntry) => void
+  /**
+   * The passage this entry grows out of, when it grows out of one (WP-63).
+   * Absent for an entry spoken from the journal, which is most of them.
+   */
+  link?: EntryLink
 }
 
-export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) {
+export default function SpeakSheet({ open, onClose, onSaved, link }: SpeakSheetProps) {
   const { settled, guess, listening, supported, fault, start, stop, replace, reset } =
     useDictation()
   /*
@@ -158,6 +186,7 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
       const row = await entryStore.addEntry({
         raw: words,
         at: startedAtRef.current ?? new Date(),
+        ...(link ? { link } : {}),
       })
       onSaved?.(row)
       onClose()
@@ -169,7 +198,16 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
     }
   }
 
-  return (
+  /*
+   * Portalled to the body, as the study lamp is.
+   *
+   * The scrim is `position: fixed`, and the reader page scales its column box
+   * with a transform when the toolbar comes up. "Fixed" inside a transformed
+   * box is fixed to *that box*, not to the screen — see the long note in
+   * `Reader.module.css`. A sheet rendered in place would be scaled and
+   * clipped with the page it rose over.
+   */
+  return createPortal(
     <div
       className={styles.scrim}
       // Only when the tap is on the scrim itself: a tap that began inside the
@@ -178,14 +216,27 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
         if (event.target === event.currentTarget) closeIfEmpty()
       }}
     >
-      <div className={styles.sheet} role="dialog" aria-modal="true" aria-label="Speak a thought">
+      <div
+        className={styles.sheet}
+        role="dialog"
+        aria-modal="true"
+        aria-label={link ? 'Tell the Scribe' : 'Speak a thought'}
+      >
         <span className={styles.handle} aria-hidden="true" />
 
         <div className={styles.head}>
-          <h2 className={styles.title}>Speak a thought</h2>
+          <h2 className={styles.title}>{link ? 'Tell the Scribe' : 'Speak a thought'}</h2>
           {listening && <span className={styles.awake}>Screen stays awake</span>}
           <span className={styles.timer}>{clock(seconds)}</span>
         </div>
+
+        {/*
+         * The passage, when there is one. The sheet covers the page it came
+         * from, so without this the reader is speaking about a sentence they
+         * can no longer see. Elided rather than scrolled: this is a reminder
+         * of what they are holding, not the book.
+         */}
+        {link && <blockquote className={styles.quote}>{elide(link.quote)}</blockquote>}
 
         {!supported && <p className={styles.fault}>{FAULT_WORDS.unsupported}</p>}
         {supported && fault && <p className={styles.fault}>{FAULT_WORDS[fault]}</p>}
@@ -262,7 +313,8 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
           </span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

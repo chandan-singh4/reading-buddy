@@ -141,6 +141,7 @@ import type {
   SectionPath,
 } from '../structure/index.ts'
 import { Opening } from './Opening.tsx'
+import SpeakSheet from '../journal/SpeakSheet.tsx'
 import styles from './Reader.module.css'
 
 /** No section read yet, so every mark falls back to its section's opening page. */
@@ -2945,6 +2946,13 @@ export default function Reader() {
    */
   const [selected, setSelected] = useState<ReaderSelection | null>(null)
   const [composing, setComposing] = useState<ReaderSelection | null>(null)
+  /*
+   * The passage being told to the Scribe (WP-63). Held apart from `selected`
+   * for the reason `composing` is: the sheet takes the selection away the
+   * moment it opens, and an entry must not lose the sentence it is about
+   * while it is being spoken.
+   */
+  const [telling, setTelling] = useState<ReaderSelection | null>(null)
 
   /**
    * The one-line "not built yet" note.
@@ -3884,6 +3892,14 @@ export default function Reader() {
           setComposing(at)
           break
 
+        case 'scribe':
+          // Over the page, not away from it. A book is where an entry is born;
+          // the journal is where it is read. The sheet drops and reading
+          // carries on — see `decisions.md`, "The book's journal action is not
+          // called 'speak'".
+          setTelling(at)
+          break
+
         case 'copy':
           void navigator.clipboard?.writeText(at.text)
           break
@@ -4644,7 +4660,7 @@ export default function Reader() {
             onHold={holdMark}
           />
 
-          {selected && !composing && (
+          {selected && !composing && !telling && (
             <SelectionMenu
               selection={selected}
               onAction={onSelectionAction}
@@ -4671,6 +4687,23 @@ export default function Reader() {
               }}
               onCancel={() => {
                 setComposing(null)
+                dropSelection()
+              }}
+            />
+          )}
+
+          {/*
+            * Told to the Scribe. The entry carries the book, the paragraph and
+            * the book's own words — `quote` is a copy, for the reason
+            * `StoredNote.quote` is one: a re-parse moves offsets and does not
+            * move words.
+            */}
+          {telling && id && (
+            <SpeakSheet
+              open
+              link={{ bookId: id, anchor: telling.anchor, quote: telling.text }}
+              onClose={() => {
+                setTelling(null)
                 dropSelection()
               }}
             />

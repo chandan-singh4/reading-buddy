@@ -215,6 +215,58 @@ describe('Entry', () => {
     expect(await db.entries.get(entry.id)).toBeTruthy()
   })
 
+  // WP-63 — an entry told to the Scribe from a page.
+  it('shows the passage it grew from, and names the book', async () => {
+    await db.books.put({
+      id: 'book-1' as never,
+      title: 'Science and Sanity',
+      source: 'epub' as never,
+      type: 'nonfiction' as never,
+    } as never)
+    const entry = await entryStore.addEntry({
+      raw: 'this is the thing i keep forgetting',
+      link: {
+        bookId: 'book-1' as never,
+        anchor: 'c1/p4' as never,
+        quote: 'The map is not the territory.',
+      },
+    })
+
+    openEntry(entry.id)
+
+    expect(await screen.findByText('The map is not the territory.')).toBeTruthy()
+    // Named by reading the book, not by a copy of its title — a renamed book
+    // must not leave a wrong name on the entry.
+    expect(await screen.findByRole('link', { name: 'Science and Sanity' })).toBeTruthy()
+  })
+
+  it('keeps the passage readable after the book is deleted', async () => {
+    // `decisions.md`: a highlight dies with its book, because it is part of
+    // the book. A thought the reader had while reading is not.
+    const entry = await entryStore.addEntry({
+      raw: 'the thought outlives the book',
+      link: {
+        bookId: 'a-book-long-gone' as never,
+        anchor: 'c1/p4' as never,
+        quote: 'The map is not the territory.',
+      },
+    })
+
+    openEntry(entry.id)
+
+    expect(await screen.findByText('The map is not the territory.')).toBeTruthy()
+    expect(await screen.findByText('A book that is no longer on the shelf')).toBeTruthy()
+  })
+
+  it('says nothing about a book for an entry that came from none', async () => {
+    const entry = await entryStore.addEntry({ raw: 'a thought from nowhere' })
+
+    openEntry(entry.id)
+
+    await screen.findByText('a thought from nowhere')
+    expect(screen.queryByLabelText('The passage this came from')).toBeNull()
+  })
+
   it('says so when the entry is not there', async () => {
     openEntry('an-id-that-was-never-written')
 

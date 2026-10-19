@@ -3448,6 +3448,26 @@ survived, because it was in the cloud.
 - **A sheet rises over the page.** The entry saves, the sheet drops, and reading
   carries on. A book is where an entry is born. The journal is where it is read.
 
+### As built, 2026-10-19
+
+- **The two doors share a block, a size and a colour.** Veda is listed first,
+  because a passage is usually not understood before it is answered. The Scribe
+  is no smaller: a thought the reader already has is worth no less than a
+  question they cannot answer.
+- **One sheet serves both doors.** `SpeakSheet` takes an optional `link`.
+- **The passage shows in the sheet.** The sheet covers the page it came from.
+- **The passage shows under the entry, not above it.** On the sheet the passage
+  was the reason to speak and the reader's words did not exist yet. On the entry
+  screen the words are the content, and the passage is the footnote to them.
+- **The book is named by reading it, never by a stored copy of its title.** A
+  renamed book would otherwise leave a wrong name on an entry.
+- **The sheet is portalled to the body.** The reader page scales its column box
+  with a transform, and `position: fixed` inside a transform is fixed to that
+  box. See the long note in `Reader.module.css`.
+- **No jump back to the line, yet.** `Reader.tsx` reads no anchor off the URL.
+  The entry links to the book and does not promise the passage. A link that
+  lands somewhere else is worse than no link.
+
 ## Tidy repairs grammar, it does not only punctuate (2026-10-19)
 
 - **REVERSAL.** The 2026-10-18 rule "*Tidy* adds punctuation and paragraphs, and

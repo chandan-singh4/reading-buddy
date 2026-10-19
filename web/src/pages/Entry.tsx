@@ -25,6 +25,13 @@
  * because a shape built from a sentence that no longer exists is worse than no
  * shape at all.
  *
+ * ## Where it came from
+ *
+ * An entry told to the Scribe from a page carries the passage (WP-63). It is
+ * shown under the entry, not above it: the reader's answer is the content and
+ * the book's sentence is the footnote. The book is named by reading it, not by
+ * a copy of its title, so renaming a book does not leave a wrong name here.
+ *
  * When that re-shape fails — or never ran, because an installed app is still on
  * an older build — the entry carries `editedAt` and the credit line says the
  * shaped copy comes from earlier words. One press makes it again.
@@ -33,7 +40,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
-import { entryStore, type StoredEntry } from '../storage/index.ts'
+import { entryStore, repository, type StoredEntry } from '../storage/index.ts'
 import { Markdown } from '../reader/markdown.tsx'
 import { modelName } from '../reader/tutor.ts'
 import { shapeMark } from '../journal/shapeMark.ts'
@@ -68,6 +75,8 @@ export default function Entry() {
    *  thing to the reader asking for a shape. */
   const [remaking, setRemaking] = useState(false)
   const [draft, setDraft] = useState('')
+  /** The name of the book an entry grew out of, when it grew out of one. */
+  const [book, setBook] = useState('')
 
   useEffect(() => {
     if (!entryId) {
@@ -86,6 +95,29 @@ export default function Entry() {
       cancelled = true
     }
   }, [entryId])
+
+  /*
+   * The book's name, for an entry told to the Scribe from a page (WP-63).
+   *
+   * Read separately rather than stored on the entry, because a book can be
+   * renamed and a copy of its title would then be wrong. A book that has been
+   * deleted leaves this empty, and the passage still reads — `decisions.md`
+   * says the thought outlives the book.
+   */
+  const bookId = entry && entry !== null ? entry.link?.bookId : undefined
+  useEffect(() => {
+    if (!bookId) {
+      setBook('')
+      return
+    }
+    let cancelled = false
+    void repository.getBook(bookId).then((meta) => {
+      if (!cancelled) setBook(meta?.title ?? '')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [bookId])
 
   /**
    * Ask a model for one shape, then store it beside the raw words.
@@ -341,6 +373,28 @@ export default function Entry() {
             </>
           )}
         </p>
+      )}
+
+      {/*
+        * Where the thought came from, when it came from a page (WP-63). Under
+        * the entry and under the credit line, because the reader's own words
+        * are the content and the passage is the footnote to them — the other
+        * way round on the sheet where the entry was spoken, where the passage
+        * was the reason to speak and the words did not exist yet.
+        */}
+      {!editing && entry.link && (
+        <section className={entryStyles.from} aria-label="The passage this came from">
+          <blockquote className={entryStyles.fromQuote}>{entry.link.quote}</blockquote>
+          <p className={entryStyles.fromBook}>
+            {book ? (
+              <Link to={`/book/${entry.link.bookId}`} className={entryStyles.fromLink}>
+                {book}
+              </Link>
+            ) : (
+              'A book that is no longer on the shelf'
+            )}
+          </p>
+        </section>
       )}
 
       {failure && <p className={styles.error}>{failure}</p>}

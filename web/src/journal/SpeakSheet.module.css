@@ -70,6 +70,27 @@
   background: var(--color-surface-raised);
 }
 
+/*
+ * The passage the entry grows out of (WP-63).
+ *
+ * Set *behind* the reader's own words on purpose: smaller, quieter, and held
+ * off by a rule down its edge. The book's sentence is the reason the sheet
+ * opened, and the reader's answer to it is still the content.
+ */
+.quote {
+  flex: 0 0 auto;
+  max-height: 7rem;
+  overflow-y: auto;
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-accent);
+  color: var(--color-text-muted);
+  font-family: var(--font-reading);
+  font-size: var(--text-sm);
+  font-style: italic;
+  line-height: 1.5;
+}
+
 /* The transcript. Settled words are the reader's; the guess is not yet. */
 .transcript {
   flex: 1 1 auto;

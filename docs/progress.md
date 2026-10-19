@@ -299,8 +299,41 @@ current shape must never read as stale because of it.
 Tags are **not** in this waypoint. `decisions.md` says Shape proposes tags, and
 WP-64 is where they land, with the saved filters that make them useful.
 
-**Next: WP-63, Tell the Scribe, from the book.** After that WP-65 unblocks and
-the split front door can be built.
+**WP-63 · Tell the Scribe, from the book — shipped 2026-10-19.** A passage can
+now become an entry.
+
+"Tell the Scribe" sits beside "Ask Veda" in the selection menu, the same size
+and the same bronze. One asks a question of the book. The other says something
+about it. The speak sheet rises over the page with the passage shown above the
+circle — the sheet covers the words it is about, so without that the reader is
+answering a sentence they can no longer see.
+
+The saved row carries `link`: the book, the paragraph's anchor, and the book's
+own words copied. A copy, for the reason `StoredNote.quote` is one — a re-parse
+moves offsets and does not move words.
+
+Three things worth knowing about how it is built.
+
+1. **The sheet is one component, not two.** `SpeakSheet` takes an optional
+   `link`. Given one it changes its name, shows the passage, and ties the
+   entry. That is the whole difference between a thought from nowhere and a
+   thought about a sentence.
+2. **It is portalled to the body now.** The reader page scales its column box
+   with a transform when the toolbar comes up, and `position: fixed` inside a
+   transformed box is fixed to *that box*. A sheet rendered in place would be
+   scaled and clipped with the page it rose over. The study lamp already
+   portals for the same reason.
+3. **The entry screen names the book by reading it**, not from a copy of the
+   title. A renamed book must not leave a wrong name on an entry. A deleted
+   book leaves the passage readable and says the book is no longer on the
+   shelf — the thought outlives the book.
+
+**Not in it: jumping back to the line.** `Reader.tsx` reads no anchor off the
+URL, so the entry links to the book and does not promise the passage. Giving
+the reader route a deep link is its own piece of work.
+
+**Next: WP-67, a professional opinion on an entry.** Then WP-65, the split
+front door, which WP-63 has now unblocked.
 
 **WP-22 · `learner.md` adaptive model.** Held, by the reader's choice, while
 the journal is built.

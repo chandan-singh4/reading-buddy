@@ -47,6 +47,7 @@ export type SelectionAction =
   | { kind: 'search' }
   | { kind: 'speak' }
   | { kind: 'ask' }
+  | { kind: 'scribe' }
 
 export interface SelectionMenuProps {
   selection: ReaderSelection
@@ -159,6 +160,8 @@ const ICONS = {
   sentence: 'M4 12h11M19.8 12a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 1 1 2.4 0',
   paragraph: 'M5 6h14M5 12h14M5 18h8',
   spark: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z',
+  // A nib on its stem, and the line it leaves. The journal's own mark.
+  scribe: 'M19 4c-6 1-9 4-10 10l-2 2 4 1 1-3c4-1 6-4 7-10zM5 20h7',
   chevron: 'M9 6l6 6-6 6',
   back: 'M15 6l-6 6 6 6',
 }
@@ -717,11 +720,16 @@ export function SelectionMenu({
         ))}
       </ul>
 
-      {/* The tutor's way in, kept apart and dressed in its own bronze because
-          it does something the rest of the menu does not: it starts a
-          conversation. One entry, not four — the choices (explain, quiz,
-          discuss…) belong under the study lamp, where there is room to read
-          them against the passage. */}
+      {/* The two ways out of the book and into a model, kept apart from the
+          rest of the menu and dressed in their own bronze because they do
+          something the four rows above do not: they open a room.
+
+          One asks a question of the book. The other says something about it.
+          Veda is first because a passage is usually not understood before it
+          is answered — but the Scribe is the same size and the same colour,
+          because a thought the reader already has is worth no less than a
+          question they cannot answer. See `decisions.md`, "The book's journal
+          action is not called 'speak'". */}
       <div className={styles.ask}>
         <button
           type="button"
@@ -732,6 +740,16 @@ export function SelectionMenu({
         >
           <Icon path={ICONS.spark} filled />
           <span>Ask Veda</span>
+        </button>
+        <button
+          type="button"
+          data-item
+          role="menuitem"
+          className={styles.askHeader}
+          onClick={() => act({ kind: 'scribe' })}
+        >
+          <Icon path={ICONS.scribe} />
+          <span>Tell the Scribe</span>
         </button>
       </div>
       </div>

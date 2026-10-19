@@ -6,49 +6,54 @@ it.
 
 ## Task
 
-**WP-60 — speak an entry.** The first slice of the journal.
+**WP-63 — Tell the Scribe, from the book.** The passage becomes an entry.
 
-The reader holds a circle and talks. The words appear as they speak. The screen
-stays awake. The app saves the raw transcript and nothing else.
+The reader holds a passage. The selection menu offers "Tell the Scribe" beside
+"Ask Veda". A sheet rises over the page, they speak, and the entry saves with
+the passage tied to it. The sheet drops and reading carries on.
 
-**Done when all five are true.**
+**The design is settled.** `decisions.md` → "The book's journal action is not
+called 'speak'" (2026-10-18). Do not re-open it.
 
-1. A circle starts and stops the recogniser.
-2. The words appear live. A guess shows grey. A settled phrase turns black and
-   gains its punctuation.
-3. The screen does not go dark while the reader speaks.
-4. The recogniser starts again by itself after a silence, until the reader
-   stops it.
-5. The entry saves to Dexie v20 `entries`, with `raw`, `at` and `id`. No audio
-   is stored.
+- The action is **"Tell the Scribe"**, not "speak" — `speak` already means Read
+  aloud in the selection menu.
+- It sits **beside "Ask Veda"**, set apart in the same way. One asks a
+  question. The other makes a statement.
+- A **sheet over the page**, not a screen. A book is where an entry is born.
+  The journal is where it is read.
 
-**Out of this slice.** The shaping models (WP-62), the book link (WP-63), tags
-(WP-64) and the front door (WP-65). The journal list screen is WP-61. For now,
-one saved entry may be proved from the console.
+**Done when all four are true.**
 
-**The app has never listened.** `narrator/` and `reader/readAloud.ts` only
-speak. There is no microphone code in `web/src`.
+1. The selection menu shows "Tell the Scribe" in the same block as "Ask Veda".
+2. It opens the speak sheet over the page, with the held passage shown in it.
+3. The saved row carries `link` — `bookId`, `anchor` and the `quote`, copied.
+4. The entry screen shows the passage the entry grew from, and names the book.
 
-**The design is settled.** Read `decisions.md` at the seven headings dated
-2026-10-18, and `architecture.md` at "The journal (WP-60 onward)". Do not
-re-open those choices.
+**Out of this slice.**
 
-### Files in scope — as built, 2026-10-18
+- **Jumping back to the exact passage.** `Reader.tsx` reads no anchor off the
+  URL, and giving it one is its own piece of work. The entry links to the book;
+  it does not promise the line.
+- The journal card's book mark (every card would need a book read).
+- Tags (WP-64), the front door (WP-65), the backup (WP-66), readings (WP-67).
+
+### Files in scope
 
 | Path | What it does |
 |---|---|
-| `web/src/journal/useDictation.ts` | **new.** Wraps the Web Speech API. Keeps the settled words apart from the guess, and starts the recogniser again after a silence. |
-| `web/src/journal/useWakeLock.ts` | **new.** Holds the screen awake, and asks again when the page comes back. |
-| `web/src/journal/SpeakSheet.tsx` | **new.** The sheet: circle, live transcript, timer, Keep and Discard. |
-| `web/src/journal/SpeakSheet.module.css` | **new.** Its styles, on the theme tokens. |
-| `web/src/storage/journal.ts` | **new.** `addEntry`, `listEntries`, `getEntry`, `deleteEntry`. |
-| `web/src/storage/db.ts` | `StoredEntry`, `EntryShaped`, `EntryLink`, the `entries` table and `db.version(20)`. |
-| `web/src/storage/index.ts` | Exports the new store and types. |
-| `web/src/pages/Journal.tsx` | **new.** The `/journal` route. Almost nothing: a way in, and the list. WP-61 replaces the body. |
-| `web/src/pages/Journal.module.css` | **new.** Its styles. |
-| `web/src/App.tsx` | The `journal` route, outside `AppShell`. |
-| `web/src/pages/Home.tsx` | One link, "Or speak a thought". WP-65 replaces it with both doors. |
-| `web/src/pages/Home.module.css` | `.toJournal`. |
+| `web/src/reader/SelectionMenu.tsx` | `SelectionAction` gains `scribe`; the button goes in the `.ask` block. |
+| `web/src/reader/SelectionMenu.module.css` | `.ask` holds two rows now, not one. |
+| `web/src/journal/SpeakSheet.tsx` | Takes an optional `link`, shows the passage, saves the tie. |
+| `web/src/journal/SpeakSheet.module.css` | `.quote`. |
+| `web/src/pages/Reader.tsx` | `case 'scribe'`, the `telling` state, and the sheet. Follows `composing`/`NoteComposer` exactly — the sheet must outlive the selection. |
+| `web/src/pages/Entry.tsx` | Shows `entry.link` under the entry. |
+| `web/src/pages/Entry.module.css` | Its styles. |
+| `web/src/storage/journal.ts` | Read-only — `addEntry` already takes `link`. |
+| `web/src/storage/db.ts` | Read-only — `EntryLink` already exists. |
+| `web/src/storage/repository.ts` | Read-only — `getBook`, for the book's name. |
+
+Tests beside each: `SelectionMenu.test.tsx`, `SpeakSheet.test.tsx`,
+`Entry.test.tsx`.
 
 Add a path here with a one-line reason before you open anything else.
 

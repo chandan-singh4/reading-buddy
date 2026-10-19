@@ -470,8 +470,15 @@
   in `api/tutor.ts`. `journal/shape.ts` makes the call. `storage/journal.ts`
   gains `setShaped` and `clearShaped`, and has no path that writes `raw`.
   Tags are not here: WP-64 still owns them. Waiting on the reader to try it.
-- [ ] **WP-63 Tell the Scribe, from the book** — a selection-menu action, a
-  sheet over the page, the entry tied to the passage · *after 61*
+- [x] **WP-63 Tell the Scribe, from the book** — shipped 2026-10-19. "Tell the
+  Scribe" sits beside "Ask Veda" in the selection menu. The speak sheet rises
+  over the page with the passage in it, and the saved entry carries `link` —
+  the book, the paragraph, and the book's own words copied. The entry screen
+  shows the passage under the words and names the book by reading it. Jumping
+  back to the exact line is not here: `Reader.tsx` reads no anchor off the
+  URL, and that is its own piece of work.
+- [ ] **WP-67 A professional opinion on an entry** — one model, all the lens
+  briefs, and it says which lens it chose · *after 63*
 - [ ] **WP-64 Tags and saved filters** — one stream, tags from the model,
   filters that read like notebooks · *after 62*
 - [ ] **WP-65 The split front door** — inhale and exhale, the lip, the bridge on
