@@ -7,7 +7,8 @@
  * for a journal with four entries in it.
  *
  * A card shows the shaped words when a shape exists, because that is the
- * readable copy, and says so on the card. The raw words are never gone — the
+ * readable copy, and says so on the card. Those words are markdown, so the
+ * card strips the marks off them — see `journal/plain.ts`. The raw words are never gone — the
  * entry screen keeps both, side by side.
  *
  * Outside `AppShell`, like the reading screen, and not a fifth tab in the swipe
@@ -18,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
+import { plainWords } from '../journal/plain.ts'
 import { shapeMark } from '../journal/shapeMark.ts'
 import SpeakSheet from '../journal/SpeakSheet.tsx'
 import { entryStore, type StoredEntry } from '../storage/index.ts'
@@ -76,7 +78,12 @@ export default function Journal() {
               <li key={entry.id}>
                 <Link to={`/journal/${entry.id}`} className={journal.entry}>
                   {entry.title && <span className={journal.entryTitle}>{entry.title}</span>}
-                  <p className={journal.snippet}>{entry.shaped?.text ?? entry.raw}</p>
+                  {/* Words, never notation. A card has three lines, and
+                      `## Dream recollection` spends one of them on a mark the
+                      reader did not write and cannot read. */}
+                  <p className={journal.snippet}>
+                    {entry.shaped ? plainWords(entry.shaped.text) : entry.raw}
+                  </p>
                   <span className={journal.meta}>
                     <time dateTime={entry.at}>{clock(entry.at)}</time>
                     <span className={journal.dot} aria-hidden="true" />

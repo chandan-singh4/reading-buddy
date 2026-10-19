@@ -278,6 +278,14 @@ the way to the other copy. The three shape cards are a drawer that opens on
 "Give it a different shape", and they stay open only while the entry has no
 shape at all.
 
+**A card shows words, not notation — 2026-10-19.** The shaped copy is
+markdown, so a card on the journal list opened with `## Dream recollection`.
+`journal/plain.ts` takes the marks off for the one place that has no room to
+render them. It drops heading lines, because a label costs a third of a
+three-line preview and says less than the sentence it labels — unless headings
+are all there is, when it keeps them. It is not a parser and must not become
+one: `reader/markdown.tsx` renders markdown everywhere there is room.
+
 Tags are **not** in this waypoint. `decisions.md` says Shape proposes tags, and
 WP-64 is where they land, with the saved filters that make them useful.
 

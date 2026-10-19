@@ -41,6 +41,25 @@ function openJournal() {
 }
 
 describe('Journal', () => {
+  it('shows the words of a shaped entry, not its markdown', async () => {
+    await entryStore.addEntry({ raw: 'i had a dream last night' })
+    const [row] = await db.entries.toArray()
+    await db.entries.update(row!.id, {
+      title: 'Dream notes',
+      shaped: {
+        level: 'unpack',
+        model: 'a-free-model',
+        at: '2026-10-19T21:30:00.000Z',
+        text: '## Dream recollection\n\nI had a dream last night.',
+      },
+    })
+
+    openJournal()
+
+    expect(await screen.findByText('I had a dream last night.')).toBeTruthy()
+    expect(screen.queryByText(/##/)).toBeNull()
+  })
+
   it('says so plainly when there is nothing yet', async () => {
     openJournal()
     expect(await screen.findByText('Nothing yet')).toBeTruthy()
