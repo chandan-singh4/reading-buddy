@@ -465,8 +465,11 @@
   `/journal/:entryId`, with the pair switch and a two-press delete. The switch
   shows only when a shape exists, so WP-62 lights it up with no more layout
   work. Waiting on the reader to try it on the phone.
-- [ ] **WP-62 Give the words a shape** — Tidy, Shape and Unpack, on a free
-  model, raw untouched · *after 61*
+- [~] **WP-62 Give the words a shape** — Tidy, Shape and Unpack, on a free
+  model, raw untouched · *after 61* — **built 2026-10-19.** Three task modules
+  in `api/tutor.ts`. `journal/shape.ts` makes the call. `storage/journal.ts`
+  gains `setShaped` and `clearShaped`, and has no path that writes `raw`.
+  Tags are not here: WP-64 still owns them. Waiting on the reader to try it.
 - [ ] **WP-63 Tell the Scribe, from the book** — a selection-menu action, a
   sheet over the page, the entry tied to the passage · *after 61*
 - [ ] **WP-64 Tags and saved filters** — one stream, tags from the model,

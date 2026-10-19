@@ -8,18 +8,27 @@
 // fails if a single press can delete them.
 import 'fake-indexeddb/auto'
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, type EntryShaped } from '../storage/db.ts'
+import { shapeEntry } from '../journal/shape.ts'
 import { entryStore } from '../storage/index.ts'
 import Entry from './Entry.tsx'
+
+vi.mock('../journal/shape.ts', async () => {
+  const real = await vi.importActual<typeof import('../journal/shape.ts')>('../journal/shape.ts')
+  return { ...real, shapeEntry: vi.fn() }
+})
+
+const asked = vi.mocked(shapeEntry)
 
 afterEach(cleanup)
 
 beforeEach(async () => {
   await db.entries.clear()
+  asked.mockReset()
 })
 
 const TIDY: EntryShaped = {
@@ -106,5 +115,65 @@ describe('Entry', () => {
     openEntry('an-id-that-was-never-written')
 
     expect(await screen.findByText('That entry is gone')).toBeTruthy()
+  })
+
+  it('offers the three shapes, and stores the one the reader picks', async () => {
+    const entry = await entryStore.addEntry({ raw: 'um so the thing is i was thinking' })
+    asked.mockResolvedValue({ text: 'So the thing is, I was thinking.', model: 'a-free-model' })
+
+    openEntry(entry.id)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Tidy/ }))
+
+    await waitFor(async () => {
+      expect((await db.entries.get(entry.id))?.shaped?.level).toBe('tidy')
+    })
+    expect(asked).toHaveBeenCalledWith('tidy', 'um so the thing is i was thinking')
+    expect(await screen.findByText('So the thing is, I was thinking.')).toBeTruthy()
+  })
+
+  it('never writes over the reader’s own words', async () => {
+    const entry = await entryStore.addEntry({ raw: 'um so the thing is i was thinking' })
+    asked.mockResolvedValue({
+      text: 'So the thing is, I was thinking.',
+      model: 'a-free-model',
+      title: 'A thought',
+    })
+
+    openEntry(entry.id)
+    fireEvent.click(await screen.findByRole('button', { name: /Shape/ }))
+
+    await waitFor(async () => {
+      expect((await db.entries.get(entry.id))?.shaped).toBeTruthy()
+    })
+    // The whole promise of the feature, in one assertion.
+    expect((await db.entries.get(entry.id))?.raw).toBe('um so the thing is i was thinking')
+    expect((await db.entries.get(entry.id))?.title).toBe('A thought')
+  })
+
+  it('keeps the words when the model will not answer', async () => {
+    const entry = await entryStore.addEntry({ raw: 'a thought to shape' })
+    asked.mockRejectedValue(new Error('The free models are busy. Try again in a minute.'))
+
+    openEntry(entry.id)
+    fireEvent.click(await screen.findByRole('button', { name: /Unpack/ }))
+
+    expect(await screen.findByText(/The free models are busy/)).toBeTruthy()
+    expect((await db.entries.get(entry.id))?.shaped).toBeUndefined()
+    expect((await db.entries.get(entry.id))?.raw).toBe('a thought to shape')
+  })
+
+  it('removes a shape without touching the words', async () => {
+    const entry = await entryStore.addEntry({ raw: 'a thought to shape' })
+    await db.entries.update(entry.id, { shaped: TIDY, title: 'A thought' })
+
+    openEntry(entry.id)
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove the shape' }))
+
+    await waitFor(async () => {
+      expect((await db.entries.get(entry.id))?.shaped).toBeUndefined()
+    })
+    expect((await db.entries.get(entry.id))?.raw).toBe('a thought to shape')
+    expect(screen.getByText('a thought to shape')).toBeTruthy()
   })
 })

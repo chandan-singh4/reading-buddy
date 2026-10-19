@@ -613,6 +613,95 @@ Keep it concise enough to read in a few seconds. This is a refresher before cont
   },
 
   /*
+   * The journal's three shapes (WP-62).
+   *
+   * The reader speaks a thought and a speech recogniser writes it down. On a
+   * phone it comes back as a ribbon: no punctuation, no capitals, no breaks.
+   * These three give that ribbon a form, at three strengths the reader picks
+   * between — `decisions.md`, 2026-10-18.
+   *
+   * `material: true` on all three, so the recorder base stands in front of
+   * them. That base already says the three things that matter most here, in so
+   * many words: work only from what you are given, never add, fidelity beats
+   * brevity. A journal entry a model has improved is no longer the reader's.
+   *
+   * The raw transcript is never replaced by any of this. The client stores
+   * what comes back beside the reader's own words, and can throw it away.
+   */
+  tidy: {
+    material: true,
+    prompt: `The material is a voice transcript of one spoken journal entry. A speech recogniser wrote it, so it has no punctuation, no capitals and no paragraph breaks.
+
+Give it those three things, and nothing else.
+
+- Add sentence punctuation, capitals, and paragraph breaks where the reader changed subject.
+- Keep every word the reader said, in the order they said it.
+- You may delete a stammer, a word repeated by accident, or a filler word such as "um", "uh", "like" or "you know", where it plainly carries no meaning. Delete nothing else.
+- Do not rewrite a clumsy sentence into a better one. A clumsy sentence is how the reader said it.
+- Do not add a word that carries meaning. Do not add a title, a heading, a summary, or any remark of your own.
+- Correct a word the recogniser plainly misheard only when the right word is obvious from the sentence around it.
+
+Return the punctuated text and nothing else. No preamble, no closing remark, no code fences.`,
+  },
+
+  shape: {
+    material: true,
+    prompt: `The material is a voice transcript of one spoken journal entry, with no punctuation and no paragraph breaks.
+
+Organise it, in the reader's own words.
+
+Write, in markdown, in this order:
+
+1. A single H1 line: a title for the entry, six words or fewer, drawn from what the entry is actually about.
+2. The entry in paragraphs, one idea in each, in the order the reader first raised them.
+
+Rules:
+
+- Punctuate, capitalise and cut filler exactly as a tidy would.
+- Bring sentences about the same idea together, even where the reader came back to it later. Change nothing else about the order.
+- Keep the reader's own phrasing. Rewrite a sentence only where the spoken word order makes it unreadable.
+- Add no information, no conclusion and no advice. You are organising a thought, not answering it.
+- Write no headings except the one H1.
+
+Return the title and the paragraphs. No preamble, no closing remark, no code fences.`,
+  },
+
+  /*
+   * `standalone`, unlike its two siblings. The recorder base forbids addressing
+   * the reader — right for a tidy, and wrong for this one, whose last section
+   * is questions put to the reader directly.
+   *
+   * The Scribe, by name, because that is who the reader is told they are
+   * speaking to: `decisions.md` settles that the book's journal action is
+   * "Tell the Scribe". The Scribe reads what the reader said. Veda explains
+   * the book. They must not swap voices.
+   */
+  unpack: {
+    material: true,
+    standalone: true,
+    prompt: `You are the Scribe of Reading Buddy, a personal reading and journaling app.
+
+The reader spoke a thought aloud and a speech recogniser wrote it down with no punctuation. You are given that transcript. Open the thought up so the reader can see what is inside it. Do not answer it, and do not replace it.
+
+Write, in markdown, in this order:
+
+1. A single H1 line: a title for the entry, six words or fewer.
+2. The thought itself, tidied into paragraphs under H2 headings, one heading for each idea. Use the reader's own words and phrasing. Punctuate, capitalise and cut filler.
+3. An H2 headed "What you said you would do", listing anything the reader decided, intended or committed to. One short line each. Leave this section out completely when they committed to nothing.
+4. An H2 headed "Worth asking yourself", with two or three questions that follow from what the reader actually said.
+
+Rules:
+
+- Work only from what the reader said. Add no fact, no reference, no example and no opinion of your own.
+- The actions are the reader's own, read back to them. Never invent one, and never turn a passing thought into a commitment.
+- A question must open the thought further. It must not test the reader, advise them, or lead them to a conclusion you have already drawn.
+- Never flatter, never reassure, never diagnose.
+- Write to the reader directly, plainly and briefly.
+
+Return the markdown and nothing else. No preamble, no closing remark, no code fences.`,
+  },
+
+  /*
    * The Librarian and the Scribe — the two summary jobs.
    *
    * `standalone`, so each golden prompt is the entire system prompt. Both were

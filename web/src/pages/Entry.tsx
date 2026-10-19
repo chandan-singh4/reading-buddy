@@ -18,7 +18,15 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { entryStore, type StoredEntry } from '../storage/index.ts'
+import { Markdown } from '../reader/markdown.tsx'
 import { shapeMark } from '../journal/shapeMark.ts'
+import {
+  shapeEntry,
+  SHAPE_BLURB,
+  SHAPE_LABEL,
+  SHAPE_LEVELS,
+  type ShapeLevel,
+} from '../journal/shape.ts'
 import styles from './page.module.css'
 import journal from './Journal.module.css'
 import entryStyles from './Entry.module.css'
@@ -33,6 +41,8 @@ export default function Entry() {
   const [side, setSide] = useState<Side>('shaped')
   const [confirming, setConfirming] = useState(false)
   const [failure, setFailure] = useState('')
+  /** The level being asked for right now, or null when nothing is in flight. */
+  const [working, setWorking] = useState<ShapeLevel | null>(null)
 
   useEffect(() => {
     if (!entryId) {
@@ -51,6 +61,46 @@ export default function Entry() {
       cancelled = true
     }
   }, [entryId])
+
+  /**
+   * Ask a model for one shape, then store it beside the raw words.
+   *
+   * The entry in state is updated from the row that was written, not from the
+   * reply, so what the screen shows is what the table holds. A shape that
+   * failed to save must not look saved.
+   */
+  async function give(level: ShapeLevel) {
+    if (!entry || working) return
+    setFailure('')
+    setWorking(level)
+    try {
+      const shaping = await shapeEntry(level, entry.raw)
+      await entryStore.setShaped(
+        entry.id,
+        { level, model: shaping.model, at: new Date().toISOString(), text: shaping.text },
+        shaping.title,
+      )
+      const saved = await entryStore.getEntry(entry.id)
+      if (saved) {
+        setEntry(saved)
+        setSide('shaped')
+      }
+    } catch (error: unknown) {
+      setFailure(error instanceof Error ? error.message : 'That didn’t work just now.')
+    } finally {
+      setWorking(null)
+    }
+  }
+
+  async function dropShape() {
+    if (!entry) return
+    await entryStore.clearShaped(entry.id)
+    const saved = await entryStore.getEntry(entry.id)
+    if (saved) {
+      setEntry(saved)
+      setSide('raw')
+    }
+  }
 
   async function remove() {
     if (!entry) return
@@ -129,7 +179,17 @@ export default function Entry() {
         </div>
       )}
 
-      <article className={entryStyles.prose}>{words}</article>
+      {/*
+        * The shaped copy is markdown — the two stronger levels write headings
+        * and lists — and goes through the renderer the tutor's answers use, so
+        * a model cannot put HTML on this page. The raw copy is printed exactly
+        * as the recogniser left it, because that is the whole claim it makes.
+        */}
+      {showing === 'shaped' ? (
+        <Markdown text={words} className={entryStyles.shapedProse} />
+      ) : (
+        <article className={entryStyles.prose}>{words}</article>
+      )}
 
       <p className={entryStyles.note}>
         {showing === 'raw'
@@ -137,9 +197,49 @@ export default function Entry() {
           : `Written by ${shaped?.model ?? 'a model'} from your words. Your own words are kept.`}
       </p>
 
+      <section className={entryStyles.give} aria-label="Give these words a shape">
+        <h2 className={entryStyles.giveHead}>
+          {shaped ? 'Give it a different shape' : 'Give it a shape'}
+        </h2>
+        <p className={entryStyles.giveLede}>
+          A free model reads your words and writes a second copy. Your own words
+          stay exactly as you spoke them.
+        </p>
+        <div className={entryStyles.levels}>
+          {SHAPE_LEVELS.map((level) => (
+            <button
+              key={level}
+              type="button"
+              className={entryStyles.level}
+              disabled={working !== null}
+              aria-busy={working === level}
+              onClick={() => {
+                void give(level)
+              }}
+            >
+              <span className={entryStyles.levelName}>
+                {working === level ? `${SHAPE_LABEL[level]}ing…` : SHAPE_LABEL[level]}
+              </span>
+              <span className={entryStyles.levelBlurb}>{SHAPE_BLURB[level]}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {failure && <p className={styles.error}>{failure}</p>}
 
       <div className={entryStyles.actions}>
+        {shaped && !confirming && (
+          <button
+            type="button"
+            className={entryStyles.quiet}
+            onClick={() => {
+              void dropShape()
+            }}
+          >
+            Remove the shape
+          </button>
+        )}
         {confirming ? (
           <>
             <button

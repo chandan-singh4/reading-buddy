@@ -195,8 +195,37 @@ Tests: `pages/Journal.test.tsx` and `pages/Entry.test.tsx`, 11 of them. Note
 that this repo *does* have a test runner — Vitest, 2600+ tests. `CLAUDE.md`
 said it did not; that line is now corrected.
 
-**Next: WP-62, give the words a shape.** Tidy, Shape and Unpack, on a free
-model, with the raw words untouched.
+**WP-62, give the words a shape — built 2026-10-19, not yet tried on the
+phone.** The entry screen now offers three strengths under the words.
+
+- **Tidy** adds punctuation, capitals and paragraph breaks, and not one new
+  word. It may cut a stammer or an "um". It may not improve a sentence.
+- **Shape** adds a title and groups the ideas into paragraphs.
+- **Unpack** adds headings, anything the reader said they would do, and two or
+  three questions to sit with.
+
+`api/tutor.ts` holds the three task modules. Tidy and Shape sit on the recorder
+base prompt, which already says "work only from what you are given, never add".
+Unpack is `standalone`, because that base forbids addressing the reader and
+Unpack must ask them questions. Unpack speaks as the Scribe, which is who the
+reader is told they are speaking to.
+
+`journal/shape.ts` makes the call. It streams, for the reason the digests do.
+It rejects rather than returning a canned line: an apology stored as the shape
+of an entry would be read a month later as something the reader wrote.
+
+`storage/journal.ts` gains `setShaped` and `clearShaped`. **Neither writes
+`raw`, and no function in that file does.** That is how the promise is kept.
+
+The shaped copy renders through `reader/markdown.tsx`, which builds React
+nodes and never HTML, so a model cannot put markup on the page. The raw copy
+still prints exactly as the recogniser left it.
+
+Tags are **not** in this waypoint. `decisions.md` says Shape proposes tags, and
+WP-64 is where they land, with the saved filters that make them useful.
+
+**Next: WP-63, Tell the Scribe, from the book.** After that WP-65 unblocks and
+the split front door can be built.
 
 **WP-22 · `learner.md` adaptive model.** Held, by the reader's choice, while
 the journal is built.

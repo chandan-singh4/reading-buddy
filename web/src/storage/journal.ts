@@ -13,7 +13,13 @@
  * already has.
  */
 
-import { db as defaultDb, type EntryLink, type ReadingBuddyDB, type StoredEntry } from './db.ts'
+import {
+  db as defaultDb,
+  type EntryLink,
+  type EntryShaped,
+  type ReadingBuddyDB,
+  type StoredEntry,
+} from './db.ts'
 
 /** Everything an entry needs that isn't invented in here. */
 export interface NewEntry {
@@ -65,6 +71,32 @@ export function createEntryStore(database: ReadingBuddyDB = defaultDb) {
 
     async getEntry(id: string): Promise<StoredEntry | undefined> {
       return database.entries.get(id)
+    },
+
+    /**
+     * Store a shape beside the reader's words (WP-62).
+     *
+     * Note what this cannot do: there is no path through it that writes `raw`.
+     * `decisions.md` settles that the raw transcript is canonical and a shape
+     * is derived from it, and the cheapest way to keep a promise like that is
+     * to leave no function that could break it.
+     *
+     * A second call replaces the shape. The reader asked for a different
+     * strength, or asked again for the same one, and two shapes of one entry
+     * is a choice nobody wanted to be offered.
+     */
+    async setShaped(id: string, shaped: EntryShaped, title?: string): Promise<void> {
+      await database.entries.update(id, {
+        shaped,
+        // Only the two stronger levels write one, and a title from a shape the
+        // reader has just replaced must not outlive it.
+        ...(title ? { title } : { title: undefined }),
+      })
+    },
+
+    /** Throw the shape away. The reader's own words are untouched. */
+    async clearShaped(id: string): Promise<void> {
+      await database.entries.update(id, { shaped: undefined, title: undefined })
     },
 
     async deleteEntry(id: string): Promise<void> {

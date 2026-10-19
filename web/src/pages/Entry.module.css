@@ -116,3 +116,97 @@
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+/* ---- giving the words a shape (WP-62) ---- */
+
+.give {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.giveHead {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.giveLede {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.levels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Each one says what it does under its own name. Three words on three buttons
+   would make the reader guess which is which, and the difference between them
+   is the whole choice. */
+.level {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  text-align: left;
+  font: inherit;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+  cursor: pointer;
+}
+
+.level:hover:not(:disabled),
+.level:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.level:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.level:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* The one being worked on keeps full strength, so the reader can see which of
+   the three they pressed while all three are held. */
+.level[aria-busy='true']:disabled {
+  opacity: 1;
+  border-color: var(--color-accent);
+}
+
+.levelName {
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+
+.levelBlurb {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* The shaped copy. The same reading face and measure as the raw words — they
+   are an equal pair and must not look like a draft and a finished thing — but
+   no `pre-wrap`: this one is rendered markdown, and the renderer has already
+   turned the blank lines into elements. */
+.shapedProse {
+  display: block;
+  margin-top: var(--space-5);
+  font-family: var(--font-reading);
+  font-size: var(--text-lg);
+  line-height: 1.6;
+}
