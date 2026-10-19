@@ -77,6 +77,32 @@ Breadth is now allowed.
 
 ### Recently done
 
+- **WP-65 — the split front door (2026-10-19).** Build green: 2,693 tests
+  across 171 files.
+  - The home page is now two halves. The book is the dark board above. The
+    journal is paper below. Both doors are open at once, and the split is even
+    at every hour.
+  - Each half is a surface with zones. The cover and Resume go straight to the
+    saved page. The question and the circle go straight into a new entry.
+    Library and Archive sit in each half's footer. Anywhere else opens that
+    half, and the other folds to a lip that still reports its state.
+  - The reading half shows the minutes read today, the percent, the title, the
+    reader's last mark, and one line of finish forecast. Opened, it adds the
+    shelf.
+  - The journal half asks a question chosen by the hour and the date. Opened,
+    it adds today's entries. The footer names the last entry.
+  - The bridge sits on the seam and carries the last mark into a new entry. It
+    goes when a half opens.
+  - `SpeakSheet` gained two props: `prompt` (shown, never saved) and
+    `listenAtOnce`.
+  - **The greeting is gone.** The halves name themselves and report real state.
+    Say so if you want it back.
+  - New: `web/src/journal/prompts.ts`. New tokens: `--color-board`,
+    `--color-board-ink`, `--color-board-mark` in `theme.css`.
+  - `PaceHorizon` and the four curated shelves left the front door. The shelf
+    is in the opened half and in `/library`; the pace strip is on the book's
+    own details page.
+
 - **The reader's marks survive a re-parse, and PDF bullets keep their level**
   (2026-10-16). Not a waypoint. Build green: 2,613 tests across 162 files.
   - **The real cause of the lost highlights.** A mark is stored as its words,

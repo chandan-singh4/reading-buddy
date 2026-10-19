@@ -489,8 +489,8 @@
   as a standing preference · *after 67*
 - [ ] **WP-64 Tags and saved filters** — one stream, tags from the model,
   filters that read like notebooks · *after 62*
-- [ ] **WP-65 The split front door** — inhale and exhale, the lip, the bridge on
-  the seam · *after 61 and 63*
+- [x] **WP-65 The split front door** — inhale and exhale, the lip, the bridge on
+  the seam · *shipped 2026-10-19*
 - [ ] **WP-66 The journal in the backup** — Supabase rows and the Drive export ·
   *after 61*
 

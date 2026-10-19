@@ -149,3 +149,43 @@ describe('SpeakSheet', () => {
     })
   })
 })
+
+/**
+ * The two doors the front door opens (WP-65).
+ *
+ * The split front door offers a question and a circle, and each has already
+ * promised what it will do. The sheet has to keep both promises.
+ */
+describe('opened from the front door', () => {
+  it('keeps the question on screen and puts the cursor in the box', () => {
+    render(
+      <SpeakSheet open onClose={() => {}} prompt="What stood out to you today?" />,
+    )
+
+    expect(screen.getByText('What stood out to you today?')).toBeDefined()
+    expect(document.activeElement).toBe(screen.getByLabelText('Your words'))
+    // A nudge, not content. Nothing is written into the box for the reader.
+    expect((screen.getByLabelText('Your words') as HTMLTextAreaElement).value).toBe('')
+    expect(heard.start).not.toHaveBeenCalled()
+  })
+
+  it('listens at once when the circle was the way in', () => {
+    render(<SpeakSheet open onClose={() => {}} listenAtOnce />)
+
+    expect(heard.start).toHaveBeenCalledTimes(1)
+  })
+
+  it('never listens on its own anywhere else', () => {
+    openSheet()
+
+    expect(heard.start).not.toHaveBeenCalled()
+  })
+
+  it('does not listen at once where the browser cannot', () => {
+    heard.supported = false
+    render(<SpeakSheet open onClose={() => {}} listenAtOnce />)
+    heard.supported = true
+
+    expect(heard.start).not.toHaveBeenCalled()
+  })
+})

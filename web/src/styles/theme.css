@@ -33,6 +33,24 @@
   --color-accent-wash: color-mix(in srgb, var(--color-accent) 8%, transparent);
 
   /*
+   * The night board, for the reading half of the front door (WP-65).
+   *
+   * The same three values in every theme, and the only tokens here that do not
+   * follow the reader's choice. That is the point of them: the board is the
+   * book's own material, the way the study lamp is, and the front door reads as
+   * a spread of two materials — board above, paper below. A board that turned
+   * pale under a light theme would be a second sheet of paper, and the split
+   * would stop being visible at all.
+   *
+   * `--color-board-mark` is the gold the accent cannot be here: a brown accent
+   * on a dark board is unreadable, and every theme's accent is a different
+   * colour on a board that never changes.
+   */
+  --color-board: #2a333c;
+  --color-board-ink: #f2ece1;
+  --color-board-mark: #c9a227;
+
+  /*
    * The glass of the Define loupe.
    *
    * Every one of these is mixed from a colour the theme already sets, so the

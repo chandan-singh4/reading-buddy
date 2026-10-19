@@ -286,3 +286,18 @@
   .sheet { animation: none; }
   .bars.on i { animation: none; height: 55%; }
 }
+
+/*
+ * The question the reader tapped on the front door (WP-65).
+ *
+ * The display face, because it is a question addressed to a person rather than
+ * a label on a control — the same distinction the greeting used to carry on
+ * Home. Quiet enough that the box below it is still the subject.
+ */
+.prompt {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: 1.2;
+  color: var(--color-text);
+}

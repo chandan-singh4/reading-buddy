@@ -3588,3 +3588,43 @@ survived, because it was in the cloud.
 - **The three shapes are a drawer once a shape exists.** Three cards and a
   paragraph is the right size for the one decision on a new entry, and far too
   much room for a decision already made.
+
+## The split front door, as built (2026-10-19)
+
+WP-65. The two settled sections above — "The front door is a split, and it does
+not guess" and "A tap goes straight through" (both 2026-10-18) — say what the
+door does. These are the calls the build had to make.
+
+- **The greeting goes.** "Good evening, Chandan" and "What book are you picking
+  up today?" are gone. The two halves name themselves (Inhale · Read, Exhale ·
+  Journal) and each one reports real state. A salutation over a split is a third
+  voice on a screen that now has two, and it cost a fifth of the first half.
+- **The open target sits behind the content, not around it.** "Anywhere else in
+  a half opens it" is a real `<button>` filling the half at the bottom of the
+  stack. The face above it lets taps fall through (`pointer-events: none`) and
+  every link and button in the face takes its own taps back. A `role="button"`
+  wrapped around links and buttons is something no browser handles sanely, and
+  the half needs both.
+- **The night board is three tokens, the same in every theme.**
+  `--color-board`, `--color-board-ink` and `--color-board-mark` in `theme.css`.
+  They are the only tokens there that do not follow the reader's theme. The
+  board is the book's own material, like the study lamp; a board that turned
+  pale under a light theme would be a second sheet of paper and the split would
+  stop being visible. `--color-board-mark` exists because a brown accent on a
+  dark board cannot be read, and each theme's accent is a different colour on a
+  board that never changes.
+- **The front door keeps the forecast as one line, not the strip.**
+  `PaceHorizon` stays on the book's own details page. The door answers "am I
+  going to finish this?" in one line and spends the room on the book instead.
+- **The four curated shelves are replaced, not moved.** The shelf is a row of
+  covers in the opened reading half, and `/library` already holds every book
+  with search and filters. With no book on the go the shelf stands in the face,
+  because the door must not presume a page to resume.
+- **The question is a function of the hour and the date.** `journal/prompts.ts`
+  stores nothing. A stored rota is a second copy of a fact the calendar holds,
+  and it would have to be carried into the backup. The hour and the date hold
+  the question still for as long as the reader is reading it.
+- **The question is never saved with the entry.** It is a nudge, not content.
+  The raw words stand alone, including on the day the reader answers something
+  else. The sheet shows the question and puts the cursor in the box; the circle
+  starts listening at once. Each door keeps the promise it made.

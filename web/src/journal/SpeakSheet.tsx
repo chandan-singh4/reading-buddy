@@ -74,9 +74,34 @@ export interface SpeakSheetProps {
    * Absent for an entry spoken from the journal, which is most of them.
    */
   link?: EntryLink
+  /**
+   * The question the reader tapped to get here (WP-65).
+   *
+   * Shown, and never saved. It is a nudge, not content: the raw words are the
+   * reader's and they have to stand on their own, including on the day they
+   * answer a different question than the one on screen. Given a prompt the
+   * sheet puts the cursor in the box rather than on the circle, because a
+   * reader who tapped a question is already reaching for the keyboard.
+   */
+  prompt?: string
+  /**
+   * Begin listening the moment the sheet opens (WP-65).
+   *
+   * The front door's circle promises recording, not a second circle to press.
+   * Off everywhere else: a sheet that starts listening when the reader only
+   * wanted the box is a sheet that listens to the room.
+   */
+  listenAtOnce?: boolean
 }
 
-export default function SpeakSheet({ open, onClose, onSaved, link }: SpeakSheetProps) {
+export default function SpeakSheet({
+  open,
+  onClose,
+  onSaved,
+  link,
+  prompt,
+  listenAtOnce,
+}: SpeakSheetProps) {
   const { settled, guess, listening, supported, fault, start, stop, replace, reset } =
     useDictation()
   /*
@@ -94,6 +119,15 @@ export default function SpeakSheet({ open, onClose, onSaved, link }: SpeakSheetP
    */
   const startedAtRef = useRef<Date | null>(null)
   const circleRef = useRef<HTMLButtonElement | null>(null)
+  const boxRef = useRef<HTMLTextAreaElement | null>(null)
+  /*
+   * Whether this opening has already been acted on.
+   *
+   * The effect below reads `supported`, which can turn from false to true once
+   * the recogniser reports in. Without this it would start listening a second
+   * time, or move the cursor out of a box the reader is already typing in.
+   */
+  const begunRef = useRef(false)
 
   useWakeLock(open && listening)
 
@@ -106,8 +140,35 @@ export default function SpeakSheet({ open, onClose, onSaved, link }: SpeakSheetP
     setSeconds(0)
     setSaving(false)
     startedAtRef.current = null
-    circleRef.current?.focus()
   }, [open, reset])
+
+  /*
+   * Where the sheet puts the reader, once per opening.
+   *
+   * Three doors into one sheet, and each of them has already said what it is
+   * going to do: the journal's button offers a circle to press, the front
+   * door's circle promises recording at once, and the front door's question
+   * promises a box to answer it in. Landing anywhere else would take back a
+   * promise the reader has already acted on.
+   */
+  useEffect(() => {
+    if (!open) {
+      begunRef.current = false
+      return
+    }
+    if (begunRef.current) return
+    begunRef.current = true
+    if (listenAtOnce && supported) {
+      startedAtRef.current = new Date()
+      start()
+      return
+    }
+    if (prompt) {
+      boxRef.current?.focus()
+      return
+    }
+    circleRef.current?.focus()
+  }, [listenAtOnce, open, prompt, start, supported])
 
   // The recogniser has heard more. The box shows it, unless the reader has
   // taken the words over — in which case `settled` is their text already.
@@ -238,6 +299,10 @@ export default function SpeakSheet({ open, onClose, onSaved, link }: SpeakSheetP
          */}
         {link && <blockquote className={styles.quote}>{elide(link.quote)}</blockquote>}
 
+        {/* The question the reader answered, kept on screen while they answer
+            it. Not a field and not saved — see `prompt` on the props. */}
+        {prompt && <p className={styles.prompt}>{prompt}</p>}
+
         {!supported && <p className={styles.fault}>{FAULT_WORDS.unsupported}</p>}
         {supported && fault && <p className={styles.fault}>{FAULT_WORDS[fault]}</p>}
 
@@ -269,6 +334,7 @@ export default function SpeakSheet({ open, onClose, onSaved, link }: SpeakSheetP
           </p>
         ) : (
           <textarea
+            ref={boxRef}
             className={styles.editor}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}

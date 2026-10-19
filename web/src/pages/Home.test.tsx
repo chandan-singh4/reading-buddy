@@ -10,7 +10,7 @@ import { forgetLibraryMemory, readLibraryMemory } from '../app/libraryMemory.ts'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
 import { forgetTabHistory } from '../app/tabHistory.ts'
 import { forgetCovers } from '../app/useCovers.ts'
-import { repository } from '../storage/index.ts'
+import { entryStore, noteStore, repository } from '../storage/index.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 
 function bookOf(id: string, title: string, author: string): BookMeta {
@@ -241,27 +241,169 @@ describe('coming back to Home', () => {
   })
 })
 
-describe('the shelves themselves', () => {
-  it('keeps every shelf on the page, with a line in the gap where a shelf is empty', async () => {
-    // The shelves used to appear and disappear with their contents, so finishing
-    // a book rearranged the whole screen under the reader's thumb. Both fixtures
-    // are unread and unopened, which leaves three of the four shelves with
-    // nothing in them — and all four still have to be there.
+describe('the two halves', () => {
+  it('opens with both doors, and neither folded', async () => {
+    // The settled rule, asserted: an even split at every hour. The app does not
+    // guess which half the reader came for.
     render(
       <MemoryRouter initialEntries={['/']}>
         <AppRoutes />
       </MemoryRouter>,
     )
-    expect(await screen.findByText('Breath')).toBeDefined()
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(shown().getByText('Exhale · Journal')).toBeDefined()
+    // A folded half shows its lip and nothing else.
+    expect(shown().queryByRole('button', { name: 'Close the reading half' })).toBeNull()
+  })
 
-    for (const title of ['Current Reading', 'Up Next', 'Unread', 'Finished']) {
-      expect(shown().getByRole('heading', { name: title })).toBeDefined()
-    }
-    expect(shown().getByText('Open a book to begin.')).toBeDefined()
-    expect(shown().getByText('Nothing lined up yet.')).toBeDefined()
-    expect(shown().getByText('Nothing finished yet.')).toBeDefined()
-    // The one shelf that does have books says nothing in place of them.
-    expect(shown().queryByText('Nothing waiting to be started.')).toBeNull()
+  it('folds the other half to a lip, and the lip brings it back', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    const surface = await screen.findByRole('button', { name: 'Open the reading half' })
+    fireEvent.click(surface)
+
+    // The journal is now a lip: its chip is still there, its question is not.
+    expect(shown().getByText('Exhale')).toBeDefined()
+    expect(shown().queryByText('Exhale · Journal')).toBeNull()
+
+    fireEvent.click(shown().getByText('Exhale'))
+    expect(shown().getByText('Exhale · Journal')).toBeDefined()
+  })
+
+  it('shows the shelf when there is no book on the go', async () => {
+    // Neither fixture has a position, so there is nothing to resume. The door
+    // must not presume a page — it shows the shelf in the face instead.
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Nothing on the go')).toBeDefined()
+    expect(shown().getByText('The Wind in the Willows')).toBeDefined()
+    expect(shown().queryByText(/^Resume/)).toBeNull()
+  })
+
+  it('counts the library and the archive in each footer', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(/Library \(2\)/)).toBeDefined()
+    expect(shown().getByText(/Archive \(0\)/)).toBeDefined()
+  })
+})
+
+describe('what the journal half remembers', () => {
+  it('names the last entry and counts the archive', async () => {
+    const first = await entryStore.addEntry({
+      raw: 'The bit about solitude landed harder than I expected.',
+      at: new Date('2026-10-18T19:04:00.000Z'),
+    })
+    const second = await entryStore.addEntry({
+      raw: 'Rough morning. Wrote it out and felt lighter.',
+      at: new Date('2026-10-18T13:20:00.000Z'),
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    // The newest, whichever day it was written on. The journal remembers the
+    // reader even on a day they have not written yet.
+    expect(
+      await screen.findByText('“The bit about solitude landed harder than I expected.”'),
+    ).toBeDefined()
+    expect(shown().getByText(/Archive \(2\)/)).toBeDefined()
+
+    await entryStore.deleteEntry(first.id)
+    await entryStore.deleteEntry(second.id)
+  })
+})
+
+describe('the question on the journal half', () => {
+  it('opens the writer with the question still on screen', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    // Whichever question the hour chose — the test must not pin the words, or
+    // it would fail every six hours.
+    const label = await screen.findByText(/prompt$|^Late$/i)
+    const question = label.parentElement?.querySelector('button')
+    expect(question).not.toBeNull()
+    const words = question!.textContent ?? ''
+    expect(words.endsWith('?')).toBe(true)
+
+    fireEvent.click(question!)
+
+    const sheet = await screen.findByRole('dialog', { name: 'Speak a thought' })
+    expect(within(sheet).getByText(words)).toBeDefined()
+  })
+
+  it('opens the writer from the circle as well', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Speak an entry' }))
+    expect(await screen.findByRole('dialog', { name: 'Speak a thought' })).toBeDefined()
+  })
+})
+
+describe('the bridge on the seam', () => {
+  it('carries the last mark into a new entry', async () => {
+    await repository.savePosition(
+      BOOKS[0]!.id,
+      { chapter: 0, block: 0 } as never,
+      40,
+      '2026-10-18T09:00:00.000Z',
+    )
+    await noteStore.addNote(BOOKS[0]!.id, {
+      anchor: { chapter: 1, block: 2 } as never,
+      author: 'you',
+      text: '',
+      quote: 'Self-knowledge is an adventure.',
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    const bridge = await screen.findByRole('button', { name: /your last mark/ })
+    fireEvent.click(bridge)
+
+    // The sheet knows it came from a book, so it is the Scribe being told
+    // something — and the passage is on it.
+    const sheet = await screen.findByRole('dialog', { name: 'Tell the Scribe' })
+    expect(within(sheet).getByText('Self-knowledge is an adventure.')).toBeDefined()
+  })
+
+  it('is not there when nothing has been marked', async () => {
+    await repository.savePosition(
+      BOOKS[0]!.id,
+      { chapter: 0, block: 0 } as never,
+      40,
+      '2026-10-18T09:00:00.000Z',
+    )
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    await screen.findByText('The Wind in the Willows')
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /your last mark/ })).toBeNull()
+    })
   })
 })
 
@@ -377,9 +519,10 @@ describe('the book in hand', () => {
     ).toBeDefined()
   })
 
-  it('drops the percentage text from the hero and keeps it on the rest', async () => {
-    // The hero says it with the lit fore edge instead. Every other tile has no
-    // fore edge of its own, so the number is the only thing that can say it.
+  it('says the percent in the line of context, and the shelf says its own', async () => {
+    // The book in hand has its percent above the title, where "where you
+    // stopped" can stand beside it. Every other book on the shelf has only the
+    // number to say it with.
     await repository.savePosition(
       BOOKS[1]!.id,
       { chapter: 0, block: 0 } as never,
@@ -388,9 +531,11 @@ describe('the book in hand', () => {
     )
     await openHomeReading(28)
 
-    // The hero is the more recently opened book, so 28 is the hero's number and
-    // 7 belongs to the tile beside it on Up Next.
-    expect(shown().queryByText('28% read')).toBeNull()
+    expect(await shown().findByText('28%')).toBeDefined()
+    // The shelf is what the fold frees room for, so it is not in the face yet.
+    expect(shown().queryByText('7% read')).toBeNull()
+
+    fireEvent.click(shown().getByRole('button', { name: 'Open the reading half' }))
     expect(await shown().findByText('7% read')).toBeDefined()
   })
 })

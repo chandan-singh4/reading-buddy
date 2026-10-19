@@ -6,77 +6,71 @@ it.
 
 ## Task
 
-**WP-67 — a professional opinion on an entry.** One all-round reader, not a
-shelf of specialists.
+**WP-65 — the split front door.** Inhale and exhale. The home page becomes two
+halves: the book above, the journal below. Both doors are open at once.
 
-The reader asks for an opinion on an entry. One model reads it, decides for
-itself how the entry wants to be read, **says which way it chose**, and gives a
-view. The reading is stored beside the entry and can be made again or thrown
-away.
+The reader opens the app and sees both ways in. No screen asks which one they
+came for. A tap in a half opens that half; the other half folds to a lip at the
+screen edge and still reports its state. A tap on the lip brings it back.
 
 ### Settled before building
 
-- **One role, all-round.** The reader asked for a role that is not a niche. So
-  there is no lens list and no router: the model picks its own angle from the
-  content, the way you would get a different answer from one thoughtful person
-  depending on what you brought them.
-- **It names the angle it chose.** This is the whole honesty of the feature.
-  The frame *is* the opinion — a dream read as a decision and read as an image
-  give two different answers — so the reader is told which one they are
-  holding. The angle is the first line, lifted exactly as `shape.ts` lifts a
-  title out of an H1.
-- **It is a fourth persona, not the Scribe.** Tidy, Shape and Unpack
-  reorganise the reader's words and add nothing; the Scribe speaks for all
-  three. This *adds*. The reader must be able to tell those two acts apart at
-  a glance, so it gets its own name: **the Counsel**.
-- **It reads `raw`, never `shaped`.** An opinion must be on what the reader
-  said, not on a model's rewrite of what the reader said.
-- **It is not a clinician.** The reader's real entries are dreams and
-  feelings. The prompt forbids diagnosis and any claim of credentials, and
-  requires it to name a qualified person where health, money, law or safety
-  are in the entry.
-- **It is collapsed by default.** "The entry is the screen" (2026-10-19). The
-  angle line shows; the body opens on a press.
+From `docs/decisions.md`, 2026-10-18 — "The front door is a split, and it does
+not guess" and "A tap goes straight through". The mockup is
+`docs/mockups/inhale-exhale.html`.
 
-**Done when all five are true.**
+1. **An even split, at every hour.** The halves stay equal, morning and night.
+   The app does not guess what the reader came for.
+2. **No streak.** A streak turns a journal into a duty. The entry count and the
+   last line carry the same sense of continuity with none of the threat.
+3. **Each half is a surface with zones, not one button.** The common act is
+   direct. The wider view is one deliberate tap away.
+   - Cover, or Resume → the book, at the saved page. No list in between.
+   - The question, or the circle → a new entry, typed or spoken.
+   - Library (n), or Archive (n) → the full list.
+   - Anywhere else in a half → the half opens.
+4. **One side continues, the other starts.** The reader almost always carries on
+   the same book, so reading resumes. Every entry is new, so the journal begins.
+5. **The opened half is the home page.** The app gains no screen to hold the
+   choice. It loses one.
+6. **The folded half stays as a 52 px lip** and still names its state.
+7. **The bridge sits on the seam** and carries the last mark into a new entry.
+   It hides while a half is open.
+8. **With no book on the go, the reading half shows the shelf** instead of
+   presuming a page to resume.
 
-1. An entry with no reading offers one quiet way to ask for it.
-2. The reading stores `angle`, `model`, `at` and `text`, beside the entry.
-3. The screen shows the angle, and opens the body on a press.
-4. Correcting the words marks the reading as made from earlier words, and
-   offers to make it again. It is never silently re-run: an opinion costs a
-   model call the reader did not ask for.
-5. The reading can be removed without touching the words or the shape.
+### What each half shows
 
-**Out of this slice.**
+**The reading half (the dark board).** Minutes read today. The percent, the
+title, and the reader's last mark in reading serif. The cover and a Resume
+button, both to the book. A footer with the finish forecast and "Library (n)".
+Opened, it adds the shelf.
 
-- A second reading per entry, or a shelf of named lenses. One role, one
-  reading. If the reader wants a second angle they press Make it again.
-- Readings on the journal list, in the backup (WP-66) or in the export.
-- Tags (WP-64), the front door (WP-65).
+**The journal half (paper).** Today's date. A question by the hour of the day. A
+circle that listens at once. A footer with the last entry's first line and
+"Archive (n)". Opened, it adds today's entries.
+
+### What leaves the front door
+
+The four curated shelves and the full pace strip. The shelf is in the opened
+reading half and in `/library`, which already holds every book, search and
+filter. `PaceHorizon` stays on the book's own details page. The front door
+keeps the forecast as one line.
 
 ### Files in scope
 
-| Path | What it does |
-|---|---|
-| `api/tutor.ts` | A `counsel` module: `material`, `standalone`, and the prompt. |
-| `web/src/journal/relay.ts` | **new.** The one call to the journal's models, extracted from `shape.ts` so two callers do not hold two copies of the stream reader. |
-| `web/src/journal/shape.ts` | Uses `relay.ts`. Keeps `titleOf`. |
-| `web/src/journal/counsel.ts` | **new.** `askCounsel`, and the angle lifted off the H1. |
-| `web/src/journal/marks.tsx` | `CounselMark` — spectacles. A second look. |
-| `web/src/storage/db.ts` | `EntryCounsel`, and `StoredEntry.counsel`. No index, so no version block — read the `db.version(19)` comment. |
-| `web/src/storage/journal.ts` | `setCounsel`, `clearCounsel`, and `setRaw` marking an existing reading stale. |
-| `web/src/storage/index.ts` | Exports the new type. |
-| `web/src/pages/Entry.tsx` | The drawer under the entry. |
-| `web/src/pages/Entry.module.css` | Its styles. |
-
-Tests beside each: `counsel.test.ts`, `journal.test.ts`, `Entry.test.tsx`,
-`shape.test.ts` (unchanged behaviour through the new relay).
-
-Add a path here with a one-line reason before you open anything else.
-
-
----
+- `web/src/pages/Home.tsx` — the split door. Rewritten.
+- `web/src/pages/Home.module.css` — the two halves, the lip, the bridge.
+- `web/src/pages/Home.test.tsx` — rewritten for the door.
+- `web/src/journal/prompts.ts` — new. The question by the hour.
+- `web/src/journal/prompts.test.ts` — new.
+- `web/src/journal/SpeakSheet.tsx` — two new props: `prompt` and `listenAtOnce`.
+- `web/src/journal/SpeakSheet.test.tsx` — the two new props.
+- `web/src/app/homeShelves.ts` — read only. The shelf the opened half shows.
+- `web/src/storage/notes.ts` — read only. The last mark.
+- `web/src/stats/sessions.ts` — read only. The minutes today.
+- `web/src/app/AppShell.module.css` — read only. `--top-bar-height`.
+- `docs/mockups/inhale-exhale.html` — the layout.
 
 ## Deferred — kept for the day it reopens
 

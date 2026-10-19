@@ -5,7 +5,7 @@
 // real repository, so there has to be a real database underneath it.
 import 'fake-indexeddb/auto'
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -74,11 +74,22 @@ function renderFrom(entries: string[]) {
  * paints the two together. These tests used the greeting as their "we are on
  * Home" landmark, which now means waiting for it.
  */
+/**
+ * A drawer link, by name.
+ *
+ * Scoped to the drawer rather than the page: the split front door (WP-65) has
+ * its own "Library (n)" link in the reading half's footer, so a loose search
+ * for /Library/ finds two.
+ */
+function drawerLink(name: RegExp): HTMLElement {
+  return within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name })
+}
+
 describe('app shell', () => {
   it('lands on Home and reports an empty shelf', async () => {
     renderAt('/')
 
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
     // Resolves only once the repository has actually answered.
     expect(await screen.findByText('No books yet')).toBeDefined()
   })
@@ -97,10 +108,10 @@ describe('app shell', () => {
     // Home is in the drawer now. It was left out when swiping didn't exist and
     // Home was simply the screen the ☰ sat on; once Home became one page among
     // four, "swipe right three times" stopped being a way back to it.
-    expect(screen.getByRole('link', { name: /Home/ })).toBeDefined()
-    expect(screen.getByRole('link', { name: /Library/ })).toBeDefined()
-    expect(screen.getByRole('link', { name: /Stats/ })).toBeDefined()
-    expect(screen.getByRole('link', { name: /Settings/ })).toBeDefined()
+    expect(drawerLink(/Home/)).toBeDefined()
+    expect(drawerLink(/Library/)).toBeDefined()
+    expect(drawerLink(/Stats/)).toBeDefined()
+    expect(drawerLink(/Settings/)).toBeDefined()
   })
 
   /**
@@ -139,13 +150,13 @@ describe('app shell', () => {
 
   it('swipes left from Home to the library, and right back again', async () => {
     renderAt('/')
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
 
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
 
     swipe(150)
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
   })
 
   it('does not swipe past the ends', async () => {
@@ -154,7 +165,7 @@ describe('app shell', () => {
     renderAt('/')
 
     swipe(150)
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
   })
 
   it('ignores a swipe that was really a scroll', async () => {
@@ -163,14 +174,14 @@ describe('app shell', () => {
     renderAt('/')
 
     swipe(-150, 300)
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
   })
 
   it('ignores a movement too short to be a swipe', async () => {
     renderAt('/')
 
     swipe(-20)
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
   })
 
   it('still navigates when the browser cancels the gesture', async () => {
@@ -247,7 +258,7 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
     expect(await screen.findByRole('alert')).toBeDefined()
@@ -259,11 +270,11 @@ describe('app shell', () => {
     renderFrom(['/'])
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Settings/ }))
+    fireEvent.click(drawerLink(/Settings/))
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Stats/ }))
+    fireEvent.click(drawerLink(/Stats/))
     expect(await screen.findByRole('heading', { name: 'Statistics' })).toBeDefined()
 
     // Back to Settings — the screen before this one — not to Home.
@@ -279,7 +290,7 @@ describe('app shell', () => {
     renderFrom(['/'])
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Stats/ }))
+    fireEvent.click(drawerLink(/Stats/))
     expect(await screen.findByRole('heading', { name: 'Statistics' })).toBeDefined()
 
     swipe(-150)
@@ -301,7 +312,7 @@ describe('app shell', () => {
     fireEvent.pointerMove(document, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 300 })
     fireEvent.pointerUp(document, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 300 })
 
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
   })
 
   it('closes the drawer on Escape', () => {
@@ -380,7 +391,7 @@ describe('app shell', () => {
   it('falls back to Home for an unknown route', async () => {
     renderAt('/nowhere')
 
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
   })
 })
 
@@ -436,22 +447,22 @@ describe('each screen keeps its own scroll position', () => {
     await screen.findByText('No books yet')
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
+    fireEvent.click(drawerLink(/Library/))
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
 
     scrollTo(1200)
 
     // Back to Home, which was at the top and must arrive at the top.
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Home/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /))
+    fireEvent.click(drawerLink(/Home/))
+    await waitFor(() => expect(screen.getByText('Inhale · Read')).toBeTruthy())
 
     expect(scrolls().at(-1)).toBe(0)
 
     // And back to Library, which must arrive where it was left — not at the
     // top, and not at Home's position.
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
+    fireEvent.click(drawerLink(/Library/))
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
 
     expect(scrolls().at(-1)).toBe(1200)
@@ -465,13 +476,13 @@ describe('each screen keeps its own scroll position', () => {
     scrollTo(300)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Library/ }))
+    fireEvent.click(drawerLink(/Library/))
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Library' })).toBeTruthy())
     scrollTo(1200)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Home/ }))
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Good /))
+    fireEvent.click(drawerLink(/Home/))
+    await waitFor(() => expect(screen.getByText('Inhale · Read')).toBeTruthy())
 
     expect(scrolls().at(-1)).toBe(300)
   })
@@ -482,7 +493,7 @@ describe('each screen keeps its own scroll position', () => {
     scrollTo(500)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
-    fireEvent.click(screen.getByRole('link', { name: /Settings/ }))
+    fireEvent.click(drawerLink(/Settings/))
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy())
 
     // Not 500. Arriving somewhere new part-way down is the fault, not the fix.
@@ -542,8 +553,9 @@ describe('crossing between two tabs', () => {
 
   it('keeps the screen being left on show, and only it fades', async () => {
     renderAt('/')
-    // The greeting is Home's own marker — whichever half of the day it is.
-    expect(await screen.findByRole('heading', { name: /Chandan/ })).toBeDefined()
+    // The reading half's own chip is Home's marker now that the split front
+    // door has replaced the greeting (WP-65).
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
 
     swipeLeft()
     await screen.findByRole('heading', { name: 'Library' })
@@ -579,8 +591,9 @@ describe('crossing between two tabs', () => {
 
   it('puts the screen being left away once it has gone', async () => {
     renderAt('/')
-    // The greeting is Home's own marker — whichever half of the day it is.
-    expect(await screen.findByRole('heading', { name: /Chandan/ })).toBeDefined()
+    // The reading half's own chip is Home's marker now that the split front
+    // door has replaced the greeting (WP-65).
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
 
     swipeLeft()
     await screen.findByRole('heading', { name: 'Library' })

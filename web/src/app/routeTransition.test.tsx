@@ -87,7 +87,7 @@ describe('crossing between the app’s major locations', () => {
     fireEvent.click(screen.getByRole('button', { name: 'go to /' }))
 
     expect(calls).toEqual(['out'])
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toMatch(/^Good /)
+    expect(await screen.findByText('Inhale · Read')).toBeDefined()
   })
 
   it('clears the direction once the transition is done', async () => {

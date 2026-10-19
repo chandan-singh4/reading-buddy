@@ -1,11 +1,32 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react'
+/**
+ * The split front door (WP-65): inhale and exhale.
+ *
+ * Two halves, one screen. The book is the dark board above; the journal is
+ * paper below. Both doors are open at once, equally, at every hour — the app
+ * does not guess which one the reader came for (`decisions.md`, 2026-10-18).
+ *
+ * ## Each half is a surface with zones, not one large button
+ *
+ * The common act in each half is direct: the cover and Resume go straight to
+ * the saved page, the question and the circle go straight into a new entry.
+ * Everything else in a half opens that half, and the other folds to a lip that
+ * still reports its state. So the opened half *is* the home page — the app
+ * gains no screen to hold the choice, it loses one.
+ *
+ * The "open this half" target is a button layered *behind* the content rather
+ * than a `role="button"` wrapped around it. Links and buttons inside a button
+ * are something the browser has no sane answer for, and the reader needs both.
+ * See `.surface` in the stylesheet for how the layering works.
+ *
+ * ## What replaced what
+ *
+ * This screen used to be four curated shelves with a pace strip on the hero.
+ * The shelf now lives in the opened reading half and, in full, at `/library` —
+ * which already holds every book, search and filter. `PaceHorizon` stays on
+ * the book's own details page; the front door keeps the forecast as one line.
+ */
+
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
@@ -15,11 +36,19 @@ import { warmLibrary } from '../app/libraryMemory.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
 import { moveBooks } from '../app/shelfTransition.ts'
 import { loadCovers, useCovers, warmCovers } from '../app/useCovers.ts'
-import type { BookId, BookMeta } from '../structure/index.ts'
-import { repository, unavailableBooks } from '../storage/index.ts'
-import { sessionStore } from '../stats/sessions.ts'
-import { trajectoryOf, type Trajectory } from '../stats/trajectory.ts'
-import { PaceHorizon, type PaceStatus } from './PaceHorizon.tsx'
+import { nudgeFor } from '../journal/prompts.ts'
+import SpeakSheet from '../journal/SpeakSheet.tsx'
+import type { BookId } from '../structure/index.ts'
+import {
+  entryStore,
+  noteStore,
+  repository,
+  unavailableBooks,
+  type EntryLink,
+  type StoredEntry,
+} from '../storage/index.ts'
+import { dayKey, sessionStore } from '../stats/sessions.ts'
+import { trajectoryOf } from '../stats/trajectory.ts'
 import styles from './Home.module.css'
 
 type LoadState =
@@ -27,6 +56,22 @@ type LoadState =
   | { status: 'ready'; shelves: HomeShelves; total: number }
   | { status: 'failed'; message: string }
 
+/** Which half is open. `both` is where the app starts, at every hour. */
+type Door = 'both' | 'read' | 'write'
+
+/** What the sheet was opened for. */
+interface Writing {
+  prompt?: string
+  listen?: boolean
+  link?: EntryLink
+}
+
+/** The reader's newest mark, as the door prints it. */
+interface Mark {
+  bookId: BookId
+  anchor: unknown
+  quote: string
+}
 
 /**
  * How long the first paint of a session will wait for cover art before giving
@@ -36,17 +81,10 @@ type LoadState =
  * this is never reached — it is here so that a slow or damaged store degrades
  * to the old behaviour (placeholders, then art) instead of holding the app on
  * an empty screen. Short enough to pass for part of the launch.
- *
- * That "few milliseconds" was only true of the device library for a while. On
- * the cloud backend the read went to Supabase and then R2, comfortably past this
- * cap, so the timeout fired on every launch and the reader met the placeholders
- * it exists to avoid. `app/coverStore.ts` is what made the sentence true again:
- * covers are read from the device first, and this is once more a safety net
- * rather than the normal path.
  */
 const COVER_WAIT_MS = 900
 
-/** Every book the shelves will actually draw, in the order they appear. */
+/** Every book the shelf will actually draw, in the order it appears. */
 function shelfBookIds(shelves: HomeShelves): BookId[] {
   return [
     ...(shelves.currentlyReading ? [shelves.currentlyReading.book.id] : []),
@@ -67,74 +105,66 @@ function atMost(work: Promise<unknown>, ms: number): Promise<void> {
   })
 }
 
-/**
- * Who the greeting addresses.
- *
- * A constant rather than a setting: this is a single-reader app on a single
- * phone, and a name field in Settings would be four screens of plumbing for a
- * value that changes never. If it ever has to be editable, this is the one
- * place that has to learn where to read it from.
- */
-const READER_NAME = 'Chandan'
+/** `Sep 24`. Local, and never near a timezone. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** "Good morning" / "Good afternoon" / "Good evening", by the clock. */
-function greetingFor(hour: number): string {
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
+function shortDate(d: Date): string {
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`
 }
 
-/**
- * The front door: four curated shelves — Current Reading, Up Next, Unread,
- * Finished — rather than the whole collection. The full library — every book,
- * search, import, delete — lives at `/library` (`Library.tsx`, unchanged), one
- * tap away via the Unread shelf's "View All" or the drawer's "All Books".
- *
- * Finished is last on purpose. It is the only shelf that looks backwards, and
- * a screen whose job is "pick up where you left off" should not open with what
- * is already done — but a reader does want to see it, which is why it is here
- * at all rather than only in the library.
- *
- * Only Unread carries "View All": it is the shelf that is capped (at ten of
- * however many you own), so it is the only one where something is actually
- * being held back. Finished is uncapped — it simply scrolls.
- */
+/** `Sun 19 Oct`, for the journal half's own date line. */
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function dateLine(d: Date): string {
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`
+}
+
+/** `19:04`. */
+function clock(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** The first line of an entry, however it was shaped. */
+function firstLine(entry: StoredEntry): string {
+  const words = (entry.title ?? entry.shaped?.text ?? entry.raw).trim().replace(/\s+/g, ' ')
+  return words.length > 90 ? `${words.slice(0, 90).trimEnd()}…` : words
+}
+
 export default function Home() {
-  // Seeded from the last visit, so a return paints the shelf on its first frame
-  // rather than showing "Loading…" where the books were. A lazy initialiser: it
-  // must read the memory on mount, not on every render.
+  // Seeded from the last visit, so a return paints the door on its first frame
+  // rather than showing an empty screen where the book was. A lazy initialiser:
+  // it must read the memory on mount, not on every render.
   const [state, setState] = useState<LoadState>(() => {
     const memory = readShelfMemory()
     return memory ? { status: 'ready', ...memory } : { status: 'loading' }
   })
-  const greeting = useMemo(() => greetingFor(new Date().getHours()), [])
+  const [door, setDoor] = useState<Door>('both')
+  const [writing, setWriting] = useState<Writing | null>(null)
+  const [mark, setMark] = useState<Mark | null>(null)
+  const [minutes, setMinutes] = useState<number | null>(null)
 
   /**
    * Which books were on which shelf, in what order, at the last paint.
    *
    * Only here to answer one question: did this re-read actually move anything?
    * Coming back from a book you merely looked at moves nothing, and starting a
-   * crossing to animate nothing would make the whole app pause for 300 ms on
-   * every visit to Home — a cost paid for a picture identical to the one already
-   * on screen.
-   *
-   * Seeded from the state this component mounted with, which is the shelf the
-   * reader is looking at right now: the *first* re-read after coming out of a
-   * book is precisely the one that moves something, and it must not be missed.
+   * crossing to animate nothing would make the app pause for 300 ms on every
+   * visit to Home — a cost paid for a picture identical to the one on screen.
    */
   const arrangement = useRef(
     state.status === 'ready' ? shelfBookIds(state.shelves).join() : '',
   )
 
-  // On arrival rather than on mount. The screen is kept alive between visits now
-  // (`app/screenActive.tsx`), so mounting happens once and is no longer the same
-  // thing as the reader coming back — but the shelf still has to notice a book
-  // deleted or renamed while they were on another tab.
+  // On arrival rather than on mount. The screen is kept alive between visits
+  // (`app/screenActive.tsx`), so mounting happens once and is no longer the
+  // same thing as the reader coming back — but the door still has to notice a
+  // book deleted or renamed while they were on another tab.
   useOnVisit(() => {
     let cancelled = false
 
-    // Whether this is the first paint of the session — nothing on screen yet, no
-    // memory to have seeded it. See the wait below.
+    // Whether this is the first paint of the session — nothing on screen yet,
+    // no memory to have seeded it. See the wait below.
     const cold = readShelfMemory() === null
 
     Promise.all([repository.listBooks(), repository.listPositions()])
@@ -143,54 +173,31 @@ export default function Home() {
 
         /*
          * Offline, the shelf listing includes books this device cannot open —
-         * that is the point of it, and the library screen shows them greyed out.
-         * Home is the exception: its whole job is "pick up where you left off",
-         * and a front door offering four books that all refuse to open is a
-         * worse answer than a shorter, true one. So here they are left out
-         * rather than dimmed, and the full collection is one tap away.
+         * that is the point of it, and the library screen shows them greyed
+         * out. The front door is the exception: its whole job is "pick up where
+         * you left off", and a door offering books that all refuse to open is a
+         * worse answer than a shorter, true one.
          */
         const away = await unavailableBooks(listed)
         const books = away.size === 0 ? listed : listed.filter((book) => !away.has(book.id))
         const shelves = shelvesOf(books, positions)
 
         /*
-         * At launch, the covers are fetched *before* the shelf is shown.
-         *
-         * Every other visit to Home is instant because something earlier warmed
-         * the caches, and this is the one visit where nothing did: opening the
-         * app went blank → shelf of coloured placeholder letters → real artwork
-         * fading in a few milliseconds apart. Two swaps in the space of a blink,
-         * on the screen the reader is looking straight at, which is why it read
-         * as the page refreshing itself even after the rebuild was fixed.
-         *
-         * So the first paint waits for the reads it would otherwise race, and
-         * the shelf appears once, finished. It costs a few milliseconds of blank
-         * screen during a launch that already has some — and unlike a swap,
-         * nothing the reader can see moves.
-         *
-         * Only when cold. A return must never wait: it already has the whole
-         * shelf on screen, and holding *that* back would be the very flash this
-         * is removing.
+         * At launch, the covers are fetched *before* the door is shown. Every
+         * other visit is instant because something earlier warmed the caches,
+         * and this is the one visit where nothing did. So the first paint waits
+         * for the reads it would otherwise race, and the door appears once,
+         * finished. Only when cold: a return must never wait.
          */
         if (cold && books.length > 0) {
           await atMost(loadCovers(shelfBookIds(shelves)), COVER_WAIT_MS)
           if (cancelled) return
         }
 
-        /*
-         * A book read and closed has changed shelf — out of Unread and into
-         * Current Reading — and the two are different parents in the tree
-         * below, so React has no choice but to destroy its cover and build
-         * another. `moveBooks` is what makes that invisible: the browser
-         * photographs the cover on the shelf it was on and animates the picture
-         * into its new place, remount and all. See `app/shelfTransition.ts`.
-         *
-         * Only when something genuinely moved, and a plain update otherwise.
-         */
         const next = shelfBookIds(shelves).join()
         // An empty string means nothing was on screen to move from — the first
-        // paint of a session. Crossing from no shelf to a shelf is a pause where
-        // an appearance should be.
+        // paint of a session. Crossing from no shelf to a shelf is a pause
+        // where an appearance should be.
         const moved = arrangement.current !== '' && arrangement.current !== next
         arrangement.current = next
 
@@ -201,18 +208,13 @@ export default function Home() {
         if (moved) moveBooks(apply)
         else apply()
 
-        // Every book, not just the ones on these three shelves. Home is the only
-        // screen that reads the whole list, so this is the one place that knows
-        // what the library will need before the reader asks for it — and it is a
-        // screen or two ahead of them, which is exactly the head start needed for
-        // the library to open with its covers already on it. See `warmCovers`.
+        // Every book, not just the ones the door draws. This is the one screen
+        // that reads the whole list, so it is the one place that knows what the
+        // library will need before the reader asks for it.
         warmCovers(books.map((book) => book.id))
 
         // And the *data* the library opens with, for the same reason and at the
-        // same moment. The covers were only half of that first-visit flash: the
-        // other half was the library starting at "Loading…" while four indexed
-        // reads ran. Warmed here, both halves are answered before the reader can
-        // reach the screen that needs them. See `libraryMemory.ts`.
+        // same moment. See `libraryMemory.ts`.
         warmLibrary()
       })
       .catch((error: unknown) => {
@@ -228,370 +230,490 @@ export default function Home() {
     }
   })
 
+  const current = state.status === 'ready' ? state.shelves.currentlyReading : undefined
+  const currentId = current?.book.id
+
   /*
-   * The whole page waits, or none of it does.
+   * The two things the board reports that are not on the shelf: how long the
+   * reader read today, and the last thing they marked.
    *
-   * The greeting used to sit outside this gate while the shelf sat inside it.
-   * On a cold launch the shelf waits for the database read and then up to
-   * COVER_WAIT_MS for the artwork, so the reader got the greeting alone on an
-   * empty page for about a second, and then the books dropped in underneath it.
-   * Reported 2026-08-25: "that delay makes it feel lagging".
-   *
-   * A warm return never showed this, because the shelf memory above seeds the
-   * first frame. So the fault was only ever on the launch — the one moment the
-   * app is being judged for speed.
-   *
-   * Holding the greeting back does not make the wait longer. It makes it one
-   * wait instead of two, and one thing arriving finished reads as faster than
-   * two things arriving in pieces. The splash screen is what fills the moment,
-   * which is what a splash screen is for.
-   *
-   * `failed` still draws the greeting: an error under a bare heading is a page,
-   * and an error alone on white is a crash.
+   * A second visit read rather than part of the first, because neither can hold
+   * the door back. The shelf is what the reader looks at; a minute count that
+   * arrives a frame later arrives in a line that was already there.
    */
-  if (state.status === 'loading') return <div className={styles.home} aria-busy="true" />
+  useOnVisit(() => {
+    let cancelled = false
+    const today = dayKey(new Date())
+    void sessionStore
+      .between(today, today)
+      .then((sessions) => {
+        if (cancelled) return
+        const ms = sessions.reduce((total, session) => total + session.activeMs, 0)
+        setMinutes(Math.round(ms / 60000))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setMinutes(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  })
 
-  return (
-    <div className={styles.home}>
-      <header className={styles.greeting}>
-        <h1 className={styles.greetingTitle}>{greeting}, {READER_NAME}.</h1>
-        {/* An open question, not a caption. The line that used to sit here
-            ("Pick up where you left off") described the shelf underneath it,
-            which the shelf was already doing for itself. This one asks the
-            reader something instead, so it earns its place. */}
-        <p className={styles.greetingAsk}>What book are you picking up today?</p>
-        {/* The one way into the journal until the split front door (WP-65)
-            replaces this screen with both doors. */}
-        <Link to="/journal" className={styles.toJournal}>
-          Or speak a thought →
-        </Link>
-      </header>
+  useEffect(() => {
+    let cancelled = false
+    if (currentId === undefined) {
+      setMark(null)
+      return
+    }
+    void noteStore
+      .listNotes(currentId)
+      .then((notes) => {
+        if (cancelled) return
+        /*
+         * The reader's own marks only, and only the ones with words of the
+         * book attached. A tutor answer is not something the reader marked,
+         * and a note on a whole paragraph has no sentence to print.
+         */
+        const mine = notes
+          .filter((note) => note.author === 'you' && note.quote)
+          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+        const newest = mine[0]
+        setMark(
+          newest
+            ? { bookId: newest.bookId, anchor: newest.anchor, quote: newest.quote! }
+            : null,
+        )
+      })
+      .catch(() => {
+        if (cancelled) return
+        setMark(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [currentId])
 
-      {state.status === 'failed' && (
+  /*
+   * Nothing appears before it is finished.
+   *
+   * The greeting used to sit outside this gate while the shelf sat inside it,
+   * so a cold launch showed a heading alone on an empty page for about a second
+   * and then dropped the books in underneath it. Reported 2026-08-25: "that
+   * delay makes it feel lagging". One wait reads as faster than two.
+   */
+  if (state.status === 'loading') return <div className={styles.door} aria-busy="true" />
+
+  if (state.status === 'failed') {
+    return (
+      <div className={styles.door}>
         <div className={styles.error} role="alert">
           <p>Couldn’t open your shelf.</p>
           <p className={styles.pending}>{state.message}</p>
         </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.door} data-door={door}>
+      <ReadingHalf
+        shelves={state.shelves}
+        total={state.total}
+        open={door === 'read'}
+        folded={door === 'write'}
+        onOpen={() => setDoor(door === 'read' ? 'both' : 'read')}
+        minutes={minutes}
+        mark={mark}
+      />
+
+      <JournalHalf
+        open={door === 'write'}
+        folded={door === 'read'}
+        onOpen={() => setDoor(door === 'write' ? 'both' : 'write')}
+        onWrite={(prompt) => setWriting({ prompt })}
+        onSpeak={() => setWriting({ listen: true })}
+      />
+
+      {/*
+        The bridge, on the seam. It carries the last mark into a new entry, so
+        the one thought that belongs to both halves starts where they meet.
+        Hidden while a half is open: there is no seam then, and a reader who has
+        chosen a side is not standing between them.
+      */}
+      {door === 'both' && mark && (
+        <button
+          type="button"
+          className={styles.bridge}
+          onClick={() =>
+            setWriting({
+              link: { bookId: mark.bookId, anchor: mark.anchor as never, quote: mark.quote },
+            })
+          }
+        >
+          <span className={styles.bridgeLabel}>The bridge · your last mark</span>
+          <span className={styles.bridgeQuote}>“{mark.quote}”</span>
+        </button>
       )}
 
-      {state.status === 'ready' && state.total === 0 && (
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>No books yet</p>
-          <p>
-            Add some from <Link to="/library">your library</Link>.
-          </p>
-        </div>
-      )}
-
-      {state.status === 'ready' && state.total > 0 && <Shelves shelves={state.shelves} />}
+      <SpeakSheet
+        open={writing !== null}
+        onClose={() => setWriting(null)}
+        {...(writing?.prompt ? { prompt: writing.prompt } : {})}
+        {...(writing?.listen ? { listenAtOnce: true } : {})}
+        {...(writing?.link ? { link: writing.link } : {})}
+      />
     </div>
   )
 }
 
-function Shelves({ shelves }: { shelves: HomeShelves }) {
-  const allBooks: BookMeta[] = useMemo(
-    () => [
-      ...(shelves.currentlyReading ? [shelves.currentlyReading.book] : []),
-      ...shelves.upNext.map((entry) => entry.book),
-      ...shelves.unread,
-      ...shelves.finished,
-    ],
+/**
+ * Inhale: the book.
+ *
+ * Content settles towards the seam, so the two halves read as one spread that
+ * meets in the middle rather than two cards stacked.
+ */
+function ReadingHalf({
+  shelves,
+  total,
+  open,
+  folded,
+  onOpen,
+  minutes,
+  mark,
+}: {
+  shelves: HomeShelves
+  total: number
+  open: boolean
+  folded: boolean
+  onOpen: () => void
+  minutes: number | null
+  mark: Mark | null
+}) {
+  const current = shelves.currentlyReading
+  // Up Next first, then the unread, which is the order a reader would pick in.
+  const rest = useMemo(
+    () => [...shelves.upNext, ...shelves.unread.map((book) => ({ book }) as ShelfEntry)],
     [shelves],
   )
-  const covers = useCovers(useMemo(() => allBooks.map((book) => book.id), [allBooks]))
+
+  if (folded) {
+    return (
+      <section className={`${styles.half} ${styles.read}`}>
+        <button type="button" className={styles.lip} onClick={onOpen} aria-expanded={false}>
+          <span className={styles.chip}>Inhale</span>
+          <span className={styles.lipNote}>
+            {current ? current.book.title : `${total} on the shelf`}
+          </span>
+        </button>
+      </section>
+    )
+  }
 
   return (
-    <>
-      {/*
-        All four shelves are drawn whether or not they have anything on them.
+    <section className={`${styles.half} ${styles.read}`}>
+      <button
+        type="button"
+        className={styles.surface}
+        onClick={onOpen}
+        aria-expanded={open}
+        aria-label={open ? 'Close the reading half' : 'Open the reading half'}
+      />
 
-        They used to appear and disappear with their contents, which meant
-        finishing a book could remove one shelf and add another, and everything
-        below it moved. The screen is a bookshelf: a shelf with nothing on it is
-        still a shelf, and keeping it there makes the front door a fixed place
-        where each thing is always in the same spot.
-
-        An empty one is never bare, though — see `Shelf`. A heading over a gap
-        over a plank reads as something that failed to load, which is the exact
-        impression this screen has spent several rounds removing.
-      */}
-      <Shelf title="Current Reading" empty={!shelves.currentlyReading} note="Open a book to begin.">
-        {shelves.currentlyReading && (
-          <div className={styles.heroCard}>
-            <BookTile
-              entry={shelves.currentlyReading}
-              coverSrc={covers.get(shelves.currentlyReading.book.id)}
-              large
-              detail={<CurrentDetail entry={shelves.currentlyReading} />}
-            />
-          </div>
-        )}
-      </Shelf>
-
-      <Shelf title="Up Next" empty={shelves.upNext.length === 0} note="Nothing lined up yet.">
-        <div className={styles.row}>
-          {shelves.upNext.map((entry) => (
-            <BookTile key={entry.book.id} entry={entry} coverSrc={covers.get(entry.book.id)} />
-          ))}
+      <div className={styles.face}>
+        <div className={styles.faceHead}>
+          <span className={styles.chip}>Inhale · Read</span>
+          <span className={styles.spacer} />
+          {minutes !== null && minutes > 0 && (
+            <span className={styles.plain}>{minutes} min today</span>
+          )}
         </div>
-      </Shelf>
 
-      <Shelf
-        title="Unread"
-        viewAllTo="/library"
-        empty={shelves.unread.length === 0}
-        note="Nothing waiting to be started."
-      >
-        <div className={styles.row}>
-          {shelves.unread.map((book) => (
-            <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
-          ))}
+        <div className={styles.readBody}>
+          {current ? (
+            <>
+              {current.percent !== undefined && (
+                <span className={styles.locline}>
+                  <b>{current.percent}%</b> · where you stopped
+                </span>
+              )}
+              <h1 className={styles.bookTitle}>{current.book.title}</h1>
+              {mark && <p className={styles.marked}>“{mark.quote}”</p>}
+
+              <div className={styles.readRow}>
+                <Link
+                  to={`/book/${current.book.id}`}
+                  className={styles.coverLink}
+                  aria-hidden="true"
+                  tabIndex={-1}
+                >
+                  <ShelfCover entry={current} />
+                </Link>
+                <span className={styles.readActions}>
+                  <Link to={`/book/${current.book.id}`} className={styles.resume}>
+                    Resume {current.book.title} →
+                  </Link>
+                  <Link
+                    to={`/book/${current.book.id}/chapters`}
+                    className={styles.quietLink}
+                  >
+                    Chapter summaries
+                  </Link>
+                </span>
+              </div>
+
+              {/* Only once the half is open. The room the fold frees is what
+                  the shelf is shown in — that is what makes the fold worth
+                  making. */}
+              {open && <ShelfRow entries={rest} />}
+            </>
+          ) : (
+            /* No book on the go, so the door does not presume a page to
+               resume: the shelf stands in the face instead. */
+            <>
+              <span className={styles.locline}>Nothing on the go</span>
+              <h1 className={styles.bookTitle}>
+                {total > 0 ? 'Pick one up' : 'No books yet'}
+              </h1>
+              {total > 0 ? (
+                <ShelfRow entries={rest} />
+              ) : (
+                <p className={styles.marked}>
+                  Add some from <Link to="/library">your library</Link>.
+                </p>
+              )}
+            </>
+          )}
         </div>
-      </Shelf>
 
-      <Shelf title="Finished" empty={shelves.finished.length === 0} note="Nothing finished yet.">
-        <div className={styles.row}>
-          {shelves.finished.map((book) => (
-            <BookTile key={book.id} entry={{ book }} coverSrc={covers.get(book.id)} />
-          ))}
-        </div>
-      </Shelf>
-    </>
-  )
-}
-
-/**
- * One shelf: a heading, its covers, and the wooden plank they stand on. The
- * plank is drawn under the row rather than behind it so the covers appear to
- * rest on it — that edge is what makes the screen read as a bookshelf instead
- * of a list of cards.
- */
-function Shelf({
-  title,
-  viewAllTo,
-  empty = false,
-  note,
-  children,
-}: {
-  title: string
-  viewAllTo?: string
-  /** Whether this shelf has nothing on it — draw the plank and say so. */
-  empty?: boolean
-  /** The quiet line to stand in the gap. Each shelf says its own thing. */
-  note?: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className={styles.shelf}>
-      <div className={styles.shelfHead}>
-        <h2 className={styles.shelfHeading}>{title}</h2>
-        {viewAllTo && (
-          <Link to={viewAllTo} className={styles.viewAll}>
-            View All
+        <div className={styles.faceFoot}>
+          {current && <Forecast entry={current} />}
+          <span className={styles.spacer} />
+          <Link to="/library" className={styles.footLink}>
+            Library ({total}) →
           </Link>
-        )}
+        </div>
       </div>
-
-      {/*
-        The note takes the covers' place rather than sitting beside them, and it
-        is one modest line high for every shelf — including Current Reading,
-        whose hero tile is several times that. Holding a hero-sized hole open at
-        the top of the screen would push everything else below the fold to say
-        nothing at all.
-      */}
-      {empty ? <p className={styles.shelfEmpty}>{note}</p> : children}
-
-      <div className={styles.plank} aria-hidden="true" />
     </section>
   )
 }
 
-/** `Sep 24`. Local, and never near a timezone. */
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/** Exhale: the journal. */
+function JournalHalf({
+  open,
+  folded,
+  onOpen,
+  onWrite,
+  onSpeak,
+}: {
+  open: boolean
+  folded: boolean
+  onOpen: () => void
+  onWrite: (prompt: string) => void
+  onSpeak: () => void
+}) {
+  const [entries, setEntries] = useState<StoredEntry[] | null>(null)
+  const nudge = useMemo(() => nudgeFor(new Date()), [])
+  const today = useMemo(() => dateLine(new Date()), [])
 
-function shortDate(d: Date): string {
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}`
-}
-
-/**
- * Everything else about the book in hand: where to go next, and when it ends.
- *
- * The shelf used to say "28% read" and stop, which left the one book the reader
- * is actually in the middle of as the book the app said least about on screen.
- * The finish date and the daily pace already existed — `trajectoryOf` works them
- * out for the book's own details page — and this brings them to the front door,
- * where "am I going to finish this?" is the question actually being asked.
- *
- * ## Why it stays quiet about a book it cannot forecast
- *
- * A trajectory needs about a quarter of an hour of reading and 5% of the book
- * before a finish date is worth printing. Until then the strip says so in one
- * line, rather than printing a date it would have to take back or leaving a gap
- * that reads as something which failed to load.
- */
-/** `trajectoryOf` writes its status for a reader; the strip wants it as a key. */
-function statusKey(status: string): PaceStatus {
-  if (status === 'Ahead') return 'ahead'
-  if (status === 'Behind') return 'behind'
-  return 'on_track'
-}
-
-function CurrentDetail({ entry }: { entry: ShelfEntry }) {
-  const { book, percent } = entry
-  const [pace, setPace] = useState<Trajectory | undefined>()
-  const [settled, setSettled] = useState(false)
-
-  useEffect(() => {
-    // Only a book in progress, matching `BookInfo`: a finished book has no
-    // finish to forecast, and one never opened has nothing to forecast from.
-    if (percent === undefined || percent <= 0 || percent >= 100) {
-      setPace(undefined)
-      setSettled(true)
-      return
-    }
+  useOnVisit(() => {
     let cancelled = false
-    setSettled(false)
-    sessionStore
-      .forBook(book.id)
-      .then((sessions) => {
+    void entryStore
+      .listEntries()
+      .then((rows) => {
         if (cancelled) return
-        setPace(trajectoryOf(sessions, percent, new Date()))
-        setSettled(true)
+        setEntries(rows)
       })
       .catch(() => {
         if (cancelled) return
-        setPace(undefined)
-        setSettled(true)
+        setEntries([])
+      })
+    return () => {
+      cancelled = true
+    }
+  })
+
+  const all = entries ?? []
+  const last = all[0]
+  const todayKey = new Date().toDateString()
+  const mine = all.filter((entry) => new Date(entry.at).toDateString() === todayKey)
+
+  if (folded) {
+    return (
+      <section className={`${styles.half} ${styles.write}`}>
+        <button type="button" className={styles.lip} onClick={onOpen} aria-expanded={false}>
+          <span className={styles.chip}>Exhale</span>
+          <span className={styles.lipNote}>
+            {mine.length > 0
+              ? `${mine.length} today · last at ${clock(mine[0]!.at)}`
+              : 'Nothing written today'}
+          </span>
+        </button>
+      </section>
+    )
+  }
+
+  return (
+    <section className={`${styles.half} ${styles.write}`}>
+      <button
+        type="button"
+        className={styles.surface}
+        onClick={onOpen}
+        aria-expanded={open}
+        aria-label={open ? 'Close the journal half' : 'Open the journal half'}
+      />
+
+      <div className={styles.face}>
+        <div className={styles.faceHead}>
+          <span className={styles.chip}>Exhale · Journal</span>
+          <span className={styles.spacer} />
+          <span className={styles.plain}>{today}</span>
+        </div>
+
+        <div className={styles.writeBody}>
+          <span className={styles.kicker}>{nudge.label}</span>
+          {/*
+            The question is the way in, so it is the control. A blank page is a
+            wall; a question is a door — and the reader who taps it lands in the
+            box with the question still on screen.
+          */}
+          <button
+            type="button"
+            className={styles.prompt}
+            onClick={() => onWrite(nudge.question)}
+          >
+            {nudge.question}
+          </button>
+          <p className={styles.hint}>Tap to write, or press the circle and just talk.</p>
+
+          <div className={styles.writeRow}>
+            <button
+              type="button"
+              className={styles.circle}
+              onClick={onSpeak}
+              aria-label="Speak an entry"
+            >
+              <span aria-hidden="true" />
+            </button>
+            <span className={styles.circleWords}>
+              <b>Speak it instead</b>
+              <span>The screen stays awake while you talk</span>
+            </span>
+          </div>
+
+          {open && mine.length > 0 && (
+            <div className={styles.recent}>
+              <span className={styles.kicker}>Earlier today</span>
+              <ul className={styles.recentList}>
+                {mine.map((entry) => (
+                  <li key={entry.id}>
+                    <Link to={`/journal/${entry.id}`} className={styles.recentEntry}>
+                      <time dateTime={entry.at}>{clock(entry.at)}</time>
+                      <span>{firstLine(entry)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.faceFoot}>
+          {last && <span className={styles.lastLine}>“{firstLine(last)}”</span>}
+          <span className={styles.spacer} />
+          <Link to="/journal" className={styles.footLink}>
+            Archive ({all.length}) →
+          </Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * The finish forecast, as one line.
+ *
+ * The full strip (`PaceHorizon`) stays on the book's own details page. The
+ * front door is asking "am I going to finish this?", and one line answers it
+ * without taking a quarter of the half to do so.
+ */
+function Forecast({ entry }: { entry: ShelfEntry }) {
+  const { book, percent } = entry
+  const [words, setWords] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (percent === undefined || percent <= 0 || percent >= 100) {
+      setWords(null)
+      return
+    }
+    void sessionStore
+      .forBook(book.id)
+      .then((sessions) => {
+        if (cancelled) return
+        const pace = trajectoryOf(sessions, percent, new Date())
+        if (pace === undefined || pace.calibrating || pace.finishOn === undefined) {
+          setWords('Still learning how fast you read this one.')
+          return
+        }
+        setWords(`Finishing ${shortDate(pace.finishOn)} · ${pace.velocity}m / day`)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setWords(null)
       })
     return () => {
       cancelled = true
     }
   }, [book.id, percent])
 
-  const finish = pace?.finishOn
-  const forecast = pace !== undefined && !pace.calibrating && finish !== undefined
+  if (words === null) return null
+  return <span className={styles.forecast}>{words}</span>
+}
+
+/** The shelf, in the room a fold frees. */
+function ShelfRow({ entries }: { entries: ShelfEntry[] }) {
+  const covers = useCovers(useMemo(() => entries.map((entry) => entry.book.id), [entries]))
+
+  if (entries.length === 0) {
+    return <p className={styles.marked}>Nothing else waiting.</p>
+  }
 
   return (
-    <div className={styles.currentDetail}>
-      {/*
-        One button, not two. "Continue reading" was a third door onto the book —
-        the cover opens it and so does the title — and a card whose most
-        prominent control repeats what tapping anywhere else already does
-        teaches the reader that the buttons are decoration.
-        Chapter summaries is the only thing here that goes somewhere new.
-      */}
-      <Link to={`/book/${book.id}/chapters`} className={styles.currentAction}>
-        {/* Violet, and the same page-with-lines mark the details screen uses on
-            its own summaries button. Violet is Veda's throughout the app and is
-            spent on nothing else — this button opens what she wrote, so it
-            takes her colour rather than the ordinary outline every other
-            control here has. */}
-        <svg
-          className={styles.actionIcon}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
+    <div className={styles.shelfRow}>
+      {entries.map((entry) => (
+        <Link
+          key={entry.book.id}
+          to={`/book/${entry.book.id}`}
+          className={styles.shelfTile}
         >
-          <path d="M4 4h13l3 3v13H4z" />
-          <path d="M8 9h8M8 13h8M8 17h5" />
-        </svg>
-        <span>Chapter summaries</span>
-      </Link>
-
-      {/* Held back until the lookup answers. A strip that says "still learning"
-          for a moment and then prints a date is a strip that changed its mind
-          in front of the reader. */}
-      {settled && (
-        forecast ? (
-          <PaceHorizon
-            progress={pace.path}
-            projectedDays={pace.daysRemaining}
-            estimatedFinishDate={shortDate(finish)}
-            pacePerDay={`${pace.velocity}m / day`}
-            status={statusKey(pace.status)}
-          />
-        ) : (
-          <div className={styles.trajectory}>
-            <div className={styles.trajectoryHead}>
-              <span className={styles.trajectoryKicker}>Trajectory</span>
-            </div>
-            <p className={styles.trajectoryNote}>
-              {percent !== undefined && percent > 0
-                ? 'Still learning how fast you read this one.'
-                : 'Open it once and a finish date appears here.'}
-            </p>
-          </div>
-        )
-      )}
+          <span className={styles.shelfArt}>
+            <Cover
+              title={entry.book.title}
+              src={covers.get(entry.book.id)}
+              bookId={entry.book.id}
+            />
+          </span>
+          <span className={styles.shelfTitle}>{entry.book.title}</span>
+          {entry.percent !== undefined && (
+            <span className={styles.shelfPercent}>{entry.percent}% read</span>
+          )}
+        </Link>
+      ))}
     </div>
   )
 }
 
-function BookTile({
-  entry,
-  coverSrc,
-  large = false,
-  detail,
-}: {
-  entry: ShelfEntry
-  coverSrc?: string
-  large?: boolean
-  /**
-   * Extra content for the column beside the cover — the hero's button and its
-   * trajectory. It sits *inside* the tile rather than under it so that the
-   * cover's own bottom edge is the bottom of the card, and the book can stand
-   * on the plank instead of hovering above a strip of text.
-   *
-   * It cannot go inside `.tileInfo`, which is itself a link to the book: a
-   * button nested in a link is a control the browser has no sane answer for.
-   */
-  detail?: ReactNode
-}) {
-  const { book, percent } = entry
+/** The book in hand, drawn as a cover. Its own hook, so the row keeps one. */
+function ShelfCover({ entry }: { entry: ShelfEntry }) {
+  const covers = useCovers(useMemo(() => [entry.book.id], [entry.book.id]))
   return (
-    <div className={large ? `${styles.tile} ${styles.tileLarge}` : styles.tile}>
-      <div className={styles.mediaWrap}>
-        {/* Decorative duplicate of the tileInfo link below — the title link
-            already reaches this book by keyboard/screen reader, so this one
-            steps out of the tab order rather than announcing it twice. */}
-        <Link to={`/book/${book.id}`} className={styles.tileMedia} aria-hidden="true" tabIndex={-1}>
-          <Cover title={book.title} src={coverSrc} bookId={book.id} />
-          {/* The fore edge, lit as far as you have read. Only on the hero: a
-              row of six small covers each with a lit edge is a row of stripes,
-              and the percentage is already printed under every one of them
-              there. Nothing is drawn at 0% — an untouched book must not carry a
-              mark that says it was started. */}
-          {large && percent !== undefined && percent > 0 && (
-            <span
-              className={styles.spineFill}
-              style={{ '--fill': `${Math.min(percent, 100)}%` } as CSSProperties}
-            />
-          )}
-        </Link>
-        <Link
-          to={`/book/${book.id}/info`}
-          className={styles.infoButton}
-          aria-label={`About ${book.title}`}
-        >
-          ⓘ
-        </Link>
-      </div>
-      <div className={detail ? styles.tileColumn : styles.tileColumnBare}>
-        <Link to={`/book/${book.id}`} className={styles.tileInfo}>
-          <span className={styles.tileTitle}>{book.title}</span>
-          {book.author && <span className={styles.tileAuthor}>{book.author}</span>}
-          {/* On the hero the fore edge says this, and says it better. Everywhere
-              else the number is the only thing that can. */}
-          {!large && percent !== undefined && (
-            <span className={styles.tileProgress}>{percent}% read</span>
-          )}
-        </Link>
-        {detail}
-      </div>
-    </div>
+    <span className={styles.coverArt}>
+      <Cover
+        title={entry.book.title}
+        src={covers.get(entry.book.id)}
+        bookId={entry.book.id}
+      />
+    </span>
   )
 }
