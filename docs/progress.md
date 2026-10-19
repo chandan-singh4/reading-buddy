@@ -198,8 +198,11 @@ said it did not; that line is now corrected.
 **WP-62, give the words a shape — built 2026-10-19, not yet tried on the
 phone.** The entry screen now offers three strengths under the words.
 
-- **Tidy** adds punctuation, capitals and paragraph breaks, and not one new
-  word. It may cut a stammer or an "um". It may not improve a sentence.
+- **Tidy** adds punctuation, capitals and paragraph breaks, and repairs the
+  grammar that speaking breaks — a hanging sentence, a stray connective, a
+  dropped word, a slipped tense. It may not improve the reader's style,
+  shorten a sentence, or change their vocabulary. See the 2026-10-19 reversal
+  in `decisions.md`.
 - **Shape** adds a title and groups the ideas into paragraphs.
 - **Unpack** adds headings, anything the reader said they would do, and two or
   three questions to sit with.

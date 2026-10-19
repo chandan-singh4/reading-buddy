@@ -3447,3 +3447,25 @@ survived, because it was in the cloud.
   the same way. One asks a question. The other makes a statement.
 - **A sheet rises over the page.** The entry saves, the sheet drops, and reading
   carries on. A book is where an entry is born. The journal is where it is read.
+
+## Tidy repairs grammar, it does not only punctuate (2026-10-19)
+
+- **REVERSAL.** The 2026-10-18 rule "*Tidy* adds punctuation and paragraphs, and
+  no new words" is superseded. It was right that a model must not rewrite the
+  reader's voice. It was wrong to think punctuation alone makes speech readable.
+- **What the first build did.** The reader spoke "the only thing is that if the
+  punctuation is not automated". Tidy punctuated it and left the stray "if", so
+  the sentence still did not parse. The reader asked for the grammar to be
+  fixed.
+- **What Tidy does now.** It finishes a sentence left hanging. It removes a
+  stray connective. It puts back a dropped word. It corrects subject and verb,
+  and a tense that slipped. It still deletes stammers and filler.
+- **What Tidy still must not do.** It must not improve style. It must not make a
+  sentence shorter, more formal, or more elegant. It must not change the
+  reader's vocabulary. It must not reorder the points. It must not add an idea.
+- **The test the prompt gives the model.** Would the reader say "yes, that is
+  what I meant", or "those are not my words"? Only the first kind of change is
+  allowed.
+- **Why this is safe to loosen.** The raw transcript is still canonical and is
+  always one tap away. The reader can compare the two copies, and delete the
+  shape. A wrong change costs a tap, not a thought.

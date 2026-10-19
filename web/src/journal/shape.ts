@@ -39,7 +39,7 @@ export const SHAPE_LABEL: Record<ShapeLevel, string> = {
 
 /** One line under each button, so the reader knows what they are choosing. */
 export const SHAPE_BLURB: Record<ShapeLevel, string> = {
-  tidy: 'Punctuation, capitals and paragraphs. Not one new word.',
+  tidy: 'Punctuation, paragraphs, and the grammar speaking breaks. Your words, your order.',
   shape: 'A title, and your ideas grouped into paragraphs.',
   unpack: 'Headings, anything you said you would do, and questions to sit with.',
 }

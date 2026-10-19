@@ -630,18 +630,28 @@ Keep it concise enough to read in a few seconds. This is a refresher before cont
    */
   tidy: {
     material: true,
-    prompt: `The material is a voice transcript of one spoken journal entry. A speech recogniser wrote it, so it has no punctuation, no capitals and no paragraph breaks.
+    prompt: `The material is a voice transcript of one spoken journal entry. A speech recogniser wrote it, so it has no punctuation, no capitals and no paragraph breaks. The reader was speaking aloud, so the grammar is spoken grammar.
 
-Give it those three things, and nothing else.
+Make it read as correct written English, while keeping it recognisably the reader's own.
+
+Do this:
 
 - Add sentence punctuation, capitals, and paragraph breaks where the reader changed subject.
-- Keep every word the reader said, in the order they said it.
-- You may delete a stammer, a word repeated by accident, or a filler word such as "um", "uh", "like" or "you know", where it plainly carries no meaning. Delete nothing else.
-- Do not rewrite a clumsy sentence into a better one. A clumsy sentence is how the reader said it.
-- Do not add a word that carries meaning. Do not add a title, a heading, a summary, or any remark of your own.
-- Correct a word the recogniser plainly misheard only when the right word is obvious from the sentence around it.
+- Repair the grammar that speaking breaks. Finish a sentence the reader left hanging. Remove a stray connective that leads nowhere, such as the "if" in "the only thing is that if the punctuation is not automated". Put back a word that was dropped. Fix subject and verb that do not agree. Fix a tense that slipped mid-sentence.
+- Delete a stammer, a word repeated by accident, a false start, and a filler word such as "um", "uh", "like" or "you know", where it carries no meaning.
+- Correct a word the recogniser plainly misheard, when the right word is obvious from the sentence around it.
 
-Return the punctuated text and nothing else. No preamble, no closing remark, no code fences.`,
+Do not do this:
+
+- Do not improve the reader's style. Do not make a plain sentence more elegant, more formal, or shorter.
+- Do not replace the reader's vocabulary with better words. If they said "good", leave "good".
+- Do not reorder their points, and do not merge or split sentences except where the grammar genuinely requires it.
+- Do not add an idea, a fact, a conclusion or an example that the reader did not speak.
+- Do not add a title, a heading, a summary, or any remark of your own.
+
+The test to apply to every change: would the reader say "yes, that is what I meant", or would they say "those are not my words"? Make the first kind of change only.
+
+Return the corrected text and nothing else. No preamble, no closing remark, no code fences.`,
   },
 
   shape: {
@@ -657,7 +667,7 @@ Write, in markdown, in this order:
 
 Rules:
 
-- Punctuate, capitalise and cut filler exactly as a tidy would.
+- Punctuate, capitalise, cut filler and repair spoken grammar exactly as a tidy would.
 - Bring sentences about the same idea together, even where the reader came back to it later. Change nothing else about the order.
 - Keep the reader's own phrasing. Rewrite a sentence only where the spoken word order makes it unreadable.
 - Add no information, no conclusion and no advice. You are organising a thought, not answering it.
@@ -686,7 +696,7 @@ The reader spoke a thought aloud and a speech recogniser wrote it down with no p
 Write, in markdown, in this order:
 
 1. A single H1 line: a title for the entry, six words or fewer.
-2. The thought itself, tidied into paragraphs under H2 headings, one heading for each idea. Use the reader's own words and phrasing. Punctuate, capitalise and cut filler.
+2. The thought itself, tidied into paragraphs under H2 headings, one heading for each idea. Use the reader's own words and phrasing. Punctuate, capitalise, cut filler and repair spoken grammar.
 3. An H2 headed "What you said you would do", listing anything the reader decided, intended or committed to. One short line each. Leave this section out completely when they committed to nothing.
 4. An H2 headed "Worth asking yourself", with two or three questions that follow from what the reader actually said.
 
