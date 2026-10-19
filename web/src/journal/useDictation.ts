@@ -67,6 +67,15 @@ export interface Dictation {
   fault: DictationFault | null
   start: () => void
   stop: () => void
+  /**
+   * Put the reader's own text in place of the recogniser's.
+   *
+   * The recogniser mishears — "Om" comes back as "umm", a name comes back as
+   * another name — and the reader must be able to fix that before the entry is
+   * kept. The text they hand over becomes the base that any later speaking is
+   * added to.
+   */
+  replace: (text: string) => void
   /** Throw the words away and begin again. */
   reset: () => void
 }
@@ -234,6 +243,29 @@ export function useDictation(): Dictation {
     }
   }, [])
 
+  /**
+   * The reader has corrected the words. Theirs are now the only ones.
+   *
+   * The running session is aborted rather than stopped, because its `results`
+   * list still holds every phrase it has settled, and the next event would
+   * rebuild that list on top of the correction and undo it. Aborting throws
+   * the list away. Nothing is lost that the reader can see: what the session
+   * had settled is already in the text they just edited.
+   */
+  const replace = useCallback((text: string) => {
+    wantedRef.current = false
+    keptRef.current = text
+    sessionRef.current = ''
+    setSettled(text)
+    setGuess('')
+    try {
+      recognitionRef.current?.abort()
+    } catch {
+      // Not running. The refs above are the part that matters.
+    }
+    setListening(false)
+  }, [])
+
   const reset = useCallback(() => {
     keptRef.current = ''
     sessionRef.current = ''
@@ -242,7 +274,7 @@ export function useDictation(): Dictation {
     setFault(null)
   }, [])
 
-  return { settled, guess, listening, supported, fault, start, stop, reset }
+  return { settled, guess, listening, supported, fault, start, stop, replace, reset }
 }
 
 /**

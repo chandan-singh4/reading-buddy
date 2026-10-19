@@ -251,6 +251,22 @@ A note for the next session, because it looked like a fault and is not one:
 shaped entry shows its heading at the top of the screen, above the date, and
 none inside the body. Headings *within* an entry are Unpack's job.
 
+**Typing and correcting — 2026-10-19.** The reader tried to say "Om" and the
+recogniser wrote "umm", with no way to fix it. Now the transcript in the speak
+sheet is a text box whenever the recogniser is not listening. The reader can
+type an entry with no microphone at all, which the unsupported-browser message
+had been promising and the app had not been keeping.
+
+`useDictation` gains `replace(text)`. It makes the typed words the base and
+aborts the running session, because that session's `results` list still holds
+every phrase it settled and the next event would rebuild it over the top of
+the correction. `SpeakSheet.test.tsx` is new and holds the order that matters:
+the correction is handed over *before* the recogniser starts again.
+
+Editing an entry that is already **saved** is still not possible. That one
+needs the reader's decision first, because a shaped copy made from the old
+words would go stale. See `decisions.md`, 2026-10-19.
+
 Tags are **not** in this waypoint. `decisions.md` says Shape proposes tags, and
 WP-64 is where they land, with the saved filters that make them useful.
 

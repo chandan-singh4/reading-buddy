@@ -81,6 +81,43 @@
   margin: 0;
 }
 
+/*
+ * The same words, now the reader's to change.
+ *
+ * It is deliberately not drawn as a form field: no frame, no filled box, the
+ * same face and the same measure as the transcript it replaces. The reader
+ * stopped speaking and the words stayed where they were — a box that appeared
+ * around them would say a different screen had arrived.
+ */
+.editor {
+  flex: 1 1 auto;
+  min-height: 7.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-reading);
+  font-size: var(--text-lg);
+  line-height: 1.55;
+  resize: none;
+}
+
+.editor::placeholder {
+  color: var(--color-text-muted);
+  font-family: var(--font-figure);
+  font-style: italic;
+}
+
+/* The caret is the whole signal that these words can be changed, so it is the
+   accent rather than the text colour, and the focus ring is left off: a ring
+   around a block of prose reads as an error. */
+.editor:focus {
+  outline: none;
+  caret-color: var(--color-accent);
+}
+
 .guess {
   color: var(--color-text-muted);
   font-style: italic;

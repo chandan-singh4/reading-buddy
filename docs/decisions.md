@@ -3469,3 +3469,22 @@ survived, because it was in the cloud.
 - **Why this is safe to loosen.** The raw transcript is still canonical and is
   always one tap away. The reader can compare the two copies, and delete the
   shape. A wrong change costs a tap, not a thought.
+
+## The reader may correct the words before they are kept (2026-10-19)
+
+- **The recogniser mishears.** "Om" comes back as "umm". A name comes back as
+  another name. The reader saw it happen on the first long entry.
+- **The transcript is a text box whenever the recogniser is not listening.**
+  The reader types in it, in the same place and the same face as the words they
+  spoke. While it is listening the words are read-only: a cursor in a field
+  that rewrites itself cannot be held.
+- **Speaking again adds to the correction.** `useDictation.replace` makes the
+  typed text the base, and aborts the running session so its old copy of the
+  words cannot come back on the next event.
+- **This does not loosen "the raw transcript is canonical" (2026-10-18).** That
+  rule stops a *model* overwriting the reader. Here no entry exists yet, and
+  the hand on the keyboard is the reader's own. What Keep saves is still the
+  one canonical copy, and no model may change it.
+- **Still open: editing an entry that is already saved.** That one does touch
+  the rule, because a shaped copy made from the old words would go stale. Ask
+  the reader before building it.

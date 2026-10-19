@@ -8,6 +8,19 @@
  * What is saved is the raw transcript and nothing else. No audio is stored —
  * there is none to store, because the recogniser returns words. The shaping
  * models are WP-62; a tie to a passage is WP-63.
+ *
+ * ## The words are editable the moment the reader stops
+ *
+ * While the recogniser is listening the transcript is read-only: a cursor in a
+ * field that is rewriting itself is a fight the reader cannot win. The moment
+ * they stop, the same words become a text box. They can fix what was misheard
+ * — "Om" comes back as "umm" — and then press the circle again, and the next
+ * sentence is added after their correction.
+ *
+ * This takes nothing away from "the raw transcript is canonical"
+ * (`decisions.md`, 2026-10-18). That rule says a *model* may not overwrite the
+ * reader's words. Here there is no entry yet, and the hand on the keyboard is
+ * the reader's own.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -36,7 +49,14 @@ export interface SpeakSheetProps {
 }
 
 export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) {
-  const { settled, guess, listening, supported, fault, start, stop, reset } = useDictation()
+  const { settled, guess, listening, supported, fault, start, stop, replace, reset } =
+    useDictation()
+  /*
+   * What the box holds. It follows `settled` while the recogniser is working,
+   * and leads it the moment the reader types — which is why it is state here
+   * and not read straight off the hook.
+   */
+  const [draft, setDraft] = useState('')
   const [seconds, setSeconds] = useState(0)
   const [saving, setSaving] = useState(false)
   /*
@@ -54,11 +74,18 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
   useEffect(() => {
     if (!open) return
     reset()
+    setDraft('')
     setSeconds(0)
     setSaving(false)
     startedAtRef.current = null
     circleRef.current?.focus()
   }, [open, reset])
+
+  // The recogniser has heard more. The box shows it, unless the reader has
+  // taken the words over — in which case `settled` is their text already.
+  useEffect(() => {
+    setDraft(settled)
+  }, [settled])
 
   useEffect(() => {
     if (!listening) return
@@ -77,9 +104,9 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
    * would teach the reader not to trust this, and Discard is right there.
    */
   const closeIfEmpty = useCallback(() => {
-    if (settled.trim() || guess.trim()) return
+    if (draft.trim() || guess.trim()) return
     close()
-  }, [close, guess, settled])
+  }, [close, draft, guess])
 
   useEffect(() => {
     if (!open) return
@@ -92,7 +119,7 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
 
   if (!open) return null
 
-  const words = settled.trim()
+  const words = draft.trim()
   /*
    * Not while listening. Pressing Keep mid-sentence would save the words the
    * recogniser had settled and throw away the phrase still in its mouth —
@@ -101,11 +128,23 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
    */
   const canKeep = words.length > 0 && !saving && !listening
 
+  /**
+   * Hand the typed words to the hook before anything else happens to them.
+   *
+   * Speaking again adds to whatever the box holds, so the correction has to be
+   * the base before the next session opens — otherwise the recogniser's own
+   * older copy is still the base, and the correction is lost on the next word.
+   */
+  function commit(): void {
+    if (draft !== settled) replace(draft)
+  }
+
   function toggle(): void {
     if (listening) {
       stop()
       return
     }
+    commit()
     startedAtRef.current ??= new Date()
     start()
   }
@@ -114,6 +153,7 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
     if (!canKeep) return
     setSaving(true)
     stop()
+    commit()
     try {
       const row = await entryStore.addEntry({
         raw: words,
@@ -151,27 +191,42 @@ export default function SpeakSheet({ open, onClose, onSaved }: SpeakSheetProps) 
         {supported && fault && <p className={styles.fault}>{FAULT_WORDS[fault]}</p>}
 
         {/*
-         * Announced politely rather than assertively: a live transcript that
-         * interrupts a screen reader on every word is unusable, and the reader
-         * already knows they are speaking.
+         * Two states of one thing, not two things. While the recogniser is
+         * working the words are read-only, because a cursor in a field that
+         * rewrites itself cannot be held. The moment it stops, the same words
+         * in the same place become a box the reader can type in.
+         *
+         * The live one is announced politely rather than assertively: a
+         * transcript that interrupts a screen reader on every word is
+         * unusable, and the reader knows they are speaking.
          */}
-        <p className={styles.transcript} aria-live="polite">
-          {words || guess ? (
-            <>
-              {words}
-              {guess && (
-                <>
-                  {words ? ' ' : ''}
-                  <span className={styles.guess}>{guess}</span>
-                </>
-              )}
-            </>
-          ) : (
-            <span className={styles.waiting}>
-              {listening ? 'Listening…' : 'Press the circle and talk.'}
-            </span>
-          )}
-        </p>
+        {listening ? (
+          <p className={styles.transcript} aria-live="polite">
+            {words || guess ? (
+              <>
+                {words}
+                {guess && (
+                  <>
+                    {words ? ' ' : ''}
+                    <span className={styles.guess}>{guess}</span>
+                  </>
+                )}
+              </>
+            ) : (
+              <span className={styles.waiting}>Listening…</span>
+            )}
+          </p>
+        ) : (
+          <textarea
+            className={styles.editor}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+            placeholder="Press the circle and talk, or type here."
+            aria-label="Your words"
+            rows={4}
+          />
+        )}
 
         <div className={styles.controls}>
           <button
