@@ -662,8 +662,8 @@ Organise it, in the reader's own words.
 
 Write, in markdown, in this order:
 
-1. A single H1 line: a title for the entry, six words or fewer, drawn from what the entry is actually about.
-2. The entry in paragraphs, one idea in each, in the order the reader first raised them.
+1. A single H1 line: a title for the entry, six words or fewer, drawn from what the entry is actually about. Write it as a markdown heading, so the line starts with "# " and nothing else marks it.
+2. The entry in paragraphs, one idea in each, in the order the reader first raised them. Put one empty line between every two paragraphs, and between the title and the first paragraph. A paragraph break written as a single line break is not a paragraph break.
 
 Rules:
 
@@ -707,6 +707,11 @@ Rules:
 - A question must open the thought further. It must not test the reader, advise them, or lead them to a conclusion you have already drawn.
 - Never flatter, never reassure, never diagnose.
 - Write to the reader directly, plainly and briefly.
+
+Markdown, strictly:
+
+- A heading line starts with "# " or "## ". Never mark a heading with bold, with capitals, or with a line on its own.
+- Put one empty line between every two blocks — between a heading and the text under it, and between every two paragraphs. A single line break is not a paragraph break.
 
 Return the markdown and nothing else. No preamble, no closing remark, no code fences.`,
   },

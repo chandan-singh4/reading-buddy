@@ -224,6 +224,25 @@ The shaped copy renders through `reader/markdown.tsx`, which builds React
 nodes and never HTML, so a model cannot put markup on the page. The raw copy
 still prints exactly as the recogniser left it.
 
+**The entry screen, after the first try on the phone — 2026-10-19.** Three
+changes the reader asked for.
+
+1. **A heading now looks like a heading.** The shaped copy renders through the
+   shared markdown renderer, which is written for the tutor's lamp: warm gold
+   ink, chat-bubble spacing, one size for every heading level. On paper that
+   gave a heading the reader could not tell from the body. `Entry.module.css`
+   now re-names the renderer's `--md-*` inks and dresses `[data-md='heading']`
+   in the display face, with air above it and a hairline under it.
+2. **The shaping prompts must write real markdown.** The model wrote the title
+   as a plain first line and broke paragraphs with one newline, so neither
+   arrived as a heading or as a paragraph. Shape and Unpack now say, in words,
+   that a heading starts with "# " and that a paragraph break is an empty line.
+3. **Marks on the controls.** `journal/marks.tsx` holds four small drawings:
+   lines on a page that gain structure from Tidy to Shape to Unpack, and a
+   waveform for the reader's own words, which were spoken and never written.
+   The words stay beside the marks. The attribution line is now only "Written
+   by <model>".
+
 Tags are **not** in this waypoint. `decisions.md` says Shape proposes tags, and
 WP-64 is where they land, with the saved filters that make them useful.
 

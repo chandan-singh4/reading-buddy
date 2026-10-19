@@ -25,6 +25,10 @@
 }
 
 .side {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   font: inherit;
   font-family: var(--font-ui);
   font-size: var(--text-sm);
@@ -34,6 +38,12 @@
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+}
+
+.sideMark {
+  width: 18px;
+  height: 18px;
+  flex: none;
 }
 
 .side[aria-pressed='true'] {
@@ -153,9 +163,11 @@
    would make the reader guess which is which, and the difference between them
    is the whole choice. */
 .level {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  align-items: center;
   text-align: left;
   font: inherit;
   padding: var(--space-3) var(--space-4);
@@ -188,6 +200,16 @@
   border-color: var(--color-accent);
 }
 
+/* The mark for each level: lines on a page that get more structure as the
+   level gets stronger. It says at a glance which of the three is which, and
+   it keeps saying it when the reader is not reading the words. */
+.levelMark {
+  grid-row: span 2;
+  width: 22px;
+  height: 22px;
+  color: var(--color-accent);
+}
+
 .levelName {
   font-family: var(--font-ui);
   font-weight: 600;
@@ -202,11 +224,61 @@
 /* The shaped copy. The same reading face and measure as the raw words — they
    are an equal pair and must not look like a draft and a finished thing — but
    no `pre-wrap`: this one is rendered markdown, and the renderer has already
-   turned the blank lines into elements. */
+   turned the blank lines into elements.
+
+   The `--md-*` block re-names the renderer's inks. `markdown.module.css` is
+   written for the lamp — warm gold on a dark page — and every colour in it
+   reads a token first. Without this block a heading would arrive as pale cream
+   on paper, which is a heading nobody can read. Same reasoning, and the same
+   shape, as the Notes panel. */
 .shapedProse {
+  --md-strong: var(--color-text);
+  --md-quiet: var(--color-text);
+  --md-faint: var(--color-text-muted);
+  --md-mark: var(--color-accent);
+  --md-link: var(--color-accent);
+  --md-code: var(--color-text);
+  --md-edge: var(--color-border);
+  --md-wash: var(--color-surface-raised);
+
   display: block;
   margin-top: var(--space-5);
   font-family: var(--font-reading);
   font-size: var(--text-lg);
   line-height: 1.6;
+}
+
+/*
+ * A heading has to look like a heading.
+ *
+ * The renderer draws every heading level as a `p` carrying `data-md="heading"`
+ * — see the note at the top of `markdown.tsx` — so the element selector is the
+ * handle, exactly as the Notes panel does it. Scoped to `.shapedProse`, so no
+ * other caller of the renderer is touched.
+ *
+ * Three things separate it from the body, because one is never enough on a
+ * phone: the display face, more air above than below (which is what ties a
+ * heading to the words under it rather than the ones over it), and a hairline.
+ * Size alone fails on a small screen; weight alone fails in a serif.
+ */
+.shapedProse [data-md='heading'] {
+  margin: 1.6em 0 0.45em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-display);
+  font-size: 1.1em;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.shapedProse [data-md='heading']:first-child {
+  margin-top: 0;
+}
+
+/* Paragraphs want room to read as paragraphs. The renderer's 0.7em is set for
+   a chat bubble, where the answer must not run off the screen; this is a page
+   the reader scrolls. */
+.shapedProse [data-md='paragraph'] {
+  margin-bottom: 0.9em;
 }

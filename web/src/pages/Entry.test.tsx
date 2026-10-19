@@ -75,6 +75,20 @@ describe('Entry', () => {
     expect(screen.getByText(/Exactly what the microphone heard/)).toBeTruthy()
   })
 
+  it('draws a heading in the shaped copy as a heading', async () => {
+    const entry = await entryStore.addEntry({ raw: 'a thought with parts' })
+    await db.entries.update(entry.id, {
+      shaped: { ...TIDY, level: 'unpack', text: '## What you said you would do\n\nTest it again.' },
+    })
+
+    openEntry(entry.id)
+
+    // The style hook. `Entry.module.css` dresses `[data-md='heading']`, so a
+    // heading that arrives as a plain paragraph is a heading nobody can see.
+    const head = await screen.findByText('What you said you would do')
+    expect(head.getAttribute('data-md')).toBe('heading')
+  })
+
   it('does not delete on one press', async () => {
     const entry = await entryStore.addEntry({ raw: 'a thought worth keeping' })
 
