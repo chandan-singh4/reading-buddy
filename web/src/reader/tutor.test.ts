@@ -20,7 +20,7 @@ vi.mock('../storage/cloud/client.ts', () => ({
   CloudError: class CloudError extends Error {},
 }))
 
-const { askTutor, INTENT_LABELS, modelLabel } = await import('./tutor.ts')
+const { askTutor, INTENT_LABELS, modelLabel, modelName } = await import('./tutor.ts')
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -237,6 +237,23 @@ describe('the chips', () => {
       'simply',
       'stilltrue',
     ])
+  })
+})
+
+describe('modelName', () => {
+  it('says the maker, and drops the parameter counts', () => {
+    expect(modelName('nvidia/nemotron-3-super-120b-a12b:free')).toBe(
+      'NVIDIA: Nemotron 3 Super',
+    )
+    expect(modelName('z-ai/glm-5.2:free')).toBe('Z-AI: GLM 5.2')
+    expect(modelName('meta-llama/llama-4-70b-instruct:free')).toBe('Meta: Llama 4')
+  })
+
+  it('still gives a name for a slug it has never seen', () => {
+    expect(modelName('someco/inkling-7b:free')).toBe('Someco: Inkling')
+    // A slug that is nothing but a size keeps the size, rather than going blank.
+    expect(modelName('someco/120b')).toBe('Someco: 120b')
+    expect(modelName('inkling')).toBe('Inkling')
   })
 })
 

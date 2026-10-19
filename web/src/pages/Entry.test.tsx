@@ -33,7 +33,7 @@ beforeEach(async () => {
 
 const TIDY: EntryShaped = {
   level: 'tidy',
-  model: 'a-free-model',
+  model: 'nvidia/nemotron-3-super-120b-a12b:free',
   at: '2026-10-18T10:00:00.000Z',
   text: 'So the thing is, I was thinking.',
 }
@@ -67,7 +67,9 @@ describe('Entry', () => {
     openEntry(entry.id)
 
     expect(await screen.findByText('So the thing is, I was thinking.')).toBeTruthy()
-    expect(screen.getByText(/Written by a-free-model/)).toBeTruthy()
+    // The slug is said the way a person would say it, not printed as a
+    // package id. See `modelName` in `reader/tutor.ts`.
+    expect(screen.getByText('Written by NVIDIA: Nemotron 3 Super')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Your words' }))
 
@@ -150,7 +152,7 @@ describe('Entry', () => {
     const entry = await entryStore.addEntry({ raw: 'um so the thing is i was thinking' })
     asked.mockResolvedValue({
       text: 'So the thing is, I was thinking.',
-      model: 'a-free-model',
+      model: 'nvidia/nemotron-3-super-120b-a12b:free',
       title: 'A thought',
     })
 

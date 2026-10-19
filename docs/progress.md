@@ -241,7 +241,15 @@ changes the reader asked for.
    lines on a page that gain structure from Tidy to Shape to Unpack, and a
    waveform for the reader's own words, which were spoken and never written.
    The words stay beside the marks. The attribution line is now only "Written
-   by <model>".
+   by <model>", and `reader/tutor.ts` gains `modelName`, which says a slug the
+   way a person would: `nvidia/nemotron-3-super-120b-a12b:free` becomes
+   `NVIDIA: Nemotron 3 Super`. `modelLabel` is untouched, because the caption
+   above a chat bubble has one line and the maker is understood there.
+
+A note for the next session, because it looked like a fault and is not one:
+**Shape writes one H1 and the client lifts it into the page title.** So a
+shaped entry shows its heading at the top of the screen, above the date, and
+none inside the body. Headings *within* an entry are Unpack's job.
 
 Tags are **not** in this waypoint. `decisions.md` says Shape proposes tags, and
 WP-64 is where they land, with the saved filters that make them useful.

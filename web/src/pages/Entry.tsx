@@ -19,6 +19,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 
 import { entryStore, type StoredEntry } from '../storage/index.ts'
 import { Markdown } from '../reader/markdown.tsx'
+import { modelName } from '../reader/tutor.ts'
 import { shapeMark } from '../journal/shapeMark.ts'
 import { LevelMark, VoiceMark } from '../journal/marks.tsx'
 import {
@@ -197,7 +198,7 @@ export default function Entry() {
       <p className={entryStyles.note}>
         {showing === 'raw'
           ? 'Exactly what the microphone heard. Nothing added, nothing taken away.'
-          : `Written by ${shaped?.model ?? 'a model'}`}
+          : `Written by ${shaped ? modelName(shaped.model) : 'a model'}`}
       </p>
 
       <section className={entryStyles.give} aria-label="Give these words a shape">

@@ -159,6 +159,71 @@ export function modelLabel(slug: string): string {
 }
 
 /**
+ * The maker's name, as a person would say it.
+ *
+ * A slug carries its vendor as a package id — `nvidia`, `z-ai`, `meta-llama`.
+ * These few are written out, because a machine rule cannot know that `z-ai`
+ * keeps its hyphen as a dash and `meta-llama` loses half of itself.
+ */
+const MAKERS: Record<string, string> = {
+  'ai21': 'AI21',
+  'anthropic': 'Anthropic',
+  'cohere': 'Cohere',
+  'deepseek': 'DeepSeek',
+  'google': 'Google',
+  'meta-llama': 'Meta',
+  'microsoft': 'Microsoft',
+  'mistralai': 'Mistral',
+  'moonshotai': 'Moonshot',
+  'nousresearch': 'Nous Research',
+  'nvidia': 'NVIDIA',
+  'openai': 'OpenAI',
+  'qwen': 'Qwen',
+  'tngtech': 'TNG',
+  'z-ai': 'Z-AI',
+}
+
+/** `120b`, `a12b`, `400m`, `8x7b` — a size, which is the builder's business. */
+const SIZE = /^(?:\d+x)?a?\d+(?:\.\d+)?[bm]$/i
+
+/** Words a slug carries that say nothing to the reader. */
+const PLUMBING = new Set(['instruct', 'chat', 'free', 'preview', 'latest'])
+
+/**
+ * The same slug, said the way the reader would say it out loud.
+ *
+ * `nvidia/nemotron-3-super-120b-a12b:free` becomes `NVIDIA: Nemotron 3 Super`.
+ *
+ * `modelLabel` is the caption above a chat bubble, where the room is one line
+ * wide and the maker is already understood. This is for a line of prose under
+ * a journal entry — "Written by …" — where the sentence has to read like a
+ * sentence. So the maker comes back, and the parameter counts go: a reader
+ * being told who wrote their journal entry does not need to know it has
+ * twelve billion active parameters.
+ *
+ * Nothing here is allowed to return nothing. A slug this has never seen is
+ * still a name, and a blank line under an entry would be worse than a long one.
+ */
+export function modelName(slug: string): string {
+  const bare = slug.trim().replace(/:.*$/, '')
+  if (!bare) return slug
+
+  const parts = bare.split('/')
+  const tail = parts.pop() ?? ''
+  const maker = parts.pop() ?? ''
+
+  const words = tail
+    .split('-')
+    .filter((part) => part && !SIZE.test(part) && !PLUMBING.has(part.toLowerCase()))
+
+  const said = modelLabel(words.join('-')) || modelLabel(tail)
+  if (!maker) return said
+
+  const who = MAKERS[maker.toLowerCase()] ?? modelLabel(maker)
+  return `${who}: ${said}`
+}
+
+/**
  * A long passage in one line: the first three words, the last four.
  *
  * The pinned bar has one line to spend, and the two ends of a passage carry
