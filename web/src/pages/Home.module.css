@@ -187,6 +187,9 @@
 }
 
 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
   font-size: var(--text-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -218,6 +221,61 @@
   color: var(--color-text-muted);
 }
 
+/* ---- the day: two hours, and the run of days behind it ---- */
+
+.measure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.streak {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+  color: var(--color-board-mark);
+  border: 1px solid color-mix(in srgb, var(--color-board-mark) 40%, transparent);
+}
+
+.goalWords {
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--color-board-ink) 62%, transparent);
+}
+
+/*
+ * The two hours, as a ring. A bar across the top of the board would be a
+ * progress bar on a page that has no other, and the ring is the one shape that
+ * can say "part of a whole" in the space a chip leaves.
+ */
+.ring {
+  width: 1.625rem;
+  height: 1.625rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  position: relative;
+  background: conic-gradient(
+    var(--color-board-mark) 0 var(--done),
+    color-mix(in srgb, var(--color-board-ink) 14%, transparent) var(--done) 100%
+  );
+}
+
+.ring::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--color-board);
+}
+
+.goalWords.met {
+  color: var(--color-board-mark);
+}
+
 .footLink {
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
@@ -226,15 +284,146 @@
   text-decoration: none;
 }
 
-.read .footLink {
+.read /* ---- the day: two hours, and the run of days behind it ---- */
+
+.measure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.streak {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+  color: var(--color-board-mark);
+  border: 1px solid color-mix(in srgb, var(--color-board-mark) 40%, transparent);
+}
+
+.goalWords {
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--color-board-ink) 62%, transparent);
+}
+
+/*
+ * The two hours, as a ring. A bar across the top of the board would be a
+ * progress bar on a page that has no other, and the ring is the one shape that
+ * can say "part of a whole" in the space a chip leaves.
+ */
+.ring {
+  width: 1.625rem;
+  height: 1.625rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  position: relative;
+  background: conic-gradient(
+    var(--color-board-mark) 0 var(--done),
+    color-mix(in srgb, var(--color-board-ink) 14%, transparent) var(--done) 100%
+  );
+}
+
+.ring::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--color-board);
+}
+
+.goalWords.met {
   color: var(--color-board-mark);
 }
 
-.write .footLink {
+.footLink {
+  color: var(--color-board-mark);
+}
+
+.write /* ---- the day: two hours, and the run of days behind it ---- */
+
+.measure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.streak {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+  color: var(--color-board-mark);
+  border: 1px solid color-mix(in srgb, var(--color-board-mark) 40%, transparent);
+}
+
+.goalWords {
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--color-board-ink) 62%, transparent);
+}
+
+/*
+ * The two hours, as a ring. A bar across the top of the board would be a
+ * progress bar on a page that has no other, and the ring is the one shape that
+ * can say "part of a whole" in the space a chip leaves.
+ */
+.ring {
+  width: 1.625rem;
+  height: 1.625rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  position: relative;
+  background: conic-gradient(
+    var(--color-board-mark) 0 var(--done),
+    color-mix(in srgb, var(--color-board-ink) 14%, transparent) var(--done) 100%
+  );
+}
+
+.ring::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--color-board);
+}
+
+.goalWords.met {
+  color: var(--color-board-mark);
+}
+
+.footLink {
   color: var(--color-accent);
 }
 
-/* ---- inhale: the book ---- */
+/*
+ * The breath, drawn rather than written.
+ *
+ * The chips used to say "Inhale · Read" and "Exhale · Journal". The reader
+ * asked for the idea without the words (2026-10-19), so it lives in the
+ * materials — board above, paper below — in the fold, and in these two marks:
+ * a filled dot for the breath held in, an open ring for the breath let out.
+ */
+.breath {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+.out {
+  background: none;
+  border: 1px solid currentColor;
+}
+
+/* ---- the book half ---- */
 
 /*
  * The reading half's content settles towards the seam, and the journal's
@@ -245,8 +434,33 @@
   flex: 1;
   min-height: 0;
   display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+
+/*
+ * The cover stands in the half, bleeding to its left and bottom edges.
+ *
+ * A thumbnail beside the title left the top third of the board empty, which is
+ * what the reader reported. A book standing in the door fills it with the one
+ * thing the half is about, and the crop is centred so the title block of a
+ * cover survives it.
+ */
+.coverLink {
+  flex: 0 0 42%;
+  display: block;
+  min-height: 0;
+  margin-left: calc(var(--space-4) * -1);
+  margin-bottom: calc(var(--space-3) * -1);
+  margin-top: calc(var(--space-2) * -1);
+}
+
+.readColumn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
   gap: var(--space-2);
 }
 
@@ -289,19 +503,15 @@
   color: var(--color-text-muted);
 }
 
-.readRow {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-3);
-}
-
-.coverLink {
-  flex: 0 0 auto;
+.coverArt {
   display: block;
-  width: 4rem;
+  width: 100%;
+  height: 100%;
+  border-radius: 0 var(--radius-md) 0 0;
+  overflow: hidden;
+  box-shadow: 4px 0 18px color-mix(in srgb, var(--color-board) 70%, transparent);
 }
 
-.coverArt,
 .shelfArt {
   display: block;
   aspect-ratio: 2 / 3;
@@ -317,33 +527,26 @@
   display: block;
 }
 
-.readActions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 /*
- * Resume names the book, so the one control the thumb reaches for says where
- * it goes. The cover beside it is the same target for a thumb that reaches
- * differently — two targets for one job, which is why the cover is hidden from
- * screen readers rather than announced twice.
+ * "Continue reading", not "Resume <the book>".
+ *
+ * The title is directly above it and the cover is beside it, so naming the
+ * book a third time said nothing and wrapped the button onto two lines on a
+ * phone. Reported 2026-10-19.
  */
 .resume {
+  align-self: flex-start;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-sm);
   font-weight: 600;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--color-board-ink) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-board-ink) 18%, transparent);
   color: var(--color-board-ink);
   text-decoration: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -548,26 +751,29 @@
 
 /*
  * One thought belongs to both halves: the thing the reader just marked in the
- * book, written down in the journal. The bridge is where they meet, so it sits
- * on the seam and nowhere else — and it goes when a half opens, because there
- * is no seam then.
+ * book, written down in the journal. The bridge is where they meet.
+ *
+ * In the column with the halves, not floating over them. A pill on the seam
+ * covered the bottom of the book and the top of the journal — "the bridge
+ * hides the content behind it" (2026-10-19). A strip takes its height from
+ * both halves instead of borrowing their words, so nothing is behind it.
  */
 .bridge {
-  position: absolute;
-  z-index: 6;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: calc(100% - var(--space-4) * 2);
+  flex: 0 0 auto;
+  z-index: 2;
   appearance: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'label go'
+    'quote go';
+  align-items: center;
+  column-gap: var(--space-3);
   padding: var(--space-2) var(--space-4);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border: 0;
+  border-block: 1px solid var(--color-border);
   box-shadow: var(--shadow-raised, 0 1px 3px rgb(0 0 0 / 0.08));
   cursor: pointer;
   text-align: left;
@@ -575,10 +781,16 @@
 
 .bridge:focus-visible {
   outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
+  outline-offset: -3px;
+}
+
+.bridgeGo {
+  grid-area: go;
+  color: var(--color-accent);
 }
 
 .bridgeLabel {
+  grid-area: label;
   font-size: var(--text-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -586,6 +798,7 @@
 }
 
 .bridgeQuote {
+  grid-area: quote;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

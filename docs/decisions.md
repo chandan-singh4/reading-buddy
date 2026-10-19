@@ -3628,3 +3628,30 @@ door does. These are the calls the build had to make.
   The raw words stand alone, including on the day the reader answers something
   else. The sheet shows the question and puts the cursor in the box; the circle
   starts listening at once. Each door keeps the promise it made.
+
+## The front door, after the first look on a phone (2026-10-19)
+
+The split door shipped, and then the first screenshot on a real phone showed
+seven faults. Each fix below reverses or narrows an earlier choice.
+
+- **The reading half gets a streak. The journal half still gets none.** The
+  mockup said "no streak", and that rule holds for the journal: a counted run of
+  days turns writing into a duty, and a missed day into a debt. Reading is not
+  the same promise. The reader asked for the count, so the count goes where the
+  reading is. `DayMeasure` carries this reason in its own doc comment.
+- **The two-hour day comes from `stats/goal.ts`, not from a new number.**
+  `DAILY_MINUTES` and `streakOf` already existed for the Statistics screen. The
+  door reads the same two functions, so the door and Statistics can never print
+  different totals.
+- **The bridge sits in the flow, on the seam.** It was absolute, so it covered
+  the text behind it. It also printed the quote a second time, so it carried
+  nothing new. Both faults had the same cure: the strip takes its own row, and
+  the mark now appears only there. That is what makes the bridge worth its room.
+- **The cover fills the left of the reading half.** A small cover above a title
+  wasted the top of the screen. The art now bleeds to the left and bottom edges,
+  and the words stand in a column beside it.
+- **The door says "Continue reading", not "Resume <book>".** The title is
+  already on the page in large type. A second copy of it in the button is noise.
+- **The words "inhale" and "exhale" leave the screen.** A filled dot marks the
+  reading half and an open ring marks the journal half. The breath is the shape
+  of the two marks, not a label the reader must read.

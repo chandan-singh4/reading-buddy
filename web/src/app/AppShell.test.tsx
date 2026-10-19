@@ -89,7 +89,7 @@ describe('app shell', () => {
   it('lands on Home and reports an empty shelf', async () => {
     renderAt('/')
 
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
     // Resolves only once the repository has actually answered.
     expect(await screen.findByText('No books yet')).toBeDefined()
   })
@@ -150,13 +150,13 @@ describe('app shell', () => {
 
   it('swipes left from Home to the library, and right back again', async () => {
     renderAt('/')
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
 
     swipe(-150)
     expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
 
     swipe(150)
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
   })
 
   it('does not swipe past the ends', async () => {
@@ -165,7 +165,7 @@ describe('app shell', () => {
     renderAt('/')
 
     swipe(150)
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
   })
 
   it('ignores a swipe that was really a scroll', async () => {
@@ -174,14 +174,14 @@ describe('app shell', () => {
     renderAt('/')
 
     swipe(-150, 300)
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
   })
 
   it('ignores a movement too short to be a swipe', async () => {
     renderAt('/')
 
     swipe(-20)
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
   })
 
   it('still navigates when the browser cancels the gesture', async () => {
@@ -258,7 +258,7 @@ describe('app shell', () => {
     expect(await screen.findByRole('heading', { name: 'Library' })).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'device back' }))
     expect(await screen.findByRole('alert')).toBeDefined()
@@ -312,7 +312,7 @@ describe('app shell', () => {
     fireEvent.pointerMove(document, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 300 })
     fireEvent.pointerUp(document, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 300 })
 
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
   })
 
   it('closes the drawer on Escape', () => {
@@ -391,7 +391,7 @@ describe('app shell', () => {
   it('falls back to Home for an unknown route', async () => {
     renderAt('/nowhere')
 
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
   })
 })
 
@@ -455,7 +455,9 @@ describe('each screen keeps its own scroll position', () => {
     // Back to Home, which was at the top and must arrive at the top.
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     fireEvent.click(drawerLink(/Home/))
-    await waitFor(() => expect(screen.getByText('Inhale · Read')).toBeTruthy())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open the reading half' })).toBeTruthy(),
+    )
 
     expect(scrolls().at(-1)).toBe(0)
 
@@ -482,7 +484,9 @@ describe('each screen keeps its own scroll position', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
     fireEvent.click(drawerLink(/Home/))
-    await waitFor(() => expect(screen.getByText('Inhale · Read')).toBeTruthy())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open the reading half' })).toBeTruthy(),
+    )
 
     expect(scrolls().at(-1)).toBe(300)
   })
@@ -553,9 +557,9 @@ describe('crossing between two tabs', () => {
 
   it('keeps the screen being left on show, and only it fades', async () => {
     renderAt('/')
-    // The reading half's own chip is Home's marker now that the split front
+    // The reading half's own surface is Home's marker now that the split front
     // door has replaced the greeting (WP-65).
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
 
     swipeLeft()
     await screen.findByRole('heading', { name: 'Library' })
@@ -591,9 +595,9 @@ describe('crossing between two tabs', () => {
 
   it('puts the screen being left away once it has gone', async () => {
     renderAt('/')
-    // The reading half's own chip is Home's marker now that the split front
+    // The reading half's own surface is Home's marker now that the split front
     // door has replaced the greeting (WP-65).
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
 
     swipeLeft()
     await screen.findByRole('heading', { name: 'Library' })

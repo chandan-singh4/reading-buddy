@@ -77,6 +77,19 @@ Breadth is now allowed.
 
 ### Recently done
 
+- **The front door, after the first look on a phone (2026-10-19).** Build
+  green: 2,698 tests across 171 files.
+  - The cover now fills the left of the reading half and bleeds to the edges.
+    The space above the title is gone, and so is the rule below it.
+  - The button says "Continue reading". The book name is in the title already.
+  - The reading half shows the streak and the two hours a day. Both numbers
+    come from the Statistics screen's own functions, so they cannot disagree.
+    The journal half still counts no streak.
+  - The bridge takes its own row on the seam. It hides nothing, and it is now
+    the only place the last mark appears.
+  - The words "inhale" and "exhale" leave the screen. A filled dot marks the
+    reading half. An open ring marks the journal half.
+
 - **WP-65 — the split front door (2026-10-19).** Build green: 2,693 tests
   across 171 files.
   - The home page is now two halves. The book is the dark board above. The

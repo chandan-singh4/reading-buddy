@@ -26,7 +26,7 @@
  * the book's own details page; the front door keeps the forecast as one line.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router'
 
 import { Cover } from '../app/Cover.tsx'
@@ -47,6 +47,8 @@ import {
   type EntryLink,
   type StoredEntry,
 } from '../storage/index.ts'
+import { minutesByDay, streakOf } from '../stats/gather.ts'
+import { DAILY_MINUTES } from '../stats/goal.ts'
 import { dayKey, sessionStore } from '../stats/sessions.ts'
 import { trajectoryOf } from '../stats/trajectory.ts'
 import styles from './Home.module.css'
@@ -64,6 +66,13 @@ interface Writing {
   prompt?: string
   listen?: boolean
   link?: EntryLink
+}
+
+/** How the day is going on the board: the minutes, and the days before it. */
+interface Day {
+  minutes: number
+  /** Consecutive days ending today, or yesterday while today is still empty. */
+  streak: number
 }
 
 /** The reader's newest mark, as the door prints it. */
@@ -142,7 +151,7 @@ export default function Home() {
   const [door, setDoor] = useState<Door>('both')
   const [writing, setWriting] = useState<Writing | null>(null)
   const [mark, setMark] = useState<Mark | null>(null)
-  const [minutes, setMinutes] = useState<number | null>(null)
+  const [day, setDay] = useState<Day | null>(null)
 
   /**
    * Which books were on which shelf, in what order, at the last paint.
@@ -243,17 +252,27 @@ export default function Home() {
    */
   useOnVisit(() => {
     let cancelled = false
-    const today = dayKey(new Date())
+    const now = new Date()
+    /*
+     * Every session, not only today's, because the streak is a run of days and
+     * a window would cap it: a reader on day 41 of a 40-day window would be
+     * told 40. The Statistics screen reads the same rows the same way, and
+     * both numbers come from `stats/gather.ts` so the front door and the
+     * Statistics screen can never disagree about them.
+     */
     void sessionStore
-      .between(today, today)
+      .all()
       .then((sessions) => {
         if (cancelled) return
-        const ms = sessions.reduce((total, session) => total + session.activeMs, 0)
-        setMinutes(Math.round(ms / 60000))
+        const byDay = minutesByDay(sessions)
+        setDay({
+          minutes: byDay.get(dayKey(now)) ?? 0,
+          streak: streakOf(byDay, now).current,
+        })
       })
       .catch(() => {
         if (cancelled) return
-        setMinutes(null)
+        setDay(null)
       })
     return () => {
       cancelled = true
@@ -323,23 +342,23 @@ export default function Home() {
         open={door === 'read'}
         folded={door === 'write'}
         onOpen={() => setDoor(door === 'read' ? 'both' : 'read')}
-        minutes={minutes}
-        mark={mark}
-      />
-
-      <JournalHalf
-        open={door === 'write'}
-        folded={door === 'read'}
-        onOpen={() => setDoor(door === 'write' ? 'both' : 'write')}
-        onWrite={(prompt) => setWriting({ prompt })}
-        onSpeak={() => setWriting({ listen: true })}
+        onUnfold={() => setDoor('both')}
+        day={day}
       />
 
       {/*
-        The bridge, on the seam. It carries the last mark into a new entry, so
-        the one thought that belongs to both halves starts where they meet.
-        Hidden while a half is open: there is no seam then, and a reader who has
-        chosen a side is not standing between them.
+        The bridge, on the seam — a strip between the halves rather than a pill
+        floating over them.
+        
+        It used to be absolutely positioned on the seam, and it covered the
+        bottom of the book and the top of the journal. Reported 2026-10-19:
+        "the bridge hides the content behind it". A thing that sits between two
+        halves belongs *in* the column with them, so now it takes its height
+        from both instead of borrowing their words.
+
+        It says what it does, because the reader also asked what the point of it
+        was. The passage is here and nowhere else now: the reading half no
+        longer repeats it under the title.
       */}
       {door === 'both' && mark && (
         <button
@@ -351,10 +370,20 @@ export default function Home() {
             })
           }
         >
-          <span className={styles.bridgeLabel}>The bridge · your last mark</span>
+          <span className={styles.bridgeLabel}>Write about your last mark</span>
           <span className={styles.bridgeQuote}>“{mark.quote}”</span>
+          <span className={styles.bridgeGo} aria-hidden="true">→</span>
         </button>
       )}
+
+      <JournalHalf
+        open={door === 'write'}
+        folded={door === 'read'}
+        onOpen={() => setDoor(door === 'write' ? 'both' : 'write')}
+        onUnfold={() => setDoor('both')}
+        onWrite={(prompt) => setWriting({ prompt })}
+        onSpeak={() => setWriting({ listen: true })}
+      />
 
       <SpeakSheet
         open={writing !== null}
@@ -368,10 +397,15 @@ export default function Home() {
 }
 
 /**
- * Inhale: the book.
+ * The book half.
  *
- * Content settles towards the seam, so the two halves read as one spread that
- * meets in the middle rather than two cards stacked.
+ * The cover stands in the left of the half, bleeding to the edges, and the
+ * words sit beside it. It used to be a small thumbnail with the title bottom-
+ * aligned, which left the top third of the board empty. Reported 2026-10-19:
+ * "there is a lot of space above the title".
+ *
+ * The passage the reader marked used to be repeated here under the title. It
+ * is on the bridge now, and on the bridge only.
  */
 function ReadingHalf({
   shelves,
@@ -379,16 +413,17 @@ function ReadingHalf({
   open,
   folded,
   onOpen,
-  minutes,
-  mark,
+  onUnfold,
+  day,
 }: {
   shelves: HomeShelves
   total: number
   open: boolean
   folded: boolean
   onOpen: () => void
-  minutes: number | null
-  mark: Mark | null
+  /* The lip always comes back to even, never on to the other half. */
+  onUnfold: () => void
+  day: Day | null
 }) {
   const current = shelves.currentlyReading
   // Up Next first, then the unread, which is the order a reader would pick in.
@@ -400,8 +435,11 @@ function ReadingHalf({
   if (folded) {
     return (
       <section className={`${styles.half} ${styles.read}`}>
-        <button type="button" className={styles.lip} onClick={onOpen} aria-expanded={false}>
-          <span className={styles.chip}>Inhale</span>
+        <button type="button" className={styles.lip} onClick={onUnfold} aria-expanded={false}>
+          <span className={styles.chip}>
+            <span className={styles.breath} aria-hidden="true" />
+            Read
+          </span>
           <span className={styles.lipNote}>
             {current ? current.book.title : `${total} on the shelf`}
           </span>
@@ -422,59 +460,53 @@ function ReadingHalf({
 
       <div className={styles.face}>
         <div className={styles.faceHead}>
-          <span className={styles.chip}>Inhale · Read</span>
+          {/* The filled dot is the breath drawn in. The words "inhale" and
+              "exhale" are gone — the materials, the fold and these two marks
+              carry it now. */}
+          <span className={styles.chip}>
+            <span className={styles.breath} aria-hidden="true" />
+            Read
+          </span>
           <span className={styles.spacer} />
-          {minutes !== null && minutes > 0 && (
-            <span className={styles.plain}>{minutes} min today</span>
-          )}
+          {day !== null && <DayMeasure day={day} />}
         </div>
 
         <div className={styles.readBody}>
           {current ? (
             <>
-              {current.percent !== undefined && (
-                <span className={styles.locline}>
-                  <b>{current.percent}%</b> · where you stopped
-                </span>
-              )}
-              <h1 className={styles.bookTitle}>{current.book.title}</h1>
-              {mark && <p className={styles.marked}>“{mark.quote}”</p>}
+              {/* Decorative: "Continue reading" below reaches the same page,
+                  and the title above it names the book. Two targets for one
+                  job, because thumbs reach differently. */}
+              <Link
+                to={`/book/${current.book.id}`}
+                className={styles.coverLink}
+                aria-hidden="true"
+                tabIndex={-1}
+              >
+                <ShelfCover entry={current} />
+              </Link>
 
-              <div className={styles.readRow}>
-                <Link
-                  to={`/book/${current.book.id}`}
-                  className={styles.coverLink}
-                  aria-hidden="true"
-                  tabIndex={-1}
-                >
-                  <ShelfCover entry={current} />
+              <div className={styles.readColumn}>
+                {current.percent !== undefined && (
+                  <span className={styles.locline}>
+                    <b>{current.percent}%</b> · where you stopped
+                  </span>
+                )}
+                <h1 className={styles.bookTitle}>{current.book.title}</h1>
+                <Link to={`/book/${current.book.id}`} className={styles.resume}>
+                  Continue reading →
                 </Link>
-                <span className={styles.readActions}>
-                  <Link to={`/book/${current.book.id}`} className={styles.resume}>
-                    Resume {current.book.title} →
-                  </Link>
-                  <Link
-                    to={`/book/${current.book.id}/chapters`}
-                    className={styles.quietLink}
-                  >
-                    Chapter summaries
-                  </Link>
-                </span>
+                <Link to={`/book/${current.book.id}/chapters`} className={styles.quietLink}>
+                  Chapter summaries
+                </Link>
               </div>
-
-              {/* Only once the half is open. The room the fold frees is what
-                  the shelf is shown in — that is what makes the fold worth
-                  making. */}
-              {open && <ShelfRow entries={rest} />}
             </>
           ) : (
             /* No book on the go, so the door does not presume a page to
                resume: the shelf stands in the face instead. */
-            <>
+            <div className={styles.readColumn}>
               <span className={styles.locline}>Nothing on the go</span>
-              <h1 className={styles.bookTitle}>
-                {total > 0 ? 'Pick one up' : 'No books yet'}
-              </h1>
+              <h1 className={styles.bookTitle}>{total > 0 ? 'Pick one up' : 'No books yet'}</h1>
               {total > 0 ? (
                 <ShelfRow entries={rest} />
               ) : (
@@ -482,9 +514,13 @@ function ReadingHalf({
                   Add some from <Link to="/library">your library</Link>.
                 </p>
               )}
-            </>
+            </div>
           )}
         </div>
+
+        {/* Only once the half is open. The room the fold frees is what the
+            shelf is shown in — that is what makes the fold worth making. */}
+        {open && current && <ShelfRow entries={rest} />}
 
         <div className={styles.faceFoot}>
           {current && <Forecast entry={current} />}
@@ -498,17 +534,62 @@ function ReadingHalf({
   )
 }
 
-/** Exhale: the journal. */
+/** `1h 03m`, or `47m`. The same shape the Statistics screen prints. */
+function clockOf(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`
+}
+
+/**
+ * How the day is going: the two hours, and the run of days behind it.
+ *
+ * Both numbers come from `stats/gather.ts` and `stats/goal.ts`, which the
+ * Statistics screen already uses. A second copy of either on the front door
+ * would be a number that can disagree with the one on Statistics.
+ *
+ * The streak is the reading streak, and it is only here. The journal still has
+ * none, and that stands: a streak turns a journal into a duty, and the night a
+ * reader does not feel like writing is the night a streak tells them they
+ * failed. Reading is a habit the reader asked to be shown. Writing is not.
+ */
+function DayMeasure({ day }: { day: Day }) {
+  const done = Math.min(Math.round((day.minutes / DAILY_MINUTES) * 100), 100)
+  const met = day.minutes >= DAILY_MINUTES
+  return (
+    <span className={styles.measure}>
+      {day.streak > 0 && (
+        <span className={styles.streak}>
+          {day.streak} {day.streak === 1 ? 'day' : 'days'}
+        </span>
+      )}
+      <span className={met ? `${styles.goalWords} ${styles.met}` : styles.goalWords}>
+        {clockOf(day.minutes)} / 2h
+      </span>
+      <span
+        className={met ? `${styles.ring} ${styles.met}` : styles.ring}
+        style={{ '--done': `${done}%` } as CSSProperties}
+        role="img"
+        aria-label={`${clockOf(day.minutes)} of your two hours today`}
+      />
+    </span>
+  )
+}
+
+/** The journal half. */
 function JournalHalf({
   open,
   folded,
   onOpen,
+  onUnfold,
   onWrite,
   onSpeak,
 }: {
   open: boolean
   folded: boolean
   onOpen: () => void
+  /* The lip always comes back to even, never on to the other half. */
+  onUnfold: () => void
   onWrite: (prompt: string) => void
   onSpeak: () => void
 }) {
@@ -541,8 +622,11 @@ function JournalHalf({
   if (folded) {
     return (
       <section className={`${styles.half} ${styles.write}`}>
-        <button type="button" className={styles.lip} onClick={onOpen} aria-expanded={false}>
-          <span className={styles.chip}>Exhale</span>
+        <button type="button" className={styles.lip} onClick={onUnfold} aria-expanded={false}>
+          <span className={styles.chip}>
+            <span className={`${styles.breath} ${styles.out}`} aria-hidden="true" />
+            Journal
+          </span>
           <span className={styles.lipNote}>
             {mine.length > 0
               ? `${mine.length} today · last at ${clock(mine[0]!.at)}`
@@ -565,7 +649,10 @@ function JournalHalf({
 
       <div className={styles.face}>
         <div className={styles.faceHead}>
-          <span className={styles.chip}>Exhale · Journal</span>
+          <span className={styles.chip}>
+            <span className={`${styles.breath} ${styles.out}`} aria-hidden="true" />
+            Journal
+          </span>
           <span className={styles.spacer} />
           <span className={styles.plain}>{today}</span>
         </div>

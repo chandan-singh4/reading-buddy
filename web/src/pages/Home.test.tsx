@@ -11,6 +11,8 @@ import { forgetShelfMemory } from '../app/shelfMemory.ts'
 import { forgetTabHistory } from '../app/tabHistory.ts'
 import { forgetCovers } from '../app/useCovers.ts'
 import { entryStore, noteStore, repository } from '../storage/index.ts'
+import { dayKey, sessionStore } from '../stats/sessions.ts'
+import { db } from '../storage/db.ts'
 import type { BookId, BookMeta } from '../structure/index.ts'
 
 function bookOf(id: string, title: string, author: string): BookMeta {
@@ -250,10 +252,13 @@ describe('the two halves', () => {
         <AppRoutes />
       </MemoryRouter>,
     )
-    expect(await screen.findByText('Inhale · Read')).toBeDefined()
-    expect(shown().getByText('Exhale · Journal')).toBeDefined()
-    // A folded half shows its lip and nothing else.
+    expect(await screen.findByRole('button', { name: 'Open the reading half' })).toBeDefined()
+    expect(shown().getByRole('button', { name: 'Open the journal half' })).toBeDefined()
+    // Neither half is open, so neither offers to close.
     expect(shown().queryByRole('button', { name: 'Close the reading half' })).toBeNull()
+    // The words "inhale" and "exhale" are gone: the idea is in the materials
+    // and the two breath marks now.
+    expect(shown().queryByText(/Inhale|Exhale/)).toBeNull()
   })
 
   it('folds the other half to a lip, and the lip brings it back', async () => {
@@ -265,12 +270,12 @@ describe('the two halves', () => {
     const surface = await screen.findByRole('button', { name: 'Open the reading half' })
     fireEvent.click(surface)
 
-    // The journal is now a lip: its chip is still there, its question is not.
-    expect(shown().getByText('Exhale')).toBeDefined()
-    expect(shown().queryByText('Exhale · Journal')).toBeNull()
+    // The journal is now a lip: it still reports, but it has no face.
+    expect(shown().queryByRole('button', { name: 'Open the journal half' })).toBeNull()
+    const lip = shown().getByRole('button', { name: /Journal/ })
 
-    fireEvent.click(shown().getByText('Exhale'))
-    expect(shown().getByText('Exhale · Journal')).toBeDefined()
+    fireEvent.click(lip)
+    expect(shown().getByRole('button', { name: 'Open the journal half' })).toBeDefined()
   })
 
   it('shows the shelf when there is no book on the go', async () => {
@@ -323,6 +328,61 @@ describe('what the journal half remembers', () => {
 
     await entryStore.deleteEntry(first.id)
     await entryStore.deleteEntry(second.id)
+  })
+})
+
+describe('how the day is going', () => {
+  /**
+   * A session of `minutes`, `daysAgo` days back.
+   *
+   * Anchored at midday, not at `new Date()`. `minutesByDay` spreads a sitting
+   * over the days its clock actually crossed, so a fixture built from "now"
+   * puts half the minutes on tomorrow whenever the suite runs near midnight.
+   */
+  async function read(minutes: number, daysAgo: number) {
+    const now = new Date()
+    const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo, 12, 0, 0)
+    await sessionStore.put({
+      id: `s-${daysAgo}`,
+      bookId: BOOKS[0]!.id,
+      day: dayKey(at),
+      startedAt: at.getTime(),
+      endedAt: at.getTime() + minutes * 60_000,
+      activeMs: minutes * 60_000,
+    })
+  }
+
+  afterEach(async () => {
+    await db.sessions.clear()
+  })
+
+  it('counts today against the two hours, and the days behind it', async () => {
+    // The same two numbers the Statistics screen prints, from the same two
+    // functions. A second copy of either could disagree with it.
+    await read(45, 0)
+    await read(70, 1)
+    await read(30, 2)
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('45m / 2h')).toBeDefined()
+    expect(shown().getByText('3 days')).toBeDefined()
+  })
+
+  it('says nothing about a streak there is not one of', async () => {
+    // A gap before yesterday is no streak, and an empty badge would be worse
+    // than none. Nothing read at all, so nothing to count back from.
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    await screen.findByText('0m / 2h')
+    expect(shown().queryByText(/day[s]?$/)).toBeNull()
   })
 })
 
@@ -517,6 +577,33 @@ describe('the book in hand', () => {
     expect(
       await shown().findByText('Still learning how fast you read this one.'),
     ).toBeDefined()
+  })
+
+  it('names the book once, and does not repeat it on the button', async () => {
+    // Reported 2026-10-19: "Keep the Title, I don't need to see Resume + Book
+    // name." The title is directly above the button and the cover is beside
+    // it, so naming the book a third time said nothing.
+    await openHomeReading(28)
+
+    expect(await shown().findByRole('link', { name: 'Continue reading →' })).toBeDefined()
+    expect(shown().queryByText(/^Resume/)).toBeNull()
+  })
+
+  it('does not repeat the marked passage under the title', async () => {
+    // The passage is on the bridge, and on the bridge only. It used to be in
+    // both places, which is half of why the bridge looked like it was covering
+    // something.
+    await noteStore.addNote(BOOKS[0]!.id, {
+      anchor: { chapter: 1, block: 2 } as never,
+      author: 'you',
+      text: '',
+      quote: 'The symbol is a living thing.',
+    })
+    await openHomeReading(28)
+
+    const shows = await shown().findAllByText('“The symbol is a living thing.”')
+    expect(shows.length).toBe(1)
+    expect(shows[0]!.closest('button')?.textContent).toContain('Write about your last mark')
   })
 
   it('says the percent in the line of context, and the shelf says its own', async () => {
