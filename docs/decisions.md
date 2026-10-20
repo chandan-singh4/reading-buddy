@@ -3655,3 +3655,12 @@ seven faults. Each fix below reverses or narrows an earlier choice.
 - **The words "inhale" and "exhale" leave the screen.** A filled dot marks the
   reading half and an open ring marks the journal half. The breath is the shape
   of the two marks, not a label the reader must read.
+- **The cover is sized by height, at a book's own 2:3.** It shipped as 42% of
+  the width by the half's full height. That is no shape a book has, so the
+  jacket was cropped at the sides, and cropped more the taller the half grew.
+  The box is now `30dvh` tall with `aspect-ratio: 2 / 3`, so one cover is the
+  same size folded or opened, and `object-fit: cover` has almost nothing to cut.
+- **Opened, the reading body stops growing.** The spare room goes below the
+  shelf, not between the cover and the shelf. The shelf tiles are `5.5rem`, not
+  `3.5rem`: four still fit across a phone, and smaller than that the jackets
+  cannot be told apart.
