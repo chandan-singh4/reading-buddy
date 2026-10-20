@@ -535,6 +535,64 @@ describe('opening the app', () => {
  * strip appears, that it says something honest when there is nothing to
  * forecast from, and that the fore edge is drawn only where it belongs.
  */
+describe('the shelves the fold frees', () => {
+  /** Puts a book in hand, then opens the reading half. */
+  async function openReading() {
+    await repository.savePosition(
+      BOOKS[0]!.id,
+      { chapter: 0, block: 0 } as never,
+      28,
+      '2026-08-30T09:00:00.000Z',
+    )
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Open the reading half' }))
+  }
+
+  it('keeps the shelves off the even door, and names them on the open one', async () => {
+    // Reported 2026-10-20. The even door shows the one book in hand. The
+    // shelves are what the fold pays for, and each one says what it holds:
+    // an unnamed row mixed the books the reader had started with the ones
+    // they had not.
+    await repository.savePosition(
+      BOOKS[0]!.id,
+      { chapter: 0, block: 0 } as never,
+      28,
+      '2026-08-30T09:00:00.000Z',
+    )
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    await screen.findByText('The Wind in the Willows')
+    expect(shown().queryByRole('heading', { name: 'Up next' })).toBeNull()
+
+    fireEvent.click(shown().getByRole('button', { name: 'Open the reading half' }))
+    expect(shown().getByRole('heading', { name: 'Up next' })).toBeDefined()
+    // Only one book was ever opened, so there is nothing else in progress.
+    expect(shown().queryByRole('heading', { name: 'Also reading' })).toBeNull()
+  })
+
+  it('puts a second book in progress on its own shelf, not among the unread', async () => {
+    await repository.savePosition(
+      BOOKS[1]!.id,
+      { chapter: 0, block: 0 } as never,
+      19,
+      '2026-08-29T09:00:00.000Z',
+    )
+    await openReading()
+
+    expect(shown().getByRole('heading', { name: 'Also reading' })).toBeDefined()
+    expect(shown().getByText('19% read')).toBeDefined()
+    // Every book has been opened, so nothing is waiting unread.
+    expect(shown().queryByRole('heading', { name: 'Up next' })).toBeNull()
+  })
+})
+
 describe('the book in hand', () => {
   async function openHomeReading(percent: number) {
     await repository.savePosition(

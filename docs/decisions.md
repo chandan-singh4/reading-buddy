@@ -3668,3 +3668,8 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   the shelf stands between the book and the footer, so a finish date under a row
   of other books reads as a fact about those books. The line now follows
   "Chapter summaries", and the footer holds only the Library link.
+- **Two shelves come back, and each one is named.** The even door shows the one
+  book in hand and no shelf. Opened, the half shows **Also reading** (the other
+  books in progress) and **Up next** (the books never opened). One unnamed row
+  mixed the two and said so nowhere, so a 4% book and an unopened book looked
+  like the same kind of thing. An empty shelf prints no heading.

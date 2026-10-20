@@ -427,8 +427,14 @@ function ReadingHalf({
 }) {
   const current = shelves.currentlyReading
   // Up Next first, then the unread, which is the order a reader would pick in.
+  // Only the no-book face uses the two as one row: with no book in hand there
+  // is nothing for the two shelves to be "also" and "next" to.
   const rest = useMemo(
     () => [...shelves.upNext, ...shelves.unread.map((book) => ({ book }) as ShelfEntry)],
+    [shelves],
+  )
+  const upNext = useMemo(
+    () => shelves.unread.map((book) => ({ book }) as ShelfEntry),
     [shelves],
   )
 
@@ -523,8 +529,15 @@ function ReadingHalf({
         </div>
 
         {/* Only once the half is open. The room the fold frees is what the
-            shelf is shown in — that is what makes the fold worth making. */}
-        {open && current && <ShelfRow entries={rest} />}
+            shelves are shown in — that is what makes the fold worth making.
+            Two shelves, each named. One unnamed row mixed the books the reader
+            had started with the ones they had not, and said so nowhere. */}
+        {open && current && (
+          <div className={styles.shelves}>
+            <Shelf label="Also reading" entries={shelves.upNext} />
+            <Shelf label="Up next" entries={upNext} />
+          </div>
+        )}
 
         <div className={styles.faceFoot}>
           <span className={styles.spacer} />
@@ -759,6 +772,21 @@ function Forecast({ entry }: { entry: ShelfEntry }) {
 
   if (words === null) return null
   return <span className={styles.forecast}>{words}</span>
+}
+
+/**
+ * One named shelf. It goes when it is empty, rather than printing a heading
+ * over nothing — an empty "Up next" is a shelf the reader has to read to learn
+ * it holds nothing.
+ */
+function Shelf({ label, entries }: { label: string; entries: ShelfEntry[] }) {
+  if (entries.length === 0) return null
+  return (
+    <section className={styles.shelf}>
+      <h2 className={styles.shelfLabel}>{label}</h2>
+      <ShelfRow entries={entries} />
+    </section>
+  )
 }
 
 /** The shelf, in the room a fold frees. */
