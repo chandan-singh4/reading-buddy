@@ -3703,3 +3703,13 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   title it was one more line in a stack of lines. Against the book it reads as a
   measure of that book. It stops where the cover stops, not where the fore edge
   does.
+- **The words stand a half-step further from the book.** The gap between the
+  cover and the column is `--space-5`, not `--space-4`. The fore edge stands
+  nine pixels proud of the cover's right side, so a one-rem gap left the words
+  against the paper.
+- **On the front door, the top bar is the top of the board.** A cream bar over a
+  dark reading half made the board read as a filling between two pale slices.
+  The bar cannot be styled from Home — it is an ancestor of the screen — so the
+  shell carries `data-screen="home"` and `AppShell.module.css` holds the one
+  rule. The board tokens never follow the reader's theme, so the bar matches the
+  board under every theme, because both are the same material.

@@ -369,7 +369,14 @@ export default function AppShell() {
   }, [open])
 
   return (
-    <div className={styles.shell}>
+    /*
+     * `data-screen` so the bar can be the top of the board on the front door.
+     * The door is two surfaces, and a cream bar above a dark reading half made
+     * the board read as a filling between two slices. The bar cannot be styled
+     * from Home: it is an ancestor of the screen, so the screen has no way to
+     * reach it. One attribute here, one rule in the stylesheet.
+     */
+    <div className={styles.shell} data-screen={location.pathname === '/' ? 'home' : undefined}>
       {/* Everything the drawer blurs sits inside this one wrapper. It has to
           be a sibling of the drawer, not its ancestor: a CSS `filter` makes an
           element a containing block for fixed-position descendants, so a

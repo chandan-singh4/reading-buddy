@@ -505,6 +505,23 @@ describe('each screen keeps its own scroll position', () => {
   })
 })
 
+describe('the bar on the front door', () => {
+  it('tells the stylesheet which screen it is showing', async () => {
+    // The door is a dark board under a cream bar, which read as a filling
+    // between two pale slices. Reported 2026-10-20. The bar is an ancestor of
+    // the screen, so the screen cannot reach it: the shell says where it is,
+    // and the stylesheet does the rest.
+    renderAt('/')
+    await screen.findByRole('button', { name: 'Open the reading half' })
+    expect(document.querySelector('[data-screen="home"]')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+    fireEvent.click(drawerLink(/Settings/))
+    await screen.findByRole('heading', { name: 'Settings' })
+    expect(document.querySelector('[data-screen="home"]')).toBeNull()
+  })
+})
+
 describe('crossing between two tabs', () => {
   interface Played {
     node: HTMLElement

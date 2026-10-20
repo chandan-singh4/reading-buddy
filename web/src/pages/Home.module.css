@@ -435,7 +435,10 @@
   min-height: 0;
   display: flex;
   align-items: stretch;
-  gap: var(--space-4);
+  /* `--space-5`, not `--space-4`. The fore edge stands nine pixels proud of the
+     cover's right side, so it eats most of a one-rem gap and the words ended up
+     against the paper. Reported 2026-10-20. */
+  gap: var(--space-5);
 }
 
 /*
