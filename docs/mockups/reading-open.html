@@ -153,8 +153,16 @@
         padding: 0 16px 20px;
       }
 
+      .coverSide {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
       .card {
         display: flex;
+        align-items: center;
         gap: 16px;
         padding: 14px;
         border-radius: 16px;
@@ -167,7 +175,6 @@
       .book {
         position: relative;
         display: block;
-        flex: 0 0 auto;
         width: 118px;
         aspect-ratio: 2 / 3;
         border-radius: 2px 6px 6px 2px;
@@ -292,11 +299,6 @@
         opacity: 0.7;
       }
 
-      .measure {
-        align-self: stretch;
-        margin-top: 2px;
-      }
-
       .track {
         height: 4px;
         border-radius: 999px;
@@ -312,7 +314,8 @@
       }
 
       .pct {
-        margin: 6px 0 0;
+        margin: 0;
+        white-space: nowrap;
         font-size: 0.74rem;
         color: color-mix(in srgb, var(--ink) 66%, transparent);
       }
@@ -475,14 +478,14 @@
       <div class="frame">
         <div class="topBar">
           <span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="brand" style="margin-right: auto">Reading Buddy</span>
-          <span class="streak">&#128293; 7 days</span>
+          <span class="brand">Reading Buddy</span>
           <span aria-hidden="true">&#9730;</span>
         </div>
 
         <div class="chipRow">
           <span class="chip"><span class="breath"></span>Read</span>
           <span class="spacer"></span>
+          <span class="streak">&#128293; 7 days</span>
           <span class="goal">38m / 2h</span>
           <span class="ring"></span>
         </div>
@@ -490,25 +493,26 @@
         <div class="body">
           <!-- The book in hand, in a card. -->
           <div class="card">
-            <span class="book">
+            <div class="coverSide">
+              <span class="book">
               <img
                 alt=""
                 src="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 300'%3E%3Crect width='200' height='300' fill='%23f7d000'/%3E%3Ctext x='100' y='60' font-family='Helvetica' font-size='28' letter-spacing='4' text-anchor='middle' fill='%23111'%3EBREATH%3C/text%3E%3Ccircle cx='100' cy='150' r='46' fill='none' stroke='%23111' stroke-width='1.5'/%3E%3Ccircle cx='78' cy='140' r='7' fill='%23e04a9b'/%3E%3Ccircle cx='120' cy='158' r='6' fill='%232bb3e0'/%3E%3Ccircle cx='96' cy='170' r='5' fill='%23111'/%3E%3Ctext x='100' y='240' font-family='Helvetica' font-size='11' letter-spacing='2' text-anchor='middle' fill='%23111'%3ETHE NEW SCIENCE%3C/text%3E%3Ctext x='100' y='258' font-family='Helvetica' font-size='11' letter-spacing='2' text-anchor='middle' fill='%23111'%3EOF A LOST ART%3C/text%3E%3Ctext x='100' y='284' font-family='Helvetica' font-size='13' letter-spacing='2' text-anchor='middle' fill='%23111'%3EJAMES NESTOR%3C/text%3E%3C/svg%3E"
               />
-            </span>
+              </span>
+              <span class="track"><i style="width: 25%"></i></span>
+              <p class="pct">25% complete</p>
+            </div>
 
             <div class="meta">
               <h1 class="title">Breath</h1>
               <p class="author">James Nestor</p>
               <a class="primary" href="#">Continue reading &rarr;</a>
               <a class="ghost" href="#"><span aria-hidden="true">&#9636;</span> Chapter summaries</a>
+              <a class="ghost" href="#"><span aria-hidden="true">&#9432;</span> Book details</a>
               <div class="figures">
                 <span><i aria-hidden="true">&#9873;</i> Nov 10</span>
                 <span><i aria-hidden="true">&#9719;</i> 25m / day</span>
-              </div>
-              <div class="measure">
-                <span class="track"><i style="width: 25%"></i></span>
-                <p class="pct">25% complete</p>
               </div>
             </div>
           </div>
@@ -582,8 +586,8 @@
             this half is for. Chapter summaries stays an outlined pill.
           </li>
           <li>
-            <b>The progress bar moves under the figures</b> and runs the width of
-            the words, with "25% complete" beneath it.
+            <b>The progress bar stays under the cover</b>, the width of the
+            cover, with "25% complete" beneath it.
           </li>
           <li>
             <b>Each shelf book gets its own card and a bigger cover</b> &mdash;
@@ -596,11 +600,11 @@
         <ul>
           <li>The journal half, in every state. Not one line of it.</li>
           <li>The bridge, and the even split both halves open at.</li>
-          <li>The two-hour ring, and the Library footer.</li>
+          <li>The top bar, the two-hour ring and the Library footer.</li>
           <li>The board colour, and the book shell &mdash; spine, pages, weight.</li>
         </ul>
 
-        <h2>Three things in your picture: two left out, one built</h2>
+        <h2>Three things in your picture I left out</h2>
         <ul>
           <li>
             <b>The bottom tab bar.</b> You said forget what is below. It would also
@@ -611,10 +615,10 @@
             bring it back.
           </li>
           <li>
-            <b>The streak in the top bar</b> &mdash; asked for, and now built.
-            It shows on the front door only, so the Library, Statistics and
-            Settings keep a plain bar. It also steps out while the journal half
-            is open.
+            <b>The streak in the top bar.</b> Built, then taken back out: the
+            bar is shared with the Library, Statistics and Settings, and the
+            streak is a fact about today's reading. It stands beside the two
+            hours.
           </li>
         </ul>
       </div>

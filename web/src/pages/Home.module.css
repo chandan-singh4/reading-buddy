@@ -223,16 +223,37 @@
 
 /* ---- the day: two hours ---- */
 
-/*
- * The run of days used to stand here, beside the two hours. It is in the top
- * bar now, where there was already room for it — see `.streak` in
- * `AppShell.module.css`. Reported 2026-10-20: the row under the bar read as a
- * crowded second header.
- */
 .measure {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/*
+ * The run of days, beside the minutes it is a run of.
+ *
+ * It spent a round in the top bar. The bar is shared with the Library,
+ * Statistics and Settings, and the streak is a fact about today's reading — so
+ * it stands with today's reading. Reported 2026-10-20.
+ */
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+  color: var(--color-board-mark);
+  background: color-mix(in srgb, var(--color-board-mark) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-board-mark) 34%, transparent);
+}
+
+.flame {
+  font-size: 0.95em;
+  line-height: 1;
 }
 
 .goalWords {
@@ -342,7 +363,13 @@
   min-width: 0;
   min-height: 0;
   display: flex;
-  align-items: flex-start;
+  /*
+   * Centred, not top-aligned. The card takes the height of the half, and the
+   * book takes about two thirds of it, so a top-aligned card left a field of
+   * empty panel under the book. Reported 2026-10-20. Centred, the spare room
+   * is shared above and below, which reads as margin rather than as a gap.
+   */
+  align-items: center;
   /* `--space-5`, not `--space-4`: the fore edge stands six pixels proud of the
      cover's right side, so it eats most of a one-rem gap. */
   gap: var(--space-5);
@@ -365,8 +392,17 @@
  * below, not on this one (2026-10-20). A width also keeps one cover the same
  * size whether the half is folded to its share or opened to the screen.
  */
-.coverLink {
+/* The book and its measure, as one column. The bar takes its width from the
+   cover above it, which is what makes the two read as one object. */
+.coverSide {
   flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.coverLink {
   display: block;
   width: 7.25rem;
   aspect-ratio: 2 / 3;
@@ -406,9 +442,10 @@
  * percent, set inline.
  */
 .progress {
-  /* The width of the words it stands under, and the last thing in the card. */
-  align-self: stretch;
-  margin-top: var(--space-1);
+  /* Under the book, the width of the book. It stood among the words for one
+     round; a measure of this object belongs against the object. Reported
+     2026-10-20. It stops where the cover stops, not where its fore edge does. */
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -416,6 +453,7 @@
 
 .progressValue {
   font-size: var(--text-xs);
+  white-space: nowrap;
   color: color-mix(in srgb, var(--color-board-ink) 66%, transparent);
   font-variant-numeric: tabular-nums;
 }

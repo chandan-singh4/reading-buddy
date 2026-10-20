@@ -86,48 +86,6 @@
 
 .shell[data-screen='home'] .brand {
   color: var(--color-board-mark);
-  /*
-   * The name moves off centre on the front door, and only there.
-   *
-   * The bar is `space-between` with three items, which is what centres the
-   * name between the hamburger and the bell. The streak is a fourth item, and
-   * four items cannot hold a centred middle — so on the door the name sits
-   * against the hamburger and the streak and the bell close the right end.
-   */
-  margin-right: auto;
-}
-
-/*
- * The reading streak, in the bar.
- *
- * It used to sit in the reading half's own chip row, beside the two hours and
- * the ring, which read as a crowded sub-header under a bar that had room in it.
- * Reported 2026-10-20. The board tokens are safe here: the bar already takes
- * the board's colour on the front door, which is the only screen that shows it.
- */
-.streak {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35em;
-  flex: 0 0 auto;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  padding: 0.3em 0.7em;
-  border-radius: 999px;
-  color: var(--color-board-mark);
-  background: color-mix(in srgb, var(--color-board-mark) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-board-mark) 34%, transparent);
-}
-
-.flame {
-  font-size: 0.95em;
-  line-height: 1;
-}
-
-.shell[data-screen='home'] .menuButton:active {
-  background: color-mix(in srgb, var(--color-board-ink) 14%, transparent);
 }
 
 .brand {

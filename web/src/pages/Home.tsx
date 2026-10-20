@@ -34,7 +34,6 @@ import { useOnVisit } from '../app/screenActive.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
 import { warmLibrary } from '../app/libraryMemory.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
-import { publishStreak } from '../app/readingStreak.ts'
 import { moveBooks } from '../app/shelfTransition.ts'
 import { loadCovers, useCovers, warmCovers } from '../app/useCovers.ts'
 import { nudgeFor } from '../journal/prompts.ts'
@@ -280,19 +279,6 @@ export default function Home() {
     }
   })
 
-  /*
-   * The streak goes up to the top bar, which is where the reader asked for it
-   * (2026-10-20). `readingStreak.ts` says why it travels this way.
-   *
-   * Only while the reading half is on screen. Folded to a lip with the journal
-   * open, the door stops reporting it: a reading streak over a page about
-   * writing is a count of the wrong thing, and the journal still has no streak
-   * of its own on purpose.
-   */
-  useEffect(() => {
-    publishStreak(day !== null && door !== 'write' ? day.streak : null)
-  }, [day, door])
-
   useEffect(() => {
     let cancelled = false
     if (currentId === undefined) {
@@ -497,14 +483,21 @@ function ReadingHalf({
               {/* Decorative: "Continue reading" below reaches the same page,
                   and the title above it names the book. Two targets for one
                   job, because thumbs reach differently. */}
-              <Link
-                to={`/book/${current.book.id}`}
-                className={styles.coverLink}
-                aria-hidden="true"
-                tabIndex={-1}
-              >
-                <ShelfCover entry={current} />
-              </Link>
+              {/* The book and its measure, as one column: the bar takes its
+                  width from the cover above it, which is what makes the two
+                  read as one object. Asked for again 2026-10-20, after a round
+                  with the bar down among the words. */}
+              <div className={styles.coverSide}>
+                <Link
+                  to={`/book/${current.book.id}`}
+                  className={styles.coverLink}
+                  aria-hidden="true"
+                  tabIndex={-1}
+                >
+                  <ShelfCover entry={current} />
+                </Link>
+                {current.percent !== undefined && <Progress percent={current.percent} />}
+              </div>
 
               <div className={styles.readColumn}>
                 <h1 className={styles.bookTitle}>{current.book.title}</h1>
@@ -523,10 +516,13 @@ function ReadingHalf({
                 {/* With the book, not in the half's footer. Opened, the shelf
                     stands between the two, and a finish date under a row of
                     other books reads as a fact about those books. */}
+                <Link to={`/book/${current.book.id}/info`} className={styles.summaries}>
+                  <span className={styles.summariesGlyph} aria-hidden="true">
+                    ⓘ
+                  </span>
+                  Book details
+                </Link>
                 <Forecast entry={current} />
-                {/* Last in the card, under the figures, the width of the words.
-                    It closes the block rather than cutting across it. */}
-                {current.percent !== undefined && <Progress percent={current.percent} />}
               </div>
             </div>
           ) : (
@@ -582,17 +578,29 @@ function clockOf(minutes: number): string {
  * Statistics screen already uses. A second copy of either on the front door
  * would be a number that can disagree with the one on Statistics.
  *
- * The streak used to stand here too. It is in the top bar now — see the
- * publisher in `Home` above. The journal still has no streak of its own, and
- * that stands: a streak turns a journal into a duty, and the night a reader
- * does not feel like writing is the night a streak tells them they failed.
- * Reading is a habit the reader asked to be shown. Writing is not.
+ * The streak stands with the two hours, not in the top bar. It went up there
+ * for one round and came back: the bar is shared with the Library, Statistics
+ * and Settings, and the run of days is a fact about *today's reading*, so it
+ * belongs with the minutes it is a run of.
+ *
+ * The journal still has no streak of its own, and that stands: a streak turns a
+ * journal into a duty, and the night a reader does not feel like writing is the
+ * night a streak tells them they failed. Reading is a habit the reader asked to
+ * be shown. Writing is not.
  */
 function DayMeasure({ day }: { day: Day }) {
   const done = Math.min(Math.round((day.minutes / DAILY_MINUTES) * 100), 100)
   const met = day.minutes >= DAILY_MINUTES
   return (
     <span className={styles.measure}>
+      {day.streak > 0 && (
+        <span className={styles.streak}>
+          <span className={styles.flame} aria-hidden="true">
+            🔥
+          </span>
+          {day.streak} {day.streak === 1 ? 'day' : 'days'}
+        </span>
+      )}
       <span className={met ? `${styles.goalWords} ${styles.met}` : styles.goalWords}>
         {clockOf(day.minutes)} / 2h
       </span>

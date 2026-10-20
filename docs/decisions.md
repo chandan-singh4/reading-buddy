@@ -3750,20 +3750,19 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   small to tell apart at `5.5rem`, which is the whole job of a shelf. The card
   edge also answers the drawn placeholder covers, which looked unfinished
   standing bare on the board.
-- **The reading streak moves to the top bar.** It stood in the half's own chip
-  row beside the two hours and the ring, which read as a crowded second header
-  under a bar that had room in it. The bar shows it on the front door only: the
-  Library, Statistics and Settings share that bar, and a streak on all of them
-  is a duty following the reader around. It also steps out while the journal
-  half is open — a reading streak over a page about writing counts the wrong
-  thing, and the journal still has no streak of its own.
-- **The number travels through a module store, not a context.** `AppShell` is an
-  ancestor of every screen, so Home cannot render into the bar and the bar
-  cannot reach into Home. Home already reads the sessions for the two-hour ring,
-  so it publishes the streak in `app/readingStreak.ts` and the bar subscribes.
-  One reader of the session table, one number, no second copy to disagree.
-- **The name moves off centre on the front door.** The bar is `space-between`
-  with three items, which is what centres "Reading Buddy" between the hamburger
-  and the bell. A fourth item cannot hold a centred middle, so on the door the
-  name sits against the hamburger and the streak and the bell close the right
-  end.
+- **The reading streak stands with the two hours, not in the top bar.** It went
+  up to the bar for one round and came back the same day. The bar is shared with
+  the Library, Statistics and Settings, and the streak is a fact about *today's
+  reading* — so it belongs beside the minutes it is a run of. "Reading Buddy"
+  keeps the middle of the bar, which only holds while the bar has three items.
+  The journal still has no streak of its own.
+- **The card centres what it holds.** The card takes the height of the half and
+  the book takes about two thirds of it, so a top-aligned card left a field of
+  empty panel under the book. Centred, the spare room is shared above and below
+  and reads as margin.
+- **The measure stays under the cover.** It moved down among the words for one
+  round. A measure of an object belongs against the object, so the bar and
+  "N% complete" sit under the book, the width of the book.
+- **The ⓘ in a circle becomes a button that says "Book details".** The mark was
+  something the reader had to learn, and they had to learn it again every time.
+  It takes the same route, `/book/:bookId/info`.

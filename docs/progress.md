@@ -78,7 +78,7 @@ Breadth is now allowed.
 ### Recently done
 
 - **The reading half, redesigned on the mockup (2026-10-20).** Build green:
-  2,703 tests across 171 files. The mockup the reader approved first is
+  2,702 tests across 171 files. The mockup the reader approved first is
   `docs/mockups/reading-open.html`.
   - The book in hand sits in a card: cover on the left, words on the right, one
     edge around both.
@@ -89,8 +89,13 @@ Breadth is now allowed.
     "N% complete" beneath it.
   - Each book on the shelf has a card of its own, `8.75rem` wide, with the same
     measure drawn thinner.
-  - The reading streak is in the top bar, on the front door only. It steps out
-    while the journal half is open.
+  - The streak is beside the two hours, with a flame on it. It spent part of the
+    day in the top bar and came back: that bar is shared with three other
+    screens.
+  - The card centres the book and its words, so there is no empty panel below
+    the book.
+  - The measure sits under the cover, the width of the cover.
+  - "Book details" is a button now. It was a ⓘ in a circle.
   - Fixed on the way past: two rules in `Home.module.css` lost their `.read` and
     `.write` scope in an earlier edit, so both halves took the last one and the
     board's footer link read in the reader's accent.
