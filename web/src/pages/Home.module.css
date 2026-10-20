@@ -570,6 +570,8 @@
 }
 
 .forecast {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

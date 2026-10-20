@@ -499,6 +499,10 @@ function ReadingHalf({
                 <Link to={`/book/${current.book.id}/chapters`} className={styles.quietLink}>
                   Chapter summaries
                 </Link>
+                {/* With the book, not in the half's footer. Opened, the shelf
+                    stands between the two, and a finish date under a row of
+                    other books reads as a fact about those books. */}
+                <Forecast entry={current} />
               </div>
             </>
           ) : (
@@ -523,7 +527,6 @@ function ReadingHalf({
         {open && current && <ShelfRow entries={rest} />}
 
         <div className={styles.faceFoot}>
-          {current && <Forecast entry={current} />}
           <span className={styles.spacer} />
           <Link to="/library" className={styles.footLink}>
             Library ({total}) →

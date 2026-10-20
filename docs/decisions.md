@@ -3664,3 +3664,7 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   shelf, not between the cover and the shelf. The shelf tiles are `5.5rem`, not
   `3.5rem`: four still fit across a phone, and smaller than that the jackets
   cannot be told apart.
+- **The finish forecast sits with the book, not in the half's footer.** Opened,
+  the shelf stands between the book and the footer, so a finish date under a row
+  of other books reads as a fact about those books. The line now follows
+  "Chapter summaries", and the footer holds only the Library link.
