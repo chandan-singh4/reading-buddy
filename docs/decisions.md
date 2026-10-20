@@ -3673,3 +3673,9 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   books in progress) and **Up next** (the books never opened). One unnamed row
   mixed the two and said so nowhere, so a 4% book and an unopened book looked
   like the same kind of thing. An empty shelf prints no heading.
+- **The books on the shelf are books again.** The old shelf's treatment comes
+  back onto `.shelfArt`: a spine down the left, six hairlines of paper down the
+  right, a soft shadow under the book, and a faint curve of light. No 3D
+  transform — a rotated element takes its own width with it and pulls the row
+  out of line. The row now carries the padding the drop shadows need, because
+  `overflow-x: auto` scrolls the vertical axis too and would cut them off.
