@@ -3725,3 +3725,9 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   top-aligned, so the cover's top edge and the title's first line agree. On the
   shelf, a title block is two lines whether the title needs two or one, so every
   "% read" below sits on the same line across the row.
+- **The author sits under the title, in italics.** On the book in hand and on
+  every book on the shelf. Italic rather than a lighter weight or a smaller
+  size: the line below the title is a different *kind* of fact, not a quieter
+  one. On the shelf the author holds one line of room whether there is an author
+  or not, for the same reason the title block holds two — a book with no author
+  would pull its own "% read" up and break the row.

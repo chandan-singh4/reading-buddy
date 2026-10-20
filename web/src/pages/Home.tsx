@@ -496,6 +496,9 @@ function ReadingHalf({
 
               <div className={styles.readColumn}>
                 <h1 className={styles.bookTitle}>{current.book.title}</h1>
+                {current.book.author !== undefined && (
+                  <p className={styles.bookAuthor}>{current.book.author}</p>
+                )}
                 <Link to={`/book/${current.book.id}`} className={styles.resume}>
                   Continue reading →
                 </Link>
@@ -867,6 +870,9 @@ function ShelfRow({ entries }: { entries: ShelfEntry[] }) {
             />
           </span>
           <span className={styles.shelfTitle}>{entry.book.title}</span>
+          {/* Always rendered, empty or not. A book with no author would pull
+              its own "% read" up a line and break the row. */}
+          <span className={styles.shelfAuthor}>{entry.book.author ?? ''}</span>
           {entry.percent !== undefined && (
             <span className={styles.shelfPercent}>{entry.percent}% read</span>
           )}

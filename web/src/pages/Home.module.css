@@ -775,6 +775,21 @@
  * book a third time said nothing and wrapped the button onto two lines on a
  * phone. Reported 2026-10-19.
  */
+/*
+ * The author, under the title and in italics.
+ *
+ * Italic rather than a second weight or a smaller size: the title is already
+ * the display face at its largest, and the one thing left to say about the
+ * line below is that it is a different *kind* of fact, not a quieter one.
+ */
+.bookAuthor {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-sm);
+  color: color-mix(in srgb, var(--color-board-ink) 68%, transparent);
+}
+
 .resume {
   align-self: flex-start;
   display: inline-flex;
@@ -883,6 +898,20 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+}
+
+/* One line of room whether there is an author or not, for the same reason the
+   title block holds two: every figure below has to sit on the same line. */
+.shelfAuthor {
+  min-height: 1.3em;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-xs);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--color-board-ink) 62%, transparent);
 }
 
 .shelfPercent {

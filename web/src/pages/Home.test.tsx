@@ -639,6 +639,22 @@ describe('the book in hand', () => {
     ).toBeDefined()
   })
 
+  it('names the author under the title, and on the shelf', async () => {
+    await repository.savePosition(
+      BOOKS[1]!.id,
+      { chapter: 0, block: 0 } as never,
+      19,
+      '2026-08-29T09:00:00.000Z',
+    )
+    await openHomeReading(28)
+
+    expect(await shown().findByText('Kenneth Grahame')).toBeDefined()
+    // The shelf is behind the fold, so the second author arrives with it.
+    expect(shown().queryByText('James Nestor')).toBeNull()
+    fireEvent.click(shown().getByRole('button', { name: 'Open the reading half' }))
+    expect(await shown().findByText('James Nestor')).toBeDefined()
+  })
+
   it('names the book once, and does not repeat it on the button', async () => {
     // Reported 2026-10-19: "Keep the Title, I don't need to see Resume + Book
     // name." The title is directly above the button and the cover is beside
