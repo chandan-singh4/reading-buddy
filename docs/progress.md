@@ -77,6 +77,25 @@ Breadth is now allowed.
 
 ### Recently done
 
+- **The reading half, redesigned on the mockup (2026-10-20).** Build green:
+  2,703 tests across 171 files. The mockup the reader approved first is
+  `docs/mockups/reading-open.html`.
+  - The book in hand sits in a card: cover on the left, words on the right, one
+    edge around both.
+  - The cover is back at `7.25rem`. The growth was for the shelf books.
+  - "Continue reading" is now the amber button. "Chapter summaries" stays an
+    outlined pill under it.
+  - The progress bar closes the card, under the finish figures, with
+    "N% complete" beneath it.
+  - Each book on the shelf has a card of its own, `8.75rem` wide, with the same
+    measure drawn thinner.
+  - The reading streak is in the top bar, on the front door only. It steps out
+    while the journal half is open.
+  - Fixed on the way past: two rules in `Home.module.css` lost their `.read` and
+    `.write` scope in an earlier edit, so both halves took the last one and the
+    board's footer link read in the reader's accent.
+  - The journal half, the bridge and the fold are untouched.
+
 - **The front door, after the first look on a phone (2026-10-19).** Build
   green: 2,698 tests across 171 files.
   - The cover now fills the left of the reading half and bleeds to the edges.

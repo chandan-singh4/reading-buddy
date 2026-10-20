@@ -8,6 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { AppRoutes } from '../App.tsx'
 import { forgetLibraryMemory, readLibraryMemory } from '../app/libraryMemory.ts'
 import { forgetShelfMemory } from '../app/shelfMemory.ts'
+import { forgetStreak } from '../app/readingStreak.ts'
 import { forgetTabHistory } from '../app/tabHistory.ts'
 import { forgetCovers } from '../app/useCovers.ts'
 import { entryStore, noteStore, repository } from '../storage/index.ts'
@@ -42,6 +43,10 @@ beforeEach(async () => {
   // would satisfy the next case's assertions without the code doing anything.
   forgetShelfMemory()
   forgetLibraryMemory()
+  // The streak the top bar shows is module-level for the same reason, and left
+  // over it would answer the next case's assertion without the door doing
+  // anything.
+  forgetStreak()
   forgetCovers()
   // The history memory is module-level for the same reason and with the same
   // hazard — left over, it reads a fresh render as a Back press and retraces a
@@ -370,7 +375,36 @@ describe('how the day is going', () => {
     )
 
     expect(await screen.findByText('45m / 2h')).toBeDefined()
-    expect(shown().getByText('3 days')).toBeDefined()
+    // The run of days is in the top bar, not in the half. The bar is outside
+    // the screen, so `shown()` must not be able to see it.
+    expect(await screen.findByText('3 days')).toBeDefined()
+    expect(shown().queryByText('3 days')).toBeNull()
+  })
+
+  it('takes the streak out of the bar while the journal is open', async () => {
+    // A reading streak over a page about writing counts the wrong thing, and
+    // the journal has no streak of its own on purpose.
+    await read(45, 0)
+    await read(70, 1)
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    )
+    // The bar can carry the streak before the door has painted: it is one
+    // read, and the shelf is another. Wait for the half itself.
+    const journal = await shown().findByRole('button', { name: 'Open the journal half' })
+    expect(await screen.findByText('2 days')).toBeDefined()
+
+    fireEvent.click(journal)
+    await waitFor(() => {
+      expect(screen.queryByText('2 days')).toBeNull()
+    })
+
+    // Back to even, and it is back.
+    fireEvent.click(shown().getByRole('button', { name: 'Close the journal half' }))
+    expect(await screen.findByText('2 days')).toBeDefined()
   })
 
   it('says nothing about a streak there is not one of', async () => {
@@ -382,7 +416,7 @@ describe('how the day is going', () => {
       </MemoryRouter>,
     )
     await screen.findByText('0m / 2h')
-    expect(shown().queryByText(/day[s]?$/)).toBeNull()
+    expect(screen.queryByText(/^\d+ days?$/)).toBeNull()
   })
 })
 
@@ -694,7 +728,7 @@ describe('the book in hand', () => {
     )
     await openHomeReading(28)
 
-    expect(await shown().findByText('28%')).toBeDefined()
+    expect(await shown().findByText('28% complete')).toBeDefined()
     expect(shown().queryByText(/where you stopped/i)).toBeNull()
     expect(shown().getByRole('img', { name: '28% read' })).toBeDefined()
     // The shelf is what the fold frees room for, so it is not in the face yet.

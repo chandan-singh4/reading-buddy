@@ -3731,3 +3731,39 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   one. On the shelf the author holds one line of room whether there is an author
   or not, for the same reason the title block holds two — a book with no author
   would pull its own "% read" up and break the row.
+- **The book in hand sits in a card.** Bare on the board, the cover and the
+  words beside it read as two things that share a row. A panel with its own edge
+  and its own padding makes them one object: the book, and all the door says
+  about it. The mockup is `docs/mockups/reading-open.html`.
+- **The hero cover comes back down to `7.25rem`.** It stood at `38dvh` for one
+  round. The growth the reader asked for was for the books on the shelf, not for
+  this one. A fixed width also keeps one cover the same size whether the half is
+  folded to its share or opened to the screen.
+- **"Continue reading" is the one filled button on the board, and it is amber.**
+  It was a dark pill on a dark board — the quietest thing in the card. "Chapter
+  summaries" stays an outlined pill, so only one of the two reads as the answer.
+- **The progress bar closes the card.** It runs the width of the words, under
+  the finish figures, with "25% complete" beneath it. It was beside the figure,
+  under the cover. The shelf cards below draw the same measure, thinner, so the
+  two read as one idea.
+- **Each book on the shelf gets a card, `8.75rem` wide.** The jackets were too
+  small to tell apart at `5.5rem`, which is the whole job of a shelf. The card
+  edge also answers the drawn placeholder covers, which looked unfinished
+  standing bare on the board.
+- **The reading streak moves to the top bar.** It stood in the half's own chip
+  row beside the two hours and the ring, which read as a crowded second header
+  under a bar that had room in it. The bar shows it on the front door only: the
+  Library, Statistics and Settings share that bar, and a streak on all of them
+  is a duty following the reader around. It also steps out while the journal
+  half is open — a reading streak over a page about writing counts the wrong
+  thing, and the journal still has no streak of its own.
+- **The number travels through a module store, not a context.** `AppShell` is an
+  ancestor of every screen, so Home cannot render into the bar and the bar
+  cannot reach into Home. Home already reads the sessions for the two-hour ring,
+  so it publishes the streak in `app/readingStreak.ts` and the bar subscribes.
+  One reader of the session table, one number, no second copy to disagree.
+- **The name moves off centre on the front door.** The bar is `space-between`
+  with three items, which is what centres "Reading Buddy" between the hamburger
+  and the bell. A fourth item cannot hold a centred middle, so on the door the
+  name sits against the hamburger and the streak and the bell close the right
+  end.

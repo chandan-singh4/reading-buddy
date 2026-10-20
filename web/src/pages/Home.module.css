@@ -221,23 +221,18 @@
   color: var(--color-text-muted);
 }
 
-/* ---- the day: two hours, and the run of days behind it ---- */
+/* ---- the day: two hours ---- */
 
+/*
+ * The run of days used to stand here, beside the two hours. It is in the top
+ * bar now, where there was already room for it — see `.streak` in
+ * `AppShell.module.css`. Reported 2026-10-20: the row under the bar read as a
+ * crowded second header.
+ */
 .measure {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-}
-
-.streak {
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  padding: 0.25em 0.6em;
-  border-radius: 999px;
-  color: var(--color-board-mark);
-  border: 1px solid color-mix(in srgb, var(--color-board-mark) 40%, transparent);
 }
 
 .goalWords {
@@ -245,6 +240,10 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: color-mix(in srgb, var(--color-board-ink) 62%, transparent);
+}
+
+.goalWords.met {
+  color: var(--color-board-mark);
 }
 
 /*
@@ -270,10 +269,6 @@
   inset: 3px;
   border-radius: 50%;
   background: var(--color-board);
-}
-
-.goalWords.met {
-  color: var(--color-board-mark);
 }
 
 .footLink {
@@ -284,121 +279,14 @@
   text-decoration: none;
 }
 
-.read /* ---- the day: two hours, and the run of days behind it ---- */
-
-.measure {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.streak {
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  padding: 0.25em 0.6em;
-  border-radius: 999px;
-  color: var(--color-board-mark);
-  border: 1px solid color-mix(in srgb, var(--color-board-mark) 40%, transparent);
-}
-
-.goalWords {
-  font-size: var(--text-xs);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--color-board-ink) 62%, transparent);
-}
-
-/*
- * The two hours, as a ring. A bar across the top of the board would be a
- * progress bar on a page that has no other, and the ring is the one shape that
- * can say "part of a whole" in the space a chip leaves.
- */
-.ring {
-  width: 1.625rem;
-  height: 1.625rem;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  position: relative;
-  background: conic-gradient(
-    var(--color-board-mark) 0 var(--done),
-    color-mix(in srgb, var(--color-board-ink) 14%, transparent) var(--done) 100%
-  );
-}
-
-.ring::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: var(--color-board);
-}
-
-.goalWords.met {
+/* The two halves part on colour alone. These two rules were written as
+   descendants and lost their scope in an edit, so both halves took the last
+   one — the board's footer read in the reader's accent. */
+.read .footLink {
   color: var(--color-board-mark);
 }
 
-.footLink {
-  color: var(--color-board-mark);
-}
-
-.write /* ---- the day: two hours, and the run of days behind it ---- */
-
-.measure {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.streak {
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  padding: 0.25em 0.6em;
-  border-radius: 999px;
-  color: var(--color-board-mark);
-  border: 1px solid color-mix(in srgb, var(--color-board-mark) 40%, transparent);
-}
-
-.goalWords {
-  font-size: var(--text-xs);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--color-board-ink) 62%, transparent);
-}
-
-/*
- * The two hours, as a ring. A bar across the top of the board would be a
- * progress bar on a page that has no other, and the ring is the one shape that
- * can say "part of a whole" in the space a chip leaves.
- */
-.ring {
-  width: 1.625rem;
-  height: 1.625rem;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  position: relative;
-  background: conic-gradient(
-    var(--color-board-mark) 0 var(--done),
-    color-mix(in srgb, var(--color-board-ink) 14%, transparent) var(--done) 100%
-  );
-}
-
-.ring::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: var(--color-board);
-}
-
-.goalWords.met {
-  color: var(--color-board-mark);
-}
-
-.footLink {
+.write .footLink {
   color: var(--color-accent);
 }
 
@@ -442,58 +330,45 @@
 }
 
 /*
- * The cover stands in the half, bleeding to its left edge.
+ * The book in hand, as a card.
  *
- * A thumbnail beside the title left the top third of the board empty, which is
- * what the reader reported. A book standing in the door fills it with the one
- * thing the half is about.
- *
- * The box is locked to a book's own 2:3 and sized by *height*, not by a share
- * of the width. It was 42% wide by the half's full height, which is no shape a
- * book has — so `object-fit: cover` ate the left and right of every jacket, and
- * ate more of it the taller the half grew. At 2:3 the crop is a few pixels on
- * the jackets that are not quite 2:3, and nothing on the ones that are.
- *
- * `30dvh` rather than the half's height, so one cover is the same size whether
- * the half is folded to its share or opened to the screen. `max-height: 100%`
- * is what holds it inside a short half; with `width: auto` the aspect ratio
- * then takes the width down with it.
- *
- * It no longer bleeds off the left edge. A book pressed against the side of the
- * screen reads as cut off rather than as standing there. Reported 2026-10-20.
+ * Bare on the board, the cover and the words beside it read as two things that
+ * happen to share a row. A panel with its own edge and its own padding makes
+ * them one object — the book, and everything the door has to say about it.
+ * Asked for 2026-10-20.
  */
-/* The book and its measure, as one column. The bar below takes its width from
-   the cover above it, which is what makes the two read as one object.
-
-   Top-aligned, not centred: the cover's top edge and the title's first line now
-   start on the same line, which is what "aligned" means on a door whose left
-   half is one tall object and whose right half is a stack of short ones. */
-.coverSide {
-  flex: 0 0 auto;
-  align-self: stretch;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: var(--space-2);
+.card {
+  flex: 1;
   min-width: 0;
   min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  /* `--space-5`, not `--space-4`: the fore edge stands six pixels proud of the
+     cover's right side, so it eats most of a one-rem gap. */
+  gap: var(--space-5);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-board-ink) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-board-ink) 10%, transparent);
 }
 
 /*
- * `38dvh`, up from 30: the book is what the half is about, and on a tall phone
- * 30 left it small against the room the open half gives it.
+ * The cover, locked to a book's own 2:3.
  *
- * `flex: 0 1 auto` with `min-height: 0` is what keeps that honest. In the even
- * split the half is half as tall, and 38dvh plus the bar below would not fit;
- * a shrinkable item gives way instead of overflowing, and `width: auto` lets
- * the aspect ratio take the width down with the height.
+ * It was 42% of the width by the half's full height, which is no shape a book
+ * has — so `object-fit: cover` ate the left and right of every jacket, and ate
+ * more of it the taller the half grew. At 2:3 the crop is a few pixels on the
+ * jackets that are not quite 2:3, and nothing on the ones that are.
+ *
+ * A fixed width, not a share of the screen's height. It stood at `38dvh` for a
+ * round, which was the growth the reader had asked for on the *shelf* books
+ * below, not on this one (2026-10-20). A width also keeps one cover the same
+ * size whether the half is folded to its share or opened to the screen.
  */
 .coverLink {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   display: block;
-  height: 38dvh;
-  min-height: 0;
-  width: auto;
+  width: 7.25rem;
   aspect-ratio: 2 / 3;
 }
 
@@ -531,26 +406,23 @@
  * percent, set inline.
  */
 .progress {
-  /* Stops where the cover stops, not where its fore edge does: the bar measures
-     the book, so it lines up with the cover's own left and right. */
-  width: 100%;
+  /* The width of the words it stands under, and the last thing in the card. */
+  align-self: stretch;
+  margin-top: var(--space-1);
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .progressValue {
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-board-mark);
+  font-size: var(--text-xs);
+  color: color-mix(in srgb, var(--color-board-ink) 66%, transparent);
   font-variant-numeric: tabular-nums;
 }
 
 .progressTrack {
-  flex: 1;
-  min-width: 0;
-  height: 3px;
+  width: 100%;
+  height: 4px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-board-ink) 16%, transparent);
   background-image: linear-gradient(
@@ -783,13 +655,23 @@
  * line below is that it is a different *kind* of fact, not a quieter one.
  */
 .bookAuthor {
-  margin: 0;
+  /* Against the title, for the same reason the shelf author is. */
+  margin: calc(var(--space-1) * -1) 0 0;
   font-family: var(--font-display);
   font-style: italic;
   font-size: var(--text-sm);
   color: color-mix(in srgb, var(--color-board-ink) 68%, transparent);
 }
 
+/*
+ * The one thing this half is for, so it is the one filled button on it.
+ *
+ * It was a dark pill on a dark board — the quietest thing in the card, and the
+ * reader could not find the difference between it and the board behind it.
+ * Reported 2026-10-20. Amber on the board carries the contrast, and "Chapter
+ * summaries" stays outlined underneath so only one of the two reads as the
+ * answer.
+ */
 .resume {
   align-self: flex-start;
   display: inline-flex;
@@ -798,10 +680,10 @@
   font-size: var(--text-sm);
   font-weight: 600;
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-board-ink) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-board-ink) 18%, transparent);
-  color: var(--color-board-ink);
+  border-radius: 999px;
+  background: var(--color-board-mark);
+  border: 1px solid var(--color-board-mark);
+  color: var(--color-board);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -858,7 +740,7 @@
 
 .shelfRow {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--space-3);
   overflow-x: auto;
   scrollbar-width: none;
   /* Room under the row for the books' own drop shadows. `overflow-x: auto`
@@ -873,16 +755,27 @@
 }
 
 /*
- * 5.5rem, not the 3.5rem this shipped at. Four tiles still fit across a phone,
- * and at 3.5rem the jackets were too small to tell apart — which is the whole
- * job of a shelf. Reported 2026-10-20.
+ * Each shelf book in a card of its own, 8.75rem wide.
+ *
+ * It shipped at 3.5rem, then 5.5rem: at either size the jackets were too small
+ * to tell apart, which is the whole job of a shelf. Reported 2026-10-20. Two
+ * cards and part of a third now fit across a phone, which is what makes the row
+ * read as something to scroll.
+ *
+ * The card edge also answers the placeholder covers: a drawn title on a plain
+ * ground looked unfinished standing bare on the board, and reads as a book
+ * inside a frame.
  */
 .shelfTile {
   flex: 0 0 auto;
-  width: 5.5rem;
+  width: 8.75rem;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-board-ink) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-board-ink) 9%, transparent);
   text-decoration: none;
   color: inherit;
 }
@@ -903,6 +796,9 @@
 /* One line of room whether there is an author or not, for the same reason the
    title block holds two: every figure below has to sit on the same line. */
 .shelfAuthor {
+  /* Pulled up against its title: the card's gap is set for the blocks in
+     it, and an author is part of the block above, not the next one. */
+  margin-top: calc(var(--space-1) * -1);
   min-height: 1.3em;
   font-family: var(--font-display);
   font-style: italic;
@@ -912,6 +808,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: color-mix(in srgb, var(--color-board-ink) 62%, transparent);
+}
+
+/* The card's own measure, thinner than the one in the book-in-hand card above
+   but drawn the same way, from the same `--read`. */
+.shelfTrack {
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-board-ink) 16%, transparent);
+  background-image: linear-gradient(
+    90deg,
+    var(--color-board-mark) var(--read),
+    transparent var(--read)
+  );
+  background-repeat: no-repeat;
 }
 
 .shelfPercent {

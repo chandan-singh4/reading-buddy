@@ -34,6 +34,7 @@ import { useOnVisit } from '../app/screenActive.tsx'
 import { shelvesOf, type HomeShelves, type ShelfEntry } from '../app/homeShelves.ts'
 import { warmLibrary } from '../app/libraryMemory.ts'
 import { readShelfMemory, writeShelfMemory } from '../app/shelfMemory.ts'
+import { publishStreak } from '../app/readingStreak.ts'
 import { moveBooks } from '../app/shelfTransition.ts'
 import { loadCovers, useCovers, warmCovers } from '../app/useCovers.ts'
 import { nudgeFor } from '../journal/prompts.ts'
@@ -279,6 +280,19 @@ export default function Home() {
     }
   })
 
+  /*
+   * The streak goes up to the top bar, which is where the reader asked for it
+   * (2026-10-20). `readingStreak.ts` says why it travels this way.
+   *
+   * Only while the reading half is on screen. Folded to a lip with the journal
+   * open, the door stops reporting it: a reading streak over a page about
+   * writing is a count of the wrong thing, and the journal still has no streak
+   * of its own on purpose.
+   */
+  useEffect(() => {
+    publishStreak(day !== null && door !== 'write' ? day.streak : null)
+  }, [day, door])
+
   useEffect(() => {
     let cancelled = false
     if (currentId === undefined) {
@@ -475,24 +489,22 @@ function ReadingHalf({
 
         <div className={styles.readBody}>
           {current ? (
-            <>
+            /* The book and everything said about it, in one card. Bare on
+               the board the cover and the words read as two things that happen
+               to be side by side; a panel with its own edge makes them one
+               object. Asked for 2026-10-20. */
+            <div className={styles.card}>
               {/* Decorative: "Continue reading" below reaches the same page,
                   and the title above it names the book. Two targets for one
                   job, because thumbs reach differently. */}
-              <div className={styles.coverSide}>
-                <Link
-                  to={`/book/${current.book.id}`}
-                  className={styles.coverLink}
-                  aria-hidden="true"
-                  tabIndex={-1}
-                >
-                  <ShelfCover entry={current} />
-                </Link>
-                {/* Under the book, the width of the book. The bar is a fact
-                    about this object, so it belongs against it rather than
-                    stacked with the words. */}
-                {current.percent !== undefined && <Progress percent={current.percent} />}
-              </div>
+              <Link
+                to={`/book/${current.book.id}`}
+                className={styles.coverLink}
+                aria-hidden="true"
+                tabIndex={-1}
+              >
+                <ShelfCover entry={current} />
+              </Link>
 
               <div className={styles.readColumn}>
                 <h1 className={styles.bookTitle}>{current.book.title}</h1>
@@ -512,8 +524,11 @@ function ReadingHalf({
                     stands between the two, and a finish date under a row of
                     other books reads as a fact about those books. */}
                 <Forecast entry={current} />
+                {/* Last in the card, under the figures, the width of the words.
+                    It closes the block rather than cutting across it. */}
+                {current.percent !== undefined && <Progress percent={current.percent} />}
               </div>
-            </>
+            </div>
           ) : (
             /* No book on the go, so the door does not presume a page to
                resume: the shelf stands in the face instead. */
@@ -567,21 +582,17 @@ function clockOf(minutes: number): string {
  * Statistics screen already uses. A second copy of either on the front door
  * would be a number that can disagree with the one on Statistics.
  *
- * The streak is the reading streak, and it is only here. The journal still has
- * none, and that stands: a streak turns a journal into a duty, and the night a
- * reader does not feel like writing is the night a streak tells them they
- * failed. Reading is a habit the reader asked to be shown. Writing is not.
+ * The streak used to stand here too. It is in the top bar now — see the
+ * publisher in `Home` above. The journal still has no streak of its own, and
+ * that stands: a streak turns a journal into a duty, and the night a reader
+ * does not feel like writing is the night a streak tells them they failed.
+ * Reading is a habit the reader asked to be shown. Writing is not.
  */
 function DayMeasure({ day }: { day: Day }) {
   const done = Math.min(Math.round((day.minutes / DAILY_MINUTES) * 100), 100)
   const met = day.minutes >= DAILY_MINUTES
   return (
     <span className={styles.measure}>
-      {day.streak > 0 && (
-        <span className={styles.streak}>
-          {day.streak} {day.streak === 1 ? 'day' : 'days'}
-        </span>
-      )}
       <span className={met ? `${styles.goalWords} ${styles.met}` : styles.goalWords}>
         {clockOf(day.minutes)} / 2h
       </span>
@@ -813,9 +824,9 @@ interface Finish {
  * bar says on its own. The numeral stays because a bar alone cannot be read to
  * the percent, and a reader who wants the figure wants the figure.
  *
- * It sits under the cover, the width of the cover. Above the title it was one
- * more line in a stack of lines; against the book it reads as a measure of
- * that book. Reported 2026-10-20.
+ * The bar runs the width of the card's words and the figure sits under it. It
+ * was beside the bar, under the cover; it now closes the block the same way the
+ * shelf tiles below close theirs, so the two read as the same measure.
  */
 function Progress({ percent }: { percent: number }) {
   return (
@@ -825,8 +836,8 @@ function Progress({ percent }: { percent: number }) {
       aria-label={`${percent}% read`}
       style={{ '--read': `${percent}%` } as CSSProperties}
     >
-      <span className={styles.progressValue}>{percent}%</span>
       <span className={styles.progressTrack} />
+      <span className={styles.progressValue}>{percent}% complete</span>
     </span>
   )
 }
@@ -874,7 +885,15 @@ function ShelfRow({ entries }: { entries: ShelfEntry[] }) {
               its own "% read" up a line and break the row. */}
           <span className={styles.shelfAuthor}>{entry.book.author ?? ''}</span>
           {entry.percent !== undefined && (
-            <span className={styles.shelfPercent}>{entry.percent}% read</span>
+            <>
+              {/* The same measure the card above draws, thinner. A bare figure
+                  on a placeholder cover read as unfinished styling. */}
+              <span
+                className={styles.shelfTrack}
+                style={{ '--read': `${entry.percent}%` } as CSSProperties}
+              />
+              <span className={styles.shelfPercent}>{entry.percent}% read</span>
+            </>
           )}
         </Link>
       ))}

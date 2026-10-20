@@ -8,6 +8,7 @@ import { recallScroll, rememberScroll } from './scrollMemory.ts'
 import { useTabHistory } from './tabHistory.ts'
 import { PAGE_ORDER, useSwipeNav } from './useSwipeNav.ts'
 import { Bell } from '../summary/Bell.tsx'
+import { useStreak } from './readingStreak.ts'
 import styles from './AppShell.module.css'
 
 /** Whether a path is one of the four screens this shell holds. */
@@ -93,6 +94,9 @@ export default function AppShell() {
    * which is all of the time a reader is on these four screens.
    */
   const location = useViewLocation()
+  /* The front door: the bar is the top of the board there, and it is the one
+     screen that carries the reading streak. */
+  const home = location.pathname === '/'
   const drawerRef = useRef<HTMLElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
@@ -376,7 +380,7 @@ export default function AppShell() {
      * from Home: it is an ancestor of the screen, so the screen has no way to
      * reach it. One attribute here, one rule in the stylesheet.
      */
-    <div className={styles.shell} data-screen={location.pathname === '/' ? 'home' : undefined}>
+    <div className={styles.shell} data-screen={home ? 'home' : undefined}>
       {/* Everything the drawer blurs sits inside this one wrapper. It has to
           be a sibling of the drawer, not its ancestor: a CSS `filter` makes an
           element a containing block for fixed-position descendants, so a
@@ -400,6 +404,16 @@ export default function AppShell() {
           </button>
 
           <span className={styles.brand}>Reading Buddy</span>
+
+          {/*
+           * The reading streak, beside the bell.
+           *
+           * On the front door only. The bar is shared with the Library,
+           * Statistics and Settings, and a streak on all of them is a duty
+           * following the reader around the app. `readingStreak.ts` says how
+           * the number gets from the door up to here.
+           */}
+          {home && <Streak />}
 
           {/*
            * The bell takes the place the spacer held: the same 44px on the
@@ -524,5 +538,25 @@ export default function AppShell() {
         </ul>
       </nav>
     </div>
+  )
+}
+
+/**
+ * The run of days, as a chip in the bar.
+ *
+ * It draws nothing until the front door reports a number, so the bar never
+ * holds an empty badge. The door also stops reporting while the journal half
+ * is open: a reading streak over a page about writing counts the wrong thing.
+ */
+function Streak() {
+  const days = useStreak()
+  if (days === null || days <= 0) return null
+  return (
+    <span className={styles.streak}>
+      <span className={styles.flame} aria-hidden="true">
+        🔥
+      </span>
+      {days} {days === 1 ? 'day' : 'days'}
+    </span>
   )
 }

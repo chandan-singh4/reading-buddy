@@ -120,12 +120,15 @@
       }
 
       .streak {
-        font-size: 0.68rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        padding: 3px 9px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.74rem;
+        font-weight: 600;
+        padding: 4px 10px;
         border-radius: 999px;
-        border: 1px solid color-mix(in srgb, var(--mark) 55%, transparent);
+        background: color-mix(in srgb, var(--mark) 14%, transparent);
+        border: 1px solid color-mix(in srgb, var(--mark) 34%, transparent);
         color: var(--mark);
       }
 
@@ -472,14 +475,14 @@
       <div class="frame">
         <div class="topBar">
           <span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="brand">Reading Buddy</span>
+          <span class="brand" style="margin-right: auto">Reading Buddy</span>
+          <span class="streak">&#128293; 7 days</span>
           <span aria-hidden="true">&#9730;</span>
         </div>
 
         <div class="chipRow">
           <span class="chip"><span class="breath"></span>Read</span>
           <span class="spacer"></span>
-          <span class="streak">7 days</span>
           <span class="goal">38m / 2h</span>
           <span class="ring"></span>
         </div>
@@ -593,11 +596,11 @@
         <ul>
           <li>The journal half, in every state. Not one line of it.</li>
           <li>The bridge, and the even split both halves open at.</li>
-          <li>The top bar, the streak, the two-hour ring and the Library footer.</li>
+          <li>The two-hour ring, and the Library footer.</li>
           <li>The board colour, and the book shell &mdash; spine, pages, weight.</li>
         </ul>
 
-        <h2>Three things in your picture I left out</h2>
+        <h2>Three things in your picture: two left out, one built</h2>
         <ul>
           <li>
             <b>The bottom tab bar.</b> You said forget what is below. It would also
@@ -608,9 +611,10 @@
             bring it back.
           </li>
           <li>
-            <b>The streak in the top bar.</b> The top bar is shared with the
-            journal, Library, Stats and Settings. Moving a reading streak there
-            puts it on all five. Say the word if you want it anyway.
+            <b>The streak in the top bar</b> &mdash; asked for, and now built.
+            It shows on the front door only, so the Library, Statistics and
+            Settings keep a plain bar. It also steps out while the journal half
+            is open.
           </li>
         </ul>
       </div>
