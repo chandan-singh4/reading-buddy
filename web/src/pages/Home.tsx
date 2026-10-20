@@ -493,16 +493,15 @@ function ReadingHalf({
               </Link>
 
               <div className={styles.readColumn}>
-                {current.percent !== undefined && (
-                  <span className={styles.locline}>
-                    <b>{current.percent}%</b> · where you stopped
-                  </span>
-                )}
+                {current.percent !== undefined && <Progress percent={current.percent} />}
                 <h1 className={styles.bookTitle}>{current.book.title}</h1>
                 <Link to={`/book/${current.book.id}`} className={styles.resume}>
                   Continue reading →
                 </Link>
-                <Link to={`/book/${current.book.id}/chapters`} className={styles.quietLink}>
+                <Link to={`/book/${current.book.id}/chapters`} className={styles.summaries}>
+                  <span className={styles.summariesGlyph} aria-hidden="true">
+                    ▤
+                  </span>
                   Chapter summaries
                 </Link>
                 {/* With the book, not in the half's footer. Opened, the shelf
@@ -742,7 +741,7 @@ function JournalHalf({
  */
 function Forecast({ entry }: { entry: ShelfEntry }) {
   const { book, percent } = entry
-  const [words, setWords] = useState<string | null>(null)
+  const [words, setWords] = useState<Finish | string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -759,7 +758,7 @@ function Forecast({ entry }: { entry: ShelfEntry }) {
           setWords('Still learning how fast you read this one.')
           return
         }
-        setWords(`Finishing ${shortDate(pace.finishOn)} · ${pace.velocity}m / day`)
+        setWords({ on: shortDate(pace.finishOn), velocity: pace.velocity })
       })
       .catch(() => {
         if (cancelled) return
@@ -771,7 +770,57 @@ function Forecast({ entry }: { entry: ShelfEntry }) {
   }, [book.id, percent])
 
   if (words === null) return null
-  return <span className={styles.forecast}>{words}</span>
+  // Calibrating still says it in words. There is no figure to draw yet, and a
+  // drawn gauge of an unknown is a claim.
+  if (typeof words === 'string') return <span className={styles.forecast}>{words}</span>
+
+  return (
+    <span
+      className={styles.forecast}
+      role="img"
+      aria-label={`Finishing ${words.on}, at ${words.velocity} minutes a day`}
+    >
+      <span className={styles.figure}>
+        <span className={styles.figureGlyph} aria-hidden="true">
+          ⚑
+        </span>
+        <span className={styles.figureValue}>{words.on}</span>
+      </span>
+      <span className={styles.figure}>
+        <span className={styles.figureGlyph} aria-hidden="true">
+          ◷
+        </span>
+        <span className={styles.figureValue}>{words.velocity}m / day</span>
+      </span>
+    </span>
+  )
+}
+
+/** The day a book lands on, and the pace that gets it there. */
+interface Finish {
+  on: string
+  velocity: number
+}
+
+/**
+ * How far in, drawn rather than said.
+ *
+ * "76% · where you stopped" spent a line of the board on four words that the
+ * bar says on its own. The numeral stays because a bar alone cannot be read to
+ * the percent, and a reader who wants the figure wants the figure.
+ */
+function Progress({ percent }: { percent: number }) {
+  return (
+    <span
+      className={styles.progress}
+      role="img"
+      aria-label={`${percent}% read`}
+      style={{ '--read': `${percent}%` } as CSSProperties}
+    >
+      <span className={styles.progressValue}>{percent}%</span>
+      <span className={styles.progressTrack} />
+    </span>
+  )
 }
 
 /**

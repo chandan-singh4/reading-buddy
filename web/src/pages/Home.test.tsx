@@ -664,10 +664,10 @@ describe('the book in hand', () => {
     expect(shows[0]!.closest('button')?.textContent).toContain('Write about your last mark')
   })
 
-  it('says the percent in the line of context, and the shelf says its own', async () => {
-    // The book in hand has its percent above the title, where "where you
-    // stopped" can stand beside it. Every other book on the shelf has only the
-    // number to say it with.
+  it('draws the percent above the title, and the shelf says its own in words', async () => {
+    // The book in hand has a figure and a bar. "Where you stopped" is gone:
+    // four words that the bar says on its own. Reported 2026-10-20. Every
+    // other book on the shelf has only the number to say it with.
     await repository.savePosition(
       BOOKS[1]!.id,
       { chapter: 0, block: 0 } as never,
@@ -677,6 +677,8 @@ describe('the book in hand', () => {
     await openHomeReading(28)
 
     expect(await shown().findByText('28%')).toBeDefined()
+    expect(shown().queryByText(/where you stopped/i)).toBeNull()
+    expect(shown().getByRole('img', { name: '28% read' })).toBeDefined()
     // The shelf is what the fold frees room for, so it is not in the face yet.
     expect(shown().queryByText('7% read')).toBeNull()
 

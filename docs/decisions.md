@@ -3679,3 +3679,18 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   transform — a rotated element takes its own width with it and pulls the row
   out of line. The row now carries the padding the drop shadows need, because
   `overflow-x: auto` scrolls the vertical axis too and would cut them off.
+- **The reading column stops stretching its children.** A flex item stretches
+  across the cross axis by default, so the "Chapter summaries" link was four
+  words of text with a hit area running to the right edge of the board. A tap on
+  the empty board beside it opened the summaries. The column is now
+  `align-items: flex-start`, and the title alone keeps `align-self: stretch` so
+  a long one still wraps.
+- **The cover no longer bleeds off the left edge.** A book pressed against the
+  side of the screen reads as cut off, not as standing there.
+- **The percent, the summaries and the forecast are drawn, not said.** The
+  percent is a numeral and a bar the width of the title block; "where you
+  stopped" goes, because the bar says it. "Chapter summaries" is an outlined
+  chip with a mark on it — outlined, because two filled buttons in one column
+  make neither of them the answer. The forecast is two marked figures, a flag
+  for the day and a clock for the pace. Each drawn figure carries an
+  `aria-label`, so what the eye reads as a picture the ear still reads as words.

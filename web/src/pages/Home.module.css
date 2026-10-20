@@ -455,6 +455,9 @@
  * the half is folded to its share or opened to the screen. `max-height: 100%`
  * is what holds it inside a short half; with `width: auto` the aspect ratio
  * then takes the width down with it.
+ *
+ * It no longer bleeds off the left edge. A book pressed against the side of the
+ * screen reads as cut off rather than as standing there. Reported 2026-10-20.
  */
 .coverLink {
   flex: 0 0 auto;
@@ -464,16 +467,111 @@
   max-height: 100%;
   width: auto;
   aspect-ratio: 2 / 3;
-  margin-left: calc(var(--space-4) * -1);
 }
 
+/*
+ * `align-items: flex-start`, because a stretched link is a link the width of
+ * the column.
+ *
+ * The children are flex items, and a flex item stretches across the cross axis
+ * by default. "Chapter summaries" is four words of text and a hit area running
+ * to the right edge of the board, so a tap on the empty board beside it opened
+ * the summaries. Reported 2026-10-20.
+ *
+ * The title keeps its own `align-self: stretch` so a long one still wraps in
+ * the column rather than growing to its longest line.
+ */
 .readColumn {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
   gap: var(--space-2);
+}
+
+.bookTitle {
+  align-self: stretch;
+}
+
+/*
+ * How far in, as a figure and a bar.
+ *
+ * The bar is the length of the title block above it, so the eye reads the two
+ * as one object — the book, and how much of it is behind you. `--read` is the
+ * percent, set inline.
+ */
+.progress {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.progressValue {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-board-mark);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-board-ink) 16%, transparent);
+  background-image: linear-gradient(
+    90deg,
+    var(--color-board-mark) var(--read),
+    transparent var(--read)
+  );
+  background-repeat: no-repeat;
+}
+
+/*
+ * "Chapter summaries", as a thing to press rather than a line to read.
+ *
+ * Outlined, not filled: "Continue reading" is the one thing this half is for,
+ * and two filled buttons in a column make neither of them the answer.
+ */
+.summaries {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-board-mark) 45%, transparent);
+  color: var(--color-board-mark);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.summariesGlyph {
+  font-size: 0.9em;
+  opacity: 0.8;
+}
+
+/* Each figure on the forecast line, behind its own mark. */
+.figure {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  white-space: nowrap;
+}
+
+.figureGlyph {
+  font-size: 0.95em;
+  opacity: 0.72;
+}
+
+.figureValue {
+  color: color-mix(in srgb, var(--color-board-ink) 82%, transparent);
+  font-variant-numeric: tabular-nums;
 }
 
 .locline {
@@ -481,11 +579,6 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--color-board-ink) 58%, transparent);
-}
-
-.locline b {
-  color: var(--color-board-mark);
-  font-weight: 600;
 }
 
 .bookTitle {
@@ -644,19 +737,15 @@
   white-space: nowrap;
 }
 
-.quietLink {
-  font-size: var(--text-xs);
-  color: var(--color-board-mark);
-  text-decoration: none;
-}
-
 .forecast {
+  align-self: flex-start;
   margin-top: var(--space-1);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
   font-size: var(--text-xs);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: color-mix(in srgb, var(--color-board-ink) 58%, transparent);
 }
 
