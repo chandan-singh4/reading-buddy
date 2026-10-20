@@ -433,10 +433,6 @@ function ReadingHalf({
     () => [...shelves.upNext, ...shelves.unread.map((book) => ({ book }) as ShelfEntry)],
     [shelves],
   )
-  const upNext = useMemo(
-    () => shelves.unread.map((book) => ({ book }) as ShelfEntry),
-    [shelves],
-  )
 
   if (folded) {
     return (
@@ -534,12 +530,12 @@ function ReadingHalf({
 
         {/* Only once the half is open. The room the fold frees is what the
             shelves are shown in — that is what makes the fold worth making.
-            Two shelves, each named. One unnamed row mixed the books the reader
-            had started with the ones they had not, and said so nowhere. */}
+            One shelf, named. It holds the books already in progress: the
+            unread belong to the Library, which is one tap away in the footer
+            and holds all 44 of them with search and filters. */}
         {open && current && (
           <div className={styles.shelves}>
             <Shelf label="Also reading" entries={shelves.upNext} />
-            <Shelf label="Up next" entries={upNext} />
           </div>
         )}
 

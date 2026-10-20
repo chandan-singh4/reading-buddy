@@ -3713,3 +3713,15 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   shell carries `data-screen="home"` and `AppShell.module.css` holds the one
   rule. The board tokens never follow the reader's theme, so the bar matches the
   board under every theme, because both are the same material.
+- **One shelf on the door, not two. "Up next" goes.** The unopened books belong
+  to the Library, which is one tap away in the half's own footer and holds all
+  of them with search and filters. The door keeps "Also reading", which is the
+  one list the Library cannot show at a glance: what is already in progress.
+- **The cover stands at `38dvh`, and shrinks rather than overflows.** The book
+  is what the half is about. `flex: 0 1 auto` with `min-height: 0` is what keeps
+  the taller cover honest in the even split: a shrinkable item gives way, and
+  `width: auto` lets the aspect ratio take the width down with the height.
+- **The book and the words start on the same line.** Both columns are
+  top-aligned, so the cover's top edge and the title's first line agree. On the
+  shelf, a title block is two lines whether the title needs two or one, so every
+  "% read" below sits on the same line across the row.

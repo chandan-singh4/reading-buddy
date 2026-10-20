@@ -463,19 +463,36 @@
  * screen reads as cut off rather than as standing there. Reported 2026-10-20.
  */
 /* The book and its measure, as one column. The bar below takes its width from
-   the cover above it, which is what makes the two read as one object. */
+   the cover above it, which is what makes the two read as one object.
+
+   Top-aligned, not centred: the cover's top edge and the title's first line now
+   start on the same line, which is what "aligned" means on a door whose left
+   half is one tall object and whose right half is a stack of short ones. */
 .coverSide {
   flex: 0 0 auto;
-  align-self: center;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   gap: var(--space-2);
   min-width: 0;
+  min-height: 0;
 }
 
+/*
+ * `38dvh`, up from 30: the book is what the half is about, and on a tall phone
+ * 30 left it small against the room the open half gives it.
+ *
+ * `flex: 0 1 auto` with `min-height: 0` is what keeps that honest. In the even
+ * split the half is half as tall, and 38dvh plus the bar below would not fit;
+ * a shrinkable item gives way instead of overflowing, and `width: auto` lets
+ * the aspect ratio take the width down with the height.
+ */
 .coverLink {
+  flex: 0 1 auto;
   display: block;
-  height: 30dvh;
+  height: 38dvh;
+  min-height: 0;
   width: auto;
   aspect-ratio: 2 / 3;
 }
@@ -498,7 +515,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-2);
 }
 
@@ -855,9 +872,13 @@
   color: inherit;
 }
 
+/* Two lines of room whether the title needs two or one, so that every "% read"
+   below sits on the same line across the row. A one-line title used to pull its
+   own figure up and break the row. Reported 2026-10-20. */
 .shelfTitle {
   font-size: var(--text-sm);
   line-height: 1.2;
+  min-height: 2.4em;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;

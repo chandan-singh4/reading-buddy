@@ -552,11 +552,15 @@ describe('the shelves the fold frees', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open the reading half' }))
   }
 
-  it('keeps the shelves off the even door, and names them on the open one', async () => {
-    // Reported 2026-10-20. The even door shows the one book in hand. The
-    // shelves are what the fold pays for, and each one says what it holds:
-    // an unnamed row mixed the books the reader had started with the ones
-    // they had not.
+  it('keeps the shelf off the even door, and names it on the open one', async () => {
+    // Reported 2026-10-20. The even door shows the one book in hand. The shelf
+    // is what the fold pays for, and it says what it holds.
+    await repository.savePosition(
+      BOOKS[1]!.id,
+      { chapter: 0, block: 0 } as never,
+      19,
+      '2026-08-29T09:00:00.000Z',
+    )
     await repository.savePosition(
       BOOKS[0]!.id,
       { chapter: 0, block: 0 } as never,
@@ -569,27 +573,25 @@ describe('the shelves the fold frees', () => {
       </MemoryRouter>,
     )
     await screen.findByText('The Wind in the Willows')
-    expect(shown().queryByRole('heading', { name: 'Up next' })).toBeNull()
+    expect(shown().queryByRole('heading', { name: 'Also reading' })).toBeNull()
 
     fireEvent.click(shown().getByRole('button', { name: 'Open the reading half' }))
-    expect(shown().getByRole('heading', { name: 'Up next' })).toBeDefined()
-    // Only one book was ever opened, so there is nothing else in progress.
-    expect(shown().queryByRole('heading', { name: 'Also reading' })).toBeNull()
-  })
-
-  it('puts a second book in progress on its own shelf, not among the unread', async () => {
-    await repository.savePosition(
-      BOOKS[1]!.id,
-      { chapter: 0, block: 0 } as never,
-      19,
-      '2026-08-29T09:00:00.000Z',
-    )
-    await openReading()
-
     expect(shown().getByRole('heading', { name: 'Also reading' })).toBeDefined()
     expect(shown().getByText('19% read')).toBeDefined()
-    // Every book has been opened, so nothing is waiting unread.
+  })
+
+  it('leaves the unopened books to the Library, and prints no shelf for them', async () => {
+    // Reported 2026-10-20: only the books already in progress belong here.
+    // Every unopened book is one tap away in the footer, where search and
+    // filters are, so a second shelf of them on the door earned nothing.
+    await openReading()
+
     expect(shown().queryByRole('heading', { name: 'Up next' })).toBeNull()
+    // Breath was never opened, so it is nowhere on the door.
+    expect(shown().queryByText('Breath')).toBeNull()
+    expect(shown().getByRole('link', { name: /Library \(2\)/ })).toBeDefined()
+    // Nothing else is in progress either, so no shelf at all.
+    expect(shown().queryByRole('heading', { name: 'Also reading' })).toBeNull()
   })
 })
 
