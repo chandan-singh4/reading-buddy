@@ -483,17 +483,22 @@ function ReadingHalf({
               {/* Decorative: "Continue reading" below reaches the same page,
                   and the title above it names the book. Two targets for one
                   job, because thumbs reach differently. */}
-              <Link
-                to={`/book/${current.book.id}`}
-                className={styles.coverLink}
-                aria-hidden="true"
-                tabIndex={-1}
-              >
-                <ShelfCover entry={current} />
-              </Link>
+              <div className={styles.coverSide}>
+                <Link
+                  to={`/book/${current.book.id}`}
+                  className={styles.coverLink}
+                  aria-hidden="true"
+                  tabIndex={-1}
+                >
+                  <ShelfCover entry={current} />
+                </Link>
+                {/* Under the book, the width of the book. The bar is a fact
+                    about this object, so it belongs against it rather than
+                    stacked with the words. */}
+                {current.percent !== undefined && <Progress percent={current.percent} />}
+              </div>
 
               <div className={styles.readColumn}>
-                {current.percent !== undefined && <Progress percent={current.percent} />}
                 <h1 className={styles.bookTitle}>{current.book.title}</h1>
                 <Link to={`/book/${current.book.id}`} className={styles.resume}>
                   Continue reading →
@@ -808,6 +813,10 @@ interface Finish {
  * "76% · where you stopped" spent a line of the board on four words that the
  * bar says on its own. The numeral stays because a bar alone cannot be read to
  * the percent, and a reader who wants the figure wants the figure.
+ *
+ * It sits under the cover, the width of the cover. Above the title it was one
+ * more line in a stack of lines; against the book it reads as a measure of
+ * that book. Reported 2026-10-20.
  */
 function Progress({ percent }: { percent: number }) {
   return (

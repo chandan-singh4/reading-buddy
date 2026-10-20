@@ -459,12 +459,20 @@
  * It no longer bleeds off the left edge. A book pressed against the side of the
  * screen reads as cut off rather than as standing there. Reported 2026-10-20.
  */
-.coverLink {
+/* The book and its measure, as one column. The bar below takes its width from
+   the cover above it, which is what makes the two read as one object. */
+.coverSide {
   flex: 0 0 auto;
   align-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.coverLink {
   display: block;
   height: 30dvh;
-  max-height: 100%;
   width: auto;
   aspect-ratio: 2 / 3;
 }
@@ -503,7 +511,9 @@
  * percent, set inline.
  */
 .progress {
-  align-self: stretch;
+  /* Stops where the cover stops, not where its fore edge does: the bar measures
+     the book, so it lines up with the cover's own left and right. */
+  width: 100%;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -608,16 +618,6 @@
   color: var(--color-text-muted);
 }
 
-.coverArt {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  border-radius: 0 var(--radius-md) 0 0;
-  overflow: hidden;
-  box-shadow: 4px 0 18px color-mix(in srgb, var(--color-board) 70%, transparent);
-}
-
 /*
  * A book, not a picture of one. Carried back from the shelf this door replaced.
  *
@@ -638,10 +638,10 @@
  * The gloss is deliberately faint. A glassy highlight would look like a stock
  * illustration of a book instead of a book.
  */
+.coverArt,
 .shelfArt {
   position: relative;
   display: block;
-  aspect-ratio: 2 / 3;
   /* Barely rounded at the spine, properly rounded at the fore edge — the shape
      a bound book actually has. */
   border-radius: 2px var(--radius-sm) var(--radius-sm) 2px;
@@ -659,8 +659,40 @@
     0 2px 4px rgb(0 0 0 / 0.16);
 }
 
+.shelfArt {
+  aspect-ratio: 2 / 3;
+}
+
+/*
+ * The book in hand is the same shell, at twice the size.
+ *
+ * It fills the box its link already sizes, so it takes no aspect ratio of its
+ * own. The page block is nine leaves rather than six: on a cover this wide, six
+ * hairlines read as one, and the point of the block is that it has leaves. The
+ * weight under it grows to match — a bigger object casts a bigger shadow, and
+ * the shelf's shadow under this book would leave it floating.
+ */
+.coverArt {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-shadow:
+    1px 0 0 0 #fbf6ec,
+    2px 0 0 0 #e9dfcd,
+    3px 0 0 0 #fbf6ec,
+    4px 0 0 0 #e2d6c0,
+    5px 0 0 0 #f6f0e3,
+    6px 0 0 0 #e9dfcd,
+    7px 0 0 0 #fbf6ec,
+    8px 0 0 0 #e2d6c0,
+    9px 0 0 0 #cfc1a7,
+    0 16px 24px -10px rgb(0 0 0 / 0.5),
+    0 3px 6px rgb(0 0 0 / 0.2);
+}
+
 /* The art is printed *on* the book: it takes the shell's shape and gives up any
    shadow of its own, which inside a book would read as a second object. */
+.coverArt > *,
 .shelfArt > * {
   display: block;
   width: 100%;
@@ -671,6 +703,7 @@
 
 /* The spine. A dark fold at the very edge easing into a thin highlight where
    the cover starts to curve away from it. */
+.coverArt::before,
 .shelfArt::before {
   content: '';
   position: absolute;
@@ -691,6 +724,7 @@
 
 /* The cover's own curve: light catching the top-left, the fore edge falling
    away into shade. */
+.coverArt::after,
 .shelfArt::after {
   content: '';
   position: absolute;

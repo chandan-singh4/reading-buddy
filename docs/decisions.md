@@ -3694,3 +3694,12 @@ seven faults. Each fix below reverses or narrows an earlier choice.
   make neither of them the answer. The forecast is two marked figures, a flag
   for the day and a clock for the pace. Each drawn figure carries an
   `aria-label`, so what the eye reads as a picture the ear still reads as words.
+- **The book in hand wears the same shell as the shelf.** Spine, page block,
+  weight and gloss are written once for `.coverArt` and `.shelfArt` together.
+  The hero gets nine leaves rather than six, and a bigger shadow: on a cover
+  twice the width, six hairlines read as one, and the shelf's shadow under a
+  book this size leaves it floating.
+- **The percent bar sits under the cover, the width of the cover.** Above the
+  title it was one more line in a stack of lines. Against the book it reads as a
+  measure of that book. It stops where the cover stops, not where the fore edge
+  does.
