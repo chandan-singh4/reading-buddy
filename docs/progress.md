@@ -39,7 +39,13 @@ Breadth is now allowed.
   undeployed. To prove a deploy: fetch the live `index.html`, read the
   `assets/index-*.js` hash, and compare it with the one in `web/dist`.
 - **Nothing mid-edit.** Everything below is merged and pushed. Build green:
-  2,613 tests across 162 files.
+  2,702 tests across 171 files.
+- **One question open, waiting on the reader.** The ☰ drawer lists Home,
+  Library, Stats and Settings. The reader asked whether those belong to the
+  journal half at all. My counter-proposal: keep the ☰ where it is and let its
+  list follow the open half — reading gives Home, Library, Stats, Settings; the
+  journal gives Home, Archive, Settings; even gives all of them. Not answered,
+  so not built.
 - **No ceiling on spending — accepted, because every model is free.** Two
   models run unasked (the Scribe and the digest). The queue skips finished work
   and only the most recently opened book runs by itself. There is no cap beyond
@@ -74,31 +80,27 @@ Breadth is now allowed.
   older than the work that found it. `Reader.test.tsx` → "crosses into the next
   chapter" failed one time on 2026-09-25 and has passed since. Cause not found
   for either. The first is worth a small task of its own.
+  A third shape of the same thing: a full run fails exactly one test, and which
+  test it is changes between runs (`tabHistory`, `Reader`). Each passes alone,
+  and it reproduces on an untouched `HEAD`. It is load order, not the work.
 
 ### Recently done
 
-- **The reading half, redesigned on the mockup (2026-10-20).** Build green:
-  2,702 tests across 171 files. The mockup the reader approved first is
-  `docs/mockups/reading-open.html`.
-  - The book in hand sits in a card: cover on the left, words on the right, one
-    edge around both.
-  - The cover is back at `7.25rem`. The growth was for the shelf books.
-  - "Continue reading" is now the amber button. "Chapter summaries" stays an
-    outlined pill under it.
-  - The progress bar closes the card, under the finish figures, with
-    "N% complete" beneath it.
-  - Each book on the shelf has a card of its own, `8.75rem` wide, with the same
-    measure drawn thinner.
-  - The streak is beside the two hours, with a flame on it. It spent part of the
-    day in the top bar and came back: that bar is shared with three other
+- **The reading half, after two looks on a phone (2026-10-20).** Build green:
+  2,702 tests across 171 files. The reader approved a mockup first, and it is
+  kept in step with the build: `docs/mockups/reading-open.html`.
+  - The book in hand sits in a card, centred in it: cover and measure on the
+    left, words on the right, one edge around both.
+  - The cover is `7.25rem`. The growth the reader asked for was for the shelf
+    books, which are now cards `8.75rem` wide with a measure of their own.
+  - "Continue reading" is the one filled button, in amber. "Chapter summaries"
+    and a new "Book details" are outlined pills under it. "Book details" takes
+    the route the ⓘ circle used to.
+  - The streak sits beside the two hours, with a flame on it. It spent part of
+    the day in the top bar and came back: that bar is shared with three other
     screens.
-  - The card centres the book and its words, so there is no empty panel below
-    the book.
-  - The measure sits under the cover, the width of the cover.
-  - "Book details" is a button now. It was a ⓘ in a circle.
-  - Fixed on the way past: two rules in `Home.module.css` lost their `.read` and
-    `.write` scope in an earlier edit, so both halves took the last one and the
-    board's footer link read in the reader's accent.
+  - Fixed on the way past: two rules in `Home.module.css` had lost their `.read`
+    and `.write` scope, so both halves took the last one.
   - The journal half, the bridge and the fold are untouched.
 
 - **The front door, after the first look on a phone (2026-10-19).** Build
@@ -169,41 +171,6 @@ Breadth is now allowed.
   - **A heading stands over its own content.** `applyOutline` searched three
     paragraphs for the outline's title and gave up; it now searches to the end
     of the page.
-
-- **Open the model roster up (2026-10-16).** Not a waypoint.
-  - The rosters are fetched live, every hour. Nothing is hardcoded.
-  - **Why only six free OpenRouter models:** both OpenRouter and Groq were
-    asked for tool-capable models. The relay sends no tools, and "Still true?"
-    uses a plugin that needs none. Both filters are gone.
-  - `gemini-3.5-flash` and `gemini-3.7-flash` are deprecated but Google still
-    routes them, so they kept passing the probe and showed a second name for
-    one model. A short maintained list drops them.
-  - The default moved to `gemini-3.8-flash`. **Gemini 4 Argon is not the
-    default on purpose:** it is off the free tier ($2/$10 per million). The
-    `limit: 0` probe already drops a model the key cannot reach, so it appears
-    only for a key that can pay. Its rank now sits above Pro.
-
-- **The cloud is the only library** (2026-10-12). Not a waypoint.
-  - Settings no longer shows "Where your library lives" or the library copy.
-    The sign-in screen no longer offers the device library.
-  - The offline copy and the backup sync are unchanged.
-
-- **Restore from vault** (2026-09-23). Not a waypoint.
-  - Settings → "Bring your notes back from Obsidian". The reader picks the
-    export zips or the chapter `.md` files.
-  - The app finds each passage by its words (`relocate`) and puts back the
-    highlights, the notes and the Veda threads. A second run adds nothing.
-  - The vault kept no colours and no dates. Restored highlights are yellow.
-  - Run on the phone on 2026-09-25.
-
-- **Everything the reader makes goes to the cloud** (2026-09-23). Not a
-  waypoint.
-  - Android Chrome cleared the app's storage when the phone was low on space.
-    Notes, highlights, Veda threads and sessions were lost. Only the shelf was
-    in the cloud.
-  - `web/src/storage/sync/` now copies eleven tables to `user_rows`. An emptied
-    device gets them back when it opens.
-  - The lost data can come back only from the Obsidian exports.
 
 ### Blockers
 - **None.** Supabase's email allowance (a few sign-in messages an hour on the
