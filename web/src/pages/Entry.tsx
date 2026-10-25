@@ -33,6 +33,11 @@
  * name and a plain line saying it is not professional advice under every
  * reading rather than once in a settings screen.
  *
+ * Inside that drawer sits one optional line (WP-68): the angle the reader
+ * wants for the next reading. It is state on this screen and nothing else.
+ * It is never written to the entry, to settings, or to the sync, and it is
+ * empty again as soon as a reading comes back.
+ *
  * ## Where it came from
  *
  * An entry told to the Scribe from a page carries the passage (WP-63). It is
@@ -53,7 +58,14 @@ import { Markdown } from '../reader/markdown.tsx'
 import { modelName } from '../reader/tutor.ts'
 import { shapeMark } from '../journal/shapeMark.ts'
 import { CounselMark, LevelMark, VoiceMark } from '../journal/marks.tsx'
-import { askCounsel, COUNSEL_BLURB, COUNSEL_LABEL } from '../journal/counsel.ts'
+import {
+  ANGLE_HINT,
+  ANGLE_LABEL,
+  ANGLE_LIMIT,
+  askCounsel,
+  COUNSEL_BLURB,
+  COUNSEL_LABEL,
+} from '../journal/counsel.ts'
 import {
   shapeEntry,
   SHAPE_BLURB,
@@ -89,6 +101,13 @@ export default function Entry() {
   /** The reading is shut until the reader opens it — the entry is the screen. */
   const [reading, setReading] = useState(false)
   const [asking, setAsking] = useState(false)
+  /**
+   * The angle the reader wants for the *next* reading, and only that one
+   * (WP-68). It lives in this component's state and nowhere else: it is never
+   * written to the entry, to settings, or to the sync, and it is cleared the
+   * moment a reading comes back.
+   */
+  const [angle, setAngle] = useState('')
 
   useEffect(() => {
     if (!entryId) {
@@ -175,7 +194,12 @@ export default function Entry() {
     setFailure('')
     setAsking(true)
     try {
-      const read = await askCounsel(entry.raw)
+      /*
+       * One argument when there is no steer, so the call is the call it always
+       * was. The angle is handed over here and is not saved with the result.
+       */
+      const steer = angle.trim()
+      const read = steer ? await askCounsel(entry.raw, steer) : await askCounsel(entry.raw)
       await entryStore.setCounsel(entry.id, {
         ...(read.angle ? { angle: read.angle } : {}),
         model: read.model,
@@ -185,6 +209,9 @@ export default function Entry() {
       const saved = await entryStore.getEntry(entry.id)
       if (saved) setEntry(saved)
       setReading(true)
+      // Empty again for the next request. Cleared only on success: a reader
+      // whose model would not answer must not also lose what they typed.
+      setAngle('')
     } catch (error: unknown) {
       setFailure(error instanceof Error ? error.message : 'That didn’t work just now.')
     } finally {
@@ -550,6 +577,23 @@ export default function Entry() {
                   <p className={entryStyles.counselFoot}>
                     {modelName(counsel.model)}. One reading, not advice from a professional.
                   </p>
+                  {/*
+                    * One optional line, used once (WP-68). The field starts
+                    * empty by the reader's choice: a prefilled angle would
+                    * steer them back to the frame the model already picked.
+                    */}
+                  <label className={entryStyles.angle}>
+                    <span className={entryStyles.angleLabel}>{ANGLE_LABEL}</span>
+                    <input
+                      type="text"
+                      className={entryStyles.angleField}
+                      value={angle}
+                      maxLength={ANGLE_LIMIT}
+                      placeholder="Optional — say how you want it read"
+                      onChange={(event) => setAngle(event.target.value)}
+                    />
+                    <span className={entryStyles.angleHint}>{ANGLE_HINT}</span>
+                  </label>
                   <div className={entryStyles.counselActions}>
                     <button
                       type="button"

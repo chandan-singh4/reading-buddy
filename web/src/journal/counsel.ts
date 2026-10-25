@@ -25,6 +25,17 @@
  * `raw`, never `shaped`. An opinion on a model's rewrite of what the reader
  * said is an opinion on the wrong text, and the reader would have no way to
  * know which one it read.
+ *
+ * ## The reader can steer one reading (WP-68)
+ *
+ * The angle stays automatic by default, because most of the time the reader
+ * does not know what they are looking for — that is why they are writing. But
+ * on the entry where they do know, a second reading can be asked for from an
+ * angle they name.
+ *
+ * It rides in the one user message and nowhere else. Nothing about it is
+ * stored: not on the entry, not in settings, not in the sync. A stored angle
+ * is the fixed lens list this feature exists to avoid, arrived at by accident.
  */
 
 import { askJournal, headingOf, withoutHeading } from './relay.ts'
@@ -41,6 +52,15 @@ export interface Counselling {
 /** What the reader presses, and what the screen calls the result. */
 export const COUNSEL_LABEL = 'Read it back to me'
 
+/** The most a steer may be. One line of steering, not a second entry. */
+export const ANGLE_LIMIT = 200
+
+/** The optional line beside "Read it again" (WP-68). */
+export const ANGLE_LABEL = 'Read it from a particular angle'
+
+/** Said beside the field, because an angle that looked stored would mislead. */
+export const ANGLE_HINT = 'This reading only. Nothing is saved.'
+
 /** One line under the button, so the reader knows what they are asking for. */
 export const COUNSEL_BLURB =
   'A free model reads your words, says how it is reading them, and gives one opinion. It is not advice from a professional.'
@@ -51,8 +71,8 @@ export const COUNSEL_BLURB =
  * Rejects rather than returning a canned line, for the reason `shapeEntry`
  * does: an apology stored as an opinion on an entry is worse than no opinion.
  */
-export async function askCounsel(raw: string): Promise<Counselling> {
-  const read = await askJournal('counsel', raw, 'Read this entry back to me.')
+export async function askCounsel(raw: string, angle?: string): Promise<Counselling> {
+  const read = await askJournal('counsel', raw, request(angle))
   const body = read.text
 
   /*
@@ -60,8 +80,28 @@ export async function askCounsel(raw: string): Promise<Counselling> {
    * nothing but a heading is a model that misread the job, and taking its one
    * line away would store a reading with nothing in it.
    */
-  const angle = headingOf(body)
-  const rest = angle ? withoutHeading(body) : ''
-  if (angle && rest) return { angle, text: rest, model: read.model }
+  const chose = headingOf(body)
+  const rest = chose ? withoutHeading(body) : ''
+  if (chose && rest) return { angle: chose, text: rest, model: read.model }
   return { text: body, model: read.model }
+}
+
+/**
+ * The one message the model is sent, with the reader's angle in it or without.
+ *
+ * The angle is a steer, not a command: the model still names the frame it
+ * read from, and it still says so when the angle does not fit the entry. An
+ * angle that could overrule the guard rails would be a way to ask the Counsel
+ * for a diagnosis by the back door.
+ */
+function request(angle?: string): string {
+  const steer = angle?.trim().slice(0, ANGLE_LIMIT).trim()
+  if (!steer) return 'Read this entry back to me.'
+  return [
+    'Read this entry back to me.',
+    '',
+    `For this reading only, I am asking you to read it from this angle: ${steer}`,
+    '',
+    'Read it from that angle where the entry supports it. Still say in your H1 how you are reading the entry. Where the angle does not fit what I actually wrote, say so plainly in one clause and read the entry the way it asks to be read. Every one of your rules still holds, and the angle does not change any of them.',
+  ].join('\n')
 }

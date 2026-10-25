@@ -362,6 +362,59 @@ describe('Entry', () => {
       expect(await screen.findByRole('button', { name: /Read it back to me/ })).toBeTruthy()
     })
 
+    // WP-68 — the reader steers one reading.
+    it('hands the typed angle to that one request, and stores nothing of it', async () => {
+      const entry = await entryStore.addEntry({ raw: 'i had the same dream again' })
+      await db.entries.update(entry.id, { counsel: READING })
+      counselled.mockResolvedValue(READING)
+
+      openEntry(entry.id)
+
+      fireEvent.click(await screen.findByRole('button', { name: /A decision already made/ }))
+      // The field starts empty, by the reader's choice: a prefilled angle
+      // would steer them back to the frame the model already picked.
+      const field = screen.getByLabelText(/Read it from a particular angle/)
+      expect((field as HTMLInputElement).value).toBe('')
+
+      fireEvent.change(field, { target: { value: 'from a Jungian angle' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Read it again' }))
+
+      await waitFor(() => {
+        expect(counselled).toHaveBeenCalledWith('i had the same dream again', 'from a Jungian angle')
+      })
+
+      // Nothing about the angle reaches the row. A stored angle is the fixed
+      // lens list this feature exists to avoid, arrived at by accident.
+      const saved = await db.entries.get(entry.id)
+      expect(JSON.stringify(saved)).not.toContain('Jungian')
+      // And the field is empty again for the next request.
+      await waitFor(() => {
+        expect((screen.getByLabelText(/Read it from a particular angle/) as HTMLInputElement).value)
+          .toBe('')
+      })
+    })
+
+    it('keeps the typed angle when no model would answer', async () => {
+      const entry = await entryStore.addEntry({ raw: 'i had the same dream again' })
+      await db.entries.update(entry.id, { counsel: READING })
+      counselled.mockRejectedValue(new Error('The free models are busy.'))
+
+      openEntry(entry.id)
+
+      fireEvent.click(await screen.findByRole('button', { name: /A decision already made/ }))
+      fireEvent.change(screen.getByLabelText(/Read it from a particular angle/), {
+        target: { value: 'from a Jungian angle' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Read it again' }))
+
+      expect(await screen.findByText('The free models are busy.')).toBeTruthy()
+      // A reader whose model would not answer must not also lose what they
+      // typed.
+      expect(
+        (screen.getByLabelText(/Read it from a particular angle/) as HTMLInputElement).value,
+      ).toBe('from a Jungian angle')
+    })
+
     it('says so when no model will answer, and stores nothing', async () => {
       const entry = await entryStore.addEntry({ raw: 'i already booked it' })
       counselled.mockRejectedValue(new Error('The free models are busy.'))

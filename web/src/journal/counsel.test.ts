@@ -6,7 +6,7 @@
 // its own.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-import { askCounsel } from './counsel.ts'
+import { ANGLE_LIMIT, askCounsel } from './counsel.ts'
 
 vi.mock('../storage/cloud/client.ts', () => ({
   accessToken: async () => 'a-token',
@@ -102,4 +102,37 @@ it('refuses rather than storing an apology as an opinion', async () => {
 
 it('will not ask about an empty entry', async () => {
   await expect(askCounsel('   ')).rejects.toThrow(/no words/)
+})
+
+// WP-68 — the reader steers one reading.
+it('sends the angle the reader typed, for that one request', async () => {
+  const fetched = relaySays({ t: 'done', reply: { text: READING, model: 'a/b:free' } })
+
+  await askCounsel('i had the same dream again', 'from a Jungian angle')
+
+  const sent = JSON.parse(String((fetched.mock.calls[0]?.[1] as RequestInit).body))
+  expect(sent.userMessage).toContain('from a Jungian angle')
+  // A steer, never a licence. The guard rails in the module prompt stand.
+  expect(sent.userMessage).toContain('Every one of your rules still holds')
+  // The entry itself is untouched by the steer.
+  expect(sent.excerpt).toBe('i had the same dream again')
+})
+
+it('asks the plain way when no angle is given, or the field was left blank', async () => {
+  const fetched = relaySays({ t: 'done', reply: { text: READING, model: 'a/b:free' } })
+
+  await askCounsel('i had the same dream again', '   ')
+
+  const sent = JSON.parse(String((fetched.mock.calls[0]?.[1] as RequestInit).body))
+  expect(sent.userMessage).toBe('Read this entry back to me.')
+})
+
+it('cuts an angle that is long enough to be a second entry', async () => {
+  const fetched = relaySays({ t: 'done', reply: { text: READING, model: 'a/b:free' } })
+
+  await askCounsel('a thought', 'x'.repeat(400))
+
+  const sent = JSON.parse(String((fetched.mock.calls[0]?.[1] as RequestInit).body))
+  expect(sent.userMessage).toContain('x'.repeat(ANGLE_LIMIT))
+  expect(sent.userMessage).not.toContain('x'.repeat(ANGLE_LIMIT + 1))
 })
